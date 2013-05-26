@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cutting GUI</title>
+<link rel="stylesheet" type="text/css" href="main.css">
+</head>
+
+<body>
+
+<div class="file_drop">
+<div id="filestem_caption"></div>
+<div class="file_drop_text">drag one or more of the following here: 
+<b><br>tetrode and cut files | pos file</b><br>
+you can drag further files onto the window at any point<br>
+<button class="help_button">help</button>
+<button id="filesystem_button">turn on FileAPIs</button>
+<button id="filesystem_load_button" style="display: none;">use existing files</button>
+</div>
+</div>
+
+<div class="side_panel">
+
+<div class="side_panel_row">
+<b>button panel</b>
+<div class="toggle_panel" id="button_panel_toggle"></div>
+
+<div id="button_panel" class="collapsable_panel">
+	<div class="button_group">
+	<button id="reset_button">reset &amp; refresh</button>
+	<button class="help_button">help</button>
+	</div>
+
+	<div class="button_group">
+	<input type="text" id="xsize_input" value="2" size ="1">
+	<input type="text" id="ysize_input" value="2" size ="3">
+	<button id="apply_size">set size</button>
+	<button id="toggle_palette">toggle palette</button> 
+	</div>
+
+	<div class="button_group">
+		<input type="checkbox" name="channel" id="channel1" value="1" /><label for="channel1">1</label>
+		<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">2</label>
+		<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">3</label>
+		<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">4</label>
+		[Channel]
+	</div>
+
+	<div class="button_group">
+	<button id="reorder">Reorder</button>
+	<button id="autocut">Autocut (sample)</button>
+	<span id="autocut_caption"></span>
+	</div>
+
+</div>
+</div>
+
+<div class="side_panel_row">
+<div class="toggle_panel" id="files_panel_toggle"></div>
+<B>available files</B><br>
+<div class="collapsable_panel" id="files_panel">
+</div>
+</div>
+
+<div class="side_panel_row">
+<div class="toggle_panel" id="spatial_panel_toggle"></div>
+<B>pos data</B><br>
+<div style="text-align:center;" class="collapsable_panel" id="spatial_panel" state="closed">
+    <canvas id="posplot" width="200" height="200"></canvas> 
+</div>
+</div>
+
+<div class="side_panel_row">
+<div class="toggle_panel" id="action_panel_toggle"></div>
+<B>action list</B><br>
+<div class="collapsable_panel" id="action_panel" state="closed">
+<div class='undo' style="display:none;">Undo</div>
+</div>
+</div>
+
+
+<div class="side_panel_row">
+<div id="info_panel" class="scrollable_area">
+<B>file info and headers</B><br>
+</div>
+</div>
+</div>
+
+<div class="tilewall">
+</div>
+
+<div class="bar">
+</div>
+<div class="help_background" style="display:none;"></div>
+<div class="help_panel_wrapper" style="display:none;">
+<div class="help_panel" >
+<div class="help_title">Help</div> <button class="close_help_button">close</button>
+<div class="help_body">
+<br>
+<u>About the application</u>
+<p>Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so.</p>
+
+
+<u>Changes</u>
+<ul>
+<li>Several sections of code have been restructured to make them more modular and easier to use.</li>
+
+<li>Can now toggle each channel on and off, by holding ctrl key when selecting channels in the button pane.</li>
+
+<li>Modified the webgl waveform rendering so that it now renders each channel separately, this simplifies the code and probably ought to be faster. (I'm too sure if it is faster because rendering times are very inconsistent.)</li>
+
+<li>Implemented (basic) multi-experiment, multi-tetrode functionality. Need to extend this to multi-cut functionality.</li>
+
+<li>Implemented reorder together with undo function.</li>
+
+<li>Have implemented an undo panel and undo button.  This is relatively simple for merging, but may be more complicated for other things.</li>
+
+<li>Have actually implemented merge.  Hooray, you can now use the program for something!</li>
+
+<li>Have added a button to toggle useage of HTML5 FileSystem.  The main reason for using it is for reloading the page on debugging, probably not that important for other users.</li>
+
+<li>Have now implemented rendering with WebGl, it's really complicated and doesn't seem to be any faster.  Also it's still pretty rough around the edges.</li>
+
+<li>Can now display path data in the spatial panel on the left.   The impelementation of this is currently fairly ruidmentary: it only uses the first tracking LED, doesn't do any filtering and may not match the path shown in Tint. </li>
+
+<li>A heirarchical autoclusering method has been partially implemented. See below. </li>
+
+<li>Can now drag cut file back onto the desktop to save it. </li>
+</ul>
+
+<u>Loading files</u>
+<p>
+To begin, use your operating system's native file explorer (e.g. Windows Explorer) to select a cut file and tetrode file and drag and drop them into the window here.</p>
+<p>You then need to click on the box with the experiment's name in the "available files" panel.  If you drag in multiple tetrodes and multiple experimental files they should automatically organise themselves in this panel.<p>
+
+<p>You will see the waveforms for each cut group appear in the "tilewall" on the right.  The colours of the waves do not correspond to anything meaningful, they are just an aide to help show the variety of shapes in the group.  If you click the "toggle palette" button all the waves within each group are shown in the same color.</p>
+<div style="text-align:center">
+<img width="400" src="screenshot1.png"/><br>
+<i>screenshot showing the main areas of the application</i>
+</div>
+
+<p>
+<u>The splitter tool [doesn't do anything]</u>
+<p>
+Hold down the right mouse button on a tile (or use the left button and the ctrl key if using a touchpad) to bring up the splitter tool.  Currently it doesn't actually do anything, but the idea is that you will use the orange target to specify a time in the wave and an amplitude at which to divide the group: all waves below the amplitude at the given time will go into one group and all the waves above the amplitude at that point will go into another group.
+</p>
+<div style="text-align:center">
+<img width="150" src="splitter.png"/><br>
+<i>using the splitter tool</i>
+</div>
+
+<u>The merger tool</u>
+<p>Hold down the left mouse button on a tile to begin dragging the tile.</p>
+<div style="text-align:center">
+<img width="150" src="merger1.png"/><br>
+<i>start of using the merger tool</i>
+</div>
+
+<p>When you get near to another tile the waveforms will "lock on" and align, the border of the tile also switches from orange to gray to let you know. The locking on does not mean the two groups match; it is up to the user to decide if there is a match.  Currently nothing happens when you release the mouse button, but the idea is that if you are locked on to another tile you will merge the two groups into a single new group.</p>
+<div style="text-align:center">
+<img width="150" src="merger2.png"/><br>
+<i>the merger tool locking on to a tile</i>
+</div>
+
+<u>Switching view</u>
+<p>In the button panel there is a row of buttons that allows you to switch between the waveforms on each of the four channels.  You can also show all 4 channels simulatenously.</p>
+
+<u>Settings and data storage</u>
+<p>Chrome exposes the HTML5 FileSystem API which allows the page to store its own private files during and across sessions.  To turn it on click the button that apepars when you first open the page.  Without it everything should still function but more memory will be used.</p>
+
+<p>Currently the application stores various settings and data in localStorage (which is distinct from the FileSystem API).   If you encounter a problem you may need to click the "reset &amp; refresh button".</p>
+
+<u>Heirarchical Autoclustering</u>
+<p>
+The implementation is only partially complete: it just uses the data from the currently viewed channel (i.e. you cannot cut on multiple channels); more importantly, it only produces clusters for a random sample of 1024*6 spikes.
+Getting this far took quite a bit of effort, but finishing off the method should be relatively easy (though will likely still take a reasonable amount of time to code).
+There are basically 5 stages, the first 3 of which have been implemented, though they require some gneralisations:
+<ol>
+<li>Compute full distance matrix for about 6000 waveforms, taking the sum of absolute differences along the length of the waves. [This is runs fast here as it uses the GPU, Matlab is relatively quick on the CPU but does take a resonable amount of time.]</li>
+<li>Build the heierarchy for the 6000 waveforms, for the distance metric use the average distance from waves in one group to waves in the other group.  To get the hierarchy, iteratively combine the two closest groups until there is only one group. [This is slow in javascript, but fast in Matlab's mex routine.]</li>
+<li>Partition the 6000 waveforms into groups, using the hierarchy.  This is relatively simple, we just cut the heierachy into sections so that no group has more than a certain number of leaves.  This does mean that some groups will have only a very small number of leaves (i.e. spikes) but it generally is a major problem.</li>
+<li>For the remaining waveforms, compute the distance matrix to the initial 6000 waves. [To do this efficiently need to sort the 6000 waves by group, and zero-pad them into blocks of 32.  Can then do partial sums on the GPU and thus transfer less data back to the CPU - the next step only needs to know the sums (or means) across groups, not the individual values in the distance matrix]</li>
+<li>For all waveforms, find the mean distance to each of the groups and choose the nearest group as the group for that waveform. [Once the previous step has been completed this should be pretty simple.]</li>
+</ol>
+</p>
+
+<u>WebGL waveform rendering</u>
+<p>
+A hidden canvas, with a web-gl contex and of size 1024x1024, is used as a buffer on which to render waveforms for several groups at a time.  From this we can then copy subimages to all the little canvases that are actually visible.  Note that because we cannot fit all the groups onto one 1024x1024 buffer we have to page through sets of groups.
+</p>
+<p>The rendering operation works as follows:<ol>
+<li>For each channel, fill a buffer with data:  each item in the buffer is 5 bytes long, where the first byte is the time within the wave (i.e. the x-coordiante, 0-49) the second byte is the voltage (i.e. 0-255). Bytes 3-5 are a manually encoded little-endian index to say which spike event the item belongs to. Each wave consists of 50 of these 5-byte values plus one extra item at the start and one extra item at the end.  These end "caps" have the same voltage value as the start and end of the wave respectively, but are given special x values to tell the shader that they are the caps...keep reading...</li>
+<li>Generate a texture (i.e. a 2d-array) which has two bytes for each spike event, the first byte gives a group id (thus the maximum number of groups is 256) and the second byte gives a colormap id, this allows you to render waves within the group in different colors.</li>
+<li>Copy the four channel buffers and the texture to the GPU, plus two textures to be used as a colormaps (there is a choice).</li>
+<li>For each page of groups, clear all the visible canvases. Then for each channel we want to view we clear the hidden large canvas and render the vertices to it in batches of about 2million at a time.</li>
+</ol>
+Inside the shader, we check to see if the current vertex is an end cap, if so we shift it into negative z and set its x value appropriately.  By shifting it into negative-z, which is not rendered, we ensure that the lines joining waves are not rendered. We use the three-byte manually-encoded index to work out where to lookup the two spike event values. The first of these values tell us the group number, and thus we can work out the offset for the vertex (what row and column its group is on the large canvas).  The second value tells us what colormap index to use (though in palette mode B we use the group itself for palette lookups).
+</p>
+<u>TODOS</u>
+<ul>
+<li>Fix bug - the partitioning of the hierarchy sometimes produces ghost groups (see test data set, actually might be because there are less than 6K waves)</li>
+<li>Fix bug - after switching between tetrodes or experiments need to clear the old cutInds if there are no new ones.</li>
+<li>Tie the new cut and action list to a single experiment and tetrode and alow user to switch between them and save individual ones.</li>
+<li>Explore the possibility of doing autocorrelations with WebGL</li>
+<li>Finish the autoclustering by implementing the assign-remainder-to-group step.</li>
+</ul>
+<br><br>
+</div>
+</div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>  
+<script src="main.js"></script>
+<script src="tool.js"></script>
+<script src="parsefiles.js"></script>
+<script src="filesystem.js"></script>
+<script src="ratemap.js"></script>
+<script src="save_cut.js"></script>
+<script src="fileorganiser.js"></script>
+<!-- <script src="webgl-debug.js"></script> -->
+<script src="gpu-distmatrix.js"></script>
+<script src="autocut.js"></script>
+
+<script src="webgl-waveforms.js"></script>
+
+</body>
+</html>
