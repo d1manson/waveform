@@ -154,12 +154,40 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     	console.time('agglomorate');
     	
     	$caption.text('linkage...');
-    	workerLinkage.postMessage(dist);
+    	workerLinkage.postMessage(dist,[dist]);
     }
     
-    
+	// This last bit is for debugging only 
+	var debugCanvas = null;
+	var ImagescDist = function(){
+		if (debugCanvas == null){
+			debugCanvas =  $('<canvas/>', {heiGht: 1024, widtH: 1024});
+			debugCanvas.css({position:"absolute",left:"200px", background:"#0f0"});
+			$('body').append(debugCanvas);
+			debugCanvas = debugCanvas.get(0);
+		}
+		
+		(function(data16){ //note that this only shows the top-left 1024x1024 section of the matrix
+			var ctx = debugCanvas.getContext('2d');
+			var imageData = ctx.getImageData(0, 0, L, L);
+			var data8 = imageData.data;
+			
+			for (var y = 0; y < 1024; ++y) 
+				for (var x = 0; x < 1024; ++x) {
+					var ind =  (y * L+ x) * 4;
+					data8[ind+1] = data8[ind+2] = data8[ind] = data16[y*L +x] >> 3;
+					data8[ind+3] = 255;
+					if(data16[y*L +x] == Math.pow(2,16)-1)
+						data8[ind] = 0;
+				}
+			ctx.putImageData(imageData, 0, 0);
+			
+		})(new Uint16Array(sampDist));
+	}
+	
     return {
-        DoAutoCut: ComputeDistMatrix
+        DoAutoCut: ComputeDistMatrix,
+		ImagescDist: ImagescDist //for debugging only
     }
 
 }($('#autocut_caption'),T.BYTES_PER_SPIKE,T.DM.ComputeMatrix)

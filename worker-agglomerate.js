@@ -18,8 +18,8 @@ self.onmessage = function(e) {
 		N = data.N;
 	}else{
 		// otherwise data is ArrayBuffer
-		dist = new Uint16Array(data);
-		var ret = Agglomerate(N,dist);
+		var ret = Agglomerate(N,new Uint16Array(data));
+		data = null; //this destroys the distance matrix entierly, since there was only ever one copy (it was passed to the worker and released from the main thread)		
 		self.postMessage(ret);
 	}
 }
@@ -128,29 +128,3 @@ function Agglomerate(N,dist) {
 		return {aInd: childA, bInd: childB, aDescCount: desA, bDescCount: desB, dist: joinDist};
 }
 
-
-/*
-var imagesc = function(){
-	var canvas =  $('<canvas/>', {heiGht: 1024, widtH: 1024});
-	canvas.css({position:"absolute",background:"#0f0"});
-	$('body').append(canvas);
-	canvas = canvas.get(0);
-	
-	return function(data16){
-		var ctx = canvas.getContext('2d');
-		var imageData = ctx.getImageData(0, 0, 1024, 1024);
-		var data8 = imageData.data;
-		
-		for (var y = 0; y < 1024; ++y) 
-			for (var x = 0; x < 1024; ++x) {
-				var ind =  (y * 1024 + x) * 4;
-				data8[ind+1] = data8[ind+2] = data8[ind] = data16[y*1024 +x] >> 3;
-				data8[ind+3] = 255;
-				if(data16[y*1024 +x] == Math.pow(2,16)-1)
-					data8[ind] = 0;
-			}
-		ctx.putImageData(imageData, 0, 0);
-		
-	}
-}();
-*/

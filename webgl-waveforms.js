@@ -1,7 +1,6 @@
 "use strict";
 
 //T.WV: uses webgl to render waveforms
-
 T.WV = function($tile_){
     
     var bW = 1024;
@@ -57,8 +56,8 @@ T.WV = function($tile_){
     "		subCol = groupInfoIndex255[0]/2;										                  ",//integer division, so floor giving 0-127
     "		subRow =  groupInfoIndex255[1]/4;									                      ",//integer division, so floor giving 0-63
     "       vec4 myGroupData = texture2D(groupData,                                       			  ",
-    "                          vec2(float(subCol)/(128.*4.) + float(colBlock)*0.25, 				  ",
-    "					       float(subRow)/(64.*4.) + float(rowBlock)*0.25));      				  ",
+    "                           vec2( float(subCol)*(1./(128.*4.)) + float(colBlock)*0.25   , 		  ",
+    "					              float(subRow)*(1./(64.*4.)) + float(rowBlock)*0.25    )  );     ",
     "       bool isFirstTwoBytes = mod(groupInfoIndex255[0],2) == 0;                             	  ",
     
     	   //We render one channel at a time and then composite each group's image using drawImage.
@@ -88,10 +87,10 @@ T.WV = function($tile_){
     "           vCol = !usePaletteB? texture2D(palette,vec2(myColmap,0.))         		 		      ",
     "                              : texture2D(paletteB,vec2(myGroupInd01,0.));           	          ",	
     "           x += colWidth * mod(groupOnPage,groupsPerRow);              			 	  		  ",
-    "           y += rowHeight * (groupOnPage/groupsPerRow);		         				  		  ",
+    "           y += rowHeight * (groupOnPage/groupsPerRow);		         				  		  ", //integer division, so floor
     "       }                                                                              			  ",
-    "		gl_Position = vec4(float(x)/" + bW/2 + ". - 1. ,									      ",
-    "						   1.-float(y)/" + bH/2 + ".	,									      ",
+    "		gl_Position = vec4(float(x)*" + 1/(bW/2) + " - 1. ,									      ",
+    "						   1.-float(y)*" + 1/(bH/2) + "	,									      ",
     "						   float(z),   1.);                                                 	  ",                                                                                           
     "   }                                                                                 			  "
     ].join('\n');

@@ -206,7 +206,7 @@ T.FS = function(requestFileSystem,PERSISTANCE){
     			results[i].remove(function() {console.log('Removed file.');}, OnError(callback));
             reader.readEntries(RemoveEntries(reader,callback),OnError(callback)); //there's still more to read
           }else{
-              callback(); //no more files to delete
+              callback(null); //no more files to delete
     	  }
     	}
      }
@@ -255,6 +255,7 @@ T.FS = function(requestFileSystem,PERSISTANCE){
         	h = fs;
         	files = {};
         	var dirReader = fs.root.createReader();
+			readEntriesList = [];
         	dirReader.readEntries(ReadEntries(dirReader,callback),OnError(callback)); 
         }
     }

@@ -156,9 +156,9 @@ T.Tool.SplitterMouseMove = function(event){
 		var left = event.pageX+ T.Tool.activeSplitter.off_left - T.WIDGET_CENTRE_RAD;
 		var top = event.pageY + T.Tool.activeSplitter.off_top - T.WIDGET_CENTRE_RAD;
 		top = top<-T.WIDGET_CENTRE_RAD?  - T.WIDGET_CENTRE_RAD : top;
-		top = top>T.CanvasHeight(false) - T.WIDGET_CENTRE_RAD*2? T.CanvasHeight(false)  - T.WIDGET_CENTRE_RAD*2: top;
+		top = top>T.CanvasOuterHeight() - T.WIDGET_CENTRE_RAD*2? T.CanvasOuterHeight()  - T.WIDGET_CENTRE_RAD*2: top;
 		left = left<-T.WIDGET_CENTRE_RAD? -T.WIDGET_CENTRE_RAD : left;
-		left = left > T.CanvasWidth(false) -T.WIDGET_CENTRE_RAD*2? T.CanvasWidth(false) -T.WIDGET_CENTRE_RAD*2: left;
+		left = left > T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2? T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2: left;
 		T.Tool.activeSplitter.$h.css({top:top+'px'})
 						  .find('.widget-center').eq(0).css({left:left+'px'});
 	}

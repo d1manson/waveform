@@ -106,10 +106,10 @@ T.DM = function(){
 		}
 	}.toString().match(/^\s*function\s*\(\s*\)\s*\{(([\s\S](?!\}$))*[\s\S])/)[1];
 
-	var workerCombineBatches = new Worker(window.URL.createObjectURL(new Blob([WORKER_STRING])));
+	var workerCombineBatches = new Worker(window.URL.createObjectURL(new Blob([WORKER_STRING],{type:'text/javascript'})));
 
     workerCombineBatches.onmessage = function(e) {
-    	success_callback(new Uint16Array(e.data));
+    	success_callback(e.data); //should use it as new Uint16Array(data)
     }
     
     var GetShaderFromString = function(str,type){

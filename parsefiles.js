@@ -141,7 +141,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
     		var posBuffer = evt.target.result.slice(dataStart,dataStart+dataLen);
     		if(swapBytes){
     			var data = new Int16Array(posBuffer);
-    			for (var k=0;k<data.length;k++)
+    			for (var k=0;k<data.length;k++) //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
     				data[k] = Swap16(data[k]);
     		}
             pendingParse--;
