@@ -10,7 +10,7 @@ T.actions = [{num: 0}];
 
 
 T.BYTES_PER_SPIKE = 4*(4 + 50);
-T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2;
+T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2);//the last two uint16s are numpix1 and bnumpix2 repeated
 T.POS_NAN = 1023;
 
 T.X_SCALE = 2; 
@@ -80,11 +80,13 @@ T.AddTile = function(ind,iW,iH,oW,oH){
 
 	var $t = $("<div class='tile' id='tile_" + ind + "'>" +
 				"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
+				"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
 				"<div class='tile-over'><div class='tile-caption'></div></div></div>");
 	$t.mousedown(T.TileMouseDown);
 	$t.data("group_num",ind);
 	$t.canvas = $t.find('canvas');
-	$t.ctx = $t.canvas.get(0).getContext('2d');
+	$t.ctx = $t.canvas.get(0).getContext('2d'); //this is for drawing waveforms
+	$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
     $t.caption = $t.find('.tile-caption');
 
 	var prev = -1;

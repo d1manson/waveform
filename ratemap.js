@@ -8,9 +8,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	var unvisitedBins;
 	var nBinsX, nBinsY, nBinsTot;//nBinsTot is just nBinsX *nBinsY
 	var P_COLORS = 5; //0th entry in palette is white, then p colors
-			
-	//TODO: it might be nice to use bitshifting for timesing by BYTES_PER_POS_SAMPLE, since its value is 16, but it probably isn't that important
-
+				
 	//matricies will be stored in the following order x1y1 x2y1 x3y1 ... xny1 x1y2 .... which is how imagedata wants it
 		
 	var vector32 = function(n){
@@ -46,31 +44,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		for(var i=0;i<n;i++)
 			result[indsXY[i*2+0]*nBinsX + indsXY[i*2+1]]++;
 		
-		return result;
-	}
-	
-	var pick = function(from,indices){
-		var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-		
-		for(var i=0;i<indices.length;i++)
-			result[i] = from[indices[i]];
-			
-		return result;
-	}
-	
-	var max = function(X){
-		return Math.max.apply(null,X);
-	}
-	
-	var min = function(X){
-		return Math.min.apply(null,X);
-	}
-	
-	var rdivide = function(numerator,denominator){
-		//note that this returns a float array no matter what class the numerator and denonminator are
-		var result = new Float32Array(numerator.length);
-		for(var i=0;i<numerator.length;i++)
-			result[i] = numerator[i]/denominator[i];
 		return result;
 	}
 	
@@ -134,7 +107,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		
 		var factor = 1/pixPerM * 100 /cmPerBin;	
 		
-		var posData = new Int16Array(posBuffer);
+		var posData = new Uint16Array(posBuffer);
 		//TODO: subtract min in x and y, deal with POS_NAN
 		
 		var wordsPerPosSample = BYTES_PER_POS_SAMPLE/2;
@@ -150,20 +123,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		var tmp = vector8(Npos);
 		for(var i=0;i<Npos;i++)
 			tmp[i] = posBinXY[2*i+0];
-		nBinsX =  max(tmp) + 1;//+1 because of zero
+		nBinsX =  M.max(tmp) + 1;//+1 because of zero
 		
 		for(var i=0;i<Npos;i++)
 			tmp[i] = posBinXY[2*i+1];
-		nBinsY =  max(tmp) + 1;
+		nBinsY =  M.max(tmp) + 1;
 		
 		nBinsTot = nBinsX*nBinsY;
 		
 		//since the only thing we really care about is pos bins, its the posbinX and posbinY we store for each spike
-		spikePosBinXY=vector8(2*Ntet); //same form as posBinXY
-		for(var i=0;i<Ntet;i++){
-			spikePosBinXY[2*i +0] = posBinXY[posInds[i]*2 +0];
-			spikePosBinXY[2*i +1] = posBinXY[posInds[i]*2 +1];
-		}
+		spikePosBinXY=M.pick(new Uint16Array(posBinXY.buffer),posInds); //same form as posBinXY, but we store it as 2byte blocks for easy picking
 		
 		var dwellCounts = accumarray(posBinXY);
 		dwellCounts[0] = 0;//this is where bad points were put, this is a quick fix
@@ -183,13 +152,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		//For each cutGroup the peak rate is stored in an array and output at the end as a single list.
 		//by output here we mean postmessage
 		for(var g=firstGroup;g<=lastGroup;g++)if(cutInds[g]){
-			var groupPosIndsXY = pick(new Uint16Array(spikePosBinXY.buffer),cutInds[g]); //we treat the posXY data as 2byte blocks here
-			var spikeCounts = accumarray(new Uint8Array(groupPosIndsXY.buffer)); //now we treat it as 1 byte blocks again
+			var groupPosIndsXY = M.pick(spikePosBinXY,cutInds[g]); //spikePosBinXY was stored as 2byte blocks, which is what we want here
+			var spikeCounts = accumarray(new Uint8Array(groupPosIndsXY.buffer)); //now we treat it as 1 byte blocks
 			spikeCounts[0] = 0; //it's the bad bin, remember
 			
 			var smoothedSpikeCounts = GetSmoothed(spikeCounts);
-			//var ratemap = rdivide(smoothedSpikeCounts,smoothedDwellCounts)
-			var ratemap = smoothedSpikeCounts;
+			var ratemap = M.rdivide(smoothedSpikeCounts,smoothedDwellCounts)
 			UseMask(ratemap,unvisitedBins);
 			
 			var im = ToImageData(ratemap);
@@ -222,16 +190,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		var buffer = new ArrayBuffer(nBinsTot*4);
 		var im = new Uint32Array(buffer);//4 because RGBA each of which is 1 byte
 		
-		 //for binning, we want values on interval [1 P], so add eps (lazy solution):
-		var eps = 0.00000001;
-		// ceil(0)=0  =>  ceil((0+eps)/(max+2eps))=1
-		// ceil(max/max*P)=P => ceil((max+eps)/(max+2eps)*P) = P
+		 //for binning, we want values on interval [1 P], so use eps (lazy solution):
+		var eps = 0.0000001;
 		
-		var factor = 1/(max(map)+eps*2)*P_COLORS;
+		var factor = 1/M.max(map)*P_COLORS*(1-eps);
 		var i = 0;
 		
 		for(var i=0;i<nBinsTot;i++)
-			im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[Math.ceil(map[i]*factor)];
+			im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1+Math.floor(map[i]*factor)];
 		
 		return new Uint8ClampedArray(buffer); //this is how it's going to be used by ShowGroupImage
 	}
@@ -242,14 +208,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	var dummyCanvasCtx = $('<canvas/>').get(0).getContext('2d');
 	
 	var ShowGroupImage =function(im,ind){
-		//TODO: work out if there is a more sensible way of doing this and whether any of it can be done in the worker
+
+		if(!$tile_[ind]) return;
 		
 		var imData = dummyCanvasCtx.createImageData(nBinsX,nBinsY);
 		var nBytes = nBinsX*nBinsY*4;
 		for(var i=0;i<nBytes;i++)
 			imData.data[i] = im[i];
 			
-		$tile_[ind].ctx.putImageData(imData, 0, 0);
+		$tile_[ind].canvas.get(1).width = nBinsX;
+		$tile_[ind].canvas.get(1).height = nBinsY;
+		$tile_[ind].canvas.eq(1).css({width: nBinsX*2 + 'px', height: nBinsY*2 + 'px'});
+		$tile_[ind].ctx2.putImageData(imData, 0, 0);
 		
 	}
 	
@@ -261,8 +231,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 }(T.BYTES_PER_SPIKE,T.BYTES_PER_POS_SAMPLE,T.$tile_,T.POS_NAN)
 
 
-/*
-T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
-			parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),2.5);
-T.RM.SetGroupData(T.cutInds,0,12);
-*/
+
+T.RatemapsDev = function(){
+	//this is not a proper implementation yet
+	var correction = 3.9;
+	T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
+				parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),2.5*correction);
+	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+}
+$('#ratemaps_button').click(T.RatemapsDev);
