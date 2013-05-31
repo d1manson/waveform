@@ -43,5 +43,13 @@ var M = {
 		for(var i=0;i<numerator.length;i++)
 			result[i] = numerator[i]/denominator[i];
 		return result;
+	},
+	
+	useMask: function(vector,mask){
+		//sets vector elemnts to zero where mask is true
+		for(var i=0;i<mask.length;i++)
+			if(mask[i])
+				vector[i] = 0;
+		//modifies vector in place
 	}
 }

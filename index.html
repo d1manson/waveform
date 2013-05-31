@@ -43,8 +43,7 @@ you can drag further files onto the window at any point<br>
 		<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
 		<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
 		<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
-
-		<button id="ratemaps_button">ratemaps (dev)</button>
+        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rate (dev)</label>
 	</div>
 
 	<div class="button_group">
@@ -81,10 +80,18 @@ you can drag further files onto the window at any point<br>
 
 
 <div class="side_panel_row">
-<div id="info_panel" class="scrollable_area">
-<B>file info and headers</B><br>
+	<div class="last_side_panel_row_inner">
+		<div class="last_side_panel_row_head">
+			<B>file headers</B>
+			<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental">
+		</div>
+		<div class="last_side_panel_row_body">
+				<div id="info_panel" class="scrollable_area"></div>
+		</div>
+	</div>
 </div>
-</div>
+
+
 </div>
 
 <div class="tilewall">
@@ -99,11 +106,14 @@ you can drag further files onto the window at any point<br>
 <div class="help_body">
 <br>
 <u>About the application</u>
-<p>Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so.</p>
+
+<p>Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. The project now has its own public repository on <a href="https://github.com/d1manson/waveform" target="_blank">GitHub</a>, so you are free to contribute.</p>
 
 
 <u>Changes</u>
 <ul>
+
+<li>Added basic ratemap generating code.</li>
 <li>Several sections of code have been restructured to make them more modular and easier to use.</li>
 
 <li>Can now toggle each channel on and off, by holding ctrl key when selecting channels in the button pane.</li>

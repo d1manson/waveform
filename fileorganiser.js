@@ -7,7 +7,7 @@
 
 
 T.ORG = function($files_panel,$document,$drop_zone, PAR,
-                    FinishedLoadingTet,FinishedLoadingCut,FinishedLoadingPos,FinishedLoadingFile){
+                    FinishedLoadingTet,FinishedLoadingCut,FinishedLoadingPos,FinishedLoadingSet,FinishedLoadingFile){
     
     var exps = [];
     var cExp = {}; //current exp object
@@ -145,8 +145,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     	
     	var str = ["<div class='button_group'>"];
     	for(i=0;i<available_tets.length;i++)if(available_tets[i])
-    		str.push("<input type='radio' name='tetrode' id='tetrode" + i + "' value='" + i + "'/><label for='tetrode" + i + "'>" + i +"</label>");
-    	str.push(" [tetrode] </div>");
+    		str.push("<input type='radio' name='tetrode' id='tetrode" + i + "' value='" + i + "'/><label for='tetrode" + i + "'>t" + i +"</label>");
+    	str.push("</div>");
     	$files_panel.prepend($(str.join('\n')));
     	
     	for(i=0;i<available_tets.length;i++)if(available_tets[i]){
@@ -189,6 +189,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     	}
         if(exp && exp.pos)
             T.FS.ReadFile(exp.pos,PAR.LoadPos,FinishedLoadingPos);
+        if(exp && exp.set)
+            T.FS.ReadFile(exp.set,PAR.LoadSet,FinishedLoadingSet);
         
         if(T.FS.GetPendingReadCount() == 0){ //if none of the files were avaialble we still call FinishLoadingFiles so that we clear the previous tet-ind
             alert('no pos data and no data for tetrode ' + tet_ind);
@@ -240,7 +242,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     
 }(//Use T.ORG constructor with the following inputs
 $('#files_panel'),$(document),$('.file_drop'),T.PAR,T.FinishedLoadingTet,
-T.FinishedLoadingCut,T.FinishedLoadingPos,T.FinishedLoadingFile
+T.FinishedLoadingCut,T.FinishedLoadingPos,T.FinishedLoadingSet,T.FinishedLoadingFile
 );
 
     

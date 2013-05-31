@@ -181,12 +181,36 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
     var LoadPosA = function(file,callback){
     	//begin async reading of the file
         pendingParse++;
-    	T.pos = {file_name: file.name};
     	var reader = new FileReader();
     	reader.onloadend = LoadPosB(file,callback);
     	reader.readAsBinaryString(file);
     }
 
+	var LoadSetB = function(callback){
+		return function(evt){
+			//receive header data and being async reading of main data
+    		if (evt.target.readyState != FileReader.DONE)
+    			return;
+				
+    		var header = {};
+    		var headerStr = evt.target.result;
+			var match;
+    		while (match = REGEX_HEADER_B.exec(headerStr))
+    			header[match[1]] = match[2];
+				
+			pendingParse--;
+			callback(header);
+		}
+	}
+	
+	var LoadSetA = function(file,callback){
+	    //begin async reading of the file
+        pendingParse++;
+    	var reader = new FileReader();
+    	reader.onloadend = LoadSetB(callback);
+    	reader.readAsBinaryString(file);
+	}
+	
     var GetPendingParseCount = function(){
         return pendingParse;
     }
@@ -196,6 +220,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         LoadCut: LoadCutA,
         LoadCut2: LoadCut2A,
         LoadTetrode: LoadTetrodeA,
+		LoadSet: LoadSetA,
         GetPendingParseCount: GetPendingParseCount
     }
     

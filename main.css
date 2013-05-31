@@ -44,6 +44,23 @@ display:table-row;
 overflow:auto;
 background: #EEE;
 }
+.last_side_panel_row_inner{
+left:0px;
+top:0px;
+display: table;
+border-spacing: 0px;
+width: 100%;
+height: 100%;
+}
+.last_side_panel_row_head{
+display:table-row;
+overflow:auto;
+}
+.last_side_panel_row_body{
+display:table-row;
+overflow:auto;
+height: 100%;
+}
 .button_area{
 min-height: 20px;
 max-height: 100px;
@@ -389,4 +406,7 @@ text-align:left;
 .file_brick[tet]:not([active]):not(:hover){
 width: 2px;
 font-size:0;
+}
+#header_search{
+float: right;
 }

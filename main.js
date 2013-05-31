@@ -5,6 +5,7 @@ T.header = {};
 T.Tool = {};
 T.buffer = 0;
 T.chanIsOn = [1,1,1,1];
+T.mapIsOn = [0];
 T.paletteMode = 0;
 T.actions = [{num: 0}];
 
@@ -19,11 +20,9 @@ T.Y_SCALE_BASE = 4; //used as a factor to scale the user-input y-size to get a n
 T.X_SCALE_BASE = 4; //number of canvas pixels between samples in time dimension
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
-
-
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
-
+T.MAPS_START = 101-1;
 
 
 
@@ -103,7 +102,7 @@ T.AddTile = function(ind,iW,iH,oW,oH){
 
 T.FinishedLoadingFile = function(){
     if(T.FS.GetPendingReadCount() == 0 && T.PAR.GetPendingParseCount() == 0){
-        T.RemoveTile();//Clear all...TODO: clear cutInds, buffers and T.WV 
+        T.RemoveTile();//Clear all...TODO: clear cutInds, buffers and T.WV and T.RM, though actually we only need to clear stuff if the experiment is new
         T.DispHeaders();
 		if(T.cutInds){
 			var iW = T.WV.CanvasInnerWidth(); 
@@ -120,14 +119,19 @@ T.FinishedLoadingFile = function(){
 		}
 		if(T.posBuffer)
 			T.PlotPos();
+		if(T.posBuffer && T.buffer){
+			T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
+				parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),9);
+			T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+		}
     }
 }
 
 
 T.DispHeaders = function(){
-	var headerlist = [T.header,T.cutProps,T.posHeader];
+	var headerlist = [T.header,T.cutProps,T.posHeader,T.setHeader];
     var tet = T.ORG.GetTet();
-	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file'];
+	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
 
     var $h = $("<div id='header_info' class='header_info'>");
     T.$info_panel.html($h);
@@ -141,7 +145,8 @@ T.DispHeaders = function(){
 		outerstrbuilder.push(headernames[i] + "<table><tbody><tr>" + strbuilder.join("</tr><tr>") + "</tr></tbody></table>");
 	}
 
-    $h.html("<B>File info and headers</B><br>" + outerstrbuilder.join("<BR><BR>"));
+    $h.html(outerstrbuilder.join("<BR>"));
+	T.FilterHeader();
 }
 
 
@@ -153,35 +158,68 @@ T.CanvasOuterHeight = function(){
 	return T.Y_SCALE*256;
 }
 
-T.ApplyChannelChoice = function(setChans){
+T.ApplyChannelChoice = function(setChans,setMaps){
 	//This is a bit inefficent because we only need to resize the canvas and its css 
 	//when we change the number of channels being displayed, but it doesn't matter much.
-	for(var i=0;i<4;i++)
+	
+	setChans = setChans == undefined? T.chanIsOn : setChans;
+	setMaps = setMaps == undefined? T.mapIsOn : setMaps;
+	
+	for(var i=0;i<T.$chanButton_.length;i++){
+		if(i < setChans.length)
 			T.$chanButton_.eq(i).prop('checked',setChans[i])
+		else if(i-setChans.length < setMaps.length)
+			T.$chanButton_.eq(i).prop('checked',setMaps[i-setChans.length]);
+	}	
 	T.chanIsOn = setChans;
+	T.mapIsOn = setMaps;
 	T.WV.ShowChannels(setChans);
+	T.RM.ShowMaps(setMaps);
 	T.ApplyCanvasSizes();
 	//Note we don't render here, that's up to the calling function
 }
 
 T.ChannelButtonClick = function(evt){
+	//TODO: change "Channel" in button names to reflect the fact it now includes maps
+	
 	var oldChans = T.chanIsOn;
+	var oldMaps = T.mapIsOn;
+	
 	var thisVal =  parseInt($(this).val())-1;
-	var setChans;
+	var setChans; var setMaps;
 
+	
 	if(evt.ctrlKey){
-		//if ctrl key is down then toggle this channel, but make sure that there is at least one channel on
+		//if ctrl key is down then toggle this item, but make sure that there is at least one itme on
 		setChans = oldChans;
-		setChans[thisVal] = !setChans[thisVal];
-		if(setChans[0] + setChans[1] + setChans[2] + setChans[3] == 0)
-			setChans[thisVal] = 1;
+		setMaps = oldMaps;
+		if(thisVal >= T.MAPS_START)
+			setMaps[thisVal-T.MAPS_START] = +!setMaps[thisVal-T.MAPS_START];
+		else
+			setChans[thisVal] = +!setChans[thisVal];
+			
+		if(M.sum(setChans) + M.sum(setMaps) == 0){
+			if(thisVal >= T.MAPS_START)
+				setMaps[thisVal-T.MAPS_START] = 1;
+			else
+				setChans[thisVal] = 1;
+		}
+			
 	}else{
 		//turn it on and everything else off
 		setChans = [0,0,0,0];
-		setChans[thisVal] = 1;
+		setMaps = [0];
+		if(thisVal >= T.MAPS_START)
+			setMaps[thisVal-T.MAPS_START] = 1;
+		else
+			setChans[thisVal] = 1;
 	}
-	T.ApplyChannelChoice(setChans);
-	T.WV.Render();
+	T.ApplyChannelChoice(setChans,setMaps);
+	
+	if(thisVal < T.MAPS_START)
+		T.WV.Render(); //if we removed all channels or just changed maps we don't need to re-render waveforms
+	else
+		T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 }
 
 
@@ -207,7 +245,7 @@ T.ApplyCanvasSizes = function(){
 	var h = T.CanvasOuterHeight();
 	var i = T.$tile_.length;
 	while(i--)if(T.$tile_[i])
-		T.$tile_[i].canvas.css({width: w + 'px',height: h + 'px'});
+		T.$tile_[i].canvas.eq(0).css({width: w + 'px',height: h + 'px'});
 }
 
 
@@ -288,6 +326,10 @@ T.FinishedLoadingCut = function(cut,props){
 	T.FinishedLoadingFile();
 }
 
+T.FinishedLoadingSet = function(header){
+	T.setHeader = header;
+	T.FinishedLoadingFile();
+}
 
 T.TogglePalette = function(){
 	T.paletteMode = T.paletteMode  ? 0: 1;
@@ -305,6 +347,10 @@ T.RunAutocut = function(){
 				alert("Currently you can only autocut on a single channel. Using channel " + (chan+1) + ".");
 				break;
 			}
+	if(chan == -1){
+		alert("Currently you can only autocut on a single channel. Using channel 1.");
+		chan = 1;
+	}
 	T.ClearActions();
 	T.AC.DoAutoCut(chan+1,parseInt(T.N),T.buffer,T.AutocutFinished);
 }
@@ -319,6 +365,7 @@ T.AutocutFinished = function(cut,chan){
 		T.WV.Setup(parseInt(T.N),T.buffer);
 	T.WV.SetGroupData(T.cutInds);
 	T.WV.Render();
+	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 	T.AddAction({description: 'autocut subsample on channel-' + chan})
 }
 
@@ -409,6 +456,7 @@ T.ReorderCut = function(){
 	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
 		T.AddTile(i);
 	T.WV.Render();
+	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 }
 
 T.UndoReorderCut = function(action){
@@ -422,6 +470,7 @@ T.UndoReorderCut = function(action){
 	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
 		T.AddTile(i);
 	T.WV.Render();
+	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 }
 
 T.ShowFileSystemLoaded = function(file_names){
@@ -432,6 +481,16 @@ T.ShowFileSystemLoaded = function(file_names){
 		$('#filestem_caption').html("Found " + file_names.length + " existing files.<BR>" + file_names.join("<BR>")); //TODO: using html here with filenames is potentially a bug
 		T.$filesystem_load_button.show();
 	}
+}
+
+T.FilterHeader = function(){
+	var str = T.$header_search.val().toLowerCase();
+	T.$info_panel.find('tr').each(function(){
+			if($(this).text().toLowerCase().search(str)==-1)
+				$(this).hide();
+			else
+				$(this).show()
+			})
 }
 
 T.$help_background = $('.help_background');
@@ -461,7 +520,7 @@ T.$chanButton_ = $("input[name=channel]:checkbox").click(T.ChannelButtonClick);
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
 T.$filesystem_load_button = $('#filesystem_load_button');
-
+T.$header_search = $('#header_search').on("search",T.FilterHeader);
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();

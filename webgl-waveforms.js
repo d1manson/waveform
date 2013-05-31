@@ -270,7 +270,8 @@ T.WV = function($tile_){
     
     var CanvasInnerWidth = function(){
     	var nChans = chanIsOn[0] + chanIsOn[1] + chanIsOn[2] + chanIsOn[3];
-    	return (50*horz)*nChans - 1;
+		
+    	return nChans==0? 0 : (50*horz)*nChans - 1;
     }
     
     var CanvasInnerHeight = function(){
@@ -279,7 +280,13 @@ T.WV = function($tile_){
     
     var ShowChannels = function(newChanIsOn){
         //chanIsOn is a vector of 4 logicals specifying which of the 4 channels to show
-        chanIsOn = newChanIsOn;
+        if(chanIsOn[0] == newChanIsOn[0] && 
+		   chanIsOn[1] == newChanIsOn[1] &&
+           chanIsOn[2] == newChanIsOn[2]  &&
+		   chanIsOn[3] == newChanIsOn[3] )
+			return; //nothing has changed
+			
+		chanIsOn = newChanIsOn.slice(0);
     	
     	var w = CanvasInnerWidth();
     	var h = CanvasInnerHeight();
