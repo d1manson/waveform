@@ -61,7 +61,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     			GotFileDetails(files[i].name,base,"tet",parseInt(ext));
     		else{
     			pendingDropFiles--;//unknown file type
-    			continue; //dont save it
+				if(pendingDropFiles == 0)
+					DispFiles();
     		}
     		
         }      

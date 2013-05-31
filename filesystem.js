@@ -31,7 +31,7 @@ T.FS = function(requestFileSystem,PERSISTANCE){
         FilesInMemory[name] = file;
     };
     
-    var ReadDataFromMemoryFile = function(name,callback){
+    var ReadDataFromMemoryFile = function(name,callback,callbackState){
     	setTimeout(function(){
             pendingReads--;
             callback(FilesInMemory[name],callbackState);

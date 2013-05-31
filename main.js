@@ -121,7 +121,7 @@ T.FinishedLoadingFile = function(){
 			T.PlotPos();
 		if(T.posBuffer && T.buffer){
 			T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
-				parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),9);
+				parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),2.5); //2.5cm
 			T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 		}
     }
@@ -181,6 +181,7 @@ T.ApplyChannelChoice = function(setChans,setMaps){
 
 T.ChannelButtonClick = function(evt){
 	//TODO: change "Channel" in button names to reflect the fact it now includes maps
+	//Also need to convert buttons to be actuall buttons rather than radio inputs becaues firefox doesn't permit clicking radio buttons with ctrl or alt or shift pressed (I think)
 	
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
@@ -520,7 +521,8 @@ T.$chanButton_ = $("input[name=channel]:checkbox").click(T.ChannelButtonClick);
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
 T.$filesystem_load_button = $('#filesystem_load_button');
-T.$header_search = $('#header_search').on("search",T.FilterHeader);
+T.$header_search = $('#header_search');
+T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();

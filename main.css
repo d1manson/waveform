@@ -43,6 +43,12 @@ display: none;
 display:table-row;
 overflow:auto;
 background: #EEE;
+position: relative;
+-webkit-user-select: none;
+-khtml-user-select: none;
+-moz-user-select: -moz-none;
+-o-user-select: none;
+user-select: none;
 }
 .last_side_panel_row_inner{
 left:0px;
@@ -192,23 +198,25 @@ color: #fff;
 .collapsable_panel[state="closed"]{
 	height: 5px;
 	overflow-y: hidden;
+	overflow-x: hidden;
 }
 .toggle_panel{
 background: #000;
-width: 12px;
+width: 52px;
 height: 12px;
-float: right;
-margin: 4px;
-top: -6px;
-left: -6px;
-position: relative;
+position: absolute;
+right: 15px;
+margin-top: 2px;
+transform:translateY(-5px);
+-webkit-transform:translateY(-5px);
+-ms-transform:translateY(-5px);
 }
 .toggle_panel:hover{
-width: 14px;
+width: 48px;
 height: 14px;
 background: #500;
 border: 2px solid #fff;
-margin: 0px;
+margin-top:0;
 }
 
 .header_field_name{
