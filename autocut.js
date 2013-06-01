@@ -11,9 +11,153 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     var remInds = [];
     var sampLinkage = null;
     var sampDist = null;
-    var workerLinkage = new Worker('worker-agglomerate.js');
     var callback;
     
+	var workerLinkage = BuildWorker(function(){
+			"use strict";
+		//Based on : http://figue.googlecode.com/svn/trunk/figue.js
+		//For an "official" paper with a very similar algorithm see the "The generic clustering algorithm" in..
+		//	Modern hierarchical, agglomerative clustering algorithms, Daniel M?llner 2011.
+		//		http://arxiv.org/pdf/1109.2378.pdf
+
+		var inf32 = Math.pow(2,32)-1;
+		var N;
+		var dist;
+		function vector(n){
+			return new Uint32Array(new ArrayBuffer(n*4));
+		}
+
+		self.onmessage = function(e) {
+			var data = e.data;
+
+			if(data.N !== undefined){
+				N = data.N;
+			}else{
+				// otherwise data is ArrayBuffer
+				var ret = Agglomerate(N,new Uint16Array(data));
+				data = null; //this destroys the distance matrix entierly, since there was only ever one copy (it was passed to the worker and released from the main thread)		
+				self.postMessage(ret);
+			}
+		}
+
+		function MaskedMinSearch(X,mask){
+			var min_ind = 0;
+			var min_val = inf32;
+			var N = X.length;
+			for(var i=0; i<N; i++) if(mask[i] && X[i] < min_val){
+						min_ind = i;
+						min_val = X[i];
+			}
+			return {val: min_val,ind: min_ind};
+		}
+
+		function MaskedWeightedMeanRowCol(X,mask,aInd,bInd,wA,wB){
+			//for a symmetrix matrix, X, it replaces column aInd and row aInd with the weighted sum of the data in aInd and bInd,
+			//mask is a vector, the same length as the sides of X, which specifies which entries in the row/col to modify.
+			N = mask.length;
+			var inverseSumWaWb = 1/(wA + wB);
+			
+			for (var i=0; i<N; i++) if(mask[i])
+				X[i*N +aInd] = X[aInd*N +i] =  ( wA * X[aInd*N +i] + wB * X[bInd*N +i])  * inverseSumWaWb;
+		}
+					
+		function Agglomerate(N,dist) {
+				var N_, i, j, p, childA, childB, min_inds, min_vals, 
+					descendants, wA, wB, wAB, desA, desB,
+					global_min_val, aInd, bInd, min_ind, min_val, P, tmp, joinDist;
+
+				N = N;
+				N_ = N-1;
+
+				//The result will be this list of pairs: (aInd,bInd,aDescendantCount,bDescendantCount,dist_ab)
+				childA = vector(N_);
+				childB = vector(N_);
+				desA = vector(N_);
+				desB = vector(N_);
+				joinDist = vector(N_);
+
+				// This will keep track of the minimum for each row
+				min_inds = vector(N);
+				min_vals = vector(N);
+
+				// This will keep track of the number of descendants for each of the elements
+				descendants = vector(N);
+				for(i=0;i<N;i++)
+					descendants[i] = 1;
+
+				//Set diagonal of dist matrix to infinity
+				for(i=0;i<N;i++)
+					dist[i*N+i] = inf32;
+
+				// Initialise min_inds and min_vals
+				for(i=0;i<N;i++){    
+					min_val = inf32;
+					min_ind = 0;
+					for(j=0;j<N;j++)if(dist[i*N+j]<min_val){
+						min_val = dist[i*N+j];
+						min_ind = j;
+					}
+					min_vals[i] = min_val;
+					min_inds[i] = min_ind;
+				}
+
+				var tmp;//used for storing multiple outputs from a function call
+				
+				// Main loop
+				for (p=0; p<N_; p++){
+					// Using the pre-computed row minima, find the global minima, (aInd,bInd)
+					tmp = MaskedMinSearch(min_vals,descendants);
+					aInd = tmp.ind;
+					global_min_val = tmp.val;
+					bInd = min_inds[aInd];
+
+					//Record that these children are the p'th siblings, note that we correct the numbering system after the main loop
+					childA[p] = aInd;
+					childB[p] = bInd;
+					joinDist[p] = global_min_val;
+
+					//Get the old descendant counts, and store the new values
+					desA[p] = wA = descendants[aInd];
+					desB[p] = wB = descendants[bInd];
+					descendants[aInd] = wA+wB;
+					descendants[bInd] = 0; //this acts as a flag in the 4 inner loops
+
+					//Overwrite row aInd and col aInd with the wieghted average of the children's dists
+					MaskedWeightedMeanRowCol(dist,descendants,aInd,bInd,wA,wB);
+					dist[aInd*N +aInd] = inf32; //set (aInd,aInd) back to inf32
+
+					//Find row-a's new minimum value and its ind
+					tmp = MaskedMinSearch(dist.subarray(aInd*N,aInd*N+N),descendants); 
+					min_inds[aInd] = tmp.ind;
+					min_vals[aInd] = tmp.val;
+
+					//Update any minima that pointed to column-b, to now point to column-a 
+					//not quite sure why this is guaranteed to be true, but I can just about believe that it is
+					for (i=0; i<N; i++) if (descendants[i] && min_inds[i] == bInd){
+						min_inds[i] = aInd;
+						min_vals[i] = dist[aInd*N + i];			
+					}
+
+				}
+
+
+				//number each leaf from 0 to N-1 and each node from N to 2N-2, and rename childA and childB to reflect this scheme
+				P = vector(N);// keep track of which node is held in each slot
+				for(i=0;i<N;i++)
+					P[i] = i;
+
+				for(i=0; i<N_; i++){
+					tmp = childA[i];
+					childA[i] = P[tmp];
+					childB[i] = P[childB[i]];
+					P[tmp] = i+N;
+				}	
+
+				return {aInd: childA, bInd: childB, aDescCount: desA, bDescCount: desB, dist: joinDist};
+		}
+	});
+		
+		
     var RandomInds = function(n,k,doSort) {
     //returns an array of k unique integers in the range [0 n-1]
       var rem_inds = Array(n);

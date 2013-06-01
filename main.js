@@ -8,7 +8,7 @@ T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.paletteMode = 0;
 T.actions = [{num: 0}];
-
+T.binSizeCm = 2.5;
 
 T.BYTES_PER_SPIKE = 4*(4 + 50);
 T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2);//the last two uint16s are numpix1 and bnumpix2 repeated
@@ -119,11 +119,8 @@ T.FinishedLoadingFile = function(){
 		}
 		if(T.posBuffer)
 			T.PlotPos();
-		if(T.posBuffer && T.buffer){
-			T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
-				parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),2.5); //2.5cm
-			T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
-		}
+		if(T.posBuffer && T.buffer)
+			T.SetupRatemaps();
     }
 }
 
@@ -225,20 +222,33 @@ T.ChannelButtonClick = function(evt){
 
 
 T.ApplySizeClick = function(){
-	var new_x_scale = Math.floor(T.$xsize_input.val()); 
-	new_x_scale = new_x_scale < 1? 1 : new_x_scale;
-	new_x_scale = new_x_scale > 8? 8 : new_x_scale;
-	T.$xsize_input.val(new_x_scale);
-	T.X_SCALE = new_x_scale;
-
-	var new_y_scale = Math.round(T.$ysize_input.val())/T.Y_SCALE_BASE;
-
-	new_y_scale = new_y_scale < 0.25? 0.25 : new_y_scale;
-	new_y_scale = new_y_scale > 2? 2 : new_y_scale;
-	T.$ysize_input.val(new_y_scale*T.Y_SCALE_BASE); 
-	T.Y_SCALE = new_y_scale;
+	var new_scale = Math.floor(T.$size_input.val()); 
+	new_scale = isNaN(new_scale)? 2 : new_scale;
+	new_scale = new_scale < 1? 1 : new_scale;
+	new_scale = new_scale > 8? 8 : new_scale;
+	T.$size_input.val(new_scale);
+	T.X_SCALE = new_scale;
+	T.Y_SCALE = new_scale/T.Y_SCALE_BASE;
 
 	T.ApplyCanvasSizes();
+}
+
+T.ApplyRmSizeClick = function(){
+	var new_scale = Math.floor(T.$rm_bin_size.val()*10)/10; //round to 1 d.p.
+	new_scale = isNaN(new_scale)? 2.5 : new_scale;
+	new_scale = new_scale < 0.5? 0.5 : new_scale;
+	new_scale = new_scale > 20? 20 : new_scale;
+	T.$rm_bin_size.val(new_scale);
+	T.binSizeCm = new_scale;
+	T.SetupRatemaps();
+}
+
+T.SetupRatemaps = function(dontShow){
+	T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
+		parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),T.binSizeCm);
+	if(dontShow)
+		return;
+	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 }
 
 T.ApplyCanvasSizes = function(){
@@ -250,16 +260,15 @@ T.ApplyCanvasSizes = function(){
 }
 
 
-
-
 T.StoreData = function(){
 	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
 	localStorage.tet = T.ORG.GetTet();
-	localStorage.X_SCALE = T.X_SCALE;
-	localStorage.Y_SCALE = T.Y_SCALE;
+	localStorage.WV_SCALE = T.X_SCALE;
 	localStorage.cutInds = T.cutInds ? JSON.stringify(T.cutInds) : "[]";
 	localStorage.FSactive = T.FS.IsActive();
+	localStorage.BIN_SIZE_CM = T.binSizeCm;
 	localStorage.state = 1;
+	
 }
 
 
@@ -268,13 +277,13 @@ T.DocumentReady = function(){
 
     T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
     
-    
 	if(localStorage.state){
-		T.ORG.SwitchToTet(localStorage.tet,null);
-		T.X_SCALE = localStorage.X_SCALE;
-		T.Y_SCALE = localStorage.Y_SCALE;
-		T.$xsize_input.val(T.X_SCALE);
-		T.$ysize_input.val(T.Y_SCALE*T.Y_SCALE_BASE);
+		T.ORG.SwitchToTet(localStorage.tet || 1 ,null);
+		T.X_SCALE = localStorage.WV_SCALE || 2;
+		T.Y_SCALE = T.X_SCALE / T.Y_SCALE_BASE;
+		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
+		T.$rm_bin_size = T.binSizeCm;
+		T.$size_input.val(T.X_SCALE);
 		T.cutInds = JSON.parse(localStorage.cutInds);
 		if(T.cutInds.length>0)
 			T.AddAction({description: "load cut from localStorage"});
@@ -494,13 +503,13 @@ T.FilterHeader = function(){
 			})
 }
 
+
 T.$help_background = $('.help_background');
 T.$help_panel_wrapper = $('.help_panel_wrapper');
 $('.help_button').each(function(){$(this).click(T.ShowHelp);});
 $('#apply_size').click(T.ApplySizeClick);
 T.close_help_button = $('.close_help_button').click(T.HideHelp);
-T.$xsize_input = $('#xsize_input');
-T.$ysize_input = $('#ysize_input');
+T.$size_input = $('#size_input');
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.$action_panel = $('#action_panel');
@@ -520,6 +529,8 @@ $('#reset_button').click(T.ResetAndRefresh);
 T.$chanButton_ = $("input[name=channel]:checkbox").click(T.ChannelButtonClick);
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
+T.$rm_bin_size = $('#rm_bin_size');
+$('#apply_rm_size').click(T.ApplyRmSizeClick);
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);

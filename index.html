@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> <!-- TODO: add manifest attribute to html tag so that app works offline -->
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 </head>
@@ -32,10 +33,12 @@ you can drag further files onto the window at any point<br>
 	</div>
 
 	<div class="button_group">
-	<input type="text" id="xsize_input" value="2" size ="1">
-	<input type="text" id="ysize_input" value="2" size ="3">
-	<button id="apply_size">set size</button>
-	<button id="toggle_palette">toggle palette</button> 
+	<input type="text" id="size_input" value="2" size ="1">
+	<button id="apply_size">set wave size</button>
+	&nbsp;&nbsp;
+	<input type="text" id="rm_bin_size" value="2.5" size ="1">
+	<button id="apply_rm_size">set bin size (cm)</button>
+		
 	</div>
 
 	<div class="button_group">
@@ -43,15 +46,20 @@ you can drag further files onto the window at any point<br>
 		<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
 		<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
 		<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
-        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rate (dev)</label>
+        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rate*</label>
+		<button id="toggle_palette">toggle palette</button> 
 	</div>
 
 	<div class="button_group">
 	<button id="reorder">Reorder</button>
-	<button id="autocut">Autocut (sample)</button>
+	<button id="autocut">Autocut**</button>
 	<span id="autocut_caption"></span>
 	</div>
 
+	<div class="notes">
+	*ratemaps are still pretty basic<br>
+	**autocut only uses about 6000 spikes and only runs on one channel
+	</div>
 </div>
 </div>
 
@@ -207,22 +215,16 @@ A hidden canvas, with a web-gl contex and of size 1024x1024, is used as a buffer
 </ol>
 Inside the shader, we check to see if the current vertex is an end cap, if so we shift it into negative z and set its x value appropriately.  By shifting it into negative-z, which is not rendered, we ensure that the lines joining waves are not rendered. We use the three-byte manually-encoded index to work out where to lookup the two spike event values. The first of these values tell us the group number, and thus we can work out the offset for the vertex (what row and column its group is on the large canvas).  The second value tells us what colormap index to use (though in palette mode B we use the group itself for palette lookups).
 </p>
-<u>TODOS</u>
-<ul>
-<li>Fix bug - the partitioning of the hierarchy sometimes produces ghost groups (see test data set, actually might be because there are less than 6K waves)</li>
-<li>Fix bug - after switching between tetrodes or experiments need to clear the old cutInds if there are no new ones.</li>
-<li>Tie the new cut and action list to a single experiment and tetrode and alow user to switch between them and save individual ones.</li>
-<li>Explore the possibility of doing autocorrelations with WebGL</li>
-<li>Finish the autoclustering by implementing the assign-remainder-to-group step.</li>
-</ul>
 <br><br>
 </div>
 </div>
 </div>
 
 <script src="jquery.min.js"></script>  
+<script src="utils.js"></script>
 <script src="Mlib.js"></script>
 <script src="main.js"></script>
+<script src="cut.js"></script>
 <script src="tool.js"></script>
 <script src="parsefiles.js"></script>
 <script src="filesystem.js"></script>

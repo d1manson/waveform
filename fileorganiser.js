@@ -218,8 +218,11 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
         evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
     }
       
-    var GetExp = function(){
-        return {name: cExp.name};
+    var GetExp = function(ind){
+		if(ind === undefined)
+			return {name: cExp.name};
+		else
+			return {name: exps[ind].name};
     }
     
     var GetTet = function(){

@@ -57,7 +57,7 @@ T.DM = function(){
     "	}																						"
     ].join('\n');
     
-	var WORKER_STRING = function(){
+	var workerCombineBatches = BuildWorker(function(){
 		"use strict";
 		
 		// This worker accepts blocks of data and combines them into a single matrix which is returned to the main thread
@@ -104,10 +104,8 @@ T.DM = function(){
 				
 			}
 		}
-	}.toString().match(/^\s*function\s*\(\s*\)\s*\{(([\s\S](?!\}$))*[\s\S])/)[1];
-
-	var workerCombineBatches = new Worker(window.URL.createObjectURL(new Blob([WORKER_STRING],{type:'text/javascript'})));
-
+	});
+	
     workerCombineBatches.onmessage = function(e) {
     	success_callback(e.data); //should use it as new Uint16Array(data)
     }
