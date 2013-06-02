@@ -2,7 +2,9 @@
 T = T || {};
 
 T.CutFileStr = function(){
-	//TODO: we want this to accept a cut-object or something rather than work on the simple T.cutInds
+	
+	//TODO: switch to T.CUT
+	s
 	var vector = function(n){return new Uint32Array(new ArrayBuffer(n*4));}
 
 	var N = parseInt(T.N);

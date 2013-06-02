@@ -48,6 +48,7 @@ T.PlotPos = function(){
 
 
 T.BuildCutIndices = function(cut){
+	//TODO: switch to T.CUT
 	T.cutInds = [[]];
 	for(var i=0;i<cut.length;i++)
 		if(T.cutInds[cut[i]] == undefined)
@@ -55,9 +56,9 @@ T.BuildCutIndices = function(cut){
 		else
 			T.cutInds[cut[i]].push(i);//append to existing subarray
     
-    //TODO: not sure if this is a good way of doing it
 	if(T.FS.GetPendingReadCount() == 0 && T.PAR.GetPendingParseCount() == 0) 
 		T.WV.SetGroupData(T.cutInds);
+	//----------------------------------------------
 }
 
 T.RemoveTile = function(ind){
@@ -284,9 +285,11 @@ T.DocumentReady = function(){
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$rm_bin_size = T.binSizeCm;
 		T.$size_input.val(T.X_SCALE);
+		//TODO: switch to T.CUT
 		T.cutInds = JSON.parse(localStorage.cutInds);
 		if(T.cutInds.length>0)
 			T.AddAction({description: "load cut from localStorage"});
+		//---------------------------
 		T.ApplyChannelChoice(JSON.parse(localStorage.chanIsOn));
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
@@ -329,6 +332,7 @@ T.FinishedLoadingPos = function(header,buffer){
 }
 
 T.FinishedLoadingCut = function(cut,props){
+    //TODO: switch to T.CUT
     T.cutProps = props;
     T.BuildCutIndices(cut);
     T.ClearActions();
@@ -366,6 +370,7 @@ T.RunAutocut = function(){
 }
 
 T.AutocutFinished = function(cut,chan){
+	//TODO: switch to T.CUT
     T.cutInds = cut;
     T.RemoveTile(); //clears all
 	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
@@ -377,6 +382,7 @@ T.AutocutFinished = function(cut,chan){
 	T.WV.Render();
 	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
 	T.AddAction({description: 'autocut subsample on channel-' + chan})
+	//------------------------------
 }
 
 T.ToggleFS = function(newState){
@@ -404,18 +410,21 @@ T.ToggleElementState = function(el){
 }
 
 T.AddAction = function(action){
+    //TODO: switch to T.CUT
 	action.num = T.actions[T.actions.length-1].num + 1;
 	if(action.num == 1)
 		T.$undo.show();
 
 	action.$div = $("<div class='action' data-action-num='" + action.num + "'><b>" + action.num + "</b>&nbsp;&nbsp;&nbsp;" + action.description + "</div>");
 	T.actions.push(action);
-
+	//--------------------------
+	
 	//insert after the undo button
 	T.$undo.after(action.$div);
 }
 
 T.UndoLastAction = function(){
+	//TODO: switch to T.CUT
 	var action = T.actions.pop();
 	var undone = false;
 	if(action.type=="merge"){
@@ -434,17 +443,21 @@ T.UndoLastAction = function(){
 		T.actions.push(action);//put it back
 		alert("Sorry, no undo.");
 	}
+	//------------------------------
 }
 
 T.ClearActions = function(){
+	//TODO: switch to T.CUT
+	
 	//clear all but the zeroth action
 	while(T.actions.length>1)
 		T.actions.pop().$div.remove();
 	T.$undo.hide();
+	//-----------------------
 }
 
 T.ReorderCut = function(){
-
+	
 	//get the sorting order for the cutInds
 	var groups = [];
 	for(var i=0;i<T.cutInds.length;i++)
@@ -453,6 +466,7 @@ T.ReorderCut = function(){
 	groups.sort(function(a,b){return b.len-a.len;});
 	//sorting order is in groups[].ind
 
+	//TODO: switch to T.CUT
 	var action = {inverseOrder: [],description: "reorder",type:"reorder"};
 	var oldCutInds = T.cutInds;
 	T.cutInds = [];
@@ -467,9 +481,11 @@ T.ReorderCut = function(){
 		T.AddTile(i);
 	T.WV.Render();
 	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+	//---------------------------------
 }
 
 T.UndoReorderCut = function(action){
+	//TODO: switch to T.CUT
 	var oldCutInds = T.cutInds;
 	T.cutInds = [];
 	for(var i=0;i<action.inverseOrder.length;i++){
@@ -481,6 +497,7 @@ T.UndoReorderCut = function(action){
 		T.AddTile(i);
 	T.WV.Render();
 	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+	//--------------------------------
 }
 
 T.ShowFileSystemLoaded = function(file_names){

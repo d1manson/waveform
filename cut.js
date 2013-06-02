@@ -1,19 +1,19 @@
 "use strict";
 
-// The cut class
-T.cut = function(){//class factory
+// The CUT module, the primary component of which is a class called cut
+T.CUT = function(){//class factory
 	
 	//the object this._ is to be considered private, though it is actually public.  
 	//Correct me if I'm wrong, but I think this is considered an ok way of emulating OOP in javascript - DM
 	
-	//static private functions, variables, and classes
-	var ChangeCallbacks = []; //callbacks must be of the form foo(cut,changeFrom,changeTo,noInterior){ }, 
+	//static private functions, variables, and classes (some of which may be exported at the bottom of the factory)
+	var changeCallbacks = []; //callbacks must be of the form foo(cut,changeFrom,changeTo,noInterior){ }, 
 							  //where cut is the current cut object and changeFrom and changeTo give the range of modified cut groups, 
 							  //noInterior is true if only the from- and to- groups changed and not the groups inbetween
 							  //Note that the modules with these callbacks will recieve their first change event at the point a cut is constructed, 
 							  //they are expected to already have any other needed data by that point (so you need to provide it separately before the new cut)
 							  
-	//TODO: need some sort of ActionCallback which gets action added events with action descriptions (and maybe more) and undo events
+	var actionCallbacks = []; //callbacks must be of the form foo(info){} where info is an object with at least a string proeprty named description
 	
 	//the undo stack is an array of these objects
 	var action = function(type,data,description){ 
@@ -22,7 +22,15 @@ T.cut = function(){//class factory
 		this.description=description
 	} 
 	
-	var DoConstruction = function(data_type,data){
+	var AddChangeCallback = function(fn){
+		changeCallbacks.push(fn);
+	}
+	var AddActionCallback = function(fn){
+		actionCallbacks.push(fn);
+	}
+	//TODO: may want to implement RemoveCallback, which I think you can do by iterating through list and testing for equality of function objects
+	
+	var DoConstruction = function(data_type,data,description){
 		switch (data_type){
 		
 		case 1: //data is an array specifying the group of each spike
@@ -33,18 +41,36 @@ T.cut = function(){//class factory
 					this._.cutInds[data[i]] = [i];//new subarray
 				else
 					this._.cutInds[data[i]].push(i);//append to existing subarray
-			//TODO: action
-		
+			break;
+			
 		case 2:
-			//TODO: implement import from JSON exported version of this class
-		
+			this._ = JSON.parse(data); 
+			//TODO: might be worth validating everything
+			break;
+			
+		case 3: //data is already in the form we want cutInds to be
+			this._.cutInds = data; //note we don't bother to clone the array, partly because it's two levels deep but mainly because we hopefully dont need to
+			this._.N = 0;
+			for(var i = 0;i<data.length;i++)
+				this._.N += data[i].length; //count number of spikes in all groups, note that this must include all spikes or export to file will not give useful result
+			break;
+			
+		case 4: //data is just N
+			this._.N = data;
+			var cut0 = [];
+			for(var i=0;i<N;i++)
+				cut0.push(i);
+			this._.cutInds = [cut0]; //everything in group zero
+			break;
 		}
 		
-		TriggerCallbacks(0,this._.cutInds.length,false);
+		PushAction.call(this,"load",{},description);
+		TriggerCallbacks.call(this,0,this._.cutInds.length,false);
 	}
 	
 	var GetJSONString = function(){
-		//TODO implement export of all _. data, for keeping in localStorage or FileSystem API
+		//for keeping in localStorage or FileSystem API
+		return JSON.stringify(this._); //this is sufficient at present because ._ data is simple, i.e. doesn't include any out-there object references and is not recursive
 	}
 	
 	var PushAction = function(type,data,description){
@@ -54,19 +80,38 @@ T.cut = function(){//class factory
 	
 	var Undo = function(){
 		//this is going to be exported (=made public), it calls the relevant inverse operation (which are private)
-		
-		//TODO: pop action, switch action.type and call relevant inverse function
+		if (this._.actionStack.length == 0)
+			return;//nothing to undo
+			
+		var action = this._.actionStack.pop();
+		var undone = true;
+		if(action.type=="add")
+			UndoAdd(action.data);
+		else if(action.type=="swap")
+			UndoSwap(action.data);
+		else if(action.type=="reorder")
+			UndoReorder(action.data);
+		else
+			undone = false;
+
+		if(undone){
+			//TODO: trigger action callback
+		}else{
+			this._.actionStack.push(action);//put it back
+			//TODO: still ought to trigger action callback, providing info that action could not be undone
+		}
 	}
 	
 	var TriggerCallbacks = function(a,b,flag){
-		for(var i=0;i<ChangeCallbacks.length;i++)
-			ChangeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
+		for(var i=0;i<changeCallbacks.length;i++)
+			changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
 	}
 	
 	var AddBToA = function(a,b){
+		var lenB = this._.cutInds[b].length;
 		this._.cutInds[a] = this._.cutInds[a].concat(this._.cutInds[b]);
 		this._.cutInds[b] = [];
-		//TODO: action
+		PushAction("merge",[a,b,lenB],'merge group-' + b + ' into group-' + a);
 		TriggerCallbacks(a,b,true);
 	}
 	
@@ -74,16 +119,21 @@ T.cut = function(){//class factory
 		var tmp = this._.cutInds[a];
 		this._.cutInds[a] = this._.cutInds[b];
 		this._.cutInds[b] = tmp;
-		//TODO: action
+		PushAction("swap",[a,b],"swap group-" + a + " and group-" + b);
 		TriggerCallbacks(a,b,true);
 	}
 	
-	var ReorderAll = function(){
-		//TODO: implement reorder
+	var ReorderAll = function(newOrder){
+		var oldCutInds = this._.cutInds;
 		
-		//TODO: action
+		for(var i=0;i<newOrder.length;i++)
+			this._.cutInds.push(oldCutInds[newOrder[i]] || []);
+			
+		PushAction("reorder",newOrder,"reorder groups");
 		TriggerCallbacks(0,this._.cutInds.length,false);
 	}
+	
+	//TODO: implement Undo* functions
 	
 	var GetGroup = function(g){
 		return this._.cutInds[g] || [];
@@ -134,8 +184,8 @@ T.cut = function(){//class factory
 	}
 	
 	
-	//constructor, which we return at the end of the factory
-	var cls = function(exp_name,tet_num,data_type,data){
+	//cut constructor, which we return at the end of the factory
+	var cut = function(exp_name,tet_num,data_type,data,description){
 		
 		 // convention is to consider ._ as being private  
 		this._ = {
@@ -146,18 +196,21 @@ T.cut = function(){//class factory
 				N: 0 //number of spikes
 			};
 			
-		DoConstruction.call(this,data_type,data);
+		DoConstruction.call(this,data_type,data,description);
 	}
 	
-	// export some private functions, making them public
-	cls.prototype.GetGroup = GetGroup;
-	cls.prototype.GetProps = GetProps;
-	cls.prototype.GetFileStr = GetFileStr;	
-	cls.prototype.AddBToA = AddBToA;
-	cls.prototype.SwapBandA = SwapBandA;
-	cls.prototype.GetJSONString = GetJSONString;
-	cls.prototype.Undo = Undo;
+	// export some functions as part of the cut class (i.e. they become public)
+	cut.prototype.GetGroup = GetGroup;
+	cut.prototype.GetProps = GetProps;
+	cut.prototype.GetFileStr = GetFileStr;	
+	cut.prototype.AddBToA = AddBToA;
+	cut.prototype.SwapBandA = SwapBandA;
+	cut.prototype.GetJSONString = GetJSONString;
+	cut.prototype.Undo = Undo;
 	
-	return cls;
+	// export the cut class together with some explicitly static functions
+	return {cls: cut,
+			AddChangeCallback: AddChangeCallback,
+			AddActionCallback: AddActionCallback };
 }();
 
