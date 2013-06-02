@@ -6,3 +6,7 @@ var BuildWorker = function(foo){
    return  new Worker(window.URL.createObjectURL(
                       new Blob([str],{type:'text/javascript'})));
 }
+
+var SimpleClone = function(ob){
+	return JSON.parse(JSON.stringify(ob));
+}

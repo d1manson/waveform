@@ -7,13 +7,18 @@ T.CUT = function(){//class factory
 	//Correct me if I'm wrong, but I think this is considered an ok way of emulating OOP in javascript - DM
 	
 	//static private functions, variables, and classes (some of which may be exported at the bottom of the factory)
-	var changeCallbacks = []; //callbacks must be of the form foo(cut,changeFrom,changeTo,noInterior){ }, 
+	
+	//we have two lists of callbacks, which are usually triggered at the same time, but they serve slightly 
+	//different purposes and sometimes only the actionCallbacks get triggerd...
+	//the changeCallbacks should not worry about the exact action performed, only what the resulting change was, whereas the actioncallbacks
+	//dont actually care what the change is they just need to know what action occured.
+	var changeCallbacks = []; //callbacks must be of the form foo(cut,changeFrom,changeTo,noInterior,actionInfo){ }, 
 							  //where cut is the current cut object and changeFrom and changeTo give the range of modified cut groups, 
 							  //noInterior is true if only the from- and to- groups changed and not the groups inbetween
 							  //Note that the modules with these callbacks will recieve their first change event at the point a cut is constructed, 
 							  //they are expected to already have any other needed data by that point (so you need to provide it separately before the new cut)
 							  
-	var actionCallbacks = []; //callbacks must be of the form foo(info){} where info is an object with at least a string proeprty named description
+	var actionCallbacks = []; //callbacks must be of the form foo(cut,info){} where info is an object with at least a string proeprty named description
 	
 	//the undo stack is an array of these objects
 	var action = function(type,data,description){ 
@@ -30,6 +35,22 @@ T.CUT = function(){//class factory
 	}
 	//TODO: may want to implement RemoveCallback, which I think you can do by iterating through list and testing for equality of function objects
 	
+	var PushAction = function(type,data,description){
+		this._.actionStack.push(new action(type,data,description));
+		
+		TriggerActionCallbacks({description:description,type:type});
+	}
+	
+	var TriggerActionCallbacks = function(ob){
+		for(var i=0;i<actionCallbacks.length;i++)
+			actionCallbacks[i](this,SimpleClone(ob));
+	}
+	
+	var TriggerChangeCallbacks = function(a,b,flag){
+		for(var i=0;i<changeCallbacks.length;i++)
+			changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
+	}
+	
 	var DoConstruction = function(data_type,data,description){
 		switch (data_type){
 		
@@ -43,9 +64,9 @@ T.CUT = function(){//class factory
 					this._.cutInds[data[i]].push(i);//append to existing subarray
 			break;
 			
-		case 2:
+		case 2: //data is a string, previously exported from an instance of this class
 			this._ = JSON.parse(data); 
-			//TODO: might be worth validating everything
+			//TODO: might be worth validating everything and doing the JSON parse inside a try-catch
 			break;
 			
 		case 3: //data is already in the form we want cutInds to be
@@ -65,7 +86,7 @@ T.CUT = function(){//class factory
 		}
 		
 		PushAction.call(this,"load",{},description);
-		TriggerCallbacks.call(this,0,this._.cutInds.length,false);
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
 	}
 	
 	var GetJSONString = function(){
@@ -73,54 +94,59 @@ T.CUT = function(){//class factory
 		return JSON.stringify(this._); //this is sufficient at present because ._ data is simple, i.e. doesn't include any out-there object references and is not recursive
 	}
 	
-	var PushAction = function(type,data,description){
-		this._.actionStack.push(new action(type,data,description));
-		//TODO: trigger action callback
-	}
-	
 	var Undo = function(){
 		//this is going to be exported (=made public), it calls the relevant inverse operation (which are private)
-		if (this._.actionStack.length == 0)
+		//the inverse operations make a call to TriggerChangeCallbacks, but this function does the call to TriggerActionCallbacks
+		if (this._.actionStack.length == 0){
+			TriggerActionCallbacks.call(this,{description:"nothing to undo", type:"empty-actions"});
 			return;//nothing to undo
-			
+		}
+		
 		var action = this._.actionStack.pop();
 		var undone = true;
 		if(action.type=="add")
-			UndoAdd(action.data);
+			UndoAddBtoA.call(this,action.data);
 		else if(action.type=="swap")
-			UndoSwap(action.data);
+			UndoSwapBandA.call(this,action.data);
 		else if(action.type=="reorder")
-			UndoReorder(action.data);
+			UndoReorderAll.call(this,action.data);
 		else
 			undone = false;
 
 		if(undone){
-			//TODO: trigger action callback
+			TriggerActionCallbacks.call(this,{description:"",type:"undo"});
 		}else{
 			this._.actionStack.push(action);//put it back
-			//TODO: still ought to trigger action callback, providing info that action could not be undone
+			TriggerActionCallbacks.call(this,{description:"cannot undo '" + action.type + "' actions", type:"no-undo"});
 		}
 	}
+
 	
-	var TriggerCallbacks = function(a,b,flag){
-		for(var i=0;i<changeCallbacks.length;i++)
-			changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
-	}
-	
-	var AddBToA = function(a,b){
+	var AddBtoA = function(a,b){
 		var lenB = this._.cutInds[b].length;
 		this._.cutInds[a] = this._.cutInds[a].concat(this._.cutInds[b]);
 		this._.cutInds[b] = [];
-		PushAction("merge",[a,b,lenB],'merge group-' + b + ' into group-' + a);
-		TriggerCallbacks(a,b,true);
+		PushAction.call(this,"add",[a,b,lenB],'merge group-' + b + ' into group-' + a);
+		TriggerChangeCallbacks.call(this,a,b,true);
+	}
+	var UndoAddBtoA = function(data){
+		this._.cutInds[data[1]] = this._.cutInds[data[0]].splice(-data[2],data[2]);
+		TriggerChangeCallbacks.call(this,data[0],data[1],true);
 	}
 	
 	var SwapBandA = function(a,b){
 		var tmp = this._.cutInds[a];
 		this._.cutInds[a] = this._.cutInds[b];
 		this._.cutInds[b] = tmp;
-		PushAction("swap",[a,b],"swap group-" + a + " and group-" + b);
-		TriggerCallbacks(a,b,true);
+		PushAction.call(this,"swap",[a,b],"swap group-" + a + " and group-" + b);
+		TriggerChangeCallbacks.call(this,a,b,true);
+	}
+	var UndoSwapBandA = function(data){
+		//yes, this is self inverse but the actual code is a bit different...
+		var tmp = this._.cutInds[data[0]];
+		this._.cutInds[data[0]] = this._.cutInds[data[1]];
+		this._.cutInds[data[1]] = tmp;
+		TriggerChangeCallbacks(data[0],data[1],true);
 	}
 	
 	var ReorderAll = function(newOrder){
@@ -129,11 +155,17 @@ T.CUT = function(){//class factory
 		for(var i=0;i<newOrder.length;i++)
 			this._.cutInds.push(oldCutInds[newOrder[i]] || []);
 			
-		PushAction("reorder",newOrder,"reorder groups");
-		TriggerCallbacks(0,this._.cutInds.length,false);
+		PushAction.call(this,"reorder",newOrder,"reorder groups");
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
 	}
 	
-	//TODO: implement Undo* functions
+	var	UndoReorderAll = function(data){
+		var oldCutInds = this._.cutInds;
+		this._.cutInds = [];
+		while(data.length)
+			this._.cutInds[data.pop()] = oldCutInds.pop();
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
+	}
 	
 	var GetGroup = function(g){
 		return this._.cutInds[g] || [];
@@ -202,10 +234,10 @@ T.CUT = function(){//class factory
 	// export some functions as part of the cut class (i.e. they become public)
 	cut.prototype.GetGroup = GetGroup;
 	cut.prototype.GetProps = GetProps;
-	cut.prototype.GetFileStr = GetFileStr;	
-	cut.prototype.AddBToA = AddBToA;
+	cut.prototype.GetFileStr = GetFileStr;
+	cut.prototype.GetJSONString = GetJSONString; //note that this includes all the information needed to recreate the cut instance at a later date, whereas GetFileStr does not
+	cut.prototype.AddBtoA = AddBtoA;
 	cut.prototype.SwapBandA = SwapBandA;
-	cut.prototype.GetJSONString = GetJSONString;
 	cut.prototype.Undo = Undo;
 	
 	// export the cut class together with some explicitly static functions
