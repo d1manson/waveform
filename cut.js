@@ -45,19 +45,19 @@ T.CUT = function(){//class factory
 		for(var i=0;i<actionCallbacks.length;i++)
 			try{
 				actionCallbacks[i](this,SimpleClone(ob));
-			}catch(err){console.log("Error in TriggerActionCallbacks: " + err.message)}
+			}catch(err){console.log("Error in TriggerActionCallbacks: " + err.stack)}
 	}
 	
 	var TriggerChangeCallbacks = function(a,b,flag){
 		for(var i=0;i<changeCallbacks.length;i++)
 			try{
 				changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
-			}catch(err){console.log("Error in TriggerChangeCallbacks: " + err.message)}
+			}catch(err){console.log("Error in TriggerChangeCallbacks: " + err.stack)}
 	}
 	var ForceChangeCallback = function(fn){
 		try{
 			fn(this,0,this._.cutInds.length,false); //force a full change callback on the requested function
-		}catch(err){console.log("Error in ForceChangeCallback: " + err.message)}
+		}catch(err){console.log("Error in ForceChangeCallback: " + err.stack)}
 	}
 	
 	var DoConstruction = function(data_type,data,description){
@@ -88,7 +88,7 @@ T.CUT = function(){//class factory
 		case 4: //data is just N
 			this._.N = data;
 			var cut0 = [];
-			for(var i=0;i<N;i++)
+			for(var i=0;i<data;i++)
 				cut0.push(i);
 			this._.cutInds = [cut0]; //everything in group zero
 			break;
@@ -249,7 +249,7 @@ T.CUT = function(){//class factory
 	cut.prototype.SwapBandA = SwapBandA;
 	cut.prototype.ReorderAll = ReorderAll;
 	cut.prototype.Undo = Undo;
-	cut.prototype.ForceChangeCallback: ForceChangeCallback;
+	cut.prototype.ForceChangeCallback = ForceChangeCallback;
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,

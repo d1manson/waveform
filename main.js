@@ -187,8 +187,9 @@ T.ApplyRmSizeClick = function(){
 }
 
 T.SetupRatemaps = function(dontShow){
-	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(T.ORG.GetPosHeader().num_pos_samples),
-		parseInt((T.ORG.GetSetHeader().timebase),parseInt((T.ORG.GetPosHeader().sample_rate),parseInt(T.ORG.GetPosHeader().pixels_per_metre),T.binSizeCm);
+	var posHeader = T.ORG.GetPosHeader();
+	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(posHeader.num_pos_samples),
+		parseInt(T.ORG.GetSetHeader().timebase),parseInt(posHeader.sample_rate),parseInt(posHeader.pixels_per_metre),T.binSizeCm);
 	if(dontShow)
 		return;
 	T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData);
@@ -234,12 +235,12 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 				oW = oW || T.CanvasOuterWidth();
 				oH = oH || T.CanvasOuterHeight();
 
-				var $t = $("<div class='tile' id='tile_" + ind + "'>" +
+				var $t = $("<div class='tile' id='tile_" + i + "'>" +
 							"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
 							"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
 							"<div class='tile-over'><div class='tile-caption'></div></div></div>");
 				$t.mousedown(T.TileMouseDown);
-				$t.data("group_num",ind);
+				$t.data("group_num",i);
 				$t.canvas = $t.find('canvas');
 				$t.ctx = $t.canvas.get(0).getContext('2d'); //this is for drawing waveforms
 				$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
@@ -247,15 +248,13 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 
 				var prev = -1;
 				//append the new tile after the previous tile
-				if(ind<T.$tile_.length)for(prev=ind-1;prev>=0;prev--)if(T.$tile_[prev]) 
+				if(i<T.$tile_.length)for(prev=ind-1;prev>=0;prev--)if(T.$tile_[prev]) 
 					break;
 				if(prev >=0)
 					T.$tile_[prev].after($t);
 				else
 					T.$tilewall.append($t);
-				T.$tile_[ind] = $t;
-				return $t;
-				
+				T.$tile_[i] = $t;				
 			}
 			T.$tile_[i].caption.text("group " + i + " | " + len + " waves ");
 		}
@@ -368,7 +367,7 @@ T.CutActionCallback = function(cut,info){
 		$oldAction.remove();
 		return;
 	}
-	if (info.type == "empty-actions" || info.type = "no-undo"){
+	if (info.type == "empty-actions" || info.type == "no-undo"){
 		alert(info.description);
 		return
 	}
@@ -382,7 +381,7 @@ T.CutActionCallback = function(cut,info){
 	
 	var $newAction = $("<div class='action' data-action-num='" + info.num + "'><b>" + info.num + "</b>&nbsp;&nbsp;&nbsp;" + info.description + "</div>");
 	T.$action_.push($newAction); //store it in the array
-	T.$undo.after(newAction);
+	T.$undo.after($newAction);
 }
 
 

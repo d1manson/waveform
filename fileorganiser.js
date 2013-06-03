@@ -144,7 +144,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				if(!hLivingTet.alive || !hLivingCut.alive) return;
 				cCut = new CUT.cls(cExp.name,cTet,1,data.cut,"loaded from file");
 				cCutHeader = data.header;
-			}else if(filetype == "tet")
+			}else if(filetype == "tet"){
 				if(!hLivingTet.alive) return;
 				cTetBuffer = data.buffer;
 				cTetHeader = data.header;
@@ -152,7 +152,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				if(cState.cut == 0){//if there is no cut we make a null cut once we know how many spikes there are
 					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
 				}	
-			else if(filetype == "set")
+			}else if(filetype == "set"){
 				cSetHeader = data.header;
 			}else if(filetype = "pos"){
 				cPosBuffer = data.buffer;
@@ -303,7 +303,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 	}
 	var MarkCurrentExp = function(){
 		document.title = cExp.name + ' [Cutting GUI]';
-    	for(var i=0;i<exps.length;i++)if(i!=exp_ind)
+    	for(var i=0;i<exps.length;i++)if(i!=cExp)
     		exps[i].$div.removeAttr("active");
     	cExp.$div.attr("active","true"); 
 	}
@@ -328,7 +328,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			GetTetHeader: function(){return cTetHeader;},
 			GetPosBuffer: function(){return cPosBuffer;},
 			GetPosHeader: function(){return cPosHeader;},
-			GetCut: function(){return cCut;}
+			GetCut: function(){return cCut;},
+			GetCutHeader: function(){return cCutHeader;}
             };
     
 }(//Use T.ORG constructor with the following inputs
