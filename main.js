@@ -1,9 +1,7 @@
 "use strict";
 
 var T = {};
-T.header = {};
 T.Tool = {};
-T.buffer = 0;
 T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.paletteMode = 0;
@@ -31,11 +29,12 @@ T.PlotPos = function(){
 	var ctx = T.$posplot.get(0).getContext('2d');
 	ctx.clearRect(0 , 0 , T.POS_PLOT_WIDTH, T.POS_PLOT_HEIGHT);
 
-	var data = new Int16Array(T.posBuffer);
+	var data = new Int16Array(T.ORG.GetPosBuffer());
+	var header = T.ORG.GetPosHeader();
 	var elementsPerPosSample = T.BYTES_PER_POS_SAMPLE/2;
-	var end = parseInt(T.posHeader.num_pos_samples) * elementsPerPosSample; 
-	var xs = T.POS_PLOT_WIDTH/(parseInt(T.posHeader.window_max_x)-parseInt(T.posHeader.window_min_x));
-	var ys = T.POS_PLOT_HEIGHT/(parseInt(T.posHeader.window_max_y)-parseInt(T.posHeader.window_min_y));
+	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
+	var xs = T.POS_PLOT_WIDTH/(parseInt(header.window_max_x)-parseInt(header.window_min_x));
+	var ys = T.POS_PLOT_HEIGHT/(parseInt(header.window_max_y)-parseInt(header.window_min_y));
 	var s = xs<ys? xs: ys;//min of the two
 	ctx.beginPath();
 	ctx.strokeStyle = "RGB(0,0,0)";
@@ -47,87 +46,29 @@ T.PlotPos = function(){
 }
 
 
-T.BuildCutIndices = function(cut){
-	//TODO: switch to T.CUT
-	T.cutInds = [[]];
-	for(var i=0;i<cut.length;i++)
-		if(T.cutInds[cut[i]] == undefined)
-			T.cutInds[cut[i]] = [i];//new subarray
-		else
-			T.cutInds[cut[i]].push(i);//append to existing subarray
+T.FinishedLoadingFile = function(status,filetype){
+	//status is an object with a field for each of the file types ["pos","set","tet","cut"] the values have the following meanings:
+	//	0 - file does not exist
+	//	1 - file exists but has not been delivered here yet
+	//  2 - this is the file currently being delievered - see the data object
+	//  3 - file has already been delivered
+	//  Note that in each round of loading files there will be an initial call with a null filetype, indicating what ui data needs to be flushed.
+	// filetype just tells us which item in status is 2, or is null if none of them are.
+	
+
+	//TODO sort out what should be done with the status information
+	T.DispHeaders();
+	T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
+	T.ApplyChannelChoice(T.chanIsOn);
+	T.WV.SetPaletteMode(T.paletteMode);
+	T.PlotPos();
+	T.SetupRatemaps();
     
-	if(T.FS.GetPendingReadCount() == 0 && T.PAR.GetPendingParseCount() == 0) 
-		T.WV.SetGroupData(T.cutInds);
-	//----------------------------------------------
-}
-
-T.RemoveTile = function(ind){
-	if(ind == undefined){
-		T.$tilewall.html("");
-        T.$tile_.splice(0,T.$tile_.length); //remove all without creating a new array instance	
-	}else{
-        T.$tile_[ind].remove();
-        T.$tile_[ind] = null;
-	}
-}
-
-T.AddTile = function(ind,iW,iH,oW,oH){
-	//calling function can help us out here if it already knows what these values are, otherwise we get them ourselves
-	iW = iW || T.WV.CanvasInnerWidth(); 
-	iH = iH || T.WV.CanvasInnerHeight();
-	oW = oW || T.CanvasOuterWidth();
-	oH = oH || T.CanvasOuterHeight();
-
-	var $t = $("<div class='tile' id='tile_" + ind + "'>" +
-				"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
-				"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
-				"<div class='tile-over'><div class='tile-caption'></div></div></div>");
-	$t.mousedown(T.TileMouseDown);
-	$t.data("group_num",ind);
-	$t.canvas = $t.find('canvas');
-	$t.ctx = $t.canvas.get(0).getContext('2d'); //this is for drawing waveforms
-	$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
-    $t.caption = $t.find('.tile-caption');
-
-	var prev = -1;
-	//append the new tile after the previous tile
-	if(ind<T.$tile_.length)for(prev=ind-1;prev>=0;prev--)if(T.$tile_[prev]) 
-		break;
-	if(prev >=0)
-		T.$tile_[prev].after($t);
-	else
-		T.$tilewall.append($t);
-    T.$tile_[ind] = $t;
-	return $t;
-}
-
-T.FinishedLoadingFile = function(){
-    if(T.FS.GetPendingReadCount() == 0 && T.PAR.GetPendingParseCount() == 0){
-        T.RemoveTile();//Clear all...TODO: clear cutInds, buffers and T.WV and T.RM, though actually we only need to clear stuff if the experiment is new
-        T.DispHeaders();
-		if(T.cutInds){
-			var iW = T.WV.CanvasInnerWidth(); 
-			var iH = T.WV.CanvasInnerHeight();
-			var oW = T.CanvasOuterWidth();
-			var oH = T.CanvasOuterHeight();
-			T.WV.Setup(parseInt(T.N),T.buffer);
-			T.ApplyChannelChoice(T.chanIsOn);
-			for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
-				T.AddTile(i,iW,iH,oW,oH);
-			T.WV.SetPaletteMode(T.paletteMode);
-			T.WV.SetGroupData(T.cutInds);
-			T.WV.Render();
-		}
-		if(T.posBuffer)
-			T.PlotPos();
-		if(T.posBuffer && T.buffer)
-			T.SetupRatemaps();
-    }
 }
 
 
 T.DispHeaders = function(){
-	var headerlist = [T.header,T.cutProps,T.posHeader,T.setHeader];
+	var headerlist = [T.ORG.GetSetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
 	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
 
@@ -215,10 +156,11 @@ T.ChannelButtonClick = function(evt){
 	}
 	T.ApplyChannelChoice(setChans,setMaps);
 	
+	//we only need to render waveforms or ratemaps, not both
 	if(thisVal < T.MAPS_START)
-		T.WV.Render(); //if we removed all channels or just changed maps we don't need to re-render waveforms
+		T.WV.Render(); 
 	else
-		T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+		T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData); //T.RM doesn't remember anything, so to render we need to send it all the group info
 }
 
 
@@ -245,11 +187,11 @@ T.ApplyRmSizeClick = function(){
 }
 
 T.SetupRatemaps = function(dontShow){
-	T.RM.Setup(T.buffer,T.posBuffer,parseInt(T.N),parseInt(T.posHeader.num_pos_samples),
-		parseInt(T.header.timebase),parseInt(T.posHeader.sample_rate),parseInt(T.posHeader.pixels_per_metre),T.binSizeCm);
+	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(T.ORG.GetPosHeader().num_pos_samples),
+		parseInt((T.ORG.GetSetHeader().timebase),parseInt((T.ORG.GetPosHeader().sample_rate),parseInt(T.ORG.GetPosHeader().pixels_per_metre),T.binSizeCm);
 	if(dontShow)
 		return;
-	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
+	T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData);
 }
 
 T.ApplyCanvasSizes = function(){
@@ -265,31 +207,79 @@ T.StoreData = function(){
 	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
 	localStorage.tet = T.ORG.GetTet();
 	localStorage.WV_SCALE = T.X_SCALE;
-	localStorage.cutInds = T.cutInds ? JSON.stringify(T.cutInds) : "[]";
+	//TODO store cuts
 	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.binSizeCm;
 	localStorage.state = 1;
 	
 }
 
+T.SetGroupDataTiles = function(cut,from,to,flag){
+	//controls the adding, removing and caption-setting for tiles
+	var iW, iH, oW, oH;
+	
+	//TODO: this should be the only place we add/remove tiles, so would make more sense to inline it here
+	for(var i=from;i<=to;i++){
+		var len = cut.GetGroup(i).length;
+		
+		if(len==0){
+			if(T.$tile_[i]){ //we don't want this tile, and it currently exists, so need to remove it
+				T.$tile_[i].remove();
+				T.$tile_[i] = null;
+			}
+		}else{
+			if(!T.$tile_[i]){ //we want this tile and we've not yet created it
+				iW = iW || T.WV.CanvasInnerWidth(); 
+				iH = iH || T.WV.CanvasInnerHeight();
+				oW = oW || T.CanvasOuterWidth();
+				oH = oH || T.CanvasOuterHeight();
 
+				var $t = $("<div class='tile' id='tile_" + ind + "'>" +
+							"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
+							"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
+							"<div class='tile-over'><div class='tile-caption'></div></div></div>");
+				$t.mousedown(T.TileMouseDown);
+				$t.data("group_num",ind);
+				$t.canvas = $t.find('canvas');
+				$t.ctx = $t.canvas.get(0).getContext('2d'); //this is for drawing waveforms
+				$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
+				$t.caption = $t.find('.tile-caption');
+
+				var prev = -1;
+				//append the new tile after the previous tile
+				if(ind<T.$tile_.length)for(prev=ind-1;prev>=0;prev--)if(T.$tile_[prev]) 
+					break;
+				if(prev >=0)
+					T.$tile_[prev].after($t);
+				else
+					T.$tilewall.append($t);
+				T.$tile_[ind] = $t;
+				return $t;
+				
+			}
+			T.$tile_[i].caption.text("group " + i + " | " + len + " waves ");
+		}
+	}
+}
 
 T.DocumentReady = function(){
 
     T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
-    
+	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
+	T.CUT.AddChangeCallback(T.WV.SetGroupData);
+	T.CUT.AddChangeCallback(T.RM.SetGroupData);
+	T.CUT.AddActionCallback(T.CutActionCallback);
+	
 	if(localStorage.state){
-		T.ORG.SwitchToTet(localStorage.tet || 1 ,null);
+		T.ORG.SwitchToTet(localStorage.tet || 1);
 		T.X_SCALE = localStorage.WV_SCALE || 2;
 		T.Y_SCALE = T.X_SCALE / T.Y_SCALE_BASE;
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
-		T.$rm_bin_size = T.binSizeCm;
+		T.$rm_bin_size.val(T.binSizeCm);
 		T.$size_input.val(T.X_SCALE);
-		//TODO: switch to T.CUT
-		T.cutInds = JSON.parse(localStorage.cutInds);
-		if(T.cutInds.length>0)
-			T.AddAction({description: "load cut from localStorage"});
-		//---------------------------
+		
+		//TODO: load files into T.cut instances
+		
 		T.ApplyChannelChoice(JSON.parse(localStorage.chanIsOn));
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
@@ -318,33 +308,6 @@ T.HideHelp = function(){
 	T.$help_panel_wrapper.css({display: 'none'});
 }
 
-T.FinishedLoadingTet = function(header,buffer){
-    T.header = header;
-    T.buffer = buffer;
-    T.N = header.num_spikes;
-    T.FinishedLoadingFile();
-}
-
-T.FinishedLoadingPos = function(header,buffer){
-    T.posHeader = header;
-    T.posBuffer = buffer;
-    T.FinishedLoadingFile();
-}
-
-T.FinishedLoadingCut = function(cut,props){
-    //TODO: switch to T.CUT
-    T.cutProps = props;
-    T.BuildCutIndices(cut);
-    T.ClearActions();
-	T.AddAction({description: "load cut from file"});
-	T.FinishedLoadingFile();
-}
-
-T.FinishedLoadingSet = function(header){
-	T.setHeader = header;
-	T.FinishedLoadingFile();
-}
-
 T.TogglePalette = function(){
 	T.paletteMode = T.paletteMode  ? 0: 1;
 	T.WV.SetPaletteMode(T.paletteMode);
@@ -366,23 +329,11 @@ T.RunAutocut = function(){
 		chan = 1;
 	}
 	T.ClearActions();
-	T.AC.DoAutoCut(chan+1,parseInt(T.N),T.buffer,T.AutocutFinished);
+	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
 }
 
 T.AutocutFinished = function(cut,chan){
-	//TODO: switch to T.CUT
-    T.cutInds = cut;
-    T.RemoveTile(); //clears all
-	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
-		T.AddTile(i);
-	T.ApplyCanvasSizes();
-	if(!T.WV.IsReady()) 
-		T.WV.Setup(parseInt(T.N),T.buffer);
-	T.WV.SetGroupData(T.cutInds);
-	T.WV.Render();
-	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
-	T.AddAction({description: 'autocut subsample on channel-' + chan})
-	//------------------------------
+	T.ORG.newCut(cut,{description: 'autocut subsample on channel-' + chan});
 }
 
 T.ToggleFS = function(newState){
@@ -409,96 +360,52 @@ T.ToggleElementState = function(el){
 	}
 }
 
-T.AddAction = function(action){
-    //TODO: switch to T.CUT
-	action.num = T.actions[T.actions.length-1].num + 1;
-	if(action.num == 1)
-		T.$undo.show();
 
-	action.$div = $("<div class='action' data-action-num='" + action.num + "'><b>" + action.num + "</b>&nbsp;&nbsp;&nbsp;" + action.description + "</div>");
-	T.actions.push(action);
-	//--------------------------
-	
-	//insert after the undo button
-	T.$undo.after(action.$div);
-}
 
-T.UndoLastAction = function(){
-	//TODO: switch to T.CUT
-	var action = T.actions.pop();
-	var undone = false;
-	if(action.type=="merge"){
-		T.Tool.UndoMerge(action);
-		undone = true;
-	}else if(action.type=="reorder"){
-		T.UndoReorderCut(action);
-		undone = true;
+T.CutActionCallback = function(cut,info){
+	if(info.type == "undo"){
+		var $oldAction = T.$action_.pop();
+		$oldAction.remove();
+		return;
 	}
-
-	if(undone){
-		action.$div.remove();
-		if(T.actions.length == 1)
-			T.$undo.hide();
-	}else{
-		T.actions.push(action);//put it back
-		alert("Sorry, no undo.");
+	if (info.type == "empty-actions" || info.type = "no-undo"){
+		alert(info.description);
+		return
 	}
-	//------------------------------
+	
+	if (info.type == "load"){
+		//remove any existing action elements and then go on to add the new one
+		T.$action_ = T.$action_ || [];
+		while(T.$action_.length)
+			T.$action_.pop().remove(); //remove all action elements from page	
+	}
+	
+	var $newAction = $("<div class='action' data-action-num='" + info.num + "'><b>" + info.num + "</b>&nbsp;&nbsp;&nbsp;" + info.description + "</div>");
+	T.$action_.push($newAction); //store it in the array
+	T.$undo.after(newAction);
 }
 
-T.ClearActions = function(){
-	//TODO: switch to T.CUT
-	
-	//clear all but the zeroth action
-	while(T.actions.length>1)
-		T.actions.pop().$div.remove();
-	T.$undo.hide();
-	//-----------------------
-}
 
 T.ReorderCut = function(){
+	//reorder the cut based on number of spikes per group
+
+	var groups = []; //we build an array of (ind,len) pairs that we can then sort by <len>.
 	
-	//get the sorting order for the cutInds
-	var groups = [];
-	for(var i=0;i<T.cutInds.length;i++)
+	var cut = T.ORG.GetCut();
+	var G = cut.GetProps().G;
+	for(var i=0;i<G;i++)
 		groups.push({ind: i,
-					 len: T.cutInds[i] ? T.cutInds[i].length : 0});
+					 len: cut.GetGroup(i).length});
 	groups.sort(function(a,b){return b.len-a.len;});
-	//sorting order is in groups[].ind
-
-	//TODO: switch to T.CUT
-	var action = {inverseOrder: [],description: "reorder",type:"reorder"};
-	var oldCutInds = T.cutInds;
-	T.cutInds = [];
-	for(var i=0;i<groups.length;i++){
-		action.inverseOrder.push(groups[i].ind);
-		T.cutInds.push(oldCutInds[groups[i].ind] || []);
-	}
-	T.AddAction(action);
-	T.RemoveTile(); //easiest thing is remove all and start again
-	T.WV.SetGroupData(T.cutInds);
-	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
-		T.AddTile(i);
-	T.WV.Render();
-	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
-	//---------------------------------
+	
+	//sorting order is in groups[].ind, now pull the inds out into their own array...
+	var inds = [];
+	while(groups.length)
+		inds.push(groups.unshift().ind);
+	
+	cut.ReorderAll(inds);
 }
 
-T.UndoReorderCut = function(action){
-	//TODO: switch to T.CUT
-	var oldCutInds = T.cutInds;
-	T.cutInds = [];
-	for(var i=0;i<action.inverseOrder.length;i++){
-		T.cutInds[action.inverseOrder[i]] = oldCutInds[i];
-	}
-	T.RemoveTile(); //easiest thing is remove all and start again
-	T.WV.SetGroupData(T.cutInds);
-	for(var i=0;i<T.cutInds.length;i++)if(T.cutInds[i] && T.cutInds[i] !== undefined && T.cutInds[i].length)
-		T.AddTile(i);
-	T.WV.Render();
-	T.RM.SetGroupData(T.cutInds,0,T.cutInds.length);
-	//--------------------------------
-}
 
 T.ShowFileSystemLoaded = function(file_names){
 	if(!file_names || file_names.length == 0){
@@ -551,7 +458,7 @@ $('#apply_rm_size').click(T.ApplyRmSizeClick);
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
-
+T.$tilewall.on("mousedown",".tile",T.TileMouseDown); //TODO: check this works
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 

@@ -45,32 +45,12 @@ T.Tool.MergerTileMouseUp = function(event){
 				ind_a = tmp;
 			}
 			
-			//TODO: switch to T.CUT
-			T.AddAction({description: 'merge group-' + ind_b + ' into group-' + ind_a,
-						 type: "merge",
-						 dest_ind: ind_a,
-						 second_ind: ind_b,
-						 lengthSecond: T.cutInds[ind_b].length});
-			T.cutInds[ind_a] = T.cutInds[ind_a].concat(T.cutInds[ind_b]);
-			T.cutInds[ind_b] = [];
-			T.RemoveTile(ind_b);
-			T.WV.SetGroupData(T.cutInds);
-			T.WV.Render(ind_a,ind_a); //only render the merged group
-			//-----------------------
-			
+			T.ORG.GetCut().AddBtoA(ind_b,ind_a);
 		}
 	}
 	delete T.Tool.activeMerger;
 }
 
-T.Tool.UndoMerge = function(action){
-	//TODO: switch to T.CUT
-	T.cutInds[action.second_ind] = T.cutInds[action.dest_ind].splice(-action.lengthSecond,action.lengthSecond);
-	T.AddTile(action.second_ind);
-	T.WV.SetGroupData(T.cutInds);
-	T.WV.Render(action.dest_ind,action.second_ind); //render all groups from the first to the second. TODO: only render the two groups in question
-	//----------------------
-}
 
 T.TileMouseUp = function(event){
 	if(T.Tool.activeMerger && event.button == 0)

@@ -6,13 +6,35 @@
 // It is also responsible for content and interactivity of the files pannel div.
 
 
-T.ORG = function($files_panel,$document,$drop_zone, PAR,
-                    FinishedLoadingTet,FinishedLoadingCut,FinishedLoadingPos,FinishedLoadingSet,FinishedLoadingFile){
+T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCallback,CUT){
     
     var exps = [];
-    var cExp = {}; //current exp object
-    var cTet = -1; //current tetrode number
-    
+	
+	//used for canceling asynchrounus loads/parses, see InternalPARcallback for useage
+	var living = function(){this.alive=true;}
+
+	//c prefix means "current"
+    var cExp = {}; //exp object
+    var cTet = -1; //tetrode number
+    var cCut = null; //cut object
+	var cN = null; // number of spikes
+	var cCutHeader = null; //object with key name pairs
+	var cTetBuffer = null; //arraybuffer
+	var cTetHeader = null; //object with key name pairs
+	var cPosBuffer = null; //arraybuffer
+	var cPosHeader = null; //object with key name pairs
+	var cSetHeader = null; //object with key name pairs
+	var cLivingExp = new living();
+	var cLivingTet = new living();
+	var cLivingCut = new living();
+	var cState = {set:0,pos:0,cut:0,tet:0}; 
+		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
+			//	0 - file does not exist
+			//	1 - file exists but has not been read from file or parsed yet
+			//  2 - the file is being announced to the callback
+			//  3 - the file has been previously announced
+					
+					
     var EXP_PROPS = function(){
 				this.name = null;
 				this.pos = null;
@@ -27,25 +49,24 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     var REGEX_FILE_EXT = /\.([0-9a-z]+)$/i;
     
     var recoveringFilesFromStorage = false;
-    var pendingDropFiles = 0;
+    var pendingNewFiles = 0;
     
     var RecoverFilesFromStorage = function(){
     	//takes the files in storage and calls the code as though they had been dropped afresh on the window
     	recoveringFilesFromStorage = true;
         T.FS.GetFileHandleList(NewFiles);
-        if($drop_zone){
-            $drop_zone.remove();
-            $drop_zone = null;
-        }
+		HideDropZone();
     }
 
     var NewFiles = function(files){
-    	pendingDropFiles = files.length;
-    	
+		//this function iterates through a list of file handles, calling GotFileDetails for each file, either synchronously or asynchrously
+		//it also stores the files for later use (unless we are currently getting files from storage)
+		
+    	pendingNewFiles = files.length;
         for(var i =0; i <files.length;i++){
             
-            if(!recoveringFilesFromStorage)
-    			T.FS.WriteFile(files[i].name,files[i]); //store the file in filesystem
+            if(!recoveringFilesFromStorage) //TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
+    			T.FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 
                 
             var ext = REGEX_FILE_EXT.exec(files[i].name);
             ext = ext[1];
@@ -60,29 +81,17 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
             else if(!isNaN(parseInt(ext)))
     			GotFileDetails(files[i].name,base,"tet",parseInt(ext));
     		else{
-    			pendingDropFiles--;//unknown file type
-				if(pendingDropFiles == 0)
+    			pendingNewFiles--;//unknown file type
+				//TODO: see note in equivalent bit of code in GotFileDetails
+				if(pendingNewFiles == 0)
 					DispFiles();
     		}
-    		
         }      
     }
 
-    var DocumentDropFile = function(evt){
-        evt = evt.originalEvent;
-        evt.stopPropagation();
-        evt.preventDefault();
-        if($drop_zone){
-            $drop_zone.remove();
-            $drop_zone = null;
-        }
-    	T.HideHelp(); //in case it was being shown
-        recoveringFilesFromStorage = false;
-        NewFiles(evt.dataTransfer.files); // FileList object.
-    }
-
-    //TODO: need to pass this as a callback to LoadCut2
     var GotFileDetails = function(file_name,exp_name,ext,tet){
+		//this function stores the file's name in the relevant place in our list of experiments
+		
     	var exp, i;
     	for(i=0,exp=exps[0]; i<exps.length; i++,exp=exps[i]) if(exp && exp.name && exp.name == exp_name)
     		break;	
@@ -108,15 +117,117 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     		exp.tets[tet].tet = file_name;
     	}
     	
-    	pendingDropFiles--;
-        if(pendingDropFiles == 0){
+		//TODO: should immediately display what we have and then as new things come along we should add them to the list, and if they are relevant top the current
+		// exp-tet we should load them (except in the case of a new cut when we already have a cut)
+    	pendingNewFiles--;
+        if(pendingNewFiles == 0){
            DispFiles();
     	   //SwitchToExpTet(0,1); //TODO: cant do this because we need to wait for async writes to complete before we can read them
     	}
     }
 
 
-    var DispFiles = function(){
+	var InternalPARcallback = function(filetype){
+		//this function is used by SwitchToExpTet and SwitchToTet to generate a closure for dealing with newly parsed files
+		
+		cState[filetype] = 1; //remember that we are loading this filetype
+		
+		// store some instance handles for use in the closure below.
+		// Note the heirarchy which we enforce with if-returns: exp > tet > cut
+		var hLivingExp  = cLivingExp; 
+		var hLivingTet = cLivingTet;
+		var hLivingCut = cLivingCut;
+		return function(data){
+			if(!hLivingExp.alive) return;
+						
+			if (filetype == "cut"){
+				if(!hLivingTet.alive || !hLivingCut.alive) return;
+				cCut = new CUT.cls(cExp.name,cTet,1,data.cut,"loaded from file");
+				cCutHeader = data.header;
+			}else if(filetype == "tet")
+				if(!hLivingTet.alive) return;
+				cTetBuffer = data.buffer;
+				cTetHeader = data.header;
+				cN = parseInt(data.header.num_spikes);
+				if(cState.cut == 0){//if there is no cut we make a null cut once we know how many spikes there are
+					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
+				}	
+			else if(filetype == "set")
+				cSetHeader = data.header;
+			}else if(filetype = "pos"){
+				cPosBuffer = data.buffer;
+				cPosHeader = data.header;
+			}
+			
+			cState[filetype] = 2; // tell the callback that this is the filetype that has just loaded
+			FinishedLoadingFileCallback(cState,filetype);
+			cState[filetype] = 3; //next time we shall tell the callback that it has ben told about this filetype
+		}
+	}
+
+    var SwitchToExpTet = function(exp_ind,tet_ind){
+    	cExp = exps[exp_ind];	
+		MarkCurrentExp();
+    
+		cLivingExp.alive = false; //if there was anything previously loading, we need to stop it
+		cSetHeader = null;
+		cPosHeader = null; cPosBuffer = null;
+        cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; //we are starting from scratch here
+
+		cLivingExp = new living();		
+		// load pos and set if they exist
+		if(cExp && cExp.pos)
+            T.FS.ReadFile(cExp.pos,PAR.LoadPos,InternalPARcallback("pos"));
+        if(cExp && cExp.set)
+            T.FS.ReadFile(cExp.set,PAR.LoadSet,InternalPARcallback("set"));
+			
+		SwitchToTet(tet_ind); //load tet and cut if they exist, this will trigger the null call to FinishedLoadingFileCallback
+    }
+	
+    var SwitchToTet = function(tet_ind){
+		cTet = tet_ind;
+		MarkCurrentTet();
+		
+		cLivingTet.alive = false; //if there were any tet or cut files loading we need to stop them
+		cN = null;
+		cCut = null; //TODO: don't want to just lose the cut, need to store it in the exps array
+		cTetHeader = null; cTetBuffer = null;
+		cState.cut = 0; cState.tet = 0; //we leave pos and set alone
+				
+		cLivingTet = new living(); 
+		// load tet and cut if they exist
+    	if(cExp &&  cExp.tets && cExp.tets[cTet]){
+    		if(cExp.tets[cTet].tet)
+    			T.FS.ReadFile(cExp.tets[cTet].tet,PAR.LoadTetrode,InternalPARcallback("tet"));		
+    		if(cExp.tets[cTet].cut_names[0])
+    			T.FS.ReadFile(cExp.tets[cTet].cut_names[0],PAR.LoadCut,InternalPARcallback("cut"));	
+    	}
+       
+	    FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+    }
+
+
+
+	//TODO: can do better than this mess of DOM-using functions =================================================
+	var DocumentDropFile = function(evt){
+        evt = evt.originalEvent;
+        evt.stopPropagation();
+        evt.preventDefault();
+        if($drop_zone){
+            $drop_zone.remove();
+            $drop_zone = null;
+        }
+    	T.HideHelp(); //in case it was being shown
+        recoveringFilesFromStorage = false;
+        NewFiles(evt.dataTransfer.files); // FileList object.
+    }
+	var HideDropZone = function(){
+	    if($drop_zone){
+            $drop_zone.remove();
+            $drop_zone = null;
+        }
+	}
+	var DispFiles = function(){
     	exps.sort(function(a,b){return a.name==b.name ? 0 : a.name>b.name ? 1 : -1; });
     	
     	$files_panel.html("");
@@ -143,7 +254,6 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     		$files_panel.append(exp.$div);
     	}
     	
-    	
     	var str = ["<div class='button_group'>"];
     	for(i=0;i<available_tets.length;i++)if(available_tets[i])
     		str.push("<input type='radio' name='tetrode' id='tetrode" + i + "' value='" + i + "'/><label for='tetrode" + i + "'>t" + i +"</label>");
@@ -152,101 +262,77 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR,
     	
     	for(i=0;i<available_tets.length;i++)if(available_tets[i]){
     		$('#tetrode' + i).prop('checked',true);
-    		SwitchToTet(i,null);
+			cTet = i;
+			MarkCurrentTet();
     		break;
     	}
     	recoveringFilesFromStorage = false; // may already have been false, but now it definitely is
     }
-
-    var SwitchToExpTet = function(exp_ind,tet_ind){
-    	var exp = exps[exp_ind];
-    	cExp = exp;
-    	
-    	//toggle off the active attr on all but the new exp
-    	for(var i=0;i<exps.length;i++)if(i!=exp_ind)
-    		exps[i].$div.removeAttr("active");
-    	exp.$div.attr("active","true"); 
-    	
-    	document.title = exp.name + ' [Cutting GUI]';
-        SwitchToTet(tet_ind,exp);
-    	//	TODO: pos and set file
-    
-    }
-
-
-    var SwitchToTet = function(tet_ind,exp){
-    	cTet = tet_ind;
-        $files_panel.find('[tet]').removeAttr("active");
-    	$files_panel.find('[tet=' + tet_ind + ']').attr("active","");
-        
-        if(recoveringFilesFromStorage || exp == null)
-            return; //here we dont actually load anything
-            
-    	if(exp &&  exp.tets && exp.tets[tet_ind]){
-    		if(exp.tets[tet_ind].tet)
-    			T.FS.ReadFile(exp.tets[tet_ind].tet,PAR.LoadTetrode,FinishedLoadingTet);		
-    		if(exp.tets[tet_ind].cut_names[0])
-    			T.FS.ReadFile(exp.tets[tet_ind].cut_names[0],PAR.LoadCut,FinishedLoadingCut);	
-    	}
-        if(exp && exp.pos)
-            T.FS.ReadFile(exp.pos,PAR.LoadPos,FinishedLoadingPos);
-        if(exp && exp.set)
-            T.FS.ReadFile(exp.set,PAR.LoadSet,FinishedLoadingSet);
-        
-        if(T.FS.GetPendingReadCount() == 0){ //if none of the files were avaialble we still call FinishLoadingFiles so that we clear the previous tet-ind
-            alert('no pos data and no data for tetrode ' + tet_ind);
-            FinishedLoadingFile();
-        }
-    
-    }
-
     var TetrodeRadioClick = function(){
-        var oldTet = cTet;
     	var newTet = parseInt($(this).val());
-    	SwitchToTet(newTet,cExp);
+    	SwitchToTet(newTet);
     }
-
     var FileGroupClick = function(evt){
     	SwitchToExpTet($(this).data("index"),cTet);
-    }
-    
-    
+    }    
     var DocumentDragOver = function (evt) {
         evt = evt.originalEvent;
         evt.stopPropagation();
         evt.preventDefault();
         evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
     }
-      
-    var GetExp = function(ind){
-		if(ind === undefined)
-			return {name: cExp.name};
-		else
-			return {name: exps[ind].name};
-    }
-    
-    var GetTet = function(){
-        return cTet;
-    }
-    
-
+	var SaveFileDragStart = function(evt){
+		var exp = exps[$(this).data('expind')];
+		var bricktype = $(this).data('bricktype');
+		
+		if (bricktype == 'new cut')
+			SaveCutDragStart(evt,exp,cTet,cCut);//TODO: we don't really want cTet and cCut we want to know which tet and cut were actually clicked on
+			
+		//todo: for completeness it might be nice to implement dragging of other files too
+	}
+	var SaveCutDragStart = function(evt,exp,tet,cut){
+		var b = new Blob([cut.GetFileStr()], {type: 'text/plain'}); 
+		var blobURL = window.URL.createObjectURL(b);
+		var filename = exp.name + "_" + tet +".cut";
+		evt.originalEvent.dataTransfer.setData("DownloadURL",'application/octet-stream:' + filename +':' + blobURL);
+		return true;
+	};
+	var MarkCurrentTet = function(){
+		$files_panel.find('[tet]').removeAttr("active");
+    	$files_panel.find('[tet=' + cTet + ']').attr("active","");
+	}
+	var MarkCurrentExp = function(){
+		document.title = cExp.name + ' [Cutting GUI]';
+    	for(var i=0;i<exps.length;i++)if(i!=exp_ind)
+    		exps[i].$div.removeAttr("active");
+    	cExp.$div.attr("active","true"); 
+	}
+	window.URL = window.webkitURL || window.URL;
+	$files_panel.on("dragstart",".file_brick",SaveFileDragStart);
     $document.on("dragover", DocumentDragOver) 
              .on("drop", DocumentDropFile);
     $files_panel.on("click",".file_group",FileGroupClick)
                 .on("change","input[name=tetrode]:radio",TetrodeRadioClick);
+	//=======================================================
+  
     
-    
-    return { //expose some of the functions
+    return { //expose some of the functions, and a few read-only things via simple Get* functions
             SwitchToTet: SwitchToTet, 
-            RecoverFilesFromStorage: RecoverFilesFromStorage,
             SwitchToExpTet: SwitchToExpTet,
-            GetExp: GetExp,
-            GetTet: GetTet
+			RecoverFilesFromStorage: RecoverFilesFromStorage,
+            GetExp: function(ind){return ind === undefined? {name: cExp.name} : {name: exps[ind].name};},
+			GetSetHeader: function(){return cSetHeader;},
+            GetTet: function(){return cTet;},
+			GetN: function(){return cN;},
+			GetTetBuffer: function(){return cTetBuffer;},
+			GetTetHeader: function(){return cTetHeader;},
+			GetPosBuffer: function(){return cPosBuffer;},
+			GetPosHeader: function(){return cPosHeader;},
+			GetCut: function(){return cCut;}
             };
     
 }(//Use T.ORG constructor with the following inputs
-$('#files_panel'),$(document),$('.file_drop'),T.PAR,T.FinishedLoadingTet,
-T.FinishedLoadingCut,T.FinishedLoadingPos,T.FinishedLoadingSet,T.FinishedLoadingFile
+$('#files_panel'),$(document),$('.file_drop'),T.PAR,T.FinishedLoadingFile, T.CUT
 );
 
     

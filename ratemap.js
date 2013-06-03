@@ -140,15 +140,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		//TODO: if division really is slow, it may even be while inverting all the elements in the smoothedDwellCounts matrix
 	}
 	
-	var SetGroupData = function(cutInds,firstGroup,lastGroup){
+	var SetGroupData = function(cut,firstGroup,lastGroup){
 		if(!mapIsOn[0])
 			return;
 		// the function only looks at the elements in cutInds between first and last group, though they can be null or undefined in which case it does the whole of cutInds
 		//for each cutGroup it builds a spikeCount map, smooths it, divides by the dwell count, applies a colorpalette to the result and outputs a matrix to be used as image data.
 		//For each cutGroup the peak rate is stored in an array and output at the end as a single list.
 		//by output here we mean postmessage
-		for(var g=firstGroup;g<=lastGroup;g++)if(cutInds[g]){
-			var groupPosIndsXY = M.pick(spikePosBinXY,cutInds[g]); //spikePosBinXY was stored as 2byte blocks, which is what we want here
+		for(var g=firstGroup;g<=lastGroup;g++)if(cut.GetGroup(g).length){
+			var groupPosIndsXY = M.pick(spikePosBinXY,cut.GetGroup(g)); //spikePosBinXY was stored as 2byte blocks, which is what we want here
 			var spikeCounts = accumarray(new Uint8Array(groupPosIndsXY.buffer)); //now we treat it as 1 byte blocks
 			spikeCounts[0] = 0; //it's the bad bin, remember
 			

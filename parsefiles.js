@@ -32,7 +32,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         		return;
         	var buffer = evt.target.result.slice(dataStart,dataStart+dataLen);
             pendingParse--;
-            callback(header,buffer);
+            callback({header:header,buffer:buffer});
         }
     }
     
@@ -119,7 +119,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         	while(match = REGEX_CUT_C.exec(cutStr))
         		cut.push(parseInt(match[0]));
             pendingParse--;
-            callback(cut,cutProps);
+            callback({cut:cut,header:cutProps});
         }
     	
     }
@@ -145,7 +145,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
     				data[k] = Swap16(data[k]);
     		}
             pendingParse--;
-    		callback(header,posBuffer);
+    		callback({header:header,buffer:posBuffer});
     	}
     }
     
@@ -199,7 +199,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
     			header[match[1]] = match[2];
 				
 			pendingParse--;
-			callback(header);
+			callback({header:header});
 		}
 	}
 	

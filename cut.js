@@ -43,12 +43,21 @@ T.CUT = function(){//class factory
 	
 	var TriggerActionCallbacks = function(ob){
 		for(var i=0;i<actionCallbacks.length;i++)
-			actionCallbacks[i](this,SimpleClone(ob));
+			try{
+				actionCallbacks[i](this,SimpleClone(ob));
+			}catch(err){console.log("Error in TriggerActionCallbacks: " + err.message)}
 	}
 	
 	var TriggerChangeCallbacks = function(a,b,flag){
 		for(var i=0;i<changeCallbacks.length;i++)
-			changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
+			try{
+				changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
+			}catch(err){console.log("Error in TriggerChangeCallbacks: " + err.message)}
+	}
+	var ForceChangeCallback = function(fn){
+		try{
+			fn(this,0,this._.cutInds.length,false); //force a full change callback on the requested function
+		}catch(err){console.log("Error in ForceChangeCallback: " + err.message)}
 	}
 	
 	var DoConstruction = function(data_type,data,description){
@@ -238,11 +247,14 @@ T.CUT = function(){//class factory
 	cut.prototype.GetJSONString = GetJSONString; //note that this includes all the information needed to recreate the cut instance at a later date, whereas GetFileStr does not
 	cut.prototype.AddBtoA = AddBtoA;
 	cut.prototype.SwapBandA = SwapBandA;
+	cut.prototype.ReorderAll = ReorderAll;
 	cut.prototype.Undo = Undo;
+	cut.prototype.ForceChangeCallback: ForceChangeCallback;
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,
 			AddChangeCallback: AddChangeCallback,
-			AddActionCallback: AddActionCallback };
+			AddActionCallback: AddActionCallback
+			};
 }();
 

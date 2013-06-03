@@ -240,7 +240,7 @@ T.WV = function($tile_){
         return allBuffers;
     };
     
-    var SetGroupData = function(cutInds){
+    var SetGroupData = function(cut,firstGroup,lastGroup,flag){
         //group data is 256x512 4-byte texture
         //each 4bytes have data for 2 spikes: gid_1 cm_1 g_id2 cm_2
         //  where gid says which group it is and cm says what colormap index
@@ -249,13 +249,13 @@ T.WV = function($tile_){
         //TODO: if this is slow it might be better to only update groups that have changed.
         var data = new Uint8Array(new ArrayBuffer(256*512*4));
     
-        var G = cutInds.length;
+        var G = cut.GetProps().G;
         if (G>255)
             error_callback("Exceeded 255 groups");
         cutIndLengths = Array(G);
         
-        for(var g=0;g<G;g++)if(cutInds[g]){
-    		var cut_g = cutInds[g];
+        for(var g=0;g<G;g++)if(cut.GetGroup(g).length){
+    		var cut_g = cut.GetGroup(g);
     		var Glen = cut_g.length;
             cutIndLengths[g] = Glen;
     		for(var i=0;i<Glen;i++){
