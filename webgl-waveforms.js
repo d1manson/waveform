@@ -12,6 +12,7 @@ T.WV = function($tile_){
     var groupsPerPage = groupsPerRow * Math.floor(bH/rowHeight);
     var hasGroupData = false;
     var ready = false;
+	var PreReadyGroupData = null;
     var VERTEX_BATCH_SIZE = 1024*1024*2; //2 "million"
     var START_CAP = 60; //special constant used in our vertex shader
     var END_CAP = 62; //special constant used in our vertex shader
@@ -241,7 +242,13 @@ T.WV = function($tile_){
     };
     
     var SetGroupData = function(cut,firstGroup,lastGroup,flag){
-        //group data is 256x512 4-byte texture
+        if(!ready){
+			//we store it all the inputs an then use it at the end of setup (whever that happpens, it gets cleared in ClearAll).
+			PreReadyGroupData = {cut:cut,firstGroup:firstGroup,lastGroup:lastGroup,flag:flag};
+			return;
+		}
+		
+		//group data is 256x512 4-byte texture
         //each 4bytes have data for 2 spikes: gid_1 cm_1 g_id2 cm_2
         //  where gid says which group it is and cm says what colormap index
         //Working out the full coordinate of any spike is a bit tricky, but we only have
@@ -304,7 +311,19 @@ T.WV = function($tile_){
             gl.uniform1i(locUsePaletteB ,1);
     }
     
-    
+    var ClearAll = function(){
+		hasGroupData = false;
+		ready = false;
+		chanIsOn = [1,1,1,1];
+		gl = null;
+		prog = null;
+		error_callback = function(s){console.log(s)};
+		success_callback = function(s){console.log(s);};
+		Canvas = null;	
+		PreReadyGroupData = null;
+		//hopefully that's all we need to do
+	}
+	
     var Setup = function(N_val,buffer){ //N should be numeric not string
         N = N_val;
         hasGroupData = false;
@@ -373,7 +392,9 @@ T.WV = function($tile_){
     
         gl.viewport(0, 0, bW,bH);
     	ready = true;
-    
+		
+		if (PreReadyGroupData != null)
+			SetGroupData(PreReadyGroupData.cut,PreReadyGroupData.firstGroup,PreReadyGroupData.lastGroup,PreReadyGroupData.flag);
     }
     
     var RenderPage = function(firstGroup,lastGroup){
@@ -496,7 +517,8 @@ T.WV = function($tile_){
         CanvasInnerWidth: CanvasInnerWidth,
         ShowChannels: ShowChannels,
         SetGroupData: SetGroupData,
-        IsReady: IsReady
+        IsReady: IsReady,
+		ClearAll: ClearAll
     }
 
 }(T.$tile_)

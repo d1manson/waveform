@@ -26,10 +26,13 @@ T.MAPS_START = 101-1;
 
 
 T.PlotPos = function(){
+	var buffer = T.ORG.GetPosBuffer();
+	if(buffer == null) return;
+	
 	var ctx = T.$posplot.get(0).getContext('2d');
 	ctx.clearRect(0 , 0 , T.POS_PLOT_WIDTH, T.POS_PLOT_HEIGHT);
 
-	var data = new Int16Array(T.ORG.GetPosBuffer());
+	var data = new Int16Array(buffer);
 	var header = T.ORG.GetPosHeader();
 	var elementsPerPosSample = T.BYTES_PER_POS_SAMPLE/2;
 	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
@@ -55,19 +58,34 @@ T.FinishedLoadingFile = function(status,filetype){
 	//  Note that in each round of loading files there will be an initial call with a null filetype, indicating what ui data needs to be flushed.
 	// filetype just tells us which item in status is 2, or is null if none of them are.
 	
+	console.log("accepting " + filetype);
+	
+	T.DispHeaders(filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
+	
+	if(filetype == null && status.tet != 3)
+		T.WV.ClearAll();
+		
+	if(filetype == "tet"){
+		T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
+		T.WV.SetPaletteMode(T.paletteMode);//required after the call to Setup
+		T.WV.ShowChannels(T.chanIsOn); 
+	}
 
-	//TODO sort out what should be done with the status information
-	T.DispHeaders();
-	T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
-	T.ApplyChannelChoice(T.chanIsOn);
-	T.WV.SetPaletteMode(T.paletteMode);
-	T.PlotPos();
-	T.SetupRatemaps();
-    
+	if(filetype == null && status.pos != 3){
+		T.PlotPos();
+		T.RM.ClearAll();
+	}
+	if(filetype == "pos")
+		T.PlotPos();
+		
+	if(status.pos >=2 && status.tet >= 2 && status.set >=2){
+		T.SetupRatemaps();
+    }
 }
 
 
-T.DispHeaders = function(){
+T.DispHeaders = function(filetype){
+	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
 	var headerlist = [T.ORG.GetSetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
 	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
@@ -248,7 +266,7 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 
 				var prev = -1;
 				//append the new tile after the previous tile
-				if(i<T.$tile_.length)for(prev=ind-1;prev>=0;prev--)if(T.$tile_[prev]) 
+				if(i<T.$tile_.length)for(prev=i-1;prev>=0;prev--)if(T.$tile_[prev]) 
 					break;
 				if(prev >=0)
 					T.$tile_[prev].after($t);
@@ -327,7 +345,6 @@ T.RunAutocut = function(){
 		alert("Currently you can only autocut on a single channel. Using channel 1.");
 		chan = 1;
 	}
-	T.ClearActions();
 	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
 }
 

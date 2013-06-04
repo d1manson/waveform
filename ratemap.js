@@ -1,12 +1,13 @@
 "use strict";
 
-//TODO: finish this and push as much as possible into a worker
+//TODO: consider pushing some of this into a worker, code has been kept fairly segregated to make this easier
 
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	var spikePosBinXY;
 	var smoothedDwellCounts;
 	var unvisitedBins;
 	var nBinsX, nBinsY, nBinsTot;//nBinsTot is just nBinsX *nBinsY
+	var ready = false;
 	var P_COLORS = 5; //0th entry in palette is white, then p colors
 				
 	//matricies will be stored in the following order x1y1 x2y1 x3y1 ... xny1 x1y2 .... which is how imagedata wants it
@@ -138,10 +139,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		smoothedDwellCounts = GetSmoothed(dwellCounts);
 		
 		//TODO: if division really is slow, it may even be while inverting all the elements in the smoothedDwellCounts matrix
+		ready = true;
 	}
 	
 	var SetGroupData = function(cut,firstGroup,lastGroup){
-		if(!mapIsOn[0])
+		if(!mapIsOn[0] || !ready) //TODO: maybe we should not drop out when mapIsOn is false, as it complicates matters later
 			return;
 		// the function only looks at the elements in cutInds between first and last group, though they can be null or undefined in which case it does the whole of cutInds
 		//for each cutGroup it builds a spikeCount map, smooths it, divides by the dwell count, applies a colorpalette to the result and outputs a matrix to be used as image data.
@@ -220,6 +222,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		
 	}
 	
+	var ClearAll = function(){
+		spikePosBinXY = null;
+		smoothedDwellCounts = null;
+		unvisitedBins= null;
+		nBinsX = null, nBinsY = null, nBinsTot = null;
+		ready = false;
+	}
+	
 	var ShowMaps = function(newMapIsOn){
 		if (newMapIsOn[0] == mapIsOn[0])
 			return; //nothing has changed;
@@ -234,7 +244,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	return {
 		Setup: Setup,
 		SetGroupData: SetGroupData,
-		ShowMaps: ShowMaps
+		ShowMaps: ShowMaps,
+		ClearAll: ClearAll
 	}
 	
 }(T.BYTES_PER_SPIKE,T.BYTES_PER_POS_SAMPLE,T.$tile_,T.POS_NAN)
