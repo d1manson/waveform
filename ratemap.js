@@ -44,7 +44,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		var result = vector32(nBinsTot);
 		var n = indsXY.length/2;
 		for(var i=0;i<n;i++)
-			result[indsXY[i*2+0]*nBinsX + indsXY[i*2+1]]++;
+			result[indsXY[i*2+1]*nBinsX + indsXY[i*2+0]]++;
 		
 		return result;
 	}

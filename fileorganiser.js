@@ -8,7 +8,7 @@
 
 T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCallback,CUT){
     
-    var exps = [];
+    var exps = []; //this array only ever grows, elemts can be set to null, but they never get spliced out
 	
 	//used for canceling asynchrounus loads/parses, see InternalPARcallback for useage
 	var living = function(){this.alive=true;}
@@ -37,11 +37,12 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			//  3 - the file has been previously announced
 					
 					
-    var EXP_PROPS = function(){
+    var EXP_PROPS = function(ind){
 				this.name = null;
 				this.pos = null;
 				this.set = null;
 				this.tets = [];
+				this.ind = ind;
 				this.$div = null;
 			};
     var EXP_PROPS_TET = function(){
@@ -101,7 +102,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     		
     	//if we didn't find the expirment in the array we make a new one
     	if(!exp){
-    		exp = new EXP_PROPS();
+    		exp = new EXP_PROPS(exps.length);
     		exp.name = exp_name;
     		exps.push(exp);
     	}
@@ -323,10 +324,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     		var str = []
     		str.push("<div class='file_group'><div class='file_group_title'>" + exp.name + "</div>");
             for(var j=0;j<exp.tets.length;j++)if(exp.tets[j]){
-    			//TODO: fix this: new cut is just one generic button that always gives the current cutInds
-    			str.push("<div class='file_brick new_cut_file_brick' tet='" + j + "' data-bricktype='new cut' data-expind='" + i + "' draggable='true'>new cut</div>"); 
     			for(var k=0;k<exp.tets[j].cut_names.length;k++)
-    				str.push("<div class='file_brick cut_file_brick' tet='" + j + "'>" + exp.tets[j].cut_names[k].replace(exp.name,"~") + "</div>");	//cut file
+    				str.push("<div class='file_brick cut_file_brick' tet='" + j + "' data-expind='" + i + "'>" + exp.tets[j].cut_names[k].replace(exp.name,"~") + "</div>");	//cut file
     			if(exp.tets[j].tet)
     				str.push("<div class='file_brick tet_file_brick' tet='" + j + "'>" + exp.tets[j].tet.replace(exp.name,"~") + "</div>");		//tet file
     			available_tets[j] = true;
@@ -355,8 +354,10 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	recoveringFilesFromStorage = false; // may already have been false, but now it definitely is
     }
 	var ShowCutInstance = function(ind){
-		cExp.$div.find(".file_brick[tet='" + cTet + "']");
-		console.log("TODO: add cut brick-" + ind); //TODO: see string
+	
+		cExp.$div.find(".file_brick[tet='" + cTet + "']").eq(0).before($(
+				"<div class='file_brick new_cut_file_brick' tet='" + cTet + "' active='' data-bricktype='new cut' " + 
+				"data-expind='" + cExp.ind + "' draggable='true'>~" + String.fromCharCode("a".charCodeAt(0)+ind)+ "_" + cTet + ".cut</div>")); 
 	}
     var TetrodeRadioClick = function(){
     	var newTet = parseInt($(this).val());
