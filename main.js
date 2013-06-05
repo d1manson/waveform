@@ -59,7 +59,7 @@ T.FinishedLoadingFile = function(status,filetype){
 	
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 	
-	T.DispHeaders(filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
+	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
 	
 	if(filetype == null && status.tet != 3)
 		T.WV.ClearAll();	
@@ -88,25 +88,25 @@ T.FinishedLoadingFile = function(status,filetype){
 }
 
 
-T.DispHeaders = function(filetype){
+T.DispHeaders = function(status,filetype){
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
+	var headerTypeList = ["tet","cut","pos","set"];
 	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
 	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
 
-    var $h = $("<div id='header_info' class='header_info'>");
-    T.$info_panel.html($h);
+	for(var i=0,hdr=headerlist[0];i<headerlist.length;hdr=headerlist[++i])
+		if(hdr && filetype==headerTypeList[i]){
+			var strbuilder = [];
+			var hdr = headerlist[i];
+			for(var k in hdr)if(hdr.hasOwnProperty(k))
+				strbuilder.push("<td class='header_field_name'>" + k + "</td><td class='header_field_value'>" + hdr[k] + '</td>');
+			T.$file_info[i].html(headernames[i] + "<table><tbody><tr>" + strbuilder.join("</tr><tr>") + "</tr></tbody></table>")
+			T.$file_info[i].show();
+		}else if(status[headerTypeList[i]]<2){
+			T.$file_info[i].hide();
+		}
 
-	var outerstrbuilder = [];
-	for(var i=0,hdr=headerlist[0];i<headerlist.length;hdr=headerlist[++i])if(hdr){
-		var strbuilder = [];
-		var hdr = headerlist[i];
-		for(var k in hdr)if(hdr.hasOwnProperty(k))
-			strbuilder.push("<td class='header_field_name'>" + k + "</td><td class='header_field_value'>" + hdr[k] + '</td>');
-		outerstrbuilder.push(headernames[i] + "<table><tbody><tr>" + strbuilder.join("</tr><tr>") + "</tr></tbody></table>");
-	}
-
-    $h.html(outerstrbuilder.join("<BR>"));
 	T.FilterHeader();
 }
 
@@ -356,7 +356,7 @@ T.RunAutocut = function(){
 }
 
 T.AutocutFinished = function(cut,chan){
-	T.ORG.newCut(cut,{description: 'autocut subsample on channel-' + chan});
+	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
 }
 
 T.ToggleFS = function(newState){
@@ -482,6 +482,7 @@ $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
 T.$rm_bin_size = $('#rm_bin_size');
 $('#apply_rm_size').click(T.ApplyRmSizeClick);
+T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);

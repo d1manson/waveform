@@ -17,16 +17,18 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     var cExp = {}; //exp object
     var cTet = -1; //tetrode number
     var cCut = null; //cut object
+	var cCutIsFileOrAllZero = false; //is true when the current cut is laoded from file and has not yet been modified, and when we create an all-zero cut, the rest of the time it is false
 	var cN = null; // number of spikes
+	var makeNullCutFromN = false; //when we recieve a tetrode file we shall generate a null cut if this is true, otherwise we leave the cut generation up to SwitchToCut
 	var cCutHeader = null; //object with key name pairs
 	var cTetBuffer = null; //arraybuffer
 	var cTetHeader = null; //object with key name pairs
 	var cPosBuffer = null; //arraybuffer
 	var cPosHeader = null; //object with key name pairs
 	var cSetHeader = null; //object with key name pairs
-	var cLivingExp = new living();
-	var cLivingTet = new living();
-	var cLivingCut = new living();
+	var cLoadingExp = new living();
+	var cLoadingTet = new living();
+	var cLoadingCut = new living();
 	var cState = {set:0,pos:0,cut:0,tet:0}; 
 		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
 			//	0 - file does not exist
@@ -44,7 +46,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			};
     var EXP_PROPS_TET = function(){
 				this.tet = null;
-				this.cut_names = [];
+				this.cut_names = []; //for files
+				this.cut_instances = []; //for instances of the cut class
 				};
     var REGEX_FILE_EXT = /\.([0-9a-z]+)$/i;
     
@@ -134,9 +137,9 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 		
 		// store some instance handles for use in the closure below.
 		// Note the heirarchy which we enforce with if-returns: exp > tet > cut
-		var hLivingExp  = cLivingExp; 
-		var hLivingTet = cLivingTet;
-		var hLivingCut = cLivingCut;
+		var hLivingExp  = cLoadingExp; 
+		var hLivingTet = cLoadingTet;
+		var hLivingCut = cLoadingCut;
 		return function(data){
 			if(!hLivingExp.alive) return;
 						
@@ -149,9 +152,13 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				cTetBuffer = data.buffer;
 				cTetHeader = data.header;
 				cN = parseInt(data.header.num_spikes);
-				if(cState.cut == 0){//if there is no cut we make a null cut once we know how many spikes there are
+				if(makeNullCutFromN){//SwitchToCut may have requested a null-cut to be generated at this point
 					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
+					cState.cut = 2; 
+					FinishedLoadingFileCallback(cState,"cut"); //it shouldn't matter that we announce the arival of the cut before we announce the arival of the tet (below).
+					cState.cut = 3; 
 				}	
+				makeNullCutFromN = false;
 			}else if(filetype == "set"){
 				cSetHeader = data.header;
 			}else if(filetype = "pos"){
@@ -169,12 +176,12 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	cExp = exps[exp_ind];	
 		MarkCurrentExp();
     
-		cLivingExp.alive = false; //if there was anything previously loading, we need to stop it
+		cLoadingExp.alive = false; //if there was anything previously loading, we need to stop it
 		cSetHeader = null;
 		cPosHeader = null; cPosBuffer = null;
         cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; //we are starting from scratch here
 
-		cLivingExp = new living();		
+		cLoadingExp = new living();		
 		// load pos and set if they exist
 		if(cExp && cExp.pos)
             T.FS.ReadFile(cExp.pos,PAR.LoadPos,InternalPARcallback("pos"));
@@ -188,25 +195,104 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 		cTet = tet_ind;
 		MarkCurrentTet();
 		
-		cLivingTet.alive = false; //if there were any tet or cut files loading we need to stop them
+		cLoadingTet.alive = false; //if there were any tet or cut files loading we need to stop them
 		cN = null;
-		cCut = null; //TODO: don't want to just lose the cut, need to store it in the exps array
 		cTetHeader = null; cTetBuffer = null;
-		cState.cut = 0; cState.tet = 0; //we leave pos and set alone
-				
-		cLivingTet = new living(); 
-		// load tet and cut if they exist
+		cState.tet = 0; //we leave pos and set alone, and we put out a call to SwitchToCut which deals with cState.cut
+		cLoadingTet = new living(); 
+		
     	if(cExp &&  cExp.tets && cExp.tets[cTet]){
+			// load tet if it exists
     		if(cExp.tets[cTet].tet)
     			T.FS.ReadFile(cExp.tets[cTet].tet,PAR.LoadTetrode,InternalPARcallback("tet"));		
+				
     		if(cExp.tets[cTet].cut_names[0])
-    			T.FS.ReadFile(cExp.tets[cTet].cut_names[0],PAR.LoadCut,InternalPARcallback("cut"));	
-    	}
-       
-	    FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				SwitchToCut(1,cExp.tets[cTet].cut_names[0]) //if there are one or more cut files, load the first one
+			else if(cExp.tets[cTet].cut_instances.length)
+				SwitchToCut(2,cExp.tets[cTet].cut_instances.length-1); //otherwise, if there are one or more cut isntances, load the first one
+			else if(cExp.tets[cTet].tet)
+				SwitchToCut(4); //otherwise, if we have tetrode data let's make an all-zero cut, TODO: this is more complciated because we don't know what cN is until later
+			else
+				SwitchToCut(0); //failing all of that, just clear the old cut
+				
+    	}else{
+			SwitchToCut(0); //if there is no data for the tetrode then clear the old cut and announce the situation
+		}
+
     }
 
-
+	var CutActionCallback = function(cut,info){
+		if (!cCutIsFileOrAllZero) return; //once we've moved off from being an actual file there is no going back, having said that TODO: might be nice to respond to undoing back to the orginal file		
+		if (info.type == "load") return; //the load should have been requested by the SwitchToCut function below, where we deal with its implications fully
+	
+		cCutIsFileOrAllZero = false;
+		cExp.tets[cTet].cut_instances.push(cCut);
+		ShowCutInstance(cExp.tets[cTet].cut_instances.length-1);
+	}
+	
+	var SwitchToCut = function(type,data){
+		cCut = null; //if cCutIsFileOrAllZero was true we can happily discard it, if it was false the cut will still be avaialble in the cut_isntance array for the exp-tet
+		cLoadingCut.alive = false; //if there wa a cut file loading, we need to stop it
+		
+		cLoadingCut = new living();
+		cState.cut = 0; 
+		cCutIsFileOrAllZero = false;
+		makeNullCutFromN = false;
+		
+		switch (type){
+			case 0:
+				//no new cut, just get rid of the old
+				cCutIsFileOrAllZero = null;
+				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				break;
+				
+			case 1:
+				//data is the name of a cut file to retrieve from T.FS (we assume it is for the current exp-tet)
+				cCutIsFileOrAllZero = true;
+				T.FS.ReadFile(data,PAR.LoadCut,InternalPARcallback("cut"));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
+				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				break;
+				
+			case 2:
+				//data is an index into the array of cut instances for the current exp-tet
+				cState.cut = 1;
+				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				cCut = cExp.tets[cTet].cut_instances(data); //TODO: somehow need to recover the action list in the gui (it is stored in the cut instance)
+				cState.cut = 2;
+				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+				cState.cut = 3;
+				break;
+				
+			case 3:
+				//data is of the same form as the private cutInds array in the cut class (i.e. this is probably the output from some automated cutting function)
+				cState.cut = 1;
+				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				cCut = new CUT.cls(cExp.name,cTet,3,data,"special cut");
+				cState.cut = 2;
+				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+				cState.cut = 3;
+				cExp.tets[cTet].cut_instances.push(cCut);
+				ShowCutInstance(cExp.tets[cTet].cut_instances.length-1);
+				break;
+				
+			case 4:
+				//data is null, we need to make an all-zero cut
+				cState.cut = 1;
+				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				cCutIsFileOrAllZero = true;
+				if(cN == null)
+					makeNullCutFromN = true; //shall have to wait for the tet file to load, it will check this flag and make a cut
+				else{
+					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
+					cState.cut = 2;
+					FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+					cState.cut = 3;
+				}
+				break;
+		}
+		
+		
+	}
 
 	//TODO: can do better than this mess of DOM-using functions =================================================
 	var DocumentDropFile = function(evt){
@@ -268,6 +354,10 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	}
     	recoveringFilesFromStorage = false; // may already have been false, but now it definitely is
     }
+	var ShowCutInstance = function(ind){
+		cExp.$div.find(".file_brick[tet='" + cTet + "']");
+		console.log("TODO: add cut brick-" + ind); //TODO: see string
+	}
     var TetrodeRadioClick = function(){
     	var newTet = parseInt($(this).val());
     	SwitchToTet(newTet);
@@ -315,10 +405,12 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
                 .on("change","input[name=tetrode]:radio",TetrodeRadioClick);
 	//=======================================================
   
-    
+    T.CUT.AddActionCallback(CutActionCallback);
+	
     return { //expose some of the functions, and a few read-only things via simple Get* functions
             SwitchToTet: SwitchToTet, 
             SwitchToExpTet: SwitchToExpTet,
+			SwitchToCut: SwitchToCut,
 			RecoverFilesFromStorage: RecoverFilesFromStorage,
             GetExp: function(ind){return ind === undefined? {name: cExp.name} : {name: exps[ind].name};},
 			GetSetHeader: function(){return cSetHeader;},
