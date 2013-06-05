@@ -9,7 +9,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	var nBinsX, nBinsY, nBinsTot;//nBinsTot is just nBinsX *nBinsY
 	var ready = false;
 	var P_COLORS = 5; //0th entry in palette is white, then p colors
-				
+	var PreReadyGroupData = null;
+			
 	//matricies will be stored in the following order x1y1 x2y1 x3y1 ... xny1 x1y2 .... which is how imagedata wants it
 		
 	var vector32 = function(n){
@@ -97,6 +98,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	}
 
 	var Setup = function(tetBuffer,posBuffer,Ntet,Npos,tetFreq,posFreq,pixPerM,cmPerBin){
+		console.time("ratemap setup");
 		var posInds = GetPosInds(tetBuffer,Ntet,tetFreq,posFreq);
 		var posBinXY = vector8(2*Npos); // xBin, yBin, xBin , yBin, ... bin numbers from 0 to 255. 
 		
@@ -140,11 +142,21 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		
 		//TODO: if division really is slow, it may even be while inverting all the elements in the smoothedDwellCounts matrix
 		ready = true;
+		
+		console.timeEnd("ratemap setup");
+		
+		if(PreReadyGroupData)
+			SetGroupData(PreReadyGroupData.cut,PreReadyGroupData.firstGroup,PreReadyGroupData.lastGroup,PreReadyGroupData.flag);
 	}
 	
-	var SetGroupData = function(cut,firstGroup,lastGroup){
-		if(!mapIsOn[0] || !ready) //TODO: maybe we should not drop out when mapIsOn is false, as it complicates matters later
+	var SetGroupData = function(cut,firstGroup,lastGroup,flag){
+		if(!ready) {
+			PreReadyGroupData = {cut:cut,firstGroup:firstGroup,lastGroup:lastGroup,flag:flag}
 			return;
+		}else{
+			PreReadyGroupData = null
+		}
+		console.time("ratemap update")
 		// the function only looks at the elements in cutInds between first and last group, though they can be null or undefined in which case it does the whole of cutInds
 		//for each cutGroup it builds a spikeCount map, smooths it, divides by the dwell count, applies a colorpalette to the result and outputs a matrix to be used as image data.
 		//For each cutGroup the peak rate is stored in an array and output at the end as a single list.
@@ -161,6 +173,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 			var im = ToImageData(ratemap);
 			ShowGroupImage(im,g); //TODO: this should be a post message, need a way to find out what g is on reciever end (either an extra post message or track the incoming messages and increment g on the other end
 		}
+		console.timeEnd("ratemap update")
 	}
 	
 	var PALETTE = function(){
@@ -206,6 +219,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 	var dummyCanvasCtx = $('<canvas/>').get(0).getContext('2d');
 	var mapIsOn = [0];
 	
+	
 	var ShowGroupImage =function(im,ind){
 
 		if(!$tile_[ind]) return;
@@ -217,7 +231,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 			
 		$tile_[ind].canvas.get(1).width = nBinsX;
 		$tile_[ind].canvas.get(1).height = nBinsY;
-		$tile_[ind].canvas.eq(1).css({width: nBinsX*2 + 'px', height: nBinsY*2 + 'px',display: 'inline'});
+		$tile_[ind].canvas.eq(1).css({width: nBinsX*2 + 'px', height: nBinsY*2 + 'px',display: mapIsOn[0]? 'inline': 'none'});
 		$tile_[ind].ctx2.putImageData(imData, 0, 0);
 		
 	}
@@ -228,17 +242,19 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,$tile_,POS_NAN){
 		unvisitedBins= null;
 		nBinsX = null, nBinsY = null, nBinsTot = null;
 		ready = false;
+		PreReadyGroupData = null;
 	}
 	
 	var ShowMaps = function(newMapIsOn){
 		if (newMapIsOn[0] == mapIsOn[0])
 			return; //nothing has changed;
-		
-		if(!newMapIsOn[0])
-			for(var i = 0;i<$tile_.length;i++)if($tile_[i])
-				$tile_[i].canvas.eq(1).css({display: 'none'});
-		
+	
 		mapIsOn = newMapIsOn.slice(0);
+		
+		var disp = mapIsOn[0]? 'inline': 'none';
+		for(var i = 0;i<$tile_.length;i++)if($tile_[i])
+			$tile_[i].canvas.eq(1).css({display: disp});
+		
 	}
 	
 	return {

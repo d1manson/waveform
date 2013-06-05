@@ -45,7 +45,7 @@ T.Tool.MergerTileMouseUp = function(event){
 				ind_a = tmp;
 			}
 			
-			T.ORG.GetCut().AddBtoA(ind_b,ind_a);
+			T.ORG.GetCut().AddBtoA(ind_a,ind_b);
 		}
 	}
 	delete T.Tool.activeMerger;

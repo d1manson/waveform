@@ -5,7 +5,6 @@ T.Tool = {};
 T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.paletteMode = 0;
-T.actions = [{num: 0}];
 T.binSizeCm = 2.5;
 
 T.BYTES_PER_SPIKE = 4*(4 + 50);
@@ -58,20 +57,23 @@ T.FinishedLoadingFile = function(status,filetype){
 	//  Note that in each round of loading files there will be an initial call with a null filetype, indicating what ui data needs to be flushed.
 	// filetype just tells us which item in status is 2, or is null if none of them are.
 	
-	console.log("accepting " + filetype);
+	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 	
 	T.DispHeaders(filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
 	
 	if(filetype == null && status.tet != 3)
-		T.WV.ClearAll();
-		
+		T.WV.ClearAll();	
+	
+	if(filetype == null && status.cut != 3)
+		T.ClearAllTiles();
+	
 	if(filetype == "tet"){
 		T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
 		T.WV.SetPaletteMode(T.paletteMode);//required after the call to Setup
 		T.WV.ShowChannels(T.chanIsOn); 
 	}
 
-	if(filetype == null && status.pos != 3){
+	if(filetype == null && (status.pos != 3 || status.tet != 3)){
 		T.PlotPos();
 		T.RM.ClearAll();
 	}
@@ -81,12 +83,14 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(status.pos >=2 && status.tet >= 2 && status.set >=2){
 		T.SetupRatemaps();
     }
+	
+	//note that cut is mainly dealt with separetly by the callbacks registered with the T.CUT module
 }
 
 
 T.DispHeaders = function(filetype){
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
-	var headerlist = [T.ORG.GetSetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
+	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
 	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
 
@@ -173,12 +177,6 @@ T.ChannelButtonClick = function(evt){
 			setChans[thisVal] = 1;
 	}
 	T.ApplyChannelChoice(setChans,setMaps);
-	
-	//we only need to render waveforms or ratemaps, not both
-	if(thisVal < T.MAPS_START)
-		T.WV.Render(); 
-	else
-		T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData); //T.RM doesn't remember anything, so to render we need to send it all the group info
 }
 
 
@@ -201,16 +199,18 @@ T.ApplyRmSizeClick = function(){
 	new_scale = new_scale > 20? 20 : new_scale;
 	T.$rm_bin_size.val(new_scale);
 	T.binSizeCm = new_scale;
+	
+	//TODO: this is a bit clumsy, isn't there a better way?
+	T.RM.ClearAll();
 	T.SetupRatemaps();
+	T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData);
 }
 
-T.SetupRatemaps = function(dontShow){
+T.SetupRatemaps = function(){
 	var posHeader = T.ORG.GetPosHeader();
+	
 	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(posHeader.num_pos_samples),
-		parseInt(T.ORG.GetSetHeader().timebase),parseInt(posHeader.sample_rate),parseInt(posHeader.pixels_per_metre),T.binSizeCm);
-	if(dontShow)
-		return;
-	T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData);
+		parseInt(T.ORG.GetTetHeader().timebase),parseInt(posHeader.sample_rate),parseInt(posHeader.pixels_per_metre),T.binSizeCm);
 }
 
 T.ApplyCanvasSizes = function(){
@@ -233,11 +233,18 @@ T.StoreData = function(){
 	
 }
 
+T.ClearAllTiles = function(){
+	while(T.$tile_.length){
+		var $t = T.$tile_.pop();
+		if($t)
+			$t.remove();
+	}
+}
+
 T.SetGroupDataTiles = function(cut,from,to,flag){
 	//controls the adding, removing and caption-setting for tiles
 	var iW, iH, oW, oH;
 	
-	//TODO: this should be the only place we add/remove tiles, so would make more sense to inline it here
 	for(var i=from;i<=to;i++){
 		var len = cut.GetGroup(i).length;
 		
@@ -394,6 +401,7 @@ T.CutActionCallback = function(cut,info){
 		T.$action_ = T.$action_ || [];
 		while(T.$action_.length)
 			T.$action_.pop().remove(); //remove all action elements from page	
+		T.$undo.show();
 	}
 	
 	var $newAction = $("<div class='action' data-action-num='" + info.num + "'><b>" + info.num + "</b>&nbsp;&nbsp;&nbsp;" + info.description + "</div>");
@@ -417,7 +425,7 @@ T.ReorderCut = function(){
 	//sorting order is in groups[].ind, now pull the inds out into their own array...
 	var inds = [];
 	while(groups.length)
-		inds.push(groups.unshift().ind);
+		inds.push(groups.shift().ind);
 	
 	cut.ReorderAll(inds);
 }
@@ -443,6 +451,9 @@ T.FilterHeader = function(){
 			})
 }
 
+T.UndoLastAction = function(){
+	T.ORG.GetCut().Undo();
+}
 
 T.$help_background = $('.help_background');
 T.$help_panel_wrapper = $('.help_panel_wrapper');

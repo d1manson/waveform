@@ -246,7 +246,11 @@ T.WV = function($tile_){
 			//we store it all the inputs an then use it at the end of setup (whever that happpens, it gets cleared in ClearAll).
 			PreReadyGroupData = {cut:cut,firstGroup:firstGroup,lastGroup:lastGroup,flag:flag};
 			return;
+		}else{
+			PreReadyGroupData = null;
 		}
+		
+		//TODO: can keep data and only update the groups requested
 		
 		//group data is 256x512 4-byte texture
         //each 4bytes have data for 2 spikes: gid_1 cm_1 g_id2 cm_2
@@ -273,6 +277,7 @@ T.WV = function($tile_){
     
         UploadTexture(groupDataTexReg,data,512,256)
     	hasGroupData = true;
+		Render();
     }
     
     var CanvasInnerWidth = function(){
@@ -301,7 +306,8 @@ T.WV = function($tile_){
     		$tile_[i].canvas.get(0).width = w;
     		$tile_[i].canvas.get(0).height = h;
     	}
-    	//Note this doesn't render, it just sets the channels
+    	
+		Render();
     }
     
     var SetPaletteMode = function(m){
@@ -321,6 +327,7 @@ T.WV = function($tile_){
 		success_callback = function(s){console.log(s);};
 		Canvas = null;	
 		PreReadyGroupData = null;
+		chanIsOn = [0,0,0,0];
 		//hopefully that's all we need to do
 	}
 	
@@ -377,10 +384,7 @@ T.WV = function($tile_){
         //Prepare group data buffer on GPU, will later fill with data
         locGroupData = gl.getUniformLocation(prog, "groupData");    
         groupDataTexReg = 1; //texture register 1 for groupData, why not?
-        gl.uniform1i(locGroupData, groupDataTexReg); 
-    
-    	//doesn't actually do any webGl stuff, but useful to set default here
-        ShowChannels([1,1,1,1]); 
+        gl.uniform1i(locGroupData, groupDataTexReg);
     
         //Prepare uniforms for paged rendering
         locFirstGroup = gl.getUniformLocation(prog,"firstGroup01");
@@ -443,7 +447,8 @@ T.WV = function($tile_){
     var Render = function(firstGroup,lastGroup,isAsync){
         //The render target is not big enough to render all groups in one go, 
         //e.g. when we are showing all channels, we might fit 2 groups on a row and have 8 rows so 16 groups per page
-    
+		if(!ready || !hasGroupData) return;
+			
     	if(isAsync === undefined)
     		window.setTimeout(function(){Render(firstGroup,lastGroup,true);},1); //call this function again but via timeout
     	else{

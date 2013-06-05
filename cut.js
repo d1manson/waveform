@@ -38,7 +38,7 @@ T.CUT = function(){//class factory
 	var PushAction = function(type,data,description){
 		this._.actionStack.push(new action(type,data,description));
 		
-		TriggerActionCallbacks({description:description,type:type});
+		TriggerActionCallbacks({description:description,type:type,num:this._.actionStack.length});
 	}
 	
 	var TriggerActionCallbacks = function(ob){
@@ -56,7 +56,7 @@ T.CUT = function(){//class factory
 	}
 	var ForceChangeCallback = function(fn){
 		try{
-			fn(this,0,this._.cutInds.length,false); //force a full change callback on the requested function
+			fn(this,0,this._.cutInds.length-1,false); //force a full change callback on the requested function
 		}catch(err){console.log("Error in ForceChangeCallback: " + err.stack)}
 	}
 	
@@ -95,7 +95,7 @@ T.CUT = function(){//class factory
 		}
 		
 		PushAction.call(this,"load",{},description);
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
 	}
 	
 	var GetJSONString = function(){
@@ -160,12 +160,12 @@ T.CUT = function(){//class factory
 	
 	var ReorderAll = function(newOrder){
 		var oldCutInds = this._.cutInds;
-		
+		this._.cutInds = [];
 		for(var i=0;i<newOrder.length;i++)
 			this._.cutInds.push(oldCutInds[newOrder[i]] || []);
 			
 		PushAction.call(this,"reorder",newOrder,"reorder groups");
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
 	}
 	
 	var	UndoReorderAll = function(data){
@@ -173,7 +173,7 @@ T.CUT = function(){//class factory
 		this._.cutInds = [];
 		while(data.length)
 			this._.cutInds[data.pop()] = oldCutInds.pop();
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length,false);
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
 	}
 	
 	var GetGroup = function(g){
