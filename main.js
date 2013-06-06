@@ -26,11 +26,12 @@ T.MAPS_START = 101-1;
 
 T.PlotPos = function(){
 	var buffer = T.ORG.GetPosBuffer();
-	if(buffer == null) return;
-	
+		
 	var ctx = T.$posplot.get(0).getContext('2d');
 	ctx.clearRect(0 , 0 , T.POS_PLOT_WIDTH, T.POS_PLOT_HEIGHT);
 
+	if(buffer == null) return;
+	
 	var data = new Int16Array(buffer);
 	var header = T.ORG.GetPosHeader();
 	var elementsPerPosSample = T.BYTES_PER_POS_SAMPLE/2;
@@ -271,14 +272,19 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 				$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
 				$t.caption = $t.find('.tile-caption');
 
-				var prev = -1;
-				//append the new tile after the previous tile
-				if(i<T.$tile_.length)for(prev=i-1;prev>=0;prev--)if(T.$tile_[prev]) 
-					break;
-				if(prev >=0)
-					T.$tile_[prev].after($t);
-				else
-					T.$tilewall.append($t);
+				if(i == 0){
+					T.$tilewall.prepend($t);
+				}else{
+					var prev = -1;
+					//append the new tile after the previous tile
+					if(i<T.$tile_.length)for(prev=i-1;prev>=0;prev--)if(T.$tile_[prev]) 
+						break;
+					if(prev >=0)
+						T.$tile_[prev].after($t);
+					else
+						T.$tilewall.append($t);
+				}
+				
 				T.$tile_[i] = $t;				
 			}
 			T.$tile_[i].caption.text("group " + i + " | " + len + " waves ");

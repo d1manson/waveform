@@ -133,7 +133,7 @@ T.WV = function($tile_){
         var data = new Uint8Array(new ArrayBuffer(256*4));
         for(var i=0;i<256;i++)
     		data[i*4+3] = 255; //set alpha to opaque
-        data[0*4+0] = 220;    data[0*4+1] = 220;    data[0*4+2] = 220;
+        data[0*4+0] = 190;    data[0*4+1] = 190;    data[0*4+2] = 190; //was 220 for all three
         data[1*4+2] = 200;
     	data[2*4+0] = 80;	data[2*4+1] = 255;
         data[3*4+0] = 255;
@@ -277,7 +277,7 @@ T.WV = function($tile_){
     
         UploadTexture(groupDataTexReg,data,512,256)
     	hasGroupData = true;
-		Render();
+		Render(firstGroup,lastGroup);
     }
     
     var CanvasInnerWidth = function(){

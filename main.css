@@ -1,6 +1,14 @@
-* {
+bod {
     padding: 0;
     margin: 0;
+}
+p,ul,ol{
+margin-top: 6px;
+margin-bottom: 6px;
+}
+ul,ol{
+padding-left:10px;
+margin-left:10px;
 }
 body{
     overflow:hidden;
@@ -222,7 +230,9 @@ background: #500;
 border: 2px solid #fff;
 margin-top:0;
 }
-
+.file_info_title{
+margin-top: 5px;
+}
 .header_field_name{
 color: #500;
 font-weight: bold;
@@ -348,7 +358,7 @@ z-index: 102;
 .help_panel{
 position: relative;
 margin: 0 auto;
-max-width: 600px;
+max-width: 640px;
 min-width: 200px;
 background: #FFF;
 height: 100%;
@@ -376,6 +386,8 @@ left: 5px;
 right: 5px;
 bottom: 2px;
 overflow-y: scroll;
+margin-left: 20px;
+padding-right: 20px;
 }
 .notes{
 font-size:0.8em;

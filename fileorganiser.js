@@ -258,7 +258,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				//data is an index into the array of cut instances for the current exp-tet
 				cState.cut = 1;
 				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
-				cCut = cExp.tets[cTet].cut_instances(data); //TODO: somehow need to recover the action list in the gui (it is stored in the cut instance)
+				cCut = cExp.tets[cTet].cut_instances[data]; //TODO: somehow need to recover the action list in the gui (it is stored in the cut instance)
 				cState.cut = 2;
 				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
 				cState.cut = 3;
