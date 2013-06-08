@@ -233,12 +233,14 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 	
 	var SwitchToCut = function(type,data){
 		cCut = null; //if cCutIsFileOrAllZero was true we can happily discard it, if it was false the cut will still be avaialble in the cut_isntance array for the exp-tet
+		cCutHeader = null;
 		cLoadingCut.alive = false; //if there wa a cut file loading, we need to stop it
 		
 		cLoadingCut = new living();
 		cState.cut = 0; 
 		cCutIsFileOrAllZero = false;
 		makeNullCutFromN = false;
+		MarkCurrentCut();
 		
 		switch (type){
 			case 0:
@@ -258,9 +260,10 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				//data is an index into the array of cut instances for the current exp-tet
 				cState.cut = 1;
 				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
-				cCut = cExp.tets[cTet].cut_instances[data]; //TODO: somehow need to recover the action list in the gui (it is stored in the cut instance)
+				cCut = cExp.tets[cTet].cut_instances[data];
 				cState.cut = 2;
 				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+				cCut.ReTriggerAll(); //relive the whole life of the cut again
 				cState.cut = 3;
 				break;
 				
@@ -398,12 +401,19 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     		exps[i].$div.removeAttr("active");
     	cExp.$div.attr("active","true"); 
 	}
+	var MarkCurrentCut = function(){
+		console.log("TODO: mark cuts as (in)active"); //TODO: need some way of selecting the div for the current cut (and an efficient way of removing the active attr for all other cut divs)
+	}
+	var FileBrickClick = function(evt){
+		evt.stopPropagation();
+	};
 	window.URL = window.webkitURL || window.URL;
 	$files_panel.on("dragstart",".file_brick",SaveFileDragStart);
     $document.on("dragover", DocumentDragOver) 
              .on("drop", DocumentDropFile);
     $files_panel.on("click",".file_group",FileGroupClick)
-                .on("change","input[name=tetrode]:radio",TetrodeRadioClick);
+                .on("change","input[name=tetrode]:radio",TetrodeRadioClick)
+				.on("click",".file_brick",FileBrickClick);
 	//=======================================================
   
     T.CUT.AddActionCallback(CutActionCallback);

@@ -492,7 +492,7 @@ T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
-T.$tilewall.on("mousedown",".tile",T.TileMouseDown); //TODO: check this works
+
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 

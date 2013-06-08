@@ -149,3 +149,5 @@ T.Tool.SplitterMouseMove = function(event){
 						  .find('.widget-center').eq(0).css({left:left+'px'});
 	}
 }
+
+T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 

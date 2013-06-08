@@ -98,6 +98,15 @@ T.CUT = function(){//class factory
 		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
 	}
 	
+	var ReTriggerAll = function(){
+		//to be used when restoring to view, i.e. after another cut has been in view
+		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
+		for(var i=0;i<this._.actionStack.length;i++){
+			var ac = this._.actionStack[i];
+			TriggerActionCallbacks({description:ac.description,type:ac.type,num:i}); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
+		}
+	}
+	
 	var GetJSONString = function(){
 		//for keeping in localStorage or FileSystem API
 		return JSON.stringify(this._); //this is sufficient at present because ._ data is simple, i.e. doesn't include any out-there object references and is not recursive
@@ -250,6 +259,7 @@ T.CUT = function(){//class factory
 	cut.prototype.ReorderAll = ReorderAll;
 	cut.prototype.Undo = Undo;
 	cut.prototype.ForceChangeCallback = ForceChangeCallback;
+	cut.prototype.ReTriggerAll = ReTriggerAll;
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,

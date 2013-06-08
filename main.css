@@ -1,4 +1,4 @@
-bod {
+* {
     padding: 0;
     margin: 0;
 }
@@ -393,7 +393,7 @@ padding-right: 20px;
 font-size:0.8em;
 }
 .file_group{
-border: 1px solid #900;
+background: #ccc;
 padding: 2px;
 margin: 2px;
 -webkit-user-select: none;
@@ -403,7 +403,8 @@ margin: 2px;
 user-select: none;
 }
 .file_group[active="true"]{
-background: rgb(255, 228, 228);
+background: #ddd;
+border: 1px solid #000;
 }
 .file_group_title{
 font-weight: bold;
@@ -411,21 +412,39 @@ color: #900;
 }
 .file_brick{
 display: inline-block;
-border: 2px #500 solid;
+border: 2px #000 solid;
 padding: 2px;
 margin: 2px;
 background: #ddd;
+cursor: default;
 }
 .cut_file_brick{
 background: #fbb;
+border-color: #500;
+color: #500;
+}
+.cut_file_brick:hover,
+.cut_file_brick[active="true"]{
+background: #500;
+color: #fff;
 }
 .pos_file_brick,
 .set_file_brick{
-background: rgb(221, 181, 80);
+background: #ddb550;
+border-color: #552510;
+color: #552510;
 }
 .new_cut_file_brick{
-background: #90F;
+background: #bbF;
+border-color: #005;
+color: #005;
 }
+.new_cut_file_brick:hover,
+new_cut_file_brick[active="true"]{
+background: #005;
+color: #fff;
+}
+
 #filestem_caption{
 text-align:left;
 }
