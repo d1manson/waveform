@@ -65,8 +65,10 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == null && status.tet != 3)
 		T.WV.ClearAll();	
 	
-	if(filetype == null && status.cut != 3)
+	if(filetype == null && status.cut < 3){
 		T.ClearAllTiles();
+		T.CutActionCallback(null,{num:0,type:"load",description:"no active cut"});
+	}
 	
 	if(filetype == "tet"){
 		T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
@@ -81,10 +83,9 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == "pos")
 		T.PlotPos();
 		
-	if(status.pos >=2 && status.tet >= 2 && status.set >=2){
+	if(status.pos >=2 && status.tet >= 2 && status.set >=2)
 		T.SetupRatemaps();
-    }
-	
+
 	//note that cut is mainly dealt with separetly by the callbacks registered with the T.CUT module
 }
 

@@ -103,7 +103,7 @@ T.CUT = function(){//class factory
 		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
 		for(var i=0;i<this._.actionStack.length;i++){
 			var ac = this._.actionStack[i];
-			TriggerActionCallbacks({description:ac.description,type:ac.type,num:i}); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
+			TriggerActionCallbacks({description:ac.description,type:ac.type,num:i+1}); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
 		}
 	}
 	
