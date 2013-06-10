@@ -129,6 +129,8 @@ you can drag further files onto the window at any point<br>
 <u>Changes</u>
 <ul>
 
+<li>Restuctured much of the code for dealing with cuts and organising multiple files.  Can now switch between different cuts.</li>
+
 <li>Added basic ratemap generating code.</li>
 
 <li>Several sections of code have been restructured to make them more modular and easier to use.</li>
@@ -184,14 +186,14 @@ Hold down the right mouse button on a tile (or use the left button and the ctrl 
 <i>start of using the merger tool</i>
 </div>
 
-<p>When you get near to another tile the waveforms will "lock on" and align, the border of the tile also switches from orange to gray to let you know. The locking on does not mean the two groups match; it is up to the user to decide if there is a match.  Currently nothing happens when you release the mouse button, but the idea is that if you are locked on to another tile you will merge the two groups into a single new group.</p>
+<p>When you get near to another tile the waveforms will "lock on" and align, the border of the tile also switches from orange to gray to let you know. The locking on does not mean the two groups match; it is up to the user to decide if there is a match.  When you release the mouse button during a lock-on, the two groups will merge into a single new group.</p>
 <div style="text-align:center">
 <img width="150" src="merger2.png"/><br>
 <i>the merger tool locking on to a tile</i>
 </div>
 
 <u>Switching view</u>
-<p>In the button panel there is a row of buttons that allows you to switch between the waveforms on each of the four channels.  You can also show all 4 channels simulatenously.</p>
+<p>In the button panel there is a row of buttons that allows you choose which of the channels you want to see the waveforms for, and whether you want to see spatial ratemaps.  Hold control while clicking to select multiple items.</p>
 
 <u>Settings and data storage</u>
 <p>Chrome exposes the HTML5 FileSystem API which allows the page to store its own private files during and across sessions.  To turn it on click the button that apepars when you first open the page.  Without it everything should still function but more memory will be used.</p>

@@ -402,13 +402,16 @@ margin: 2px;
 -o-user-select: none;
 user-select: none;
 }
-.file_group[active="true"]{
+.file_group[active]{
 background: #ddd;
 border: 1px solid #000;
 }
 .file_group_title{
 font-weight: bold;
 color: #900;
+}
+.tet_group{
+display: inline;
 }
 .file_brick{
 display: inline-block;
@@ -423,8 +426,9 @@ background: #fbb;
 border-color: #500;
 color: #500;
 }
-.cut_file_brick:hover,
-.cut_file_brick[active="true"]{
+
+.file_group[active] > .tet_group[active] > .cut_file_brick:hover,
+.file_group[active] > .tet_group[active] > .cut_file_brick[active]{
 background: #500;
 color: #fff;
 }
@@ -439,8 +443,8 @@ background: #bbF;
 border-color: #005;
 color: #005;
 }
-.new_cut_file_brick:hover,
-new_cut_file_brick[active="true"]{
+.file_group[active] > .tet_group[active] > .new_cut_file_brick:hover,
+.file_group[active] > .tet_group[active] > .new_cut_file_brick[active]{
 background: #005;
 color: #fff;
 }
@@ -448,7 +452,7 @@ color: #fff;
 #filestem_caption{
 text-align:left;
 }
-.file_brick[tet]:not([active]):not(:hover){
+.tet_group:not([active]) > div:not(:hover){
 width: 2px;
 font-size:0;
 }

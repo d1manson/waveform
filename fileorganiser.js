@@ -68,28 +68,40 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 		
     	pendingNewFiles = files.length;
         for(var i =0; i <files.length;i++){
-            
-            if(!recoveringFilesFromStorage) //TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
-    			T.FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 
-                
+                            
             var ext = REGEX_FILE_EXT.exec(files[i].name);
             ext = ext[1];
     		var base = files[i].name.slice(0,files[i].name.length-ext.length-1);
     
-            if(ext=="cut")
-                PAR.LoadCut2(files[i],parseInt(base.slice(-1)),GotFileDetails); //reads the header to find out the experiment name (done asynchrously)
-    		else if(ext == "pos")
-    			GotFileDetails(files[i].name,base,"pos")
-    		else if(ext == "set")
-    			GotFileDetails(files[i].name,base,"set")
-            else if(!isNaN(parseInt(ext)))
-    			GotFileDetails(files[i].name,base,"tet",parseInt(ext));
-    		else{
-    			pendingNewFiles--;//unknown file type
-				//TODO: see note in equivalent bit of code in GotFileDetails
-				if(pendingNewFiles == 0)
-					DispFiles();
-    		}
+			var type = -1;
+			if(ext=="cut") 					type = 1;
+			else if(ext == "pos") 			type = 2;
+    		else if(ext == "set") 			type = 3;
+            else if(!isNaN(parseInt(ext)))	type = 4;
+				
+			if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
+					T.FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 
+				
+			switch(type){
+				case 1:
+					PAR.LoadCut2(files[i],parseInt(base.slice(-1)),GotFileDetails); //reads the header to find out the experiment name (done asynchrously)
+					break;
+				case 2:
+					GotFileDetails(files[i].name,base,"pos");
+					break;
+				case 3:
+					GotFileDetails(files[i].name,base,"set");
+					break;
+				case 4:
+					GotFileDetails(files[i].name,base,"tet",parseInt(ext));
+					break;
+				default:
+					pendingNewFiles--;//unknown file type
+					//TODO: see note in equivalent bit of code in GotFileDetails
+					if(pendingNewFiles == 0)
+						DispFiles();
+			}
+               			
         }      
     }
 
@@ -121,13 +133,13 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     		exp.tets[tet].tet = file_name;
     	}
     	
+		pendingNewFiles--;
+		
 		//TODO: should immediately display what we have and then as new things come along we should add them to the list, and if they are relevant top the current
 		// exp-tet we should load them (except in the case of a new cut when we already have a cut)
-    	pendingNewFiles--;
-        if(pendingNewFiles == 0){
+        if(pendingNewFiles == 0)
            DispFiles();
-    	   //SwitchToExpTet(0,1); //TODO: cant do this because we need to wait for async writes to complete before we can read them
-    	}
+    	
     }
 
 
@@ -208,7 +220,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     			T.FS.ReadFile(cExp.tets[cTet].tet,PAR.LoadTetrode,InternalPARcallback("tet"));		
 				
     		if(cExp.tets[cTet].cut_names[0])
-				SwitchToCut(1,cExp.tets[cTet].cut_names[0]) //if there are one or more cut files, load the first one
+				SwitchToCut(1,0) //if there are one or more cut files, load the first one
 			else if(cExp.tets[cTet].cut_instances.length)
 				SwitchToCut(2,cExp.tets[cTet].cut_instances.length-1); //otherwise, if there are one or more cut isntances, load the first one
 			else if(cExp.tets[cTet].tet)
@@ -240,7 +252,6 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 		cState.cut = 0; 
 		cCutIsFileOrAllZero = false;
 		makeNullCutFromN = false;
-		MarkCurrentCut();
 		
 		switch (type){
 			case 0:
@@ -250,10 +261,11 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				break;
 				
 			case 1:
-				//data is the name of a cut file to retrieve from T.FS (we assume it is for the current exp-tet)
+				//data is the index of a cut name in the cut_names array for the cTet on cExp, we retrieve the cut file from T.FS
 				cCutIsFileOrAllZero = true;
-				T.FS.ReadFile(data,PAR.LoadCut,InternalPARcallback("cut"));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
+				T.FS.ReadFile(cExp.tets[cTet].cut_names[data],PAR.LoadCut,InternalPARcallback("cut"));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
 				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				MarkCurrentCut(data,null);
 				break;
 				
 			case 2:
@@ -265,6 +277,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
 				cCut.ReTriggerAll(); //relive the whole life of the cut again
 				cState.cut = 3;
+				MarkCurrentCut(null,data);
 				break;
 				
 			case 3:
@@ -325,12 +338,14 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	var i, exp;
     	for(i=0, exp=exps[0];i<exps.length;i++,exp=exps[i]){
     		var str = []
-    		str.push("<div class='file_group'><div class='file_group_title'>" + exp.name + "</div>");
+    		str.push("<div class='file_group' data-expind='" + i + "'><div class='file_group_title'>" + exp.name + "</div>");
             for(var j=0;j<exp.tets.length;j++)if(exp.tets[j]){
+				str.push("<div class='tet_group' tet='" + j + "' data-tetind='" + j + "'>")
     			for(var k=0;k<exp.tets[j].cut_names.length;k++)
-    				str.push("<div class='file_brick cut_file_brick' tet='" + j + "' data-expind='" + i + "'>" + exp.tets[j].cut_names[k].replace(exp.name,"~") + "</div>");	//cut file
-    			if(exp.tets[j].tet)
-    				str.push("<div class='file_brick tet_file_brick' tet='" + j + "'>" + exp.tets[j].tet.replace(exp.name,"~") + "</div>");		//tet file
+    				str.push("<div class='file_brick cut_file_brick' data-bricktype='cut' data-cuttype='file' data-cutind='" + k + "'>" + exp.tets[j].cut_names[k].replace(exp.name,"~") + "</div>");	//cut file
+				if(exp.tets[j].tet)
+    				str.push("<div class='file_brick tet_file_brick'>" + exp.tets[j].tet.replace(exp.name,"~") + "</div>");		//tet file
+				str.push("</div>");
     			available_tets[j] = true;
     		}
     		if(exp.pos)
@@ -357,10 +372,10 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	recoveringFilesFromStorage = false; // may already have been false, but now it definitely is
     }
 	var ShowCutInstance = function(ind){
-	
-		cExp.$div.find(".file_brick[tet='" + cTet + "']").eq(0).before($(
-				"<div class='file_brick new_cut_file_brick' tet='" + cTet + "' active='' data-bricktype='new cut' " + 
-				"data-expind='" + cExp.ind + "' draggable='true'>~" + String.fromCharCode("a".charCodeAt(0)+ind)+ "_" + cTet + ".cut</div>")); 
+		cExp.$div.find(".tet_group[tet='" + cTet + "']").prepend($(
+				"<div class='file_brick new_cut_file_brick' data-bricktype='cut' data-cuttype='new' data-cutind='" + ind + "' " 
+				+ "' draggable='true'>~" + String.fromCharCode("a".charCodeAt(0)+ind)+ "_" + cTet + ".cut</div>")); 
+		MarkCurrentCut(null,ind);
 	}
     var TetrodeRadioClick = function(){
     	var newTet = parseInt($(this).val());
@@ -376,11 +391,18 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
         evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
     }
 	var SaveFileDragStart = function(evt){
-		var exp = exps[$(this).data('expind')];
-		var bricktype = $(this).data('bricktype');
+
+		if( $(this).data('bricktype') != 'cut')
+			return;
 		
-		if (bricktype == 'new cut')
-			SaveCutDragStart(evt,exp,cTet,cCut);//TODO: we don't really want cTet and cCut we want to know which tet and cut were actually clicked on
+		if( $(this).data('cuttype') != 'new')
+			return;
+
+		var exp = exps[$(this).parent().parent().data('expind')];
+		var tet = $(this).parent().data('tetind');
+		
+		var svCut = exp.tets[tet].cut_instances[$(this).data('cutind')];
+		SaveCutDragStart(evt,exp,tet,svCut);
 			
 		//todo: for completeness it might be nice to implement dragging of other files too
 	}
@@ -392,21 +414,40 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 		return true;
 	};
 	var MarkCurrentTet = function(){
-		$files_panel.find('[tet]').removeAttr("active");
-    	$files_panel.find('[tet=' + cTet + ']').attr("active","");
+		$files_panel.find('.tet_group').removeAttr("active"); //TODO: ought to keep a jquery cache of all tet_groups with each tet=x value
+    	$files_panel.find('.tet_group[tet=' + cTet + ']').attr("active","");
 	}
 	var MarkCurrentExp = function(){
 		document.title = cExp.name + ' [Cutting GUI]';
-    	for(var i=0;i<exps.length;i++)if(i!=cExp)
-    		exps[i].$div.removeAttr("active");
-    	cExp.$div.attr("active","true"); 
+    	cExp.$div.attr("active","")
+				 .siblings().removeAttr("active");
 	}
-	var MarkCurrentCut = function(){
-		console.log("TODO: mark cuts as (in)active"); //TODO: need some way of selecting the div for the current cut (and an efficient way of removing the active attr for all other cut divs)
+	var MarkCurrentCut = function(file_ind,inst_ind){
+		var $cut_brick;
+		if(file_ind != null)
+			$cut_brick = cExp.$div.find(".tet_group[tet='"+cTet+"'] > .cut_file_brick[data-cutind='" + file_ind + "']");
+		else if(inst_ind != null)
+			$cut_brick = cExp.$div.find(".tet_group[tet='"+cTet+"'] > .new_cut_file_brick[data-cutind='" + inst_ind + "']");
+		else{
+			console.log("what do you mean MarkCurrentCut?");
+			return;
+		}
+		$cut_brick.attr("active","")
+				  .siblings().removeAttr("active");
 	}
 	var FileBrickClick = function(evt){
 		evt.stopPropagation();
+		
+		var $this = $(this);
+		if($this.data('bricktype') != 'cut')
+			return;
+		
+		if($this.data('cuttype') == 'new')
+			SwitchToCut(2,$this.data('cutind'));
+		else
+			SwitchToCut(1,$this.data('cutind'));
 	};
+	
 	window.URL = window.webkitURL || window.URL;
 	$files_panel.on("dragstart",".file_brick",SaveFileDragStart);
     $document.on("dragover", DocumentDragOver) 
@@ -414,6 +455,8 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     $files_panel.on("click",".file_group",FileGroupClick)
                 .on("change","input[name=tetrode]:radio",TetrodeRadioClick)
 				.on("click",".file_brick",FileBrickClick);
+				
+	// '.file_group[active]>tet_group[active]>.file_brick'
 	//=======================================================
   
     T.CUT.AddActionCallback(CutActionCallback);
