@@ -417,7 +417,7 @@ T.CutActionCallback = function(cut,info){
 }
 
 
-T.ReorderCut = function(){
+T.ReorderNCut = function(){
 	//reorder the cut based on number of spikes per group
 
 	var groups = []; //we build an array of (ind,len) pairs that we can then sort by <len>.
@@ -437,6 +437,43 @@ T.ReorderCut = function(){
 	cut.ReorderAll(inds);
 }
 
+T.ReorderACut = function(){
+	var chan = -1;
+	for(var i=0;i<4;i++)
+		if(T.chanIsOn[i])
+			if(chan == -1)
+				chan = i;
+			else{
+				alert("Currently you can only reorder-on-amplitude using a single channel, taking channel" + (chan+1) + ".");
+				break;
+			}
+	if(chan == -1){
+		alert("Currently you can only reorder-on-amplitude using a single channel, taking channel 1.");
+		chan = 1;
+	}
+	
+	var N = T.ORG.GetN();
+	var amps = new Uint8Array(N);	//TODO: cache amplitdues while tetrode is loaded (for all channels)
+	var buffer = new Int8Array(T.ORG.GetTetBuffer());
+	for (var i=0;i<N;i++){
+		var b = buffer.subarray(T.BYTES_PER_SPIKE*i + chan*(50+4) + 4,T.BYTES_PER_SPIKE*i + (chan+1)*54-1);
+		amps[i] = M.max(b) - M.min(b);
+	}
+	
+	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps,"mean");
+	
+	var groups = []; //we build an array of (ind,amp) pairs that we can then sort by <amp>.
+	for(var i=0;i<mean_amps.length;i++)
+		groups.push({ind: i,
+					 amp: isNaN(i)? 256 : mean_amps[i]});
+	groups.sort(function(a,b){return b.amp-a.amp;});
+	
+	//sorting order is in groups[].ind, now pull the inds out into their own array...
+	var inds = [];
+	while(groups.length)
+		inds.push(groups.shift().ind);
+	T.ORG.GetCut().ReorderAll(inds);
+}
 
 T.ShowFileSystemLoaded = function(file_names){
 	if(!file_names || file_names.length == 0){
@@ -474,7 +511,8 @@ T.$action_panel = $('#action_panel');
 T.$tile_ = [];
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
-$('#reorder').click(T.ReorderCut);
+$('#reorder_n_button').click(T.ReorderNCut);
+$('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('.undo').click(T.UndoLastAction);
 $('.bar').click(T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
 T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);

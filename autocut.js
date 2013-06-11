@@ -5,9 +5,8 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     var G_DM_Error = function(s){alert(s);};
     var L = 1024*6;
     var groups = 250;
-    var thresholdDist = 800;
+    var thresholdDist = 900;
 	var joinRatioThreshold = 1.2;
-	var jRvsD = [3,0.003];
     var chan = null;
     var sampInds = [];
     var remInds = [];
@@ -218,23 +217,10 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     	
     	$caption.text('partitioning...');
     		
-    	//Build nodeList, which gives the indicies of nodes that will be the group heads
-    	var nodeList = T.nodeList = Array();
+
     	
     	var n = sampInds.length;
-		
-		/*
-    	var K = groups;
-    	var iThreshold = 2*n-K-1;
-    	for(var i=iThreshold-n; i<n-1; i++){  
-    		if(A[i] < iThreshold)
-    			nodeList.push(A[i]);
-    		if(B[i] < iThreshold)	
-    			nodeList.push(B[i]);		
-    	}
-    	*/
-    	
-		
+				
 		var ds = sampLinkage.dist;
 		var nA = sampLinkage.aDescCount;
     	var nB = sampLinkage.bDescCount;
@@ -246,12 +232,16 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		
 		//find first over-threhold node
 		var start = 0;
-		for(start=0;start<n;start++)
+		for(start=0;start<n-1;start++)
 			if(ds[start] > thresholdDist)
 				break;
-		//TODO: what if start==n?
 		
-		for(var i=start;i<n;i++){
+		//Build nodeList, which gives the indicies of nodes that will be the group heads
+    	var nodeList = [];
+		
+		if(start == n-2)
+			nodeList = [2*n-2];	//no partitioning, just one big group
+		else for(var i=start;i<n-1;i++){
 			var tA = A[i] < n || !isNaN(joinRatio[A[i]-n]);
 			var tB = B[i] < n || !isNaN(joinRatio[B[i]-n]);
 			
@@ -261,49 +251,6 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 				joinRatio[i] = NaN;
 			}
 		}
-		
-		
-		
-		/*
-		for(i=0;i<n-1;i++){
-			if (joinRatio[i] < joinRatioThreshold){
-				if(  (A[i] > n-1 || joinRatio[A[i]-n] == 0) 
-				  && (B[i] > n-1 || joinRatio[B[i]-n] == 0) ){
-					joinRatio[i] = 0;
-					if(A[i] > n-1) joinRatio[A[i]-n] = Infinity;
-					if(B[i] > n-1) joinRatio[B[i]-n] = Infinity;
-				  }
-			}
-		}
-		*/
-		
-		/*
-		//start at the top and go down..doesn't work well
-		for(i =n-2;i>-1 && nodeList.length<groups;i--){
-			if (joinRatio[i] < joinRatioThreshold)
-				nodeList.push(i+n);
-			else if (joinRatio[i] < Infinity)
-				continue;
-			
-			//If this node has Inifite joinRatio or has just been made into a node, then set its children to have infintie joinRatios
-			//This will ensure that all descendants of a node will be set to Inifinity rather than potentially be added to the nodeList
-			if(A[i] > n-1) joinRatio[A[i]-n] = Infinity;
-			if(B[i] > n-1) joinRatio[B[i]-n] = Infinity;	
-		}*/
-		
-		
-		/*
-    	var K = threshold;
-    	var dA = sampLinkage.aDescCount;
-    	var dB = sampLinkage.bDescCount;
-    	for(var i=0; i<n-1; i++)if((dA[i]<K || dB[i]<K) && dA[i]+dB[i] > K){//that's not right, it should be weighted average of dA and dB
-    		if(dA[i] < K)
-    			nodeList.push(A[i]);
-    		if(dB[i] < K)
-    			nodeList.push(B[i]);		
-    	}
-    	*/
-    	
     	
     	//For each node in the list collect all the leaf nodes
     	var G = nodeList.length;

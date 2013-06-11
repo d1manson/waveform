@@ -53,6 +53,23 @@ var M = {
 		//modifies vector in place
 	},
 	
+	accumarray: function(inds,values,fn){
+		if(fn == "mean"){
+			var S = M.max(inds) + 1; //zero-based indexing, remember!
+			var result = new Float32Array(S); //we assume that whatever the class was we still want a float for the means
+			var counts = new Uint32Array(S);
+			for(var i=0;i<inds.length;i++){
+				result[inds[i]] += values[i];
+				counts[inds[i]]++;
+			}			
+			for(var i=0;i<S;i++)
+				result[i] /= counts[i];
+			return result;
+		}else
+			throw(fn + " is not implemetned, sorry");
+		
+	},
+	
 	basic: function(typedArr){
 		return Array.apply([],typedArr);//turns typed array into a basic javascript array
 	}

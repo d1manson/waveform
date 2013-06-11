@@ -189,19 +189,13 @@ T.CUT = function(){//class factory
 		return this._.cutInds[g] || [];
 	}
 
-	var GetProps = function(){
-		return {exp_name: this._.exp_name, 
-				tet_num: this._.tet_num,
-				G: this._.cutInds.length};
-	}
-	
-	var GetFileStr = function(){
+	var GetAsVector = function(cap){
 		var N = this._.N;
 		var cutInds = this._.cutInds;
 		var G = cutInds.length;
-		
 		var theCut = new Uint32Array(N);
-		G = G > 31? 31 : G; // groups 0-30, spikes in a group higher than 30 will be left as cluster 0
+		
+		if (cap) G = G > cap? cap : G; 
 
 		//convert cutInds nested arrays into a single vector giving a gorup number for each spike
 		for(var g=0;g<G;g++){
@@ -210,14 +204,28 @@ T.CUT = function(){//class factory
 			for(var i=0;i<Glen;i++)
 				theCut[cut_g[i]] = g;
 		}
-
+		
+		return theCut;
+	}
+	
+	var GetProps = function(){
+		return {exp_name: this._.exp_name, 
+				tet_num: this._.tet_num,
+				G: this._.cutInds.length};
+	}
+	
+	var GetFileStr = function(){
+		var theCut = GetAsVector.call(this,30);
+		var G = this._.cutInds.length;
+		var N = this._.N;
+		
 		var str = [
 			'n_clusters: ' + G,
 			'n_channels: 4',
 			'n_params: 0',
 			'times_used_in_Vt: 0 0 0 0']
 
-		for(g=0; g<G; g++){
+		for(var g=0; g<G; g++){
 			str.push(' cluster: ' + g + ' center: 0 0 0 0 0 0 0 0');
 			str.push(' min:   0 0 0 0 0 0 0 0');
 			str.push(' max:   0 0 0 0 0 0 0 99');
@@ -227,7 +235,7 @@ T.CUT = function(){//class factory
 		str.push('');
 		
 		str = [str.join('\n')];
-		for(i=0;i<N;i++)
+		for(var i=0;i<N;i++)
 			str.push(theCut[i] + ' ');
 
 		return str.join('');
@@ -260,6 +268,7 @@ T.CUT = function(){//class factory
 	cut.prototype.Undo = Undo;
 	cut.prototype.ForceChangeCallback = ForceChangeCallback;
 	cut.prototype.ReTriggerAll = ReTriggerAll;
+	cut.prototype.GetAsVector = GetAsVector;
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,
