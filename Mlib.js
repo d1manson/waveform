@@ -51,5 +51,9 @@ var M = {
 			if(mask[i])
 				vector[i] = 0;
 		//modifies vector in place
+	},
+	
+	basic: function(typedArr){
+		return Array.apply([],typedArr);//turns typed array into a basic javascript array
 	}
 }
