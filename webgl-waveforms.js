@@ -2,7 +2,10 @@
 
 //T.WV: uses webgl to render waveforms
 T.WV = function($tile_){
-    
+
+	var living = function(){this.alive=true;} //used for canceling previous renders
+	var cRender = null; //instance of living
+	
     var bW = 1024;
     var bH = 1024;
     var rowHeight = 128;
@@ -277,7 +280,7 @@ T.WV = function($tile_){
     
         UploadTexture(groupDataTexReg,data,512,256)
     	hasGroupData = true;
-		Render(firstGroup,lastGroup);
+		CallRender(firstGroup,lastGroup);
     }
     
     var CanvasInnerWidth = function(){
@@ -307,7 +310,7 @@ T.WV = function($tile_){
     		$tile_[i].canvas.get(0).height = h;
     	}
     	
-		Render();
+		CallRender();
     }
     
     var SetPaletteMode = function(m){
@@ -320,7 +323,6 @@ T.WV = function($tile_){
     var ClearAll = function(){
 		hasGroupData = false;
 		ready = false;
-		chanIsOn = [1,1,1,1];
 		gl = null;
 		prog = null;
 		error_callback = function(s){console.log(s)};
@@ -397,6 +399,8 @@ T.WV = function($tile_){
         gl.viewport(0, 0, bW,bH);
     	ready = true;
 		
+		chanIsOn = [0,0,0,0];
+		
 		if (PreReadyGroupData != null)
 			SetGroupData(PreReadyGroupData.cut,PreReadyGroupData.firstGroup,PreReadyGroupData.lastGroup,PreReadyGroupData.flag);
     }
@@ -443,22 +447,29 @@ T.WV = function($tile_){
     	console.timeEnd("render page");
     }
     
-    
-    var Render = function(firstGroup,lastGroup,isAsync){
-        //The render target is not big enough to render all groups in one go, 
+    var CallRender = function(firstGroup,lastGroup){
+		if(cRender && cRender.alive){
+			cRender.alive = false; //TODO: we don't want to just cancel the whole of the last render, if we are only rendering a subset of groups each time we still need to do it
+			console.log('Killing old render.  TODO: we may actually need to do the previous render.')
+		}
+		cRender = new living(); 
+		window.setTimeout(function(){Render(firstGroup,lastGroup,cRender);},1);
+	}
+	
+    var Render = function(firstGroup,lastGroup,hRender){	
+		if(!ready || !hasGroupData || !hRender.alive) return;	
+    	
+		firstGroup = firstGroup === undefined? 0 : firstGroup;
+		lastGroup = lastGroup === undefined? cutIndLengths.length-1 : lastGroup;
+		
+		//The render target is not big enough to render all groups in one go, 
         //e.g. when we are showing all channels, we might fit 2 groups on a row and have 8 rows so 16 groups per page
-		if(!ready || !hasGroupData) return;
-			
-    	if(isAsync === undefined)
-    		window.setTimeout(function(){Render(firstGroup,lastGroup,true);},1); //call this function again but via timeout
-    	else{
-    		firstGroup = firstGroup === undefined? 0 : firstGroup;
-    		lastGroup = lastGroup === undefined? cutIndLengths.length-1 : lastGroup;
-    		RenderPage(firstGroup,Math.min(lastGroup,firstGroup+ groupsPerPage-1))
-    		firstGroup += groupsPerPage;
-    		if(firstGroup < lastGroup)
-    			window.setTimeout(function(){Render(firstGroup,lastGroup,true);},1);
-    	}
+		RenderPage(firstGroup,Math.min(lastGroup,firstGroup+ groupsPerPage-1))
+		firstGroup += groupsPerPage;
+		if(firstGroup < lastGroup)
+			window.setTimeout(function(){Render(firstGroup,lastGroup,hRender);},1);
+    	else
+			hRender.alive = false; //it's done
     }
     
     
@@ -516,7 +527,7 @@ T.WV = function($tile_){
     
     return {
         Setup: Setup,
-        Render: Render,
+        Render: CallRender,
         SetPaletteMode: SetPaletteMode,
         CanvasInnerHeight: CanvasInnerHeight,
         CanvasInnerWidth: CanvasInnerWidth,

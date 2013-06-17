@@ -462,6 +462,8 @@ T.ReorderACut = function(){
 	
 	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps,"mean");
 	
+	//TODO: I think there will be a bug if there are any empty groups beyond the end of the last occupied group, need to do an identity transformation for the end or something
+	
 	var groups = []; //we build an array of (ind,amp) pairs that we can then sort by <amp>.
 	for(var i=0;i<mean_amps.length;i++)
 		groups.push({ind: i,
