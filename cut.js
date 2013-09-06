@@ -20,6 +20,9 @@ T.CUT = function(){//class factory
 							  
 	var actionCallbacks = []; //callbacks must be of the form foo(cut,info){} where info is an object with at least a string proeprty named description
 	
+    //TODO: modify changeCallbacks to accept a list of movedGroups, newGroups, and removedGroups
+    //this may require having webgl-waveforms and the ratemap keep a handle on each of their canvases, then they can use old ones easily, even if the tile has been deleted
+    
 	//the undo stack is an array of these objects
 	var action = function(type,data,description){ 
 		this.type=type;
@@ -128,6 +131,8 @@ T.CUT = function(){//class factory
 			UndoSwapBandA.call(this,action.data);
 		else if(action.type=="reorder")
 			UndoReorderAll.call(this,action.data);
+		else if(action.type=="split")
+			UndoSplitA.call(this,action.data);
 		else
 			undone = false;
 
@@ -139,6 +144,35 @@ T.CUT = function(){//class factory
 		}
 	}
 
+	var SplitA = function(a,splitMask){
+		var cut_a = this._.cutInds[a];
+		var first_half = [];
+		var second_half = [];
+		
+		for(var i=0;cut_a.length;i++)
+			if(splitMask[i])
+				second_half.push(cut_a.shift());
+			else
+				first_half.push(cut_a.shift());
+		
+		this._.cutInds.splice(a,1,first_half,second_half);
+		PushAction.call(this,"split",[a,splitMask],'split group-' + a + ' in two');
+		TriggerChangeCallbacks.call(this,a,this._.cutInds.length,false);
+	}
+	var UndoSplitA = function(data){
+		var a = data[0];
+		var splitMask = data[1];
+		var first_half = this._.cutInds[a];
+		var second_half = this._.cutInds[a+1];
+		var cut_a = [];
+		for (var i=0;i<splitMask.length;i++)
+			if(splitMask[i])
+				cut_a.push(second_half.shift());
+			else
+				cut_a.push(first_half.shift());	
+		this._.cutInds.splice(a,2,cut_a);
+		TriggerChangeCallbacks.call(this,a,this._.cutInds.length,false);
+	}
 	
 	var AddBtoA = function(a,b){
 		var lenB = this._.cutInds[b].length;
@@ -264,6 +298,7 @@ T.CUT = function(){//class factory
 	cut.prototype.GetJSONString = GetJSONString; //note that this includes all the information needed to recreate the cut instance at a later date, whereas GetFileStr does not
 	cut.prototype.AddBtoA = AddBtoA;
 	cut.prototype.SwapBandA = SwapBandA;
+	cut.prototype.SplitA = SplitA;
 	cut.prototype.ReorderAll = ReorderAll;
 	cut.prototype.Undo = Undo;
 	cut.prototype.ForceChangeCallback = ForceChangeCallback;

@@ -462,3 +462,30 @@ padding: 3px 0px 3px 0px;
 #header_search{
 float: right;
 }
+
+.tile[disabled]{
+pointer-events: none;
+}
+
+.tile > .blind{
+position: absolute;
+left: 0px;
+right: 0px;
+top: 0px;
+bottom: 0px;
+z-index: 100;
+background: rgba(0,0,0,0.5);
+display: none;
+}
+.tile[disabled] > .blind{
+display: block;
+}
+.tile[separating] > .blind{
+display: none;
+}
+.tile[separating] > .tile-over{
+visibility: visible;
+}
+.separator_half{
+    display: inline-block;
+}

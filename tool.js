@@ -4,6 +4,7 @@
 T.PROXIMITY = 30;
 T.TILE_MOVING_BORDER_WIDTH = 10;
 T.WIDGET_CENTRE_RAD = 10;
+T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 
 T.Tool.GetSplitter = function($tile){
 	var $w = $tile.find('.widget').eq(0);
@@ -33,7 +34,7 @@ T.Tool.MergerTileMouseUp = function(event){
 					.toggleClass('shake',true)
 					.toggleClass('tile-proximate',false)
 					.find('canvas').eq(0).css({position: '',left: '',top: ''});
-					
+
 	if(T.Tool.activeMerger.target != null){
 		var ind_a = T.Tool.activeMerger.$h.data("group_num");
 		var ind_b = T.$tile_[T.Tool.activeMerger.target].toggleClass('shake',true)
@@ -44,7 +45,7 @@ T.Tool.MergerTileMouseUp = function(event){
 				ind_b = ind_a;
 				ind_a = tmp;
 			}
-			
+
 			T.ORG.GetCut().AddBtoA(ind_a,ind_b);
 		}
 	}
@@ -53,6 +54,7 @@ T.Tool.MergerTileMouseUp = function(event){
 
 
 T.TileMouseUp = function(event){
+	console.log("mouse up");
 	if(T.Tool.activeMerger && event.button == 0)
 		T.Tool.MergerTileMouseUp.call(this,event);
 }
@@ -98,6 +100,7 @@ T.Tool.BeginMergerTileMouseDown = function(event){
 }
 
 T.TileMouseDown = function(event){
+	console.log("mouse down");
 	if(T.Tool.activeSplitter || T.Tool.activeMerger)
 		return;
 
@@ -150,4 +153,100 @@ T.Tool.SplitterMouseMove = function(event){
 	}
 }
 
+T.TileDoubleClick = function(event){
+	console.log("double click");
+	var $h = $(this);
+	$h.toggleClass('shake',false); //clear the failed dragging animation (the mouse down events triggered this)
+
+	var c = T.ORG.GetCut();
+	var g = $h.data("group_num");
+	var cut_g = c.GetGroup(g);
+	var n_1 = Math.floor(cut_g.length/2);
+	var n_2 = Math.ceil(cut_g.length/2);
+	c.SplitA(g,T.Tool.SeparatorMakeMask(n_1,n_2));
+
+	$.each(T.$tile_,function(){$(this).attr('disabled','true');})
+    var $separator_first = $("<div class='separator_half' />")
+                            .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,true)})
+                            .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,true)});
+    var $separator_second = $("<div class='separator_half' />")
+                            .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,false)})
+                            .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,false)});
+	T.$tile_[g].attr('separating','true')
+                .wrap($separator_first);
+	T.$tile_[g+1].attr('separating','true')
+                .wrap($separator_second);
+    T.Tool.separating = {g:g,n_1:n_1,n_2:n_2,increment:1,isFirst:NaN,timer:null};
+}
+
+T.TileWallMouseDown = function(event){
+    if(T.Tool.separating){
+        var g = T.Tool.separating.g;
+        T.$tile_[g].removeAttr('separating')
+                                     .unwrap();
+        T.$tile_[g+1].removeAttr('separating')
+                                     .unwrap();
+        $.each(T.$tile_,function(){$(this).removeAttr('disabled');});
+		clearInterval(T.Tool.separating.timer);
+        delete T.Tool.separating;
+        
+        if(event.button == 2 || event.ctrlKey)
+            T.ORG.GetCut().Undo();
+    }
+}
+
+T.Tool.SeparatorMakeMask = function(n_1,n_2){
+	var mask = new Uint8Array(n_1+n_2);
+	for(var i=n_1;i<n_1+n_2;i++)
+		mask[i] = 1;
+	return mask;
+}
+T.Tool.SeparatorMouseUpDown = function(event,isDown,isFirst){
+    event.stopPropagation();
+   //isDown is false for up events, isFirst is false when the second separator is the source
+   var s = T.Tool.separating;
+	if(isDown){
+		//mouse down: start timer and run first iteration
+		s.isFirst = isFirst;
+		s.increment = 1;
+		s.timer = setInterval(T.Tool.SeparatorMouseDownTick,T.SEPARATOR_MOUSE_DOWN_TIMER_MS);
+		T.Tool.SeparatorMouseDownTick();
+	}else{
+		//mouse up: apply new n values
+		clearInterval(s.timer);
+		s.isFirst = NaN;
+		s.timer = null;	
+		var c = T.ORG.GetCut();
+		c.Undo();
+		c.SplitA(s.g,T.Tool.SeparatorMakeMask(s.n_1,s.n_2));
+	}
+ 
+}
+T.Tool.SeparatorMouseDownTick = function(){
+	var s = T.Tool.separating;
+	if(s.isFirst){
+		s.n_1 += s.increment;
+		s.n_2 -= s.increment;
+		if (s.n_2 < 1){
+			s.n_1 += s.n_2 - 1;
+			s.n_2 = 1;
+		}
+	}else{
+		s.n_1 -= s.increment;
+		s.n_2 += s.increment;
+		if (s.n_1 < 1){
+			s.n_2 += s.n_1 - 1;
+			s.n_1 = 1;
+		}
+	}
+	s.increment += 8;
+	s.increment = s.increment > 800 ? 800 : Math.round(s.increment);
+
+	T.$tile_[s.g].caption.text("group " + s.g + " | " + s.n_1 + " waves ");
+	T.$tile_[s.g+1].caption.text("group " + (s.g+1) + " | " + s.n_2 + " waves ");
+}
+
+
+T.$tilewall.on("mousedown",T.TileWallMouseDown);
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
+T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); //double click is triggered after the sequence mouse-down, mouse-up, mouse-down, mouse-up.  Which would have meant the merge tool was started and stopped twice.

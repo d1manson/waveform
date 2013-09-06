@@ -265,7 +265,7 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 				var $t = $("<div class='tile' id='tile_" + i + "'>" +
 							"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
 							"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
-							"<div class='tile-over'><div class='tile-caption'></div></div></div>");
+							"<div class='tile-over'><div class='tile-caption'></div></div><div class='blind'></div></div>");
 				$t.mousedown(T.TileMouseDown);
 				$t.data("group_num",i);
 				$t.canvas = $t.find('canvas');
@@ -286,7 +286,7 @@ T.SetGroupDataTiles = function(cut,from,to,flag){
 						T.$tilewall.append($t);
 				}
 				
-				T.$tile_[i] = $t;				
+				T.$tile_[i] = $t;
 			}
 			T.$tile_[i].caption.text("group " + i + " | " + len + " waves ");
 		}
