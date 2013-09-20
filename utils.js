@@ -10,3 +10,7 @@ var BuildWorker = function(foo){
 var SimpleClone = function(ob){
 	return JSON.parse(JSON.stringify(ob));
 }
+
+var isNum = function(x){
+	return (typeof(x) === "number") && isFinite(x); //returns false for +-Infinity, NaN, null, undefined, and any other rubbish you might try it with
+}

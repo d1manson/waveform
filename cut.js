@@ -2,34 +2,41 @@
 
 // The CUT module, the primary component of which is a class called cut
 T.CUT = function(){//class factory
-	
+
 	//the object this._ is to be considered private, though it is actually public.  
 	//Correct me if I'm wrong, but I think this is considered an ok way of emulating OOP in javascript - DM
-	
+
 	//static private functions, variables, and classes (some of which may be exported at the bottom of the factory)
+
+	//The cut is stored in a somewhat complciated data structure which is designed specifically to prevent redundant renders each time the cut is modified.
+	//Rather than having an array with one element per group, we instead maintain a list of "immutable" inds arrays.  Each of these immutables is then associated to
+	//a particular group.  If/when the group number changes, we push the new group number onto the group_history array for the given immutable.  Each of these inds/group_history pairs is
+	//stored in an object that occupies a slot in the immutablesSlots array.  When inds are no longer needed we clear the data, and make the slot available for future use.  In order
+	//to keep everyone on the same page with reference to the contents of each slot, we also keep a generation counter for each slot which is incremented each time we reuse the slot 
+	//with a new immutable.  The cut pseudo-class exposes two ways of accessing ind data, you can either call GetGroup(group_num) or GetImmutableSlot(slot_num).
+	//Note that we also maitain an array, groupToImmutablesMapping, providing the inverse mapping from group_num to slot_num.
 	
 	//we have two lists of callbacks, which are usually triggered at the same time, but they serve slightly 
 	//different purposes and sometimes only the actionCallbacks get triggerd...
 	//the changeCallbacks should not worry about the exact action performed, only what the resulting change was, whereas the actioncallbacks
 	//dont actually care what the change is they just need to know what action occured.
-	var changeCallbacks = []; //callbacks must be of the form foo(cut,changeFrom,changeTo,noInterior,actionInfo){ }, 
-							  //where cut is the current cut object and changeFrom and changeTo give the range of modified cut groups, 
-							  //noInterior is true if only the from- and to- groups changed and not the groups inbetween
-							  //Note that the modules with these callbacks will recieve their first change event at the point a cut is constructed, 
-							  //they are expected to already have any other needed data by that point (so you need to provide it separately before the new cut)
-							  
+	var changeCallbacks = []; //callbacks must be of the form foo(cut,invalidatedImmutableSlots,isNewCut){ }, 
+							  //where cut is the current cut object and invalidatedImmutableSlots is a logical vector with a true for each immutable slot that has just
+							  //been invalidated.  The callback should logically OR the invalidation vector with its current invalidation vector (if it has one) and process each of the invalid slots.
+							  //When a cut is constructed the isNewCut parameter is true and the invalidatedImmutablesSlots will all be true.  This means the callbacks
+							  //are expected to already have any other needed data by that point (so you need to provide it separately before the new cut)
+
 	var actionCallbacks = []; //callbacks must be of the form foo(cut,info){} where info is an object with at least a string proeprty named description
-	
-    //TODO: modify changeCallbacks to accept a list of movedGroups, newGroups, and removedGroups
-    //this may require having webgl-waveforms and the ratemap keep a handle on each of their canvases, then they can use old ones easily, even if the tile has been deleted
-    
+
+    //TODO: modify changeCallbacks to work with the immutable system, and debug any outstanding internal issues here with the immutable system
+
 	//the undo stack is an array of these objects
 	var action = function(type,data,description){ 
 		this.type=type;
 		this.data=data;
 		this.description=description
 	} 
-	
+
 	var AddChangeCallback = function(fn){
 		changeCallbacks.push(fn);
 	}
@@ -37,92 +44,193 @@ T.CUT = function(){//class factory
 		actionCallbacks.push(fn);
 	}
 	//TODO: may want to implement RemoveCallback, which I think you can do by iterating through list and testing for equality of function objects
-	
+
 	var PushAction = function(type,data,description){
 		this._.actionStack.push(new action(type,data,description));
-		
+
 		TriggerActionCallbacks({description:description,type:type,num:this._.actionStack.length});
 	}
-	
+
 	var TriggerActionCallbacks = function(ob){
 		for(var i=0;i<actionCallbacks.length;i++)
 			try{
 				actionCallbacks[i](this,SimpleClone(ob));
 			}catch(err){console.log("Error in TriggerActionCallbacks: " + err.stack)}
 	}
-	
-	var TriggerChangeCallbacks = function(a,b,flag){
+
+	var TriggerChangeCallbacks = function(invalidatedImmtableSlots,isNew){ 
 		for(var i=0;i<changeCallbacks.length;i++)
 			try{
-				changeCallbacks[i](this,Math.min(a,b),Math.max(a,b),flag);
+				changeCallbacks[i](this,invalidatedImmtableSlots,isNew);
 			}catch(err){console.log("Error in TriggerChangeCallbacks: " + err.stack)}
 	}
-	var ForceChangeCallback = function(fn){
+	var ForceChangeCallback = function(fn){ 
 		try{
-			fn(this,0,this._.cutInds.length-1,false); //force a full change callback on the requested function
+			fn(this,M.repvec(1,this._.immutablesSlots.length),false); //force a full change callback on the requested function, but don't claim that it's a new cut
 		}catch(err){console.log("Error in ForceChangeCallback: " + err.stack)}
+	}
+
+    var NewImmutable = function(inds,group_num){
+		var k = this._.nextImmutableSlot;
+		if(!(k > 0 || k==0)) throw('no slot available');
+			
+        this._.groupToImmutablesMapping[group_num] = k;
+
+        // set all the properties of slot k
+        var slot_k = this._.immutablesSlots[k];
+        if(slot_k){
+            slot_k.generation++;
+        }else{
+            slot_k = {generation: 1, inds: null, group_history: [],num:k};
+            this._.immutablesSlots[k] = slot_k;
+        }
+        slot_k.inds = new Uint32Array(inds);
+        slot_k.group_history = [group_num];
+
+        //find the next vacant slot.  First search from this point to the end...
+        for(var i=k+1;i<this._.immutablesSlots.length;i++)
+            if(!this._.immutablesSlots[i] || this._.immutablesSlots[i].inds == null){
+                this._.nextImmutableSlot = i;
+                return;
+            }
+        //then, if neccessary, wrap around and search from the beginnning again
+        for(var i=0;i<k;i++)
+            if(!this._.immutablesSlots[i] || this._.immutablesSlots[i].inds == null){
+                this._.nextImmutableSlot = i;
+                return;
+            }
+
+        this._.nextImmutableSlot = NaN;
+        return k;
+    }
+
+    var DeleteImmutable = function(group_num){
+        var k = this._.groupToImmutablesMapping[group_num];
+        var slot_k = this._.immutablesSlots[k];
+        if(slot_k){
+            slot_k.inds = null;
+            slot_k.group_history = [];
+        }//if slot_k doesn't exist we don't need to worry
+        this._.groupToImmutablesMapping[group_num] = null;
+        this._.nextImmutableSlot = k;
+		return k;
+    }
+
+	var SpliceImmutables = function(a,n_remove /* , inds_1, inds_2, ... */){	//behaves like javascript array "splice"
+		var s = this._.immutablesSlots;
+		var m = this._.groupToImmutablesMapping;
+		
+		var invalidated = M.repvec(0,s.length);
+		
+		// clear the slots with groups  a,a+1,...,a+n_remove-1
+		for(var i=0;i<n_remove;i++)
+			invalidated[DeleteImmutable.call(this,a+i)] = 1;
+		
+		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
+		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
+		for(var i=0;i<s.length;i++)if(s[i] && s[i].group_history.slice(-1)[0] >= a){
+			s[i].group_history.push(s[i].group_history(-1)[0] + increment);
+			invalidatedSlots[i] = 1;
+			m[s[i].group_history(-1)[0]] = i;
+		}
+		
+		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...
+		for(var i=2;i<arguments.length;i++)
+			invalidated[NewImmutable.call(this,arguments[i],a+i-2)] = 1;
+
+		return invalidated;
+	}
+	
+	var GetImmutableSlot = function(k){
+		// the calling function *must* check the generation value is what it expected
+		return this._.immutablesSlots[k] || {};
 	}
 	
 	var DoConstruction = function(data_type,data,description){
 		switch (data_type){
-		
+
 		case 1: //data is an array specifying the group of each spike
-			this._.cutInds = [[]];
 			this._.N = data.length;
+			var cutInds = [[]];
 			for(var i=0;i<data.length;i++)
-				if(this._.cutInds[data[i]] == undefined)
-					this._.cutInds[data[i]] = [i];//new subarray
+				if(cutInds[data[i]] == undefined)
+					cutInds[data[i]] = [i];//new subarray
 				else
-					this._.cutInds[data[i]].push(i);//append to existing subarray
-			break;
+					cutInds[data[i]].push(i);//append to existing subarray
 			
+			//now that we have an array of inds arrays, we can make the immutables
+			for(var i =0;i<cutInds.length;i++)
+				NewImmutable.call(this,cutInds.shift(),i);
+			break;
+
 		case 2: //data is a string, previously exported from an instance of this class
-			this._ = JSON.parse(data); 
+			this._ = JSON.parse(data);
+            
+            //restore the inds in immutablesSlots to being typedArrays (they were encoded as basic arrays)
+            var m = this._.immutablesSlots;
+            for(var i=0;i<m.length;i++)if(m[i] && m[i].inds)
+                m[i].inds = new Uint32Array(m[i].inds);
+                
 			//TODO: might be worth validating everything and doing the JSON parse inside a try-catch
 			break;
-			
-		case 3: //data is already in the form we want cutInds to be
-			this._.cutInds = data; //note we don't bother to clone the array, partly because it's two levels deep but mainly because we hopefully dont need to
-			this._.N = 0;
-			for(var i = 0;i<data.length;i++)
-				this._.N += data[i].length; //count number of spikes in all groups, note that this must include all spikes or export to file will not give useful result
+
+		case 3: //data is an array of inds arrays
+			var N = 0;
+			for(var i =0;i<data.length;i++){
+				NewImmutable.call(this,data[i],i);
+				N += data[i].length; //count number of spikes in all groups, note that this must include all spikes or export to file will not give useful result
+			}
+			this._.N = N; 
 			break;
-			
+
 		case 4: //data is just N
 			this._.N = data;
-			var cut0 = [];
-			for(var i=0;i<data;i++)
-				cut0.push(i);
-			this._.cutInds = [cut0]; //everything in group zero
+			//everything in group zero
+			NewImmutable.call(this,M.range(0,this._.N-1),0);
 			break;
 		}
-		
+
 		PushAction.call(this,"load",{},description);
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
+		TriggerChangeCallbacks.call(this,M.repvec(1,this._.immutablesSlots.length),true); 
 	}
-	
+
 	var ReTriggerAll = function(){
 		//to be used when restoring to view, i.e. after another cut has been in view
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
+		TriggerChangeCallbacks.call(this,M.repvec(1,this._.immutablesSlots.length),true);
 		for(var i=0;i<this._.actionStack.length;i++){
 			var ac = this._.actionStack[i];
 			TriggerActionCallbacks({description:ac.description,type:ac.type,num:i+1}); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
 		}
 	}
-	
+
 	var GetJSONString = function(){
-		//for keeping in localStorage or FileSystem API
-		return JSON.stringify(this._); //this is sufficient at present because ._ data is simple, i.e. doesn't include any out-there object references and is not recursive
+        
+        //we temporarily convert the inds in immutablesSlots to standard arrays
+        //this is necceesarry for JSON to work well
+        var m = this._.immutablesSlots;
+        var tmpInds = [];
+        for(var i=0;i<m.length;i++)if(m[i] && m[i].inds){
+            tmpInds.push(m[i].inds);
+            m[i].inds = M.basic(m[i].inds);
+        }
+        
+		var str = JSON.stringify(this._); //._ doesn't include any out-there object references and is not recursive
+        
+        //restore the inds arrays to their original typed arrays.
+        for(var i=0;i<m.length;i++)if(m[i] && m[i].inds)
+            m[i].inds = tmpInds.shift();
+        
+        return str;
 	}
-	
-	var Undo = function(){
+
+	var Undo = function(){ 
 		//this is going to be exported (=made public), it calls the relevant inverse operation (which are private)
 		//the inverse operations make a call to TriggerChangeCallbacks, but this function does the call to TriggerActionCallbacks
 		if (this._.actionStack.length == 0){
 			TriggerActionCallbacks.call(this,{description:"nothing to undo", type:"empty-actions"});
 			return;//nothing to undo
 		}
-		
+
 		var action = this._.actionStack.pop();
 		var undone = true;
 		if(action.type=="add")
@@ -145,114 +253,183 @@ T.CUT = function(){//class factory
 	}
 
 	var SplitA = function(a,splitMask){
-		var cut_a = this._.cutInds[a];
+		var cut_a = GetGroup.call(this,a);
 		var first_half = [];
 		var second_half = [];
-		
-		for(var i=0;cut_a.length;i++)
+
+		for(var i=0;i<cut_a.length;i++)
 			if(splitMask[i])
-				second_half.push(cut_a.shift());
+				second_half.push(cut_a[i]);
 			else
-				first_half.push(cut_a.shift());
+				first_half.push(cut_a[i]);
 		
-		this._.cutInds.splice(a,1,first_half,second_half);
+		var invalidatedSlots = SpliceImmutables.call(this,a,1,first_half,second_half);
 		PushAction.call(this,"split",[a,splitMask],'split group-' + a + ' in two');
-		TriggerChangeCallbacks.call(this,a,this._.cutInds.length,false);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
-	var UndoSplitA = function(data){
+	var UndoSplitA = function(data){ 
 		var a = data[0];
 		var splitMask = data[1];
-		var first_half = this._.cutInds[a];
-		var second_half = this._.cutInds[a+1];
+		var first_half = M.basic(GetGroup.call(this,a));
+		var second_half = M.basic(GetGroup.call(this,a+1));
 		var cut_a = [];
 		for (var i=0;i<splitMask.length;i++)
 			if(splitMask[i])
 				cut_a.push(second_half.shift());
 			else
 				cut_a.push(first_half.shift());	
-		this._.cutInds.splice(a,2,cut_a);
-		TriggerChangeCallbacks.call(this,a,this._.cutInds.length,false);
+		var invalidatedSlots = SpliceImmutables.call(this,a,2,cut_a);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
-	
+
 	var AddBtoA = function(a,b){
-		var lenB = this._.cutInds[b].length;
-		this._.cutInds[a] = this._.cutInds[a].concat(this._.cutInds[b]);
-		this._.cutInds[b] = [];
+		var cut_a = GetGroup.call(this,a);
+		var cut_b = GetGroup.call(this,b);
+		
+		var lenB = cut_b.length;
+		
+		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
+		
+		//delete the two individual sets of inds
+		invalidatedSlots[DeleteImmutable.call(this,a)] = 1;
+		invalidatedSlots[DeleteImmutable.call(this,b)] = 1;		
+
+		//create the new inds
+		invalidatedSlots[NewImmutable.call(this,M.concat(cut_a,cut_b),a)] = 1;
+		
 		PushAction.call(this,"add",[a,b,lenB],'merge group-' + b + ' into group-' + a);
-		TriggerChangeCallbacks.call(this,a,b,true);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
 	var UndoAddBtoA = function(data){
-		this._.cutInds[data[1]] = this._.cutInds[data[0]].splice(-data[2],data[2]);
-		TriggerChangeCallbacks.call(this,data[0],data[1],true);
+		var a = data[0]; var b = data[1]; var lenB = data[2];
+		
+		var cut_ab = GetGroup.call(this,data[0]);
+		
+		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
+		
+		// delete the joint set of inds
+		invalidatedSlots[DeleteImmutable.call(this,a)] = 1;
+		
+		// create the two individual sets of inds
+		invalidatedSlots[NewImmutable.call(this,cut_ab.subarray(0,-lenB),a)] = 1;
+		invalidatedSlots[NewImmutable.call(this,cut_ab.subarray(-lenB),b)] = 1;		
+
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
-	
+
+	var SwapBandAHelper = function(a,b){
+		//since swapping is self-inverse we have this helper function which is utilised by both the do and undo functions
+		
+		var k_a = this._.groupToImmutablesMapping[a];
+		var k_b = this._.groupToImmutablesMapping[b];
+		
+		// add the updated group numbers to both sets of inds
+		this._.immutablesSlots[k_b].group_history.push(a);  // "slot k_b now refers to group a"
+		this._.immutablesSlots[k_a].group_history.push(b);  // "slot k_a now refers to group b"
+		
+		// keep the groupToImmutablesMapping up to date
+		this._.groupToImmutablesMapping[a] = k_b;
+		this._.groupToImmutablesMapping[b] = k_a;
+		
+		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
+		invalidatedSlots[k_a] = 1;
+		invalidatedSlots[k_b] = 1;
+		
+		return invalidatedSlots;
+	}
 	var SwapBandA = function(a,b){
-		var tmp = this._.cutInds[a];
-		this._.cutInds[a] = this._.cutInds[b];
-		this._.cutInds[b] = tmp;
+		var invalidatedSlots = SwapBandAHelper.call(this,a,b);
 		PushAction.call(this,"swap",[a,b],"swap group-" + a + " and group-" + b);
-		TriggerChangeCallbacks.call(this,a,b,true);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
 	var UndoSwapBandA = function(data){
-		//yes, this is self inverse but the actual code is a bit different...
-		var tmp = this._.cutInds[data[0]];
-		this._.cutInds[data[0]] = this._.cutInds[data[1]];
-		this._.cutInds[data[1]] = tmp;
-		TriggerChangeCallbacks(data[0],data[1],true);
+		var invalidatedSlots = SwapBandAHelper.call(this,data[0],data[1]);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
-	
+
 	var ReorderAll = function(newOrder){
-		var oldCutInds = this._.cutInds;
-		this._.cutInds = [];
-		for(var i=0;i<newOrder.length;i++)
-			this._.cutInds.push(oldCutInds[newOrder[i]] || []);
-			
+		var m_old = this._.groupToImmutablesMapping;
+		var m = m_old.slice(0); //during the loop we are going to need a copy of the old mapping
+		this._.groupToImmutablesMapping = m;
+		
+		var s = this._.immutablesSlots;
+		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
+		
+		for (var i=0;i<newOrder.length;i++)if(newOrder[i] != i){
+			var k = m_old[newOrder[i]];
+			s[k].group_history.push(i); // "slot_k now refers to group i" 
+			m[i] = k;
+			invalidatedSlots[k] = 1; //note that if newOrder[i] == i we avoid invalidating the slot
+		}
+		
 		PushAction.call(this,"reorder",newOrder,"reorder groups");
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
 	}
-	
+
 	var	UndoReorderAll = function(data){
-		var oldCutInds = this._.cutInds;
-		this._.cutInds = [];
-		while(data.length)
-			this._.cutInds[data.pop()] = oldCutInds.pop();
-		TriggerChangeCallbacks.call(this,0,this._.cutInds.length-1,false);
+		//the inverse is pretty simillar to the forward operation, except for the interpretation of the ordering
+		
+		var m_old = this._.groupToImmutablesMapping;
+		var m = m_old.slice(0); //during the loop we are going to need a copy of the old mapping
+		this._.groupToImmutablesMapping = m;
+
+		var s = this._.immutablesSlots;
+		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
+
+		for (var i=0;i<data.length;i++)if(data[i] != i){
+			var k = m_old[i];
+			s[k].group_history.push(data[i]); // "slot_k now refers to group data[i]" 
+			m[data[i]] = k;
+			invalidatedSlots[k] = 1; //note that if newOrder[i] == i we avoid invalidating the slot
+		}
+				
+		TriggerChangeCallbacks.call(this,invalidatedSlots); 
 	}
-	
+
 	var GetGroup = function(g){
-		return this._.cutInds[g] || [];
+        var k = this._.groupToImmutablesMapping[g];
+        return this._.immutablesSlots[k] ? (this._.immutablesSlots[k].inds || []) : [];
 	}
 
 	var GetAsVector = function(cap){
 		var N = this._.N;
-		var cutInds = this._.cutInds;
-		var G = cutInds.length;
+		var G = GetNGroups.call(this);
 		var theCut = new Uint32Array(N);
-		
+
 		if (cap) G = G > cap? cap : G; 
 
-		//convert cutInds nested arrays into a single vector giving a gorup number for each spike
+		//convert immutablesSlots inds into a single vector giving a gorup number for each spike
 		for(var g=0;g<G;g++){
-			var cut_g = cutInds[g];
+			var cut_g = GetGroup.call(this,g);
 			var Glen = cut_g.length;
 			for(var i=0;i<Glen;i++)
 				theCut[cut_g[i]] = g;
 		}
-		
+
 		return theCut;
 	}
-	
+
+    var GetNGroups = function(){
+        var m = this._.groupToImmutablesMapping;
+        var G= 0;
+        for(var i=0;i<m.length;i++)
+            if(m[i] || m[i]==0)
+                G++;
+        return G;
+    }
+    
 	var GetProps = function(){
 		return {exp_name: this._.exp_name, 
 				tet_num: this._.tet_num,
-				G: this._.cutInds.length};
+				G: GetNGroups.call(this)};
 	}
-	
+
 	var GetFileStr = function(){
 		var theCut = GetAsVector.call(this,30);
-		var G = this._.cutInds.length;
+		var G = M.max(theCut);
+        G += G>0 ? 1 : 0; //if there are non-zero groups we need to remember to count the zero group
 		var N = this._.N;
-		
+
 		var str = [
 			'n_clusters: ' + G,
 			'n_channels: 4',
@@ -267,30 +444,32 @@ T.CUT = function(){//class factory
 		str.push('');
 		str.push('Exact_cut_for: '+ this._.exp_name +' spikes: ' + N);
 		str.push('');
-		
+
 		str = [str.join('\n')];
 		for(var i=0;i<N;i++)
 			str.push(theCut[i] + ' ');
 
 		return str.join('');
 	}
-	
-	
+
+
 	//cut constructor, which we return at the end of the factory
 	var cut = function(exp_name,tet_num,data_type,data,description){
-		
+
 		 // convention is to consider ._ as being private  
 		this._ = {
 				exp_name: exp_name, //exp_name and tet_num ought to redundant, we should always have another way of knowing what exp and tet this cut corresponds to
 				tet_num: tet_num,  //but for convenience we rememebr them.
-				cutInds: [],
 				actionStack: [],
+                immutablesSlots: Array(255), //this is where we store the indicies for each group
+                nextImmutableSlot: 0, //this makes it quicker to find a vacant slot in the above array when you need one
+                groupToImmutablesMapping: [], //the indicies for group g are stored in immutablesSlots[groupToImmutablesMapping[g]]
 				N: 0 //number of spikes
 			};
-			
+
 		DoConstruction.call(this,data_type,data,description);
 	}
-	
+
 	// export some functions as part of the cut class (i.e. they become public)
 	cut.prototype.GetGroup = GetGroup;
 	cut.prototype.GetProps = GetProps;
@@ -304,6 +483,7 @@ T.CUT = function(){//class factory
 	cut.prototype.ForceChangeCallback = ForceChangeCallback;
 	cut.prototype.ReTriggerAll = ReTriggerAll;
 	cut.prototype.GetAsVector = GetAsVector;
+	cut.prototype.GetImmutableSlot = GetImmutableSlot;
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,

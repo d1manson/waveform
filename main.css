@@ -19,6 +19,10 @@ background: #c77;
 td{
 font-size: 0.8em;
 }
+.tilewall[tilemoving]{
+cursor: move;
+}
+
 .bar{
 position: fixed;
 top: 20px;
@@ -109,17 +113,22 @@ border: 1px solid #CCC;
 display: inline-block;
 position: relative;
 overflow: hidden;
+transform: rotateY(0);
+-webkit-transform: rotateY(0);
+min-width: 98px;
+min-height: 128px;
 }
-.tile-moving{
+.tile[moving]{
 border-width: 10px;
 border-color: #FFAD33;
-cursor: none;
 background: #888;
 z-index: 100;
 opacity:0.5;
+pointer-events: none;
 }
-.tile-placeholder{
+.tile[placeholder]{
 background: #8F8;
+pointer-events:none;
 }
 .tile-over{
 visibility: hidden;
@@ -142,7 +151,7 @@ border: 1px solid #FFAD33;
 background: #888;
 border-color: #FFAD33;
 }
-.tile-proximate, .tile-proximate:hover{
+.tile[proximate]{
 border-color: #000;
 }
 .pending{
@@ -247,7 +256,8 @@ bottom: 5px;
 right: 5px;
 padding: 5px;
 background: #EEE;
-overflow:auto;
+overflow-y:auto;
+overflow-x:hidden;
 -webkit-user-select: none;
 -khtml-user-select: none;
 -moz-user-select: -moz-none;

@@ -11,27 +11,30 @@ T.BYTES_PER_SPIKE = 4*(4 + 50);
 T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2);//the last two uint16s are numpix1 and bnumpix2 repeated
 T.POS_NAN = 1023;
 
-T.X_SCALE = 2; 
-T.Y_SCALE = 0.5;
-T.Y_SCALE_BASE = 4; //used as a factor to scale the user-input y-size to get a number of pixels per voltage unit (with units being in the range 0-255).  4 makes y and x scales look similar
-T.X_SCALE_BASE = 4; //number of canvas pixels between samples in time dimension
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
 T.MAPS_START = 101-1;
+T.xFactor = 2;
+T.yFactor = 2;
 
-
+T.$newTile = $("<div class='tile'>" +
+			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" + 
+			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
+			"<div class='tile-over'><div class='tile-caption'></div></div>" + 
+			"<div class='blind'></div>" + 
+			"</div>");		//this gets cloned and appended to $tilewall
 
 
 T.PlotPos = function(){
 	var buffer = T.ORG.GetPosBuffer();
-		
+
 	var ctx = T.$posplot.get(0).getContext('2d');
 	ctx.clearRect(0 , 0 , T.POS_PLOT_WIDTH, T.POS_PLOT_HEIGHT);
 
 	if(buffer == null) return;
-	
+
 	var data = new Int16Array(buffer);
 	var header = T.ORG.GetPosHeader();
 	var elementsPerPosSample = T.BYTES_PER_POS_SAMPLE/2;
@@ -57,23 +60,23 @@ T.FinishedLoadingFile = function(status,filetype){
 	//  3 - file has already been delivered
 	//  Note that in each round of loading files there will be an initial call with a null filetype, indicating what ui data needs to be flushed.
 	// filetype just tells us which item in status is 2, or is null if none of them are.
-	
+
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
-	
+
 	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
-	
+
 	if(filetype == null && status.tet != 3)
-		T.WV.ClearAll();	
-	
+		T.WV.LoadTetrodeData(null);	
+
 	if(filetype == null && status.cut < 3){
 		T.ClearAllTiles();
 		T.CutActionCallback(null,{num:0,type:"load",description:"no active cut"});
 	}
-	
+
 	if(filetype == "tet"){
-		T.WV.Setup(T.ORG.GetN(),T.ORG.GetTetBuffer());
-		T.WV.SetPaletteMode(T.paletteMode);//required after the call to Setup
-		T.WV.ShowChannels(T.chanIsOn); 
+		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
+		if(status.cut == 3) //if we happened to have loaded the cut before the tet, we need to force T.WV to accept it now
+			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
 	}
 
 	if(filetype == null && (status.pos != 3 || status.tet != 3)){
@@ -82,7 +85,7 @@ T.FinishedLoadingFile = function(status,filetype){
 	}
 	if(filetype == "pos")
 		T.PlotPos();
-		
+
 	if(status.pos >=2 && status.tet >= 2 && status.set >=2)
 		T.SetupRatemaps();
 
@@ -113,21 +116,14 @@ T.DispHeaders = function(status,filetype){
 }
 
 
-T.CanvasOuterWidth = function(){
-	T.WV.CanvasInnerWidth() * T.X_SCALE;
-}
-
-T.CanvasOuterHeight = function(){
-	return T.Y_SCALE*256;
-}
 
 T.ApplyChannelChoice = function(setChans,setMaps){
 	//This is a bit inefficent because we only need to resize the canvas and its css 
 	//when we change the number of channels being displayed, but it doesn't matter much.
-	
+
 	setChans = setChans == undefined? T.chanIsOn : setChans;
 	setMaps = setMaps == undefined? T.mapIsOn : setMaps;
-	
+
 	for(var i=0;i<T.$chanButton_.length;i++){
 		if(i < setChans.length)
 			T.$chanButton_.eq(i).prop('checked',setChans[i])
@@ -137,22 +133,21 @@ T.ApplyChannelChoice = function(setChans,setMaps){
 	T.chanIsOn = setChans;
 	T.mapIsOn = setMaps;
 	T.WV.ShowChannels(setChans);
-	T.RM.ShowMaps(setMaps);
-	T.ApplyCanvasSizes();
-	//Note we don't render here, that's up to the calling function
+	
+	T.RM.ShowMaps(setMaps); 	//Note we don't render here, that's up to the calling function
 }
 
 T.ChannelButtonClick = function(evt){
 	//TODO: change "Channel" in button names to reflect the fact it now includes maps
 	//Also need to convert buttons to be actuall buttons rather than radio inputs becaues firefox doesn't permit clicking radio buttons with ctrl or alt or shift pressed (I think)
-	
+
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
-	
+
 	var thisVal =  parseInt($(this).val())-1;
 	var setChans; var setMaps;
 
-	
+
 	if(evt.ctrlKey){
 		//if ctrl key is down then toggle this item, but make sure that there is at least one itme on
 		setChans = oldChans;
@@ -161,14 +156,14 @@ T.ChannelButtonClick = function(evt){
 			setMaps[thisVal-T.MAPS_START] = +!setMaps[thisVal-T.MAPS_START];
 		else
 			setChans[thisVal] = +!setChans[thisVal];
-			
+
 		if(M.sum(setChans) + M.sum(setMaps) == 0){
 			if(thisVal >= T.MAPS_START)
 				setMaps[thisVal-T.MAPS_START] = 1;
 			else
 				setChans[thisVal] = 1;
 		}
-			
+
 	}else{
 		//turn it on and everything else off
 		setChans = [0,0,0,0];
@@ -188,8 +183,8 @@ T.ApplySizeClick = function(){
 	new_scale = new_scale < 1? 1 : new_scale;
 	new_scale = new_scale > 8? 8 : new_scale;
 	T.$size_input.val(new_scale);
-	T.X_SCALE = new_scale;
-	T.Y_SCALE = new_scale/T.Y_SCALE_BASE;
+	T.xFactor = new_scale;
+	T.yFactor = new_scale;
 
 	T.ApplyCanvasSizes();
 }
@@ -201,7 +196,7 @@ T.ApplyRmSizeClick = function(){
 	new_scale = new_scale > 20? 20 : new_scale;
 	T.$rm_bin_size.val(new_scale);
 	T.binSizeCm = new_scale;
-	
+
 	//TODO: this is a bit clumsy, isn't there a better way?
 	T.RM.ClearAll();
 	T.SetupRatemaps();
@@ -210,107 +205,153 @@ T.ApplyRmSizeClick = function(){
 
 T.SetupRatemaps = function(){
 	var posHeader = T.ORG.GetPosHeader();
-	
+
 	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(posHeader.num_pos_samples),
 		parseInt(T.ORG.GetTetHeader().timebase),parseInt(posHeader.sample_rate),parseInt(posHeader.pixels_per_metre),T.binSizeCm);
 }
 
 T.ApplyCanvasSizes = function(){
-	var w = T.CanvasOuterWidth();
-	var h = T.CanvasOuterHeight();
+	
 	var i = T.$tile_.length;
-	while(i--)if(T.$tile_[i])
-		T.$tile_[i].canvas.eq(0).css({width: w + 'px',height: h + 'px'});
+	while(i--)if(T.$tile_[i]){
+		var $c = T.$tile_[i].find('canvas').eq(0);
+		$c.css({width: $c.get(0).width * T.xFactor + 'px',height: $c.get(0).height * T.yFactor + 'px'});
+	}
 }
 
 
 T.StoreData = function(){
 	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
 	localStorage.tet = T.ORG.GetTet();
-	localStorage.WV_SCALE = T.X_SCALE;
+	localStorage.xFactor = T.xFactor;
+	localStorage.yFactor = T.yFactor;
+	
 	//TODO store cuts
 	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.binSizeCm;
 	localStorage.state = 1;
+
+}
+
+
+
+//for each cut slot, these two arrays track the updates applied during calls to SetGroupDataTiles
+T.cutSlotToTileMapping = [];
+//T.cutSlotGeneration = [];  //we don't care about generation here because whenever the group or immutable changes we have to update the caption regardless
+
+T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
+	//this callback recieves the newly rendered canvases from the waveform rendering and ratemap rendering modules
+	//these rendering modules recieve slot-invalidation events directly from the cut module and can choose to ignore them or
+	//spend any length of time rendering a new canvas.  They must hwoever guarantee to call this function in chronological order for
+	//the invalidation events on each slot. When a group number changes for a given slot the canvas will follow the group, so that if it 
+	//doesn't need to be re-rendered it will be in the right place.  Also, if rendering paramaters are changed the rendering modules may need
+	//to issue updated canvases without any slot-invalidation events being received by SetGroupDataTiles.
+	//slotInd matches the cut immutables slot thing, canvasNum is 0 for waveforms and 1 for ratemaps.
+
+	if($canvas)	
+		$canvas.css({width: $canvas.get(0).width * T.xFactor + 'px',height: $canvas.get(0).height * T.yFactor + 'px'}); //apply css scaling
+	else
+		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
+		
+	var $tile = T.$tile_[T.cutSlotToTileMapping[slotInd]];
+	$tile.find('canvas').eq(canvasNum).replaceWith($canvas); 
 	
+}
+
+T.SetGroupDataTiles = function(cut,invalidatedSlots,isNew){
+	//controls the adding, removing, rearanging, and caption-setting for tiles. (Unfortunately the logic is a bit complicated)
+
+	var nGroups = cut.GetProps().G;
+
+	while(T.$tile_.length < nGroups){ //if there are too few tiles, add more
+		var $t = T.$newTile.clone();
+		$t.data("group_num",T.$tile_.length-1);
+		$t.caption = $t.find('.tile-caption');
+		T.$tilewall.append($t);
+		T.$tile_.push($t);
+	}
+
+	var displaced_$tile_ = []; //if we move tiles around during the loop (see the nested "if" statement inside the loop), 
+								//we store the displaced tiles in this array so that they can be used by subsequent iterations if needed
+
+	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
+		var slot_k = cut.GetImmutableSlot(k);
+		var old_tile_ind = T.cutSlotToTileMapping[k];
+
+		if(slot_k.inds == null){
+			// immutable has been cleared, it may or may not have been previosuly associated to a tile
+				if(isNum(old_tile_ind)){
+					//hide the tile if one was associated to the slot
+					T.$tile_[old_tile_ind].hide(); 
+					T.cutSlotToTileMapping[k] = null;
+				}
+
+		}else{
+			var new_tile_ind = slot_k.group_history.slice(-1)[0];
+
+			if(isNum(old_tile_ind)){
+				// We already had a tile for this slot, now there is either a new immutable for the slot or the group on the existing immutable has changed.
+				// In both cases we need to move the tile
+				var $oldTile = displaced_$tile_[old_tile_ind] || T.$tile_[old_tile_ind];
+                var $simpleDiv = $("<div style='display:none;'/>")
+                $simpleDiv.isSimple = true;                               
+                //store the displaced tile in the displace_$tile_ array in case it needs to be used in a subsequent iteration,
+                //and at the old tile location we just leave $simpleDiv
+				displaced_$tile_[new_tile_ind] = T.$tile_[new_tile_ind].replaceWith($oldTile.wrap($simpleDiv)); 
+				T.$tile_[new_tile_ind] = $oldTile; 
+				T.$tile_[old_tile_ind] = $simpleDiv;
+
+			} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
+
+			T.$tile_[new_tile_ind].show()
+								  .data("group_num",new_tile_ind)
+								  .caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
+			T.cutSlotToTileMapping[k] = new_tile_ind;
+		}
+	}
+
+	while(T.$tile_.length > nGroups){ // if there are too many tiles, delete some
+		var $t = T.$tile_.pop();
+		$t.remove();
+	}
+
+	// if we have any simpleDivs in the tilewall, replace them with actual hidden tiles (it just makes life easier next time this function is called)
+	for(var i=0;i<nGroups;i++) if(T.$tile_[i].isSimple){
+			var $t = T.$newTile.clone();
+			$t.data("group_num",i);
+			$t.caption = $t.find('.tile-caption');
+			$t.hide();
+			T.$tile_[i].replaceWith($t);
+            T.$tile_[i] = $t;
+	}
+
 }
 
 T.ClearAllTiles = function(){
-	while(T.$tile_.length){
-		var $t = T.$tile_.pop();
-		if($t)
-			$t.remove();
-	}
+	while(T.$tile_.length)
+		T.$tile_.pop().remove();
+	T.cutSlotToTileMapping = [];
 }
 
-T.SetGroupDataTiles = function(cut,from,to,flag){
-	//controls the adding, removing and caption-setting for tiles
-	var iW, iH, oW, oH;
-	
-	for(var i=from;i<=to;i++){
-		var len = cut.GetGroup(i).length;
-		
-		if(len==0){
-			if(T.$tile_[i]){ //we don't want this tile, and it currently exists, so need to remove it
-				T.$tile_[i].remove();
-				T.$tile_[i] = null;
-			}
-		}else{
-			if(!T.$tile_[i]){ //we want this tile and we've not yet created it
-				iW = iW || T.WV.CanvasInnerWidth(); 
-				iH = iH || T.WV.CanvasInnerHeight();
-				oW = oW || T.CanvasOuterWidth();
-				oH = oH || T.CanvasOuterHeight();
-
-				var $t = $("<div class='tile' id='tile_" + i + "'>" +
-							"<canvas width='" + iW + "' height='" + iH + "' style='width:" + oW + "px;height:" + oH + "px;'></canvas>" + 
-							"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
-							"<div class='tile-over'><div class='tile-caption'></div></div><div class='blind'></div></div>");
-				$t.mousedown(T.TileMouseDown);
-				$t.data("group_num",i);
-				$t.canvas = $t.find('canvas');
-				$t.ctx = $t.canvas.get(0).getContext('2d'); //this is for drawing waveforms
-				$t.ctx2 = $t.canvas.get(1).getContext('2d'); //this is for drawing ratemaps etc.
-				$t.caption = $t.find('.tile-caption');
-
-				if(i == 0){
-					T.$tilewall.prepend($t);
-				}else{
-					var prev = -1;
-					//append the new tile after the previous tile
-					if(i<T.$tile_.length)for(prev=i-1;prev>=0;prev--)if(T.$tile_[prev]) 
-						break;
-					if(prev >=0)
-						T.$tile_[prev].after($t);
-					else
-						T.$tilewall.append($t);
-				}
-				
-				T.$tile_[i] = $t;
-			}
-			T.$tile_[i].caption.text("group " + i + " | " + len + " waves ");
-		}
-	}
-}
 
 T.DocumentReady = function(){
 
     T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
-	T.CUT.AddChangeCallback(T.WV.SetGroupData);
+	T.CUT.AddChangeCallback(T.WV.SlotsInvalidated);
 	T.CUT.AddChangeCallback(T.RM.SetGroupData);
 	T.CUT.AddActionCallback(T.CutActionCallback);
-	
+
 	if(localStorage.state){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
-		T.X_SCALE = localStorage.WV_SCALE || 2;
-		T.Y_SCALE = T.X_SCALE / T.Y_SCALE_BASE;
+		T.xFactor = localStorage.xFactor || 2;
+		T.yFactor = localStorage.yFactor;
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$rm_bin_size.val(T.binSizeCm);
-		T.$size_input.val(T.X_SCALE);
-		
+		T.$size_input.val(T.xFactor);
+
 		//TODO: load files into T.cut instances
-		
+
 		T.ApplyChannelChoice(JSON.parse(localStorage.chanIsOn));
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
@@ -341,8 +382,7 @@ T.HideHelp = function(){
 
 T.TogglePalette = function(){
 	T.paletteMode = T.paletteMode  ? 0: 1;
-	T.WV.SetPaletteMode(T.paletteMode);
-	T.WV.Render();
+	T.WV.SetPaletteMode(T.paletteMode*2 - 1);
 }
 
 T.RunAutocut = function(){
@@ -402,7 +442,7 @@ T.CutActionCallback = function(cut,info){
 		alert(info.description);
 		return
 	}
-	
+
 	if (info.type == "load"){
 		//remove any existing action elements and then go on to add the new one
 		T.$action_ = T.$action_ || [];
@@ -410,7 +450,7 @@ T.CutActionCallback = function(cut,info){
 			T.$action_.pop().remove(); //remove all action elements from page	
 		T.$undo.show();
 	}
-	
+
 	var $newAction = $("<div class='action' data-action-num='" + info.num + "'><b>" + info.num + "</b>&nbsp;&nbsp;&nbsp;" + info.description + "</div>");
 	T.$action_.push($newAction); //store it in the array
 	T.$undo.after($newAction);
@@ -421,19 +461,19 @@ T.ReorderNCut = function(){
 	//reorder the cut based on number of spikes per group
 
 	var groups = []; //we build an array of (ind,len) pairs that we can then sort by <len>.
-	
+
 	var cut = T.ORG.GetCut();
 	var G = cut.GetProps().G;
 	for(var i=0;i<G;i++)
 		groups.push({ind: i,
 					 len: cut.GetGroup(i).length});
 	groups.sort(function(a,b){return b.len-a.len;});
-	
+
 	//sorting order is in groups[].ind, now pull the inds out into their own array...
 	var inds = [];
 	while(groups.length)
 		inds.push(groups.shift().ind);
-	
+
 	cut.ReorderAll(inds);
 }
 
@@ -451,7 +491,7 @@ T.ReorderACut = function(){
 		alert("Currently you can only reorder-on-amplitude using a single channel, taking channel 1.");
 		chan = 1;
 	}
-	
+
 	var N = T.ORG.GetN();
 	var amps = new Uint8Array(N);	//TODO: cache amplitdues while tetrode is loaded (for all channels)
 	var buffer = new Int8Array(T.ORG.GetTetBuffer());
@@ -459,17 +499,17 @@ T.ReorderACut = function(){
 		var b = buffer.subarray(T.BYTES_PER_SPIKE*i + chan*(50+4) + 4,T.BYTES_PER_SPIKE*i + (chan+1)*54-1);
 		amps[i] = M.max(b) - M.min(b);
 	}
-	
+
 	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps,"mean");
-	
+
 	//TODO: I think there will be a bug if there are any empty groups beyond the end of the last occupied group, need to do an identity transformation for the end or something
-	
+
 	var groups = []; //we build an array of (ind,amp) pairs that we can then sort by <amp>.
 	for(var i=0;i<mean_amps.length;i++)
 		groups.push({ind: i,
 					 amp: isNaN(i)? 256 : mean_amps[i]});
 	groups.sort(function(a,b){return b.amp-a.amp;});
-	
+
 	//sorting order is in groups[].ind, now pull the inds out into their own array...
 	var inds = [];
 	while(groups.length)

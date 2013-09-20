@@ -6,157 +6,132 @@ T.TILE_MOVING_BORDER_WIDTH = 10;
 T.WIDGET_CENTRE_RAD = 10;
 T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 
-T.Tool.GetSplitter = function($tile){
-	var $w = $tile.find('.widget').eq(0);
-	if(!$w.length){
-		$w = $("<div class='widget'><div class='widget-center'></div></div>");
-		$w.mouseup(T.Tool.SplitterMouseUp);
-		$tile.append($w);
-	}
-	return $w;
+/* =================== GENERAL =================== */
+T.TileMouseDown = function(event){
+	$(this).toggleClass('shake',false); //clear any existing dragging animation
+	
+	if(event.button == 2 || event.ctrlKey)
+		T.Tool.TileMouseDown_BeginSplitter.call(this,event);
+	else if (event.button == 0)
+		T.Tool.TileMouseDown_BeginMerger.call(this,event);
+
+    event.preventDefault();
 }
 
-T.Tool.SplitterMouseUp = function(event){
-	if(T.Tool.activeSplitter && event.button == 2 || T.Tool.activeSplitter.usedCtrl){
-		T.Tool.activeSplitter.$h.remove();
-		$(document).unbind('mousemove')
-				   .unbind('mouseup');
-		delete T.Tool.activeSplitter;
-	}
+T.TileDoubleClick = function(event){
+	$(this).toggleClass('shake',false); //clear the failed dragging animation from the second mouse down event
+	
+	T.TileDoubleClick_BeginSeparator.call(this,event);
 }
 
-T.Tool.MergerTileMouseUp = function(event){
-	$(document).unbind('mousemove')
-			   .unbind('mouseup');
-	T.Tool.activeMerger.$placeholder.remove();
-	T.Tool.activeMerger.$h.css({left: '',top:'',position:''})
-					.toggleClass('tile-moving',false)
-					.toggleClass('shake',true)
-					.toggleClass('tile-proximate',false)
-					.find('canvas').eq(0).css({position: '',left: '',top: ''});
-
-	if(T.Tool.activeMerger.target != null){
-		var ind_a = T.Tool.activeMerger.$h.data("group_num");
-		var ind_b = T.$tile_[T.Tool.activeMerger.target].toggleClass('shake',true)
-														.data("group_num");
-		if(ind_a != ind_b){
-			if(ind_a > ind_b){
-				var tmp = ind_b;
-				ind_b = ind_a;
-				ind_a = tmp;
-			}
-
-			T.ORG.GetCut().AddBtoA(ind_a,ind_b);
-		}
-	}
-	delete T.Tool.activeMerger;
-}
+// These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
+// temporarily registerd on $tile's, $tilewall, and $document.
+T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
+T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
 
 
-T.TileMouseUp = function(event){
-	console.log("mouse up");
-	if(T.Tool.activeMerger && event.button == 0)
-		T.Tool.MergerTileMouseUp.call(this,event);
-}
+/* =================== MERGER =================== */
 
-T.Tool.BeginSplitterTileMouseDown = function(event){
-	var offset = $(this).offset();
-	var $h = T.Tool.GetSplitter($(this));
-	T.Tool.activeSplitter = {usedCtrl: event.button != 2,
-					off_left:  -offset.left,
-					off_top:  -offset.top,
-					$h: $h};
-
-	$h.toggleClass("widget-moving",true)
-	   .mousemove(T.Tool.SplitterMouseMove);
-	$(document).mousemove(T.Tool.SplitterMouseMove)
-			   .mouseup(T.Tool.SplitterMouseUp);
-	T.Tool.SplitterMouseMove(event);
-}
-
-T.Tool.BeginMergerTileMouseDown = function(event){
-	var offset = $(this).offset();
+T.Tool.TileMouseDown_BeginMerger = function(event){
+	
 	var $h = $(this);
-	$h.toggleClass('shake',false); //clear it from any previous dragging
+	var offset = $h.offset();
 	var $parent = $h.parent();
 	var parentOff = $parent.offset();
 	parentOff.scrollTop = $parent.scrollTop();
-	var $p = $h.clone().toggleClass('tile-placeholder',true);
+	var $p = $h.clone().attr('placeholder',true);
 	T.Tool.activeMerger = {off_left: -parentOff.left + (offset.left-event.clientX) ,
 					off_top: -parentOff.top + (offset.top-event.clientY),
 					$h: $h,
 					$parent: $parent,
 					$placeholder: $p,
-					allTilePositions: T.$tile_.map(function($t,ind){var bad = {left: 99999, top: 999999}; if(!$t) return bad; var a=$t.position();a.top += parentOff.scrollTop; return a || bad;}),
 					target: null};
 	$p.insertAfter($h);
-	$h.css({position:'absolute'});
-	$h.toggleClass("tile-moving",true)
-	   .mousemove(T.TileMouseMove)
-	   .mouseup(T.TileMouseUp);
-	$(document).mousemove(T.TileMouseMove)
-			   .mouseup(T.TileMouseUp);
-	T.TileMouseMove(event);
+	$h.css({position:'absolute'})
+	  .attr("moving",true); //among other things this means it no longer gets mouse events
+	T.$tilewall.attr('tilemoving',true);
+	
+	//attach mousemove, mouseup handlers for document 
+	// and mousemove, mouseup, mouseenter, mouseleave for all the tiles (the placeholder and moving tiles are invisible to the mouse)
+	$(document).mousemove(T.Tool.DocumentMouseMove_Merger)
+			   .mouseup(T.Tool.DocumentMouseUp_Merger);
+	$.each(T.$tile_, function(){
+						this.on("mouseenter mouseleave",T.Tool.TileMouseLeaveEnter_MergerTarget)
+							.on("mouseup",T.Tool.TileMouseUp_MergerTarget)
+							.on("mousemove",T.Tool.TileMouseMove_MergerTarget);	
+					 });
 }
 
-T.TileMouseDown = function(event){
-	console.log("mouse down");
-	if(T.Tool.activeSplitter || T.Tool.activeMerger)
-		return;
-
-	if(event.button == 2 || event.ctrlKey)
-		T.Tool.BeginSplitterTileMouseDown.call(this,event);
-	else if (event.button == 0)
-		T.Tool.BeginMergerTileMouseDown.call(this,event);
-
-    event.preventDefault();
-}
-
-T.Tool.MergerTileMouseMove = function(event){
+T.Tool.DocumentMouseMove_Merger = function(event){
 	var left = event.clientX + T.Tool.activeMerger.off_left;
 	var top = event.clientY + T.Tool.activeMerger.off_top + T.Tool.activeMerger.$parent.scrollTop();
 	T.Tool.activeMerger.$h.css({left: left+'px', top:top+'px'});
+}
+T.Tool.DocumentMouseUp_Merger = function(event){
+	//this happens on an abandonded merge (otherwise the target tile would intercept the event)
+	T.Tool.EndMerger();
+}
 
+T.Tool.EndMerger = function(){
+	$(document).off('mousemove mouseup');
+	$.each(T.$tile_, function(){this.off("mouseenter mouseleave mouseup mousemove")});
+	T.Tool.activeMerger.$placeholder.remove();
+	T.Tool.activeMerger.$h.css({left: '',top:'',position:''})
+					.removeAttr('moving')
+					.toggleClass('shake',true)
+					.removeAttr('proximate')
+					.find('canvas').eq(0).css({position: '',left: '',top: ''});
+	T.$tilewall.removeAttr('tilemoving');
+	delete T.Tool.activeMerger;
+}
+
+T.Tool.TileMouseLeaveEnter_MergerTarget = function(event){
+	if(event.type == "mouseenter")
+		T.Tool.activeMerger.$h.attr("proximate",true);
+	else
+		T.Tool.activeMerger.$h.removeAttr("proximate");
+}
+T.Tool.TileMouseMove_MergerTarget = function(event){
+	//TODO: snap waveforms together
+	
+	/* relevant old code ... I think?
 	T.Tool.activeMerger.target = null;
 	var pos = T.Tool.activeMerger.allTilePositions;
 	for(var i = 0;i<pos.length;i++) if(pos[i])
 		if(Math.abs(pos[i].left-left-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY && Math.abs(pos[i].top-top-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY){
 			T.Tool.activeMerger.target = i;
 			T.$tile_[i].toggleClass('shake',false); //clear this so that it's ready to be reused if we merge
-			T.Tool.activeMerger.$h.toggleClass('tile-proximate',true);
+			T.Tool.activeMerger.$h.attr('proximate',true);
 			T.Tool.activeMerger.$h.find('canvas').eq(0).css({
 								position: 'relative',
 								left: pos[i].left-left-T.TILE_MOVING_BORDER_WIDTH + 'px', 
 								top: pos[i].top-top-T.TILE_MOVING_BORDER_WIDTH + 'px'});
 			return;
 		}
-
-	T.Tool.activeMerger.$h.toggleClass('tile-proximate',false)
-				   .find('canvas').eq(0).css({position: '',left: '',top: ''});
+	*/
 }
-
-T.TileMouseMove = function(event){
-	if(T.Tool.activeMerger)
-		T.Tool.MergerTileMouseMove.call(this,event);
-}
-
-T.Tool.SplitterMouseMove = function(event){
-	if(T.Tool.activeSplitter){
-		var left = event.pageX+ T.Tool.activeSplitter.off_left - T.WIDGET_CENTRE_RAD;
-		var top = event.pageY + T.Tool.activeSplitter.off_top - T.WIDGET_CENTRE_RAD;
-		top = top<-T.WIDGET_CENTRE_RAD?  - T.WIDGET_CENTRE_RAD : top;
-		top = top>T.CanvasOuterHeight() - T.WIDGET_CENTRE_RAD*2? T.CanvasOuterHeight()  - T.WIDGET_CENTRE_RAD*2: top;
-		left = left<-T.WIDGET_CENTRE_RAD? -T.WIDGET_CENTRE_RAD : left;
-		left = left > T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2? T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2: left;
-		T.Tool.activeSplitter.$h.css({top:top+'px'})
-						  .find('.widget-center').eq(0).css({left:left+'px'});
+T.Tool.TileMouseUp_MergerTarget = function(event){
+	//Successful merger
+	var ind_a = T.Tool.activeMerger.$h.data("group_num");
+	var ind_b = $(this).toggleClass('shake',true)
+					   .data("group_num");
+	if(ind_a > ind_b){
+		var tmp = ind_b;
+		ind_b = ind_a;
+		ind_a = tmp;
 	}
+
+	T.ORG.GetCut().AddBtoA(ind_a,ind_b);	
+	T.Tool.EndMerger();
+	event.stopPropagation();
+
 }
 
-T.TileDoubleClick = function(event){
-	console.log("double click");
+
+	
+/* ========================= SEPARATOR ================== */
+T.TileDoubleClick_BeginSeparator = function(event){
 	var $h = $(this);
-	$h.toggleClass('shake',false); //clear the failed dragging animation (the mouse down events triggered this)
 
 	var c = T.ORG.GetCut();
 	var g = $h.data("group_num");
@@ -176,23 +151,8 @@ T.TileDoubleClick = function(event){
                 .wrap($separator_first);
 	T.$tile_[g+1].attr('separating','true')
                 .wrap($separator_second);
+	T.$tilewall.mousedown(T.Tool.TileWallMouseDown_Separating);
     T.Tool.separating = {g:g,n_1:n_1,n_2:n_2,increment:1,isFirst:NaN,timer:null};
-}
-
-T.TileWallMouseDown = function(event){
-    if(T.Tool.separating){
-        var g = T.Tool.separating.g;
-        T.$tile_[g].removeAttr('separating')
-                                     .unwrap();
-        T.$tile_[g+1].removeAttr('separating')
-                                     .unwrap();
-        $.each(T.$tile_,function(){$(this).removeAttr('disabled');});
-		clearInterval(T.Tool.separating.timer);
-        delete T.Tool.separating;
-        
-        if(event.button == 2 || event.ctrlKey)
-            T.ORG.GetCut().Undo();
-    }
 }
 
 T.Tool.SeparatorMakeMask = function(n_1,n_2){
@@ -246,7 +206,86 @@ T.Tool.SeparatorMouseDownTick = function(){
 	T.$tile_[s.g+1].caption.text("group " + (s.g+1) + " | " + s.n_2 + " waves ");
 }
 
+T.Tool.TileWallMouseDown_Separating = function(event){
+		//this is the only way to end the separating tool
+		
+		T.$tilewall.off('mousedown');
+        T.$tile_[g].removeAttr('separating')
+                                     .unwrap();
+        T.$tile_[g+1].removeAttr('separating')
+                                     .unwrap();
+        $.each(T.$tile_,function(){$(this).removeAttr('disabled');});
+		clearInterval(T.Tool.separating.timer);
+        delete T.Tool.separating;
+        
+        if(event.button == 2 || event.ctrlKey)
+            T.ORG.GetCut().Undo();
+}
+	
+	
+	
+	
+	
+	
+	
+	
+/* =================== SPLITTER =================== */
+T.Tool.GetSplitter = function($tile){
+	var $w = $tile.find('.widget').eq(0);
+	if(!$w.length){
+		$w = $("<div class='widget'><div class='widget-center'></div></div>");
+		$w.mouseup(T.Tool.SplitterMouseUp);
+		$tile.append($w);
+	}
+	return $w;
+}
 
-T.$tilewall.on("mousedown",T.TileWallMouseDown);
-T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
-T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); //double click is triggered after the sequence mouse-down, mouse-up, mouse-down, mouse-up.  Which would have meant the merge tool was started and stopped twice.
+T.Tool.SplitterMouseUp = function(event){
+	if(T.Tool.activeSplitter && event.button == 2 || T.Tool.activeSplitter.usedCtrl){
+		T.Tool.activeSplitter.$h.remove();
+		$(document).off('mousemove mouseup');
+		delete T.Tool.activeSplitter;
+	}
+}
+
+T.Tool.TileMouseDown_BeginSplitter = function(event){
+	var offset = $(this).offset();
+	var $h = T.Tool.GetSplitter($(this));
+	T.Tool.activeSplitter = {usedCtrl: event.button != 2,
+					off_left:  -offset.left,
+					off_top:  -offset.top,
+					$h: $h};
+
+	$h.toggleClass("widget-moving",true)
+	   .mousemove(T.Tool.SplitterMouseMove);
+	$(document).mousemove(T.Tool.SplitterMouseMove)
+			   .mouseup(T.Tool.SplitterMouseUp);
+	T.Tool.SplitterMouseMove(event);
+}
+
+T.Tool.SplitterMouseMove = function(event){
+	if(T.Tool.activeSplitter){
+		var left = event.pageX+ T.Tool.activeSplitter.off_left - T.WIDGET_CENTRE_RAD;
+		var top = event.pageY + T.Tool.activeSplitter.off_top - T.WIDGET_CENTRE_RAD;
+		top = top<-T.WIDGET_CENTRE_RAD?  - T.WIDGET_CENTRE_RAD : top;
+		top = top>T.CanvasOuterHeight() - T.WIDGET_CENTRE_RAD*2? T.CanvasOuterHeight()  - T.WIDGET_CENTRE_RAD*2: top;
+		left = left<-T.WIDGET_CENTRE_RAD? -T.WIDGET_CENTRE_RAD : left;
+		left = left > T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2? T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2: left;
+		T.Tool.activeSplitter.$h.css({top:top+'px'})
+						  .find('.widget-center').eq(0).css({left:left+'px'});
+	}
+}
+
+
+/* =========================== */
+
+
+
+
+
+
+
+
+
+
+
