@@ -19,10 +19,12 @@ background: #c77;
 td{
 font-size: 0.8em;
 }
+canvas{
+vertical-align:bottom;
+}
 .tilewall[tilemoving]{
 cursor: move;
 }
-
 .bar{
 position: fixed;
 top: 20px;

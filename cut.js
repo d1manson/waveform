@@ -159,7 +159,7 @@ T.CUT = function(){//class factory
 					cutInds[data[i]].push(i);//append to existing subarray
 			
 			//now that we have an array of inds arrays, we can make the immutables
-			for(var i =0;i<cutInds.length;i++)
+			for(var i =0;cutInds.length;i++)
 				NewImmutable.call(this,cutInds.shift(),i);
 			break;
 

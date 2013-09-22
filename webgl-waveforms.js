@@ -12,14 +12,42 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 //TODO: supposedly we should have some code to deal with lost-context, I've not actually found it to be a problem though (possibly because it's offscreen anyway?)
 
-	var offCanv = {$: {}, //jquery handle to the offscreen canvas
-					//The following are all in units of actual shader pixels, for the offscreen canvas
+	// Create an object to hold basic info about the offscreen canvas
+	var offCanv = function(){ 
+		var c = { //The following are all in units of actual pixels
 				   W: 1024, // full width 
 				   H: 1024, // full height
 				   waveH: 128, //height of a wave
 				   dT: 2, //distance from t to t+1 on the wave
-				   waveW: (50-1)*2, //width of a wave (note that the *2 is *dT)
 				   waveGap: 2 } //horizontal gap between waves
+				   
+		c.waveW = (50-1)*c.dT; //width of a wave
+
+		// use the above to compute the x and y offsets of the spaces for waves on the offscreen canvas
+		var nSpaces = Math.floor(c.H/c.waveH) * Math.floor(c.W/c.waveW);
+		c.xOffsets = new Uint16Array(nSpaces);
+		c.yOffsets = new Uint16Array(nSpaces);
+		var i = 0;
+		for(var y= c.waveH; y<c.H; y+= c.waveH)for(var x = 0;x<c.W;x+= c.waveW+c.waveGap,i++){
+				c.xOffsets[i] = x;
+				c.yOffsets[i] = y;
+		}
+		
+		// convert the x and y offsets from pixel units to units normalised to the range -128 to 128
+		c.xOffsetsInt8 = new Int8Array(nSpaces);
+		c.yOffsetsInt8 = new Int8Array(nSpaces);
+		for(i=0;i<nSpaces;i++){
+			c.xOffsetsInt8[i] = c.xOffsets[i]/c.W * 255 - 128;
+			c.yOffsetsInt8[i] = 127 - c.yOffsets[i]/c.H * 255;
+		}
+		
+		// in addition to all the coordinate stuff we also need to actually create the canvas and store a reference to it
+		var canvas = $("<canvas width='" + c.W + "' height='" + c.H + "' />");
+    	//canvas.css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
+        c.el = canvas.get(0);
+		
+		return c;
+	}();	
 
 	var locs = {}; //caches webgl uniform/attribute locations
 	var buffs = {}; //holds all the webgl buffers
@@ -106,9 +134,6 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		//the given wave on the hidden rendering canvas, in canvas coordinates [-1 to +1], but using the units [-128 to +128]. c_i gives
 		//the texture coordiantes within the palette for the given wave.  Note that each sets of values is repeated.
 
-		var yIncrement = offCanv.waveH/offCanv.H * 2 * 128;
-		var xIncrement = (offCanv.waveW+offCanv.waveGap)/offCanv.W * 2 * 128;
-
 		//create a typed array buffer of length 6N, and get both a signed and an unsigned 8-bit view of it
 		var buffInt8 = new Int8Array(N*3*2); 
 		var buffUint8 = new Uint8ClampedArray(buffInt8.buffer);
@@ -119,16 +144,17 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
             buffInt8[i] = 127;
 
 		//set x and y data for the desired waves
-		for(var y=128-yIncrement, s=0; y>=-128 && s<cutSlots.length; y-=yIncrement)
-			for(var x=-128; x<128 && s<cutSlots.length; x+=xIncrement, s++){
-				var inds = cutSlots[s].inds;
-				for(i=0;i<inds.length;i++){
-					buffInt8[inds[i]*6 + 0] = x;
-					buffInt8[inds[i]*6 + 1] = y;
-					buffInt8[inds[i]*6 + 3] = x;
-					buffInt8[inds[i]*6 + 4] = y;
+		for(var s=0; s<offCanv.xOffsets.length && s<cutSlots.length; s++){
+			var inds = cutSlots[s].inds;
+			var x = offCanv.xOffsetsInt8[s];
+			var y = offCanv.yOffsetsInt8[s];
+			for(i=0;i<inds.length;i++){
+				buffInt8[inds[i]*6 + 0] = x;
+				buffInt8[inds[i]*6 + 1] = y;
+				buffInt8[inds[i]*6 + 3] = x;
+				buffInt8[inds[i]*6 + 4] = y;
 				}
-			}
+		}
 
 		//set color map data for the desired waves
         if(slotRenderState.desiredColormap == -1){
@@ -211,10 +237,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 	var Init = function(){
 		//This function is run on page load.  It does quite a bit of technical webgl stuff but nothing that depends on having actual data
 
-		offCanv.$ = GetCanvas();
-
 		// initialise gl context and program
-    	gl =  ValidGL(offCanv.$.getContext("experimental-webgl"));
+    	gl =  ValidGL(offCanv.el.getContext("experimental-webgl"));
         gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined); //DEBUG ONLY
 
         prog = gl.createProgram();	
@@ -295,7 +319,9 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var chanIsToBeRendered = [0,0,0,0]; // We render only those channels that do not yet have (the correct) images, but this is not slot-specific. 
 											// In other words, even if only one slot is missing a given channel, we still end up rendering that channel for all slots in the list.
 		var slotsToRender = []; //slot objects which are chosen to be rendered on this particular run of the Render function
-
+		var canvasContexts = []; //elements in this array correspond to the slotsToRender array.  Gives the 2d contexts to each of the canvases on which we are to render.
+		var nDesiredChannels = M.sum(r.desiredChannels);
+		
 		for(var i=r.firstInd;i<r.nSlots;i++,r.firstInd++)if(r.invalidatedSlots[i]){ //for all slots that have been invalidated...
 
 			if(false /*TODO: need to check if the slotsToRender array is full*/)
@@ -304,8 +330,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			var s = cCut.GetImmutableSlot(i); //get the latest info on the slot
 
 			if(!s || !s.inds || !s.inds.length){ //check if the slot is empty
-				//TODO: it's probably redundant but may want to send a blank canvas in this case
-				//TODO: may want to update some values in r's arrays, including losing the reference to the canvas 
+				r.$canvases[i] = null; //loose the reference to the old canvas, and update the associated properties to reflect this...
+				r.slotGeneration[i] = NaN;
+				r.slotColMap[i] = NaN;
+				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
+				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null); //sending null tells main to remove any existing canvas
 				continue;
 			}
 
@@ -315,29 +344,47 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			if(!generationIsCorrect || !colMapIsCorrect){
 				M.useMask(chanIsToBeRendered,r.desiredChannels,1); //force render of all desired channels
 				slotsToRender.push(s); //we need to render this slot
-				//TODO: need to prepare a blank canvas and set the associated other properties
+				// create a new canvas of the right size and update all associated properties to reflect the fact the canvas is empty...
+				r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
+				canvasContexts.push(r.$canvases[i] .get(0).getContext('2d')); //we're going to need the 2d context for copying image data from the offscreen canvas
+				r.slotGeneration[i] = NaN;
+				r.slotColMap[i] = NaN;
+				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
 				continue;
 			}
 
 			// If we've got passed the above two if statements it means the slot contains actual data and the last-rendered generation and colormap are still valid.
 			// So, here we only need to render channels we don't yet have.
-			// TODO: if the existing canvas is not exactly correct we need to copy across the good bits to a new canvas and update all the relevant arrays in r
 			var mustRenderThisSlot = 0;
 			for(var c = 0;c<chanIsToBeRendered.length;c++)if(r.desiredChannels[i] && !isNum(r.chanXOffset[i][c])){ //if channel-c is desired and we haven't yet rendered it for this slot
 				chanIsToBeRendered[c] = 1; // force render of at least this channel
 				mustRenderThisSlot = 1; // we need to render this slot (see if statement below)
 			}
-			if(mustRenderThisSlot)
+			if(mustRenderThisSlot){
 				slotsToRender.push(s);	
+				// TODO: we need to copy across the good bits from the old canvas and update all the relevant arrays in r
+				r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
+				canvasContexts.push(r.$canvases[i] .get(0).getContext('2d')); //we're going to need the 2d context for copying image data from the offscreen canvas
+				r.slotGeneration[i] = NaN;
+				r.slotColMap[i] = NaN;
+				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
+			}
 		}
 
 		// setup the gpu for rendering these slots
 		UploadWaveBuffer(slotsToRender); 
 
+		var xOff = Array(r.desiredChannels.length + 1);
+		xOff[0] = 0;
+		for(var c=0;c<r.desiredChannels.length;c++)
+			xOff[c+1] = xOff[c] + (r.desiredChannels[c]? offCanv.waveW : 0);
+		
 		// render each of the requested channels, copying all the new images to their individual canvases
 		for(var c=0;c<chanIsToBeRendered.length;c++)if(chanIsToBeRendered[c]){
 			PerformRenderForChannel(c);
-			//TODO: copy any needed new images to their canvases and update the r arrays accordingly
+			for(var i=0;i<slotsToRender.length;i++)
+				canvasContexts[i].drawImage(offCanv.el,offCanv.xOffsets[i],offCanv.yOffsets[i]-offCanv.waveH,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
+			//TODO: update the r arrays accordingly
 		}
 
 		// trigger a CanvasUpdateCallback for each of the rendered slots
@@ -370,6 +417,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			r.slotColMap = Array(r.nSlots);
 			r.slotGeneration = Array(r.nSlots);
 			r.$canvases = Array(r.nSlots);
+			ready.cut = true;
 		}else{
 			M.or(r.invalidatedSlots,newlyInvalidatedSlots,M.IN_PLACE); //slotRenderState.invalidatedSlots |= newlyInvalidatedSlots
 		}
@@ -377,7 +425,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		if(cut && cut != cCut)
 			throw new Error("webgl-waveforms SlotsInvalidated with unexpected cut instance argument");
 
-		slotRenderState.nextSlotInd = 0;
+		slotRenderState.firstInd = 0;
 		window.setTimeout(function(){Render(cRender);},1);
 	}
 
@@ -430,12 +478,6 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
        gl.compileShader(shader);
        return ValidShader(shader,str);
     }
-
-    var GetCanvas = function(){
-        var canvas =  $('<canvas/>', {heiGht: offCanv.W, widtH: offCanv.H});
-    	canvas.css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
-        return canvas.get(0);
-    };
 
 	 var PALETTE_HOT = function(){
         var data = new Uint8Array(256*4);

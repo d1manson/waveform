@@ -248,12 +248,15 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	//to issue updated canvases without any slot-invalidation events being received by SetGroupDataTiles.
 	//slotInd matches the cut immutables slot thing, canvasNum is 0 for waveforms and 1 for ratemaps.
 
+	var $tile = T.$tile_[T.cutSlotToTileMapping[slotInd]];
+	if(!$tile)
+		return;
+		
 	if($canvas)	
 		$canvas.css({width: $canvas.get(0).width * T.xFactor + 'px',height: $canvas.get(0).height * T.yFactor + 'px'}); //apply css scaling
 	else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
-		
-	var $tile = T.$tile_[T.cutSlotToTileMapping[slotInd]];
+	
 	$tile.find('canvas').eq(canvasNum).replaceWith($canvas); 
 	
 }
