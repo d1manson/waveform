@@ -44,7 +44,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 							nSlots: 0, 
 							firstInd: 0,
 							desiredChannels: [0,0,0,0], 
-							desiredColormap: -1 //-1: hot, +1: flag
+							desiredColormap: 0 //-1: hot, +1: flag
 							}; 
 	var slotRenderState = SimpleClone(blankSlotRenderState);
 
@@ -55,8 +55,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 	var VERTEX_SHADER_STR = [
 	"   attribute float isTPlusOne;																	  ", // 0 1 0 1 0 1 0 1 ... 1 
     "   attribute float voltage;                                                      				  ", // v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)  values are on the interval [0 1]
-	"   attribute vec2 waveXYOffset;																  ", // x_1 y_1  #  x_2 y_2  #  ... x_n y_n  #
-	"   attribute float waveColorTex;																	  ", //  #   #  c_1  #   #  c_2 ...  #   #  c_n
+	"   attribute vec2 waveXYOffset;																  ", // x_1 y_1  #  x_1 y_1  #  x_2 y_2  #  x_2 y_2  #  ... x_n y_n  #  x_n y_n  #
+	"   attribute float waveColorTex;																  ", //  #   #  c_1  #   #  c_1  #   #  c_2  #   #  c_2 ...  #   #  c_n  #   #  c_n
 	"   uniform mediump float tXOffset;																  ", // canavas x-coordiantes from the leftmost point of the wave to point t
     "   varying lowp vec4 vCol;                                                                  	  ",
     "   uniform sampler2D palette;                                                  	       		  ",
@@ -69,11 +69,13 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
     "       vCol = texture2D(palette,vec2(waveColorTex,0.));                           			 	  ", 
 
 			//calculate the x coordiante in canvas coordinates
-	"		gl_Position.x = waveXYOffset.x + (tXOffset + deltaTXOffset*isTPlusOne);					  ", //TODO: make sure both coordinates here are going to be in the right units
+	"		gl_Position.x = waveXYOffset.x + (tXOffset + deltaTXOffset*isTPlusOne);					  ",
 
 			//calculate the y coordiante in canvas coordinates
 	"		gl_Position.y = waveXYOffset.y + voltage*yFactor;										  ", 
-
+	
+			//best to set the fourth element to 1
+	"		gl_Position[3] = 1.;																	  ", 
     "   }                                                                                 			  "
     ].join('\n');
 
@@ -85,11 +87,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 		for(var t=0;t<50-1;t++){
 			// update x-offset for the new value of t
-			gl.uniform1f(locs.tXOffset, offCanv.dT*t); 
+			gl.uniform1f(locs.tXOffset,offCanv.dT*t/offCanv.W*2); 
 
 			// bind the voltage buffer with data for (t,t+1)
-			gl.bindBuffer(gl.ARRAY_BUFFER, bufs.voltage[c*(50-1) + t]);
-    		gl.vertexAttribPointer(locs.voltage, 1, gl.BYTE, true, 1, 0); 
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffs.voltage[c*(50-1) + t]);
+    		gl.vertexAttribPointer(locs.voltage, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
 
 			// for each wave on this channel, render the line from t to t+1
 			gl.drawArrays(gl.LINES, 0,2*N); 
@@ -100,29 +102,31 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		//cutSlots is an array of the immutable cutSlots, each of which has index data associated to it and a group number
 		//given the values in offCanv, there is a limit to how many groups we can simultaneously render.  The calling 
 		//function should be aware of this and not provide too many cutSlots.
-		//This function produces a vector of the form x_1 y_1 c_1 x_2 y_2 c_2 ... x_n y_n c_n, where x_i and y_i specify the offset for
+		//This function produces a vector of the form x_1 y_1 c_1 x_1 y_1 c_1  x_2 y_2 c_2 x_2 y_2 c_2 ... x_n y_n c_n x_n y_n c_n, where x_i and y_i specify the offset for
 		//the given wave on the hidden rendering canvas, in canvas coordinates [-1 to +1], but using the units [-128 to +128]. c_i gives
-		//the texture coordiantes within the palette for the given wave.
+		//the texture coordiantes within the palette for the given wave.  Note that each sets of values is repeated.
 
 		var yIncrement = offCanv.waveH/offCanv.H * 2 * 128;
 		var xIncrement = (offCanv.waveW+offCanv.waveGap)/offCanv.W * 2 * 128;
 
-		//create a typed array buffer of length 3N, and get both a signed and an unsigned 8-bit view of it
-		var buffInt8 = new Int8Array(N*3); 
-		var buffUint8 = new Uint8Array(buffInt8);
+		//create a typed array buffer of length 6N, and get both a signed and an unsigned 8-bit view of it
+		var buffInt8 = new Int8Array(N*3*2); 
+		var buffUint8 = new Uint8ClampedArray(buffInt8.buffer);
 
         //set default x to be in the "right hand margin" of the offscreen canvas. We don't care what this area looks like, so
         //it's fine to render all the excess verticies here.
         for(var i=0;i<buffInt8.length;i+=3)
-            buffInt8[i] = 128;
+            buffInt8[i] = 127;
 
 		//set x and y data for the desired waves
-		for(var y=-128+yIncrement, s=0; y<=128 && s<cutSlots.length; y+=yIncrement)
+		for(var y=128-yIncrement, s=0; y>=-128 && s<cutSlots.length; y-=yIncrement)
 			for(var x=-128; x<128 && s<cutSlots.length; x+=xIncrement, s++){
 				var inds = cutSlots[s].inds;
 				for(i=0;i<inds.length;i++){
-					buffInt8[inds[i]*3 + 0] = x;
-					buffInt8[inds[i]*3 + 1] = y;
+					buffInt8[inds[i]*6 + 0] = x;
+					buffInt8[inds[i]*6 + 1] = y;
+					buffInt8[inds[i]*6 + 3] = x;
+					buffInt8[inds[i]*6 + 4] = y;
 				}
 			}
 
@@ -130,15 +134,19 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
         if(slotRenderState.desiredColormap == -1){
             for(var s=0;s<cutSlots.length;s++){
                 var inds = cutSlots[s].inds;
-        			for(i=0;i<inds.length;i++)
-    				    buffUint8[inds[i]*3 + 2] = i/(inds.length-1)*255; 
+				for(i=0;i<inds.length;i++){
+					buffUint8[inds[i]*6 + 2] = i/(inds.length-1)*254; 
+					buffUint8[inds[i]*6 + 5] = i/(inds.length-1)*254; 
+				}
             }
         }else{
             for(var s=0;s<cutSlots.length;s++){
                 var inds = cutSlots[s].inds;
-                var val = cutSlots[s].groupHistory.slice(-1)[0]; //group number is the colormap index
-            		for(i=0;i<inds.length;i++)
-    				    buffUint8[inds[i]*3 + 2] = val;
+                var val = cutSlots[s].group_history.slice(-1)[0]; //group number is the colormap index
+				for(i=0;i<inds.length;i++){
+					buffUint8[inds[i]*6 + 2] = val;
+					buffUint8[inds[i]*6 + 5] = val;
+				}
             }            
         }
 
@@ -148,7 +156,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 		// tell the gpu where to find the wave data
 		gl.vertexAttribPointer(locs.waveXYOffset, 2, gl.BYTE, true, 3, 0); 
-		gl.vertexAttribPointer(locs.waveColorTex, 2, gl.UNSIGNED_BYTE, true, 3, 0); 
+		gl.vertexAttribPointer(locs.waveColorTex, 1, gl.UNSIGNED_BYTE, true, 3, 2); 
 	}
 
 	var UploadVoltage = function(buffer){
@@ -163,8 +171,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			for(var t=0;t<50-1;t++){ //for each time point (except the last one)
 				var p = (50+4)*c + 4 + t; //pointer to the t'th voltage sample on channel c for the first spike
 				for(var i=0; i<N; i++){ //for each spike
-					cBuffer[N2] = 127 - oldData[p]; //TODO: check that 127 - oldData gives us 0 to 255, with up the way we want.
-					cBuffer[N2 +1] = 127 - oldData[p+1];
+					cBuffer[i*2 + 0] = 128 + oldData[p]; //TODO: check that 127 - oldData gives us 0 to 255, with up the way we want.
+					cBuffer[i*2 + 1] = 128 + oldData[p+1];
 					p += (50+4)*4; //step through to the same point in the next spike
 				}
 				//upload the current buffer to the gpu.  
@@ -182,7 +190,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		ready.voltage = false;
 		ready.cut = false;
 		cRender.alive = false; //stop render if there is one occuring
-		
+
 		N = N_val;
         if(!ValidN(N)) return;
 
@@ -190,8 +198,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		UploadIsTPlusOne(); //only needs to know N
         ready.voltage = true;
 
+		//Clear all the data that is obviously now out of date (we may not need to do this but it makes life easier)
 		cCut = null;
+		var oldSlotRenderState = slotRenderState;
 		slotRenderState = SimpleClone(blankSlotRenderState);
+		slotRenderState.desiredChannels = oldSlotRenderState.desiredChannels; //we didn't want to clear this ..
+		slotRenderState.desiredColormap = oldSlotRenderState.desiredColormap; //..or this.
 
 		//Note we do not provide any cut data, so at this point we cannot render yet
 	}
@@ -217,7 +229,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		locs.isTPlusOne = gl.getAttribLocation(prog, "isTPlusOne");
 		locs.waveColorTex = gl.getAttribLocation(prog, "waveColorTex");
 		locs.voltage = gl.getAttribLocation(prog, "voltage");
-		locs.tXOffset = gl.getUniformLocation(prog, "tXoffset");
+		locs.tXOffset = gl.getUniformLocation(prog, "tXOffset");
 		locs.palette = gl.getUniformLocation(prog, "palette");
 
 		// call enableVertexAttribArray for the four attributes
@@ -237,6 +249,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
         UploadPalette(PALETTE_HOT_REGISTER_IND,PALETTE_HOT); 
 		UploadPalette(PALETTE_FLAG_REGISTER_IND,PALETTE_FLAG); 
 
+		SetPaletteMode(-1); //set the palette to be hot
+		
 		// turn off depth testing since we want to just render in order (negative z is still invisible)
     	gl.disable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND); //think this is off by default, but anyway we don't need it.
@@ -251,8 +265,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		// uploads an n-length vector to the gpu, the vector is of the form 0 1 0 1 ... 0 1
 
 		//create the array
-		var b = new Uint8Array(N);
-		for(var i=1;i<N;i+=2)
+		var b = new Uint8Array(N*2);
+		for(var i=1;i<b.length;i+=2)
 			b[i] = 255;
 
 		//upload to the gpu
@@ -297,7 +311,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 			// if either of the following two tests are false we will need to force a render of all desired channels and add this slot to the render list
 			var generationIsCorrect = r.slotGeneration[i] === s.generation;
-			var colMapIsCorrect = (r.desiredColormap == -1 && r.slotColMap[i] == -1) || (r.desiredColormap == +1 && r.slotColMap[i] == cachedSlots[i].group_history.slice(-1)[0]);
+			var colMapIsCorrect = (r.desiredColormap == -1 && r.slotColMap[i] == -1) || (r.desiredColormap == +1 && r.slotColMap[i] == s.group_history.slice(-1)[0]);
 			if(!generationIsCorrect || !colMapIsCorrect){
 				M.useMask(chanIsToBeRendered,r.desiredChannels,1); //force render of all desired channels
 				slotsToRender.push(s); //we need to render this slot
@@ -341,7 +355,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 	var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
 		if(!ready.voltage)
 			throw new Error('SlotsInvalidated without any voltage data.');
-		
+
 		if(cRender && cRender.alive)
 			cRender.alive = false;  //kill the old render. In a way this is not necessary (due to the fact that rendering tries to use the most up to date information), but it is simpler.
 
@@ -366,11 +380,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		slotRenderState.nextSlotInd = 0;
 		window.setTimeout(function(){Render(cRender);},1);
 	}
-	
+
 	var InvalidateAll = function(){
 		SlotsInvalidated(null,M.repvec(1,slotRenderState.nSlots)); //invalidate all slots
 	}
-	
+
 	var ShowChannels = function(newChanIsOn){
         //newChanIsOn is a vector of 4 logicals specifying which of the 4 channels to show
         if(slotRenderState.desiredChannels[0] == newChanIsOn[0] && 
@@ -419,12 +433,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
     var GetCanvas = function(){
         var canvas =  $('<canvas/>', {heiGht: offCanv.W, widtH: offCanv.H});
-    	canvas.css({position:"absolute",left:"400px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
+    	canvas.css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
         return canvas.get(0);
     };
 
 	 var PALETTE_HOT = function(){
-        var data = new Uint8Array(new ArrayBuffer(256*4));
+        var data = new Uint8Array(256*4);
     	for(var i=0;i<256;i++)
     		data[i*4+3] = 255; //set alpha to opaque
 
@@ -443,7 +457,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
     }();
 
     var PALETTE_FLAG = function(){
-        var data = new Uint8Array(new ArrayBuffer(256*4));
+        var data = new Uint8Array(256*4);
         for(var i=0;i<256;i++)
     		data[i*4+3] = 255; //set alpha to opaque
         data[0*4+0] = 190;    data[0*4+1] = 190;    data[0*4+2] = 190; //was 220 for all three
@@ -539,7 +553,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
     var error_callback = function(s){console.log(s)};
     var success_callback = function(s){console.log(s);};
-	
+
 	Init(); //initialises all the webgl stuff without actually doing any data-specific stuff
 
 	return {LoadTetrodeData: LoadTetrodeData,
