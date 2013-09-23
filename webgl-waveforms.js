@@ -20,7 +20,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 				   waveH: 128, //height of a wave
 				   dT: 2, //distance from t to t+1 on the wave
 				   waveGap: 2 } //horizontal gap between waves
-				   
+
 		c.waveW = (50-1)*c.dT; //width of a wave
 
 		// use the above to compute the x and y offsets of the spaces for waves on the offscreen canvas
@@ -28,11 +28,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		c.xOffsets = new Uint16Array(nSpaces);
 		c.yOffsets = new Uint16Array(nSpaces);
 		var i = 0;
-		for(var y= c.waveH; y<c.H; y+= c.waveH)for(var x = 0;x<c.W;x+= c.waveW+c.waveGap,i++){
+		for(var y= c.waveH; y<c.H; y+= c.waveH)for(var x = 0;x+c.waveW<c.W;x+= c.waveW+c.waveGap,i++){
 				c.xOffsets[i] = x;
 				c.yOffsets[i] = y;
 		}
-		
+
 		// convert the x and y offsets from pixel units to units normalised to the range -128 to 128
 		c.xOffsetsInt8 = new Int8Array(nSpaces);
 		c.yOffsetsInt8 = new Int8Array(nSpaces);
@@ -40,12 +40,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			c.xOffsetsInt8[i] = c.xOffsets[i]/c.W * 255 - 128;
 			c.yOffsetsInt8[i] = 127 - c.yOffsets[i]/c.H * 255;
 		}
-		
+
 		// in addition to all the coordinate stuff we also need to actually create the canvas and store a reference to it
 		var canvas = $("<canvas width='" + c.W + "' height='" + c.H + "' />");
     	//canvas.css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
         c.el = canvas.get(0);
-		
+
 		return c;
 	}();	
 
@@ -101,7 +101,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 			//calculate the y coordiante in canvas coordinates
 	"		gl_Position.y = waveXYOffset.y + voltage*yFactor;										  ", 
-	
+
 			//best to set the fourth element to 1
 	"		gl_Position[3] = 1.;																	  ", 
     "   }                                                                                 			  "
@@ -274,7 +274,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		UploadPalette(PALETTE_FLAG_REGISTER_IND,PALETTE_FLAG); 
 
 		SetPaletteMode(-1); //set the palette to be hot
-		
+
 		// turn off depth testing since we want to just render in order (negative z is still invisible)
     	gl.disable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND); //think this is off by default, but anyway we don't need it.
@@ -321,7 +321,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var slotsToRender = []; //slot objects which are chosen to be rendered on this particular run of the Render function
 		var canvasContexts = []; //elements in this array correspond to the slotsToRender array.  Gives the 2d contexts to each of the canvases on which we are to render.
 		var nDesiredChannels = M.sum(r.desiredChannels);
-		
+
 		for(var i=r.firstInd;i<r.nSlots;i++,r.firstInd++)if(r.invalidatedSlots[i]){ //for all slots that have been invalidated...
 
 			if(false /*TODO: need to check if the slotsToRender array is full*/)
@@ -378,7 +378,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		xOff[0] = 0;
 		for(var c=0;c<r.desiredChannels.length;c++)
 			xOff[c+1] = xOff[c] + (r.desiredChannels[c]? offCanv.waveW : 0);
-		
+
 		// render each of the requested channels, copying all the new images to their individual canvases
 		for(var c=0;c<chanIsToBeRendered.length;c++)if(chanIsToBeRendered[c]){
 			PerformRenderForChannel(c);

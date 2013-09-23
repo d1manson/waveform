@@ -320,7 +320,6 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
             $drop_zone.remove();
             $drop_zone = null;
         }
-    	T.HideHelp(); //in case it was being shown
         recoveringFilesFromStorage = false;
         NewFiles(evt.dataTransfer.files); // FileList object.
     }

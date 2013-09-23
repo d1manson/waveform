@@ -55,10 +55,10 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	// and mousemove, mouseup, mouseenter, mouseleave for all the tiles (the placeholder and moving tiles are invisible to the mouse)
 	$(document).mousemove(T.Tool.DocumentMouseMove_Merger)
 			   .mouseup(T.Tool.DocumentMouseUp_Merger);
-	$.each(T.$tile_, function(){
-						this.on("mouseenter mouseleave",T.Tool.TileMouseLeaveEnter_MergerTarget)
-							.on("mouseup",T.Tool.TileMouseUp_MergerTarget)
-							.on("mousemove",T.Tool.TileMouseMove_MergerTarget);	
+	$.each(T.tiles, function(){
+						this.$.on("mouseenter mouseleave",T.Tool.TileMouseLeaveEnter_MergerTarget)
+							  .on("mouseup",T.Tool.TileMouseUp_MergerTarget)
+							  .on("mousemove",T.Tool.TileMouseMove_MergerTarget);	
 					 });
 }
 
@@ -74,7 +74,7 @@ T.Tool.DocumentMouseUp_Merger = function(event){
 
 T.Tool.EndMerger = function(){
 	$(document).off('mousemove mouseup');
-	$.each(T.$tile_, function(){this.off("mouseenter mouseleave mouseup mousemove")});
+	$.each(T.tiles, function(){this.$.off("mouseenter mouseleave mouseup mousemove")});
 	T.Tool.activeMerger.$placeholder.remove();
 	T.Tool.activeMerger.$h.css({left: '',top:'',position:''})
 					.removeAttr('moving')
@@ -100,7 +100,7 @@ T.Tool.TileMouseMove_MergerTarget = function(event){
 	for(var i = 0;i<pos.length;i++) if(pos[i])
 		if(Math.abs(pos[i].left-left-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY && Math.abs(pos[i].top-top-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY){
 			T.Tool.activeMerger.target = i;
-			T.$tile_[i].toggleClass('shake',false); //clear this so that it's ready to be reused if we merge
+			T.tiles[i].toggleClass('shake',false); //clear this so that it's ready to be reused if we merge
 			T.Tool.activeMerger.$h.attr('proximate',true);
 			T.Tool.activeMerger.$h.find('canvas').eq(0).css({
 								position: 'relative',
@@ -140,16 +140,16 @@ T.TileDoubleClick_BeginSeparator = function(event){
 	var n_2 = Math.ceil(cut_g.length/2);
 	c.SplitA(g,T.Tool.SeparatorMakeMask(n_1,n_2));
 
-	$.each(T.$tile_,function(){$(this).attr('disabled','true');})
+	$.each(T.tiles,function(){this.$.attr('disabled','true');})
     var $separator_first = $("<div class='separator_half' />")
                             .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,true)})
                             .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,true)});
     var $separator_second = $("<div class='separator_half' />")
                             .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,false)})
                             .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,false)});
-	T.$tile_[g].attr('separating','true')
+	T.tiles[g].$.attr('separating','true')
                 .wrap($separator_first);
-	T.$tile_[g+1].attr('separating','true')
+	T.tiles[g+1].$.attr('separating','true')
                 .wrap($separator_second);
 	T.$tilewall.mousedown(T.Tool.TileWallMouseDown_Separating);
     T.Tool.separating = {g:g,n_1:n_1,n_2:n_2,increment:1,isFirst:NaN,timer:null};
@@ -202,19 +202,19 @@ T.Tool.SeparatorMouseDownTick = function(){
 	s.increment += 8;
 	s.increment = s.increment > 800 ? 800 : Math.round(s.increment);
 
-	T.$tile_[s.g].caption.text("group " + s.g + " | " + s.n_1 + " waves ");
-	T.$tile_[s.g+1].caption.text("group " + (s.g+1) + " | " + s.n_2 + " waves ");
+	T.tiles[s.g].caption.text("group " + s.g + " | " + s.n_1 + " waves ");
+	T.tiles[s.g+1].caption.text("group " + (s.g+1) + " | " + s.n_2 + " waves ");
 }
 
 T.Tool.TileWallMouseDown_Separating = function(event){
 		//this is the only way to end the separating tool
 		
 		T.$tilewall.off('mousedown');
-        T.$tile_[g].removeAttr('separating')
+        T.tiles[g].$.removeAttr('separating')
                                      .unwrap();
-        T.$tile_[g+1].removeAttr('separating')
+        T.tiles[g+1].$.removeAttr('separating')
                                      .unwrap();
-        $.each(T.$tile_,function(){$(this).removeAttr('disabled');});
+        $.each(T.tiles,function(){this.$.removeAttr('disabled');});
 		clearInterval(T.Tool.separating.timer);
         delete T.Tool.separating;
         

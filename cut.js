@@ -91,13 +91,13 @@ T.CUT = function(){//class factory
         for(var i=k+1;i<this._.immutablesSlots.length;i++)
             if(!this._.immutablesSlots[i] || this._.immutablesSlots[i].inds == null){
                 this._.nextImmutableSlot = i;
-                return;
+                return k;
             }
         //then, if neccessary, wrap around and search from the beginnning again
         for(var i=0;i<k;i++)
             if(!this._.immutablesSlots[i] || this._.immutablesSlots[i].inds == null){
                 this._.nextImmutableSlot = i;
-                return;
+                return k;
             }
 
         this._.nextImmutableSlot = NaN;
@@ -413,11 +413,14 @@ T.CUT = function(){//class factory
         var m = this._.groupToImmutablesMapping;
         var G= 0;
         for(var i=0;i<m.length;i++)
-            if(m[i] || m[i]==0)
-                G++;
+            if(m[i] || m[i]==0){
+                //G++; // this version will give the number of groups in use
+				G = i; //this version returns the maximum in-use group number
+			}
         return G;
     }
     
+	
 	var GetProps = function(){
 		return {exp_name: this._.exp_name, 
 				tet_num: this._.tet_num,

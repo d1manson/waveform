@@ -212,9 +212,9 @@ T.SetupRatemaps = function(){
 
 T.ApplyCanvasSizes = function(){
 	
-	var i = T.$tile_.length;
-	while(i--)if(T.$tile_[i]){
-		var $c = T.$tile_[i].find('canvas').eq(0);
+	var i = T.tiles.length;
+	while(i--)if(T.tiles[i]){
+		var $c = T.tiles[i].$.find('canvas').eq(0);
 		$c.css({width: $c.get(0).width * T.xFactor + 'px',height: $c.get(0).height * T.yFactor + 'px'});
 	}
 }
@@ -248,8 +248,8 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	//to issue updated canvases without any slot-invalidation events being received by SetGroupDataTiles.
 	//slotInd matches the cut immutables slot thing, canvasNum is 0 for waveforms and 1 for ratemaps.
 
-	var $tile = T.$tile_[T.cutSlotToTileMapping[slotInd]];
-	if(!$tile)
+	var t = T.tiles[T.cutSlotToTileMapping[slotInd]];
+	if(!t)
 		return;
 		
 	if($canvas)	
@@ -257,82 +257,81 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 	
-	$tile.find('canvas').eq(canvasNum).replaceWith($canvas); 
+	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
 	
+}
+
+T.CreateTile = function(i){
+	var $ = T.$newTile.clone();
+	
+	$.data("group_num",i);
+    $.hide();	
+	return {$: $,
+			caption: $.find('.tile-caption')
+			}
+
 }
 
 T.SetGroupDataTiles = function(cut,invalidatedSlots,isNew){
 	//controls the adding, removing, rearanging, and caption-setting for tiles. (Unfortunately the logic is a bit complicated)
 
-	var nGroups = cut.GetProps().G;
+	var nGroups = cut.GetProps().G; 
 
-	while(T.$tile_.length < nGroups){ //if there are too few tiles, add more
-		var $t = T.$newTile.clone();
-		$t.data("group_num",T.$tile_.length-1);
-		$t.caption = $t.find('.tile-caption');
-		T.$tilewall.append($t);
-		T.$tile_.push($t);
+	while(T.tiles.length < nGroups){ //if there are too few tiles, add more
+		var t = T.CreateTile(T.tiles.length-1);
+		T.$tilewall.append(t.$);
+		T.tiles.push(t);
 	}
 
-	var displaced_$tile_ = []; //if we move tiles around during the loop (see the nested "if" statement inside the loop), 
+	var displaced_tiles = []; //if we move tiles around during the loop (see the nested "if" statement inside the loop), 
 								//we store the displaced tiles in this array so that they can be used by subsequent iterations if needed
 
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
 		var slot_k = cut.GetImmutableSlot(k);
 		var old_tile_ind = T.cutSlotToTileMapping[k];
 
-		if(slot_k.inds == null){
+		if(slot_k.inds == null  ||slot_k.inds.length==0 ){
 			// immutable has been cleared, it may or may not have been previosuly associated to a tile
 				if(isNum(old_tile_ind)){
 					//hide the tile if one was associated to the slot
-					T.$tile_[old_tile_ind].hide(); 
+					T.tiles[old_tile_ind].$.hide(); 
 					T.cutSlotToTileMapping[k] = null;
 				}
 
 		}else{
 			var new_tile_ind = slot_k.group_history.slice(-1)[0];
 
-			if(isNum(old_tile_ind)){
+			if(isNum(old_tile_ind) && old_tile_ind != new_tile_ind){
 				// We already had a tile for this slot, now there is either a new immutable for the slot or the group on the existing immutable has changed.
 				// In both cases we need to move the tile
-				var $oldTile = displaced_$tile_[old_tile_ind] || T.$tile_[old_tile_ind];
-                var $simpleDiv = $("<div style='display:none;'/>")
-                $simpleDiv.isSimple = true;                               
-                //store the displaced tile in the displace_$tile_ array in case it needs to be used in a subsequent iteration,
-                //and at the old tile location we just leave $simpleDiv
-				displaced_$tile_[new_tile_ind] = T.$tile_[new_tile_ind].replaceWith($oldTile.wrap($simpleDiv)); 
-				T.$tile_[new_tile_ind] = $oldTile; 
-				T.$tile_[old_tile_ind] = $simpleDiv;
+				
+				// there are 3 tiles involved here:
+				displaced_tiles[new_tile_ind] = T.tiles[new_tile_ind]; //store the tile which is about to be displaced (in case we need it in a future iteration of the k-loop)
+				var movingTile = displaced_tiles[old_tile_ind] || T.tiles[old_tile_ind]; //get the tile which we want to move
+				T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
+				movingTile.$.before(T.tiles[old_tile_ind].$); 
+				T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
+				T.tiles[new_tile_ind] = movingTile; 
+				
 
 			} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
-			T.$tile_[new_tile_ind].show()
+			T.tiles[new_tile_ind].$.show()
 								  .data("group_num",new_tile_ind)
-								  .caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
+			T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
+			
 			T.cutSlotToTileMapping[k] = new_tile_ind;
 		}
 	}
 
-	while(T.$tile_.length > nGroups){ // if there are too many tiles, delete some
-		var $t = T.$tile_.pop();
-		$t.remove();
-	}
-
-	// if we have any simpleDivs in the tilewall, replace them with actual hidden tiles (it just makes life easier next time this function is called)
-	for(var i=0;i<nGroups;i++) if(T.$tile_[i].isSimple){
-			var $t = T.$newTile.clone();
-			$t.data("group_num",i);
-			$t.caption = $t.find('.tile-caption');
-			$t.hide();
-			T.$tile_[i].replaceWith($t);
-            T.$tile_[i] = $t;
-	}
+	while(T.tiles.length > nGroups) // if there are too many tiles, delete some
+		T.tiles.pop().$.remove();
 
 }
 
 T.ClearAllTiles = function(){
-	while(T.$tile_.length)
-		T.$tile_.pop().remove();
+	while(T.tiles.length)
+		T.tiles.pop().$.remove();
 	T.cutSlotToTileMapping = [];
 }
 
@@ -374,13 +373,7 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 }
 
 T.ShowHelp = function(){
-	T.$help_background.css({display: 'block'});
-	T.$help_panel_wrapper.css({display: 'block'});
-}
-
-T.HideHelp = function(){
-	T.$help_background.css({display: 'none'});
-	T.$help_panel_wrapper.css({display: 'none'});
+	window.open("https://github.com/d1manson/waveform/wiki","_blank");
 }
 
 T.TogglePalette = function(){
@@ -544,16 +537,13 @@ T.UndoLastAction = function(){
 	T.ORG.GetCut().Undo();
 }
 
-T.$help_background = $('.help_background');
-T.$help_panel_wrapper = $('.help_panel_wrapper');
 $('.help_button').each(function(){$(this).click(T.ShowHelp);});
 $('#apply_size').click(T.ApplySizeClick);
-T.close_help_button = $('.close_help_button').click(T.HideHelp);
 T.$size_input = $('#size_input');
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.$action_panel = $('#action_panel');
-T.$tile_ = [];
+T.tiles = [];
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
 $('#reorder_n_button').click(T.ReorderNCut);
