@@ -115,8 +115,33 @@ var M = {
 			for(var i=0;i<S;i++)
 				result[i] /= counts[i];
 			return result;
+		}else if (fn == "sum" && values == 1){
+    	    var S = M.max(inds) + 1; //zero-based indexing, remember!
+			var counts = new Uint32Array(S);
+			for(var i=0;i<inds.length;i++)
+				counts[inds[i]]++;
+			return counts;
 		}else
 			throw(fn + " is not implemetned, sorry");
+		
+	},
+	
+    toInds: function(vals,binWidth){
+        //as the moment this is just doing a division
+        var ret = new Uint32Array(vals.length); //note we'll have problems with negative values
+        for(var i=0;i<vals.length;i++)
+            ret[i] = vals[i]/binWidth; // integer assignation is floor
+        return ret;
+    },
+    
+	sort: function(x,flag){
+		if(flag === M.IN_PLACE){
+			Array.prototype.sort.call(x,function(a,b){return a-b;});
+		}else{
+			var x_ = M.clone(x);
+			Array.prototype.sort.call(x_,function(a,b){return a-b;});
+			return x_;
+		}
 		
 	},
 	

@@ -4,6 +4,7 @@ var T = {};
 T.Tool = {};
 T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
+T.tAutocorrIsOn = 0;
 T.paletteMode = 0;
 T.binSizeCm = 2.5;
 
@@ -15,12 +16,18 @@ T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
-T.MAPS_START = 101-1;
+T.DISPLAY_ISON = {CHAN: [1,2,3,4], RM: [101], TC: 201, //value attribute in DOM
+				  CHAN_: [0,1,2,3], RM_: [4], TC_: 5}; //order in DOM
+				  
+T.DISPLAYAUTOCORR_START = 201-1;
 T.xFactor = 2;
 T.yFactor = 2;
+T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
+T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
 
 T.$newTile = $("<div class='tile'>" +
 			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" + 
+			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
 			"<div class='tile-over'><div class='tile-caption'></div></div>" + 
 			"<div class='blind'></div>" + 
@@ -75,8 +82,11 @@ T.FinishedLoadingFile = function(status,filetype){
 
 	if(filetype == "tet"){
 		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
-		if(status.cut == 3) //if we happened to have loaded the cut before the tet, we need to force T.WV to accept it now
+		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
+		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV and T.TC to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
+			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
+		}
 	}
 
 	if(filetype == null && (status.pos != 3 || status.tet != 3)){
@@ -86,8 +96,11 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == "pos")
 		T.PlotPos();
 
-	if(status.pos >=2 && status.tet >= 2 && status.set >=2)
+	if(status.pos >=2 && status.tet >= 2 && status.set >=2){
 		T.SetupRatemaps();
+		if(status.cut == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.WV to accept it now
+			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
+	}
 
 	//note that cut is mainly dealt with separetly by the callbacks registered with the T.CUT module
 }
@@ -117,63 +130,76 @@ T.DispHeaders = function(status,filetype){
 
 
 
-T.ApplyChannelChoice = function(setChans,setMaps){
-	//This is a bit inefficent because we only need to resize the canvas and its css 
-	//when we change the number of channels being displayed, but it doesn't matter much.
+T.SetDisplayIsOn = function(v){ 
 
-	setChans = setChans == undefined? T.chanIsOn : setChans;
-	setMaps = setMaps == undefined? T.mapIsOn : setMaps;
-
-	for(var i=0;i<T.$chanButton_.length;i++){
-		if(i < setChans.length)
-			T.$chanButton_.eq(i).prop('checked',setChans[i])
-		else if(i-setChans.length < setMaps.length)
-			T.$chanButton_.eq(i).prop('checked',setMaps[i-setChans.length]);
-	}	
-	T.chanIsOn = setChans;
-	T.mapIsOn = setMaps;
-	T.WV.ShowChannels(setChans);
+	//there are currently 6 buttons: the first 4 are channels, then 1 for ratemap and 1 for temporal autocorr
+	//this function will 
+	if('chanIsOn' in v){
+		T.chanIsOn = v.chanIsOn; //array of 4
+		for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)
+			T.$chanButton_.eq(T.DISPLAY_ISON.CHAN_[i]).prop('checked',T.chanIsOn[i])
+		T.WV.ShowChannels(T.chanIsOn);
+	}
 	
-	T.RM.ShowMaps(setMaps); 	//Note we don't render here, that's up to the calling function
+	if('mapIsOn' in v){
+		T.mapIsOn = v.mapIsOn; //array of 1
+		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
+			T.$chanButton_.eq(T.DISPLAY_ISON.RM_[i]).prop('checked',T.mapIsOn[i])
+		T.RM.ShowMaps(T.mapIsOn);
+	}
+	
+	if('tAutocorrIsOn' in v){
+		T.tAutocorrIsOn = v.tAutocorrIsOn; //1 or 0 (not an array)
+		T.$chanButton_.eq(T.DISPLAY_ISON.TC_).prop('checked',T.tAutocorrIsOn)
+		T.TC.SetShow(T.tAutocorrIsOn);
+	}
+	
 }
 
-T.ChannelButtonClick = function(evt){
+T.DisplayIsOnClick = function(evt){
+	//displayIsOn are the 6 buttons: 4xchannel 1xratemap 1xtemporal-autocorr
+	
 	//TODO: change "Channel" in button names to reflect the fact it now includes maps
 	//Also need to convert buttons to be actuall buttons rather than radio inputs becaues firefox doesn't permit clicking radio buttons with ctrl or alt or shift pressed (I think)
 
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
-
-	var thisVal =  parseInt($(this).val())-1;
-	var setChans; var setMaps;
-
+	var oldTautocorr = T.tAutocorrIsOn;
+	
+	var thisVal =  parseInt($(this).val());
+	var setChans; var setMaps; var setTautocorr;
 
 	if(evt.ctrlKey){
-		//if ctrl key is down then toggle this item, but make sure that there is at least one itme on
+		//if ctrl key is down then at least keep the old values
 		setChans = oldChans;
 		setMaps = oldMaps;
-		if(thisVal >= T.MAPS_START)
-			setMaps[thisVal-T.MAPS_START] = +!setMaps[thisVal-T.MAPS_START];
-		else
-			setChans[thisVal] = +!setChans[thisVal];
-
-		if(M.sum(setChans) + M.sum(setMaps) == 0){
-			if(thisVal >= T.MAPS_START)
-				setMaps[thisVal-T.MAPS_START] = 1;
-			else
-				setChans[thisVal] = 1;
-		}
-
+		setTautocorr = oldTautocorr;
 	}else{
-		//turn it on and everything else off
+		//if ctr key is not down then we start with a blank slate
 		setChans = [0,0,0,0];
 		setMaps = [0];
-		if(thisVal >= T.MAPS_START)
-			setMaps[thisVal-T.MAPS_START] = 1;
-		else
-			setChans[thisVal] = 1;
+		setTautocorr = 0;
 	}
-	T.ApplyChannelChoice(setChans,setMaps);
+	
+	if(thisVal == T.DISPLAY_ISON.TC){
+		//clicked temporal autocorr button (there's no array, it's just a single button)
+		setTautocorr = evt.ctrlKey ? !setTautocorr : 1;
+	}else for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
+		//clicked the i'th ratemap button (there is currently only one available)
+		setMaps[i] = evt.ctrlKey ? !setMaps[i] : 1;
+	}else for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)if(thisVal == T.DISPLAY_ISON.CHAN[i]){
+		//clicked the i'th channel button (of which there are 4)
+		setChans[i] = evt.ctrlKey ? !setChans[i] : 1;
+	}
+		
+	if(evt.ctrlKey && M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0){
+		//if ctrl key was down and we are about to turn off the one and only display we should abort that, and keep what we had
+		setChans = oldChans; 
+		setMaps = oldMaps;
+		setTautocorr = oldTautocorr;
+	}
+	
+	T.SetDisplayIsOn({chanIsOn: setChans, mapIsOn: setMaps, tAutocorrIsOn: setTautocorr});
 }
 
 
@@ -200,7 +226,7 @@ T.ApplyRmSizeClick = function(){
 	//TODO: this is a bit clumsy, isn't there a better way?
 	T.RM.ClearAll();
 	T.SetupRatemaps();
-	T.ORG.GetCut().ForceChangeCallback(T.RM.SetGroupData);
+	T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
 }
 
 T.SetupRatemaps = function(){
@@ -215,7 +241,7 @@ T.ApplyCanvasSizes = function(){
 	var i = T.tiles.length;
 	while(i--)if(T.tiles[i]){
 		var $c = T.tiles[i].$.find('canvas').eq(0);
-		$c.css({width: $c.get(0).width * T.xFactor + 'px',height: $c.get(0).height * T.yFactor + 'px'});
+		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING  + 'px'});
 	}
 }
 
@@ -252,9 +278,24 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	if(!t)
 		return;
 		
-	if($canvas)	
-		$canvas.css({width: $canvas.get(0).width * T.xFactor + 'px',height: $canvas.get(0).height * T.yFactor + 'px'}); //apply css scaling
-	else
+	if($canvas)	{
+		var xF = 1;
+		var yF = 1;
+        switch (canvasNum){
+			case 0:
+				xF = T.xFactor*T.SPECIAL_SCALING;
+				yF = T.yFactor*T.SPECIAL_SCALING;
+				break;
+			case 1:
+				xF = T.SPECIAL_SCALING_RM;
+				yF = T.SPECIAL_SCALING_RM;
+				break;
+			case 2:
+				// for temporal autocorr leave it at 1
+				break;
+		}
+		$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
+    }else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 	
 	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
@@ -275,9 +316,9 @@ T.CreateTile = function(i){
 T.SetGroupDataTiles = function(cut,invalidatedSlots,isNew){
 	//controls the adding, removing, rearanging, and caption-setting for tiles. (Unfortunately the logic is a bit complicated)
 
-	var nGroups = cut.GetProps().G; 
+	var maxGroupNum = cut.GetProps().G; 
 
-	while(T.tiles.length < nGroups){ //if there are too few tiles, add more
+	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
 		T.$tilewall.append(t.$);
 		T.tiles.push(t);
@@ -324,7 +365,7 @@ T.SetGroupDataTiles = function(cut,invalidatedSlots,isNew){
 		}
 	}
 
-	while(T.tiles.length > nGroups) // if there are too many tiles, delete some
+	while(T.tiles.length-1 > maxGroupNum) // if there are too many tiles, delete some (-1 becuase of group 0)
 		T.tiles.pop().$.remove();
 
 }
@@ -341,7 +382,8 @@ T.DocumentReady = function(){
     T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
 	T.CUT.AddChangeCallback(T.WV.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.RM.SetGroupData);
+	T.CUT.AddChangeCallback(T.RM.SlotsInvalidated);
+	T.CUT.AddChangeCallback(T.TC.SlotsInvalidated);
 	T.CUT.AddActionCallback(T.CutActionCallback);
 
 	if(localStorage.state){
@@ -354,12 +396,13 @@ T.DocumentReady = function(){
 
 		//TODO: load files into T.cut instances
 
-		T.ApplyChannelChoice(JSON.parse(localStorage.chanIsOn));
+		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn)});
+		
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
 
 	}else{
-		T.ApplyChannelChoice([1,1,1,1]);
+		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
 	}
 }
 
@@ -460,7 +503,7 @@ T.ReorderNCut = function(){
 
 	var cut = T.ORG.GetCut();
 	var G = cut.GetProps().G;
-	for(var i=0;i<G;i++)
+	for(var i=0;i<=G;i++)
 		groups.push({ind: i,
 					 len: cut.GetGroup(i).length});
 	groups.sort(function(a,b){return b.len-a.len;});
@@ -557,7 +600,7 @@ $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
 $('#reset_button').click(T.ResetAndRefresh);
-T.$chanButton_ = $("input[name=channel]:checkbox").click(T.ChannelButtonClick);
+T.$chanButton_ = $("input[name=channel]:checkbox").click(T.DisplayIsOnClick);
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
 T.$rm_bin_size = $('#rm_bin_size');

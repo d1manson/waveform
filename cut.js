@@ -455,7 +455,9 @@ T.CUT = function(){//class factory
 		return str.join('');
 	}
 
-
+    var GetNImmutables = function(){
+        return this._.immutablesSlots.length; //this is hopefully always 255
+    }
 	//cut constructor, which we return at the end of the factory
 	var cut = function(exp_name,tet_num,data_type,data,description){
 
@@ -487,7 +489,7 @@ T.CUT = function(){//class factory
 	cut.prototype.ReTriggerAll = ReTriggerAll;
 	cut.prototype.GetAsVector = GetAsVector;
 	cut.prototype.GetImmutableSlot = GetImmutableSlot;
-	
+	cut.prototype.GetNImmutables = GetNImmutables;
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,
 			AddChangeCallback: AddChangeCallback,
