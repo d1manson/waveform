@@ -32,27 +32,24 @@ you can drag further files onto the window at any point<br>
 	<button class="help_button">help (wiki)</button>
 	</div>
 
-	<div class="button_group">
-	<input type="text" id="size_input" value="2" size ="1">
-	<button id="apply_size">set wave size</button>
-	&nbsp;&nbsp;
-	<input type="text" id="rm_bin_size" value="2.5" size ="1">
-	<button id="apply_rm_size">set bin size (cm)</button>
-		
-	</div>
 
 	<div class="button_group">
 		<input type="checkbox" name="channel" id="channel1" value="1" /><label for="channel1">c1</label>
 		<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
 		<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
 		<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
-        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rate*</label>
+        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rm*</label>
 		<input type="checkbox" name="channel" id="tautocorr_chk" value="201"/><label for="tautocorr_chk">t-autocorr</label>
 		
 	</div>
 	<div class="button_group">
-	<button id="toggle_palette">toggle palette</button> 
+	<input type="text" id="size_input" value="2" size ="1" style="display:none;">
+	<button id="apply_size" style="display:none;">wave size</button>
+	<input type="text" id="rm_bin_size" value="2.5" size ="1">
+	<button id="apply_rm_size">rm bin cm</button>
+	<button id="toggle_palette">palette</button> 
 	</div>
+
 	<div class="button_group">
 	<button id="reorder_n_button">Reorder n</button>
 	<button id="reorder_A_button">Reorder A</button>

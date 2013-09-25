@@ -79,10 +79,14 @@ var M = {
 		return result;
 	},
 	
-	clone: function(a){ //TODO: is there no builtin way of doing this?
-		var result = new a.constructor(a.length);
-		result.set(a);
-		return result;
+	clone: function(a){ 
+		if(a.slice){
+			return a.slice(0); //for basic arrays and pure ArrayBuffer
+		}else{
+			var result = new a.constructor(a.length); //
+			result.set(a);
+			return result;
+		}
 	},
 	
 	range: function(a,b){

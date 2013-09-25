@@ -214,7 +214,7 @@ T.DM = function(){
     			gl.readPixels(0, 0, S/2, S, gl.RGBA, gl.UNSIGNED_BYTE, tmpMatrixView8);
     
     			//8. Store the new batch in the resultMatrix
-    			workerCombineBatches.postMessage({params:true,a:a,b:b});
+    			workerCombineBatches.postMessage({params:true,a:a,b:b}); //TODO: no need to do it in two separate calls
     			workerCombineBatches.postMessage(tmpMatrix,[tmpMatrix]);
     		}
     	}
