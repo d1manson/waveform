@@ -11,12 +11,20 @@ var M = {
 	},
 	
 	max: function(X){
-		return Math.max.apply(null,X);
+        var m = X[0];
+        for(var i = 1;i< X.length; i++){
+            (m < X[i]) && (m = X[i])
+        }
+        return m; //Math.max works recursively and fails for large enough arrays
 	},
 	
 	min: function(X){
-		return Math.min.apply(null,X);
-	},
+        var m = X[0];
+        for(var i = 1;i< X.length; i++){
+            (m > X[i]) && (m = X[i])
+        }
+        return m; //Math.min works recursively and fails for large enough arrays
+    },
 	
 	eq: function(X,v){
 		var result = new Uint8Array(X.length);

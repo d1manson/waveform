@@ -5,7 +5,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
     var plotOpts = {
         W: 100,
         H: 50,
-		nBins: 255 //I think you get one extra due to zero bin
+		nBins: 100 //I think you get one extra due to zero bin
     }
 	
 	var cCut = {};
@@ -13,10 +13,10 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 	var ready = false;
 	var renderState = {generation: [],
 						maxDeltaT: [], 
-					   desiredMaxDeltaT: 500}
+					   desiredMaxDeltaT: 500} //miliseconds
 	var allSpikeTimes = null;
 				   
-	var LoadTetrodeData = function(N_val, buffer){
+	var LoadTetrodeData = function(N_val, buffer,timebase){
 		ClearAll();
 		
 		//create the alLSpikeTimes array from the buffer
@@ -29,7 +29,11 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		if (endian == 'L') 
 			for(var i=0;i<N_val; i++)
 				allSpikeTimes[i] = Swap32(allSpikeTimes[i]);
-				
+		
+        timebase/= 1000; //get it in miliseconds
+        for(var i=0;i<N_val;i++)
+            allSpikeTimes[i] /= timebase;
+            
 		ready = true;
 	}
 		
@@ -61,12 +65,22 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
         var diffInds = M.toInds(diffs,binSize);
             
         var hist = M.accumarray(diffInds,1,"sum");
-        hist[0] += cutInds.length; //to take acount of the self difference for each spike
+        //hist[0] += cutInds.length; //to take acount of the self difference for each spike
         var $canvas = $("<canvas width='" + plotOpts.W + "' height='" + plotOpts.H + "' />");
+        var ctx = $canvas.get(0).getContext('2d');
         
+		var xStep = plotOpts.W/plotOpts.nBins;
+		var yScale = plotOpts.H/M.max(hist);
+		
+		ctx.beginPath();
+		ctx.moveTo(0,plotOpts.H-hist[0]*yScale)
+		for(var i=1;i<hist.length;i++){
+			ctx.lineTo(i*xStep,plotOpts.H-hist[i]*yScale);
+			//TODO: make it steps not a "smooth" line
+		}
         
-        //TODO: implement plotting
-        
+		ctx.strokeStyle="red";
+		ctx.stroke();
         return $canvas;
     }
     
@@ -82,7 +96,12 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
             
         if(!show)
             return; //we only render when we want to see them
-            
+         
+		if(isNewCut){
+			renderState.generation = [];
+			renderState.maxDeltaT = [];
+		}
+		
 		for(var s=0;s<newlyInvalidatedSlots.length;s++)if(newlyInvalidatedSlots[s]){
 			var slot_s = cCut.GetImmutableSlot(s);
 			

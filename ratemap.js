@@ -147,6 +147,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
         if(!mapIsOn[0])
             return; //we only render ratemps when we want to see them
             
+		if(isNewCut){
+			renderState.generation = [];
+			renderState.binSize = [];
+		}
+		
 		//for each cutGroup it builds a spikeCount map, smooths it, divides by the dwell count, applies a colorpalette to the result and outputs a matrix to be used as image data.
 		//For each cutGroup the peak rate is stored in an array and output at the end as a single list.
 		//by output here we mean postmessage

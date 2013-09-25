@@ -82,7 +82,7 @@ T.FinishedLoadingFile = function(status,filetype){
 
 	if(filetype == "tet"){
 		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
-		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
+		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
 		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV and T.TC to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
 			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
@@ -96,7 +96,7 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == "pos")
 		T.PlotPos();
 
-	if(status.pos >=2 && status.tet >= 2 && status.set >=2){
+	if(status.pos >=2 && status.tet >= 2 && status.set >=2 && (filetype == 'pos' || filetype == 'set' || filetype == 'tet')){
 		T.SetupRatemaps();
 		if(status.cut == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.WV to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
