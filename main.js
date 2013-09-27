@@ -96,6 +96,9 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == "pos")
 		T.PlotPos();
 
+	if(filetype == null && status.tet < 2)
+		T.TC.LoadTetrodeData(0);
+		
 	if(status.pos >=2 && status.tet >= 2 && status.set >=2 && (filetype == 'pos' || filetype == 'set' || filetype == 'tet')){
 		T.SetupRatemaps();
 		if(status.cut == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.WV to accept it now

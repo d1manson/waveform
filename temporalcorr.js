@@ -1,13 +1,12 @@
 "use strict";
 
 T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
-	//TODO: there is an inefficiency in the worker-main communication.  It might be better to get the worker to actually keep a copy of each slot rather than send a copy each call.
-	//otherwise we might be sending loads of copies of the same cutInds data.
-	
+	//TODO: debug latest modification which is the switch to using a BridgedWorker and dealing with most of the re-rendering desciions in the woker
+
 	// === WORKER ==================================================
-	var myWorker = BuildWorker(function(){
+	var workerFunction = function(){
 		"use strict";
-		
+
 		// Some functions copied (and simplified) from Mlib.js and utils.js
 		var Swap32 = function(val) {
 			return   ((val & 0xFF) << 24)
@@ -41,19 +40,67 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			return m; 
         }
 		// ==============================================
-		
+
 		var allSpikeTimes = null;
 		var histTimer = null; 
-		var histSlotQueue = []; //holds a queue of which slots need to be sent to GetGroupHist_sync
-		var histSlotArgs = []; //holds the arguments for the GetGroupHist_sync function, indexed by slot number
-		
+		var slots = [];
+		var histSlotQueue = []; //holds a queue of which slotsInds need to be sent to GetGroupHist
+		var nBins = 100;
+		var desiredMaxDeltaT = 500;
+        var binSize = desiredMaxDeltaT / nBins; //gets updated when we change desiredMaxDeltaT
+        
+		var SetImmutable = function(inds,slotInd,generation){
+			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,maxDeltaT:null};
+            QueueSlot(slotInd);
+		}
+
+		var NewCut = function(){
+			slots = [];
+			ClearQueue();
+		}
+
+		var SetMaxDeltaT = function(v){
+			if(v == desiredMaxDeltaT)
+                return; //no point doing anything if the value isn't new
+                
+            ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for this maxDeltaT, but in that case there would be no reason to compute them
+			desiredMaxDeltaT = v;
+            binSize = desiredMaxDeltaT / nBins;
+			for(var i=0;i<slots.length;i++)if(slots[i] &&  slots[i].maxDeltaT != desiredMaxDeltaT)
+				QueueSlot(i);
+		}
+
+		var QueueTick = function(){
+            var s = histSlotQueue.shift(); 
+            while(!slots[s] && histSlotQueue.length)
+                s = histSlotQueue.shift(); 
+			if(slots[s])
+                GetGroupHist(slots[s]);
+			histTimer  = histSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
+            //TODO: may want to time the hist call and potentially do more within this tick
+		}
+
+		var QueueSlot = function(slotInd){
+			if(histSlotQueue.indexOf(slotInd) == -1)
+				histSlotQueue.push(slotInd);
+			if(!histTimer)
+				histTimer = setTimeout(QueueTick,1);
+		}
+
+		var ClearQueue = function(){
+			clearTimeout(histTimer);
+            histTimer = 0;
+			histSlotQueue = [];
+		}
+
 		var CreateAllSpikeTimes = function(buffer,N_val,timebase,BYTES_PER_SPIKE){	
-			CancelAll();
+			ClearQueue();
+			NewCut();
 			if(!N_val){
 				allSpikeTimes = null;
 				return;
 			}
-			
+
 			var oldData = new Int32Array(buffer);
 			allSpikeTimes = new Uint32Array(N_val);
 
@@ -63,122 +110,85 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			if (endian == 'L') 
 				for(var i=0;i<N_val; i++)
 					allSpikeTimes[i] = Swap32(allSpikeTimes[i]);
-			
+
 			timebase/= 1000; //get it in miliseconds
 			for(var i=0;i<N_val;i++)
 				allSpikeTimes[i] /= timebase;
-				
+
 		}
-        
-		var GetGroupHist_sync = function(cutIndsBuffer,slotInd,maxDeltaT,generation,binSize){
+
+		var GetGroupHist = function(slot){
 			if(allSpikeTimes == null)
-				throw('GetGroupHist called before CreateAllSpikeTimes');
-			
-			var cutInds = new Uint32Array(cutIndsBuffer);
-			
+				return;
+
+			var cutInds = slot.inds;
+
 			// note maxDeltaT and allSpikeTimes should be in the same units, represented as uin32s.
 			var spikeTimes = new Uint32Array(cutInds.length);
 			for(var i=0;i<cutInds.length;i++)
 				spikeTimes[i] = allSpikeTimes[cutInds[i]]
-				
+
 			sort(spikeTimes);
 			var diffs = [];
-			
+
 			// For every pair of spikes separated in time by no more than maxDeltaT, record
 			// the time separation in the diffs array.
 			for(var laterInd=1, earlierInd = 0;laterInd<spikeTimes.length;laterInd++){
 				var laterTime = spikeTimes[laterInd];
-				while (spikeTimes[earlierInd] < laterTime - maxDeltaT)
+				while (spikeTimes[earlierInd] < laterTime - desiredMaxDeltaT)
 					earlierInd++;
 				for(var i=earlierInd;i<laterInd;i++)
 					diffs.push(laterTime - spikeTimes[i]);
 			}
-			
+
 			var diffs = new Uint16Array(diffs);
 			rDivide(diffs,binSize); //in-place integer division does a = floor(a/b)
-			
+
 			var ret = hist(diffs);	
 			//ret[0] += cutInds.length; //to take acount of the self difference for each spike
-			
-			self.postMessage({foo:"PlotHist",args:[ret.buffer,slotInd,maxDeltaT,generation]},[ret.buffer])
+			slot.maxDeltaT = desiredMaxDeltaT;
+			main.PlotHist(ret.buffer,slot.num,desiredMaxDeltaT,slot.generation,[ret.buffer]);
 
 		}
-		
-		var GetGroupHist = function(buffer,slotInd,maxDeltaT,generation,binSize){
-			//rather than directly call the GetGroupHist_sync function, we create a queue of calls to the function and execute them 
-			//asynchrounsly with setInterval.  This means we can cancel the queue by stopping the timer.
-			if(!histSlotArgs[slotInd])
-				histSlotQueue.push(slotInd); //if this slot is already in the queue then we will just assign new args
-				
-			histSlotArgs[slotInd] = arguments;
-			
-			if(!histTimer){
-				setInterval(function(){
-					var s = histSlotQueue.shift();
-					GetGroupHist_sync.apply(null,histSlotArgs[s]);
-					histSlotArgs[s] = null;
-					if(histSlotQueue.length == 0)
-						clearInterval(histTimer);
-				},1);
-			}
-		}
-		
-		var CancelAll = function(){
-			clearInterval(histTimer);
-			histSlotQueue = [];
-			histSlotArgs = [];
-		}
-		
-		var myFoos = {	CreateAllSpikeTimes: CreateAllSpikeTimes, 
-						GetGroupHist: GetGroupHist, 
-						CancelAll: CancelAll };
-		self.onmessage = function(e){ myFoos[e.data.foo].apply(null,e.data.args); } //main thread has requested that the worker call function foo with arguments args
-		
-	});
-	
+
+	};
+
+
 	// ==== END WORKER =========================================================
-	
-    var plotOpts = function(){
-		var p = {W: 100, H: 50};
-		p.nBins = p.W; //I think you may get one extra due to zero bin..dunno?
-		return p;
-	}();
-	
+
+    var plotOpts =  {W: 100, H: 50}; //see also binSize in worker
+
 	var cCut = null;
 	var show = false;
-	var renderState = {generation: [],
-						maxDeltaT: [], 
-					   desiredMaxDeltaT: 500} //miliseconds
-					   
-					   
-	
+	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
+
+
 	var LoadTetrodeData = function(N_val, buffer,timebase){
 		cCut = null;
-		renderState.generation = [];
-		renderState.maxDeltaT = [];
-		
+        workerSlotGeneration = [];
+
 		if(!N_val){
-			myWorker.postMessage({foo: "CreateAllSpikeTimes", args: []}); //among other things this cancels any queued histing
+			theWorker.CreateAllSpikeTimes(null) //among other things this cancels any queued histing
 			//TODO: decide whether we need to send null canvases
 			return;
 		}
-		
+
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
-		myWorker.postMessage({foo: "CreateAllSpikeTimes", args: [buffer, N_val, timebase, BYTES_PER_SPIKE]},[buffer]);
-		
+		theWorker.CreateAllSpikeTimes(buffer, N_val, timebase, BYTES_PER_SPIKE,[buffer]);
+
 		// A subtle, but important, point is that because messages on the worker are processed in order we don't need to wait for the createspikes to have completed
 		// before we post a GetGroupHist request (in fact the worker doesn't bother to inform us when it's done with the above call it just sits there waiting to process
 		// the next thing in the message queue).  Also, because the GetGroupHist function is executed asynchrously on the worker we are able to cancel the queue.
 	}
-	
+
 	var PlotHist = function(histBuffer,slotInd,maxDeltaT,generation){
 		var hist = new Uint32Array(histBuffer);
         var $canvas = $("<canvas width='" + plotOpts.W + "' height='" + plotOpts.H + "' />");
         var ctx = $canvas.get(0).getContext('2d');
-        
-		var xStep = plotOpts.W/plotOpts.nBins;
+
+		var xStep = plotOpts.W/(hist.length-1); //the last bin has fewer points due to rounding or something (I think?)
 		var yScale = plotOpts.H/M.max(hist);
-		
+
 		ctx.beginPath();
 		ctx.moveTo(0,plotOpts.H-hist[0]*yScale)
 		for(var i=1;i<hist.length;i++){
@@ -187,86 +197,79 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		}
 		ctx.strokeStyle="red";
 		ctx.stroke();
-		
+
 		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
-		renderState.maxDeltaT[slotInd] = maxDeltaT;
-		renderState.generation[slotInd] = generation;
     }
-    
+
     var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
-		
+
         if(cut == null && cCut == null)
             throw(new Error ("SlotsInvalidated temporalcorr with null cut"));
-        
+
         if(cut != null)
             cCut = cut;
-            
+
         if(!show)
             return; //we only render when we want to see them
-         
+
 		if(isNewCut){
-			renderState.generation = [];
-			renderState.maxDeltaT = [];
+			workerSlotGeneration.generation = [];
+			theWorker.NewCut();
 		}
-		
-		var binSize = renderState.desiredMaxDeltaT/plotOpts.nBins;
-		
+
+
 		for(var s=0;s<newlyInvalidatedSlots.length;s++)if(newlyInvalidatedSlots[s]){
 			var slot_s = cCut.GetImmutableSlot(s);
-			
+
             if(!slot_s.inds || slot_s.inds.length == 0){
-                if(!isNaN(renderState.generation[s])){
+                if(isNum(workerSlotGeneration[s])){
                     CanvasUpdateCallback(s,TILE_CANVAS_NUM,null); 
-                    renderState.generation[s] = NaN; 
+                    theWorker.SetImmutable(s,null);
+                    workerSlotGeneration[s] = null; 
                 }
                 continue; // immutable is empty or deleted
             }
-            
-            if(renderState.generation[s] == slot_s.generation && renderState.maxDeltaT[s] == renderState.desiredMaxDeltaT)
-				continue; //immutable has already been rendered with the requested maxDeltaT
-            
+
+            if(workerSlotGeneration[s] == slot_s.generation)
+				continue; //worker already has this slot, there is no reason to send it again here
+
 			var inds = M.clone(slot_s.inds); //we need to clone these before transfering them, in order to keep a copy on this thread
-			myWorker.postMessage({foo:"GetGroupHist",args:[inds.buffer,s,renderState.desiredMaxDeltaT,slot_s.generation,binSize]},[inds.buffer]);
+			theWorker.SetImmutable(inds.buffer,s,s,slot_s.generation,[inds.buffer]);
 			// Worker will hopefully come back with a PlotHist(hist,...) event 
 		}
 
 	}
 
-    var InvalidateAll = function(){
-		if(!cCut)
-			return;
-		SlotsInvalidated(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
-	}
-	
+
 	var SetShow = function(v){
 		if(show ==v)
 			return;
 		show = v;
+        if(!cCut)
+            return;
 		if(v){
-			InvalidateAll();
+        	SlotsInvalidated(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
 		}else{
-			for(var i=0;i<renderState.generation.length;i++)
+			for(var i=0;i<workerSlotGeneration.length;i++)
 				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
-			renderState.generation = [];
-			renderState.maxDeltaT = []; 
+			workerSlotGeneration = [];
+			theWorker.NewCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
 		}
 	}
-	
+
 	var SetDeltaT = function(v){
-		if(renderState.desiredMaxDeltaT == v)
-			return;
-		renderState.desiredMaxDeltaT = v;
-		InvalidateAll();
+		theWorker.SetMaxDeltaT(v); //the worker will send back one hist for each slot that it has previously been sent
 	}
-	
-	var myFoos = {PlotHist: PlotHist};
-	myWorker.onmessage = function(e){ myFoos[e.data.foo].apply(null,e.data.args); } //worker has requested that the main thread call function foo with arguments args
-	
+
+
+	var theWorker = BuildBridgedWorker(workerFunction,["CreateAllSpikeTimes*","SetImmutable*","NewCut","SetMaxDeltaT"],["PlotHist*"],[PlotHist]);
+	console.log("tmporalcorr BridgeWorker is:\n  " + theWorker.blobURL);
+
     return {
 		SlotsInvalidated: SlotsInvalidated,
 		SetShow: SetShow,
 		SetDeltaT: SetDeltaT,
 		LoadTetrodeData: LoadTetrodeData
     };
-    
+
 }(T.BYTES_PER_SPIKE,T.CutSlotCanvasUpdate, 2);
