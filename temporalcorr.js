@@ -1,7 +1,6 @@
 "use strict";
 
 T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
-	//TODO: debug latest modification which is the switch to using a BridgedWorker and dealing with most of the re-rendering desciions in the woker
 
 	// === WORKER ==================================================
 	var workerFunction = function(){
@@ -34,6 +33,8 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			return counts;
 		}
 		var max = function(X){
+			if(X.length == 0)
+				return -Infinity;
 			var m = X[0];
 			for(var i = 1;i< X.length; i++)
 				(m < X[i]) && (m = X[i])
@@ -187,12 +188,12 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
         var ctx = $canvas.get(0).getContext('2d');
 
 		var xStep = plotOpts.W/(hist.length-1); //the last bin has fewer points due to rounding or something (I think?)
-		var yScale = plotOpts.H/M.max(hist);
+		var yScale = (plotOpts.H-1)/M.max(hist);
 
 		ctx.beginPath();
-		ctx.moveTo(0,plotOpts.H-hist[0]*yScale)
+		ctx.moveTo(0,plotOpts.H-hist[0]*yScale -1)
 		for(var i=1;i<hist.length;i++){
-			ctx.lineTo(i*xStep,plotOpts.H-hist[i]*yScale);
+			ctx.lineTo(i*xStep,plotOpts.H-hist[i]*yScale -1);
 			//TODO: make it steps not a "smooth" line
 		}
 		ctx.strokeStyle="red";
@@ -235,6 +236,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 			var inds = M.clone(slot_s.inds); //we need to clone these before transfering them, in order to keep a copy on this thread
 			theWorker.SetImmutable(inds.buffer,s,s,slot_s.generation,[inds.buffer]);
+			workerSlotGeneration[s] = slot_s.generation;
 			// Worker will hopefully come back with a PlotHist(hist,...) event 
 		}
 
