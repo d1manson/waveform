@@ -10,7 +10,7 @@ T.binSizeCm = 2.5;
 
 T.BYTES_PER_SPIKE = 4*(4 + 50);
 T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2);//the last two uint16s are numpix1 and bnumpix2 repeated
-T.POS_NAN = 1023;
+T.POS_NAN = 1023; 
 
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
@@ -72,39 +72,44 @@ T.FinishedLoadingFile = function(status,filetype){
 
 	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
 
-	if(filetype == null && status.tet != 3)
-		T.WV.LoadTetrodeData(null);	
-
-	if(filetype == null && status.cut < 3){
-		T.ClearAllTiles();
-		T.CutActionCallback(null,{num:0,type:"load",description:"no active cut"});
+	if(filetype == null){
+		if(status.tet < 3){
+			T.WV.LoadTetrodeData(null);	
+			T.RM.LoadTetData(null);
+			T.TC.LoadTetrodeData(0);
+			T.PlotPos();
+		}
+		if(status.cut < 3){
+			T.ClearAllTiles();
+			T.CutActionCallback(null,{num:0,type:"load",description:"no active cut"});
+		}
+		if(status.pos < 3){
+			T.RM.LoadPosData(null);
+			T.PlotPos();
+		}
 	}
-
+	
 	if(filetype == "tet"){
 		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
 		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
-		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV and T.TC to accept it now
+		T.RM.LoadTetData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
+		
+		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV, T.TC, and T.RM to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
 			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
+			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
 		}
 	}
 
-	if(filetype == null && (status.pos != 3 || status.tet != 3)){
+	if(filetype == "pos"){
 		T.PlotPos();
-		T.RM.ClearAll();
-	}
-	if(filetype == "pos")
-		T.PlotPos();
-
-	if(filetype == null && status.tet < 2)
-		T.TC.LoadTetrodeData(0);
-		
-	if(status.pos >=2 && status.tet >= 2 && status.set >=2 && (filetype == 'pos' || filetype == 'set' || filetype == 'tet')){
-		T.SetupRatemaps();
-		if(status.cut == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.WV to accept it now
+		var posHeader = T.ORG.GetPosHeader();
+		T.RM.LoadPosData(parseInt(posHeader.num_pos_samples), T.ORG.GetPosBuffer(),parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre));
+		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.RM to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
+		}
 	}
-
+		
 	//note that cut is mainly dealt with separetly by the callbacks registered with the T.CUT module
 }
 
@@ -148,7 +153,7 @@ T.SetDisplayIsOn = function(v){
 		T.mapIsOn = v.mapIsOn; //array of 1
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
 			T.$chanButton_.eq(T.DISPLAY_ISON.RM_[i]).prop('checked',T.mapIsOn[i])
-		T.RM.ShowMaps(T.mapIsOn);
+		T.RM.SetShow(T.mapIsOn);
 	}
 	
 	if('tAutocorrIsOn' in v){
@@ -226,18 +231,10 @@ T.ApplyRmSizeClick = function(){
 	T.$rm_bin_size.val(new_scale);
 	T.binSizeCm = new_scale;
 
-	//TODO: this is a bit clumsy, isn't there a better way?
-	T.RM.ClearAll();
-	T.SetupRatemaps();
-	T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
+	T.RM.SetCmPerBin(new_scale);
 }
 
-T.SetupRatemaps = function(){
-	var posHeader = T.ORG.GetPosHeader();
 
-	T.RM.Setup(T.ORG.GetTetBuffer(),T.ORG.GetPosBuffer(),T.ORG.GetN(),parseInt(posHeader.num_pos_samples),
-		parseInt(T.ORG.GetTetHeader().timebase),parseInt(posHeader.sample_rate),parseInt(posHeader.pixels_per_metre),T.binSizeCm);
-}
 
 T.ApplyCanvasSizes = function(){
 	
@@ -396,11 +393,11 @@ T.DocumentReady = function(){
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$rm_bin_size.val(T.binSizeCm);
 		T.$size_input.val(T.xFactor);
-
+		
 		//TODO: load files into T.cut instances
 
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn)});
-		
+		T.RM.SetCmPerBin(T.binSizeCm);
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
 

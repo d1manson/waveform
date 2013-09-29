@@ -25,9 +25,9 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			for(var i=0;i<x.length;i++)
 				x[i] /= d; //if x is integer this division will give the floor of x/d
 		}
-		var hist = function(inds){
-		    var S = max(inds) + 1; //zero-based indexing, remember!
-			var counts = new Uint32Array(S);
+		var hist = function(inds,maxInd){
+    		var counts = new Uint32Array(maxInd+1);//+1 for zeroth index
+		
 			for(var i=0;i<inds.length;i++)
 				counts[inds[i]]++;
 			return counts;
@@ -49,7 +49,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var nBins = 100;
 		var desiredMaxDeltaT = 500;
         var binSize = desiredMaxDeltaT / nBins; //gets updated when we change desiredMaxDeltaT
-        
+
 		var SetImmutable = function(inds,slotInd,generation){
 			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,maxDeltaT:null};
             QueueSlot(slotInd);
@@ -63,7 +63,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var SetMaxDeltaT = function(v){
 			if(v == desiredMaxDeltaT)
                 return; //no point doing anything if the value isn't new
-                
+
             ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for this maxDeltaT, but in that case there would be no reason to compute them
 			desiredMaxDeltaT = v;
             binSize = desiredMaxDeltaT / nBins;
@@ -145,7 +145,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			var diffs = new Uint16Array(diffs);
 			rDivide(diffs,binSize); //in-place integer division does a = floor(a/b)
 
-			var ret = hist(diffs);	
+			var ret = hist(diffs,Math.floor(desiredMaxDeltaT/binSize));	
 			//ret[0] += cutInds.length; //to take acount of the self difference for each spike
 			slot.maxDeltaT = desiredMaxDeltaT;
 			main.PlotHist(ret.buffer,slot.num,desiredMaxDeltaT,slot.generation,[ret.buffer]);
@@ -188,14 +188,19 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
         var ctx = $canvas.get(0).getContext('2d');
 
 		var xStep = plotOpts.W/(hist.length-1); //the last bin has fewer points due to rounding or something (I think?)
-		var yScale = (plotOpts.H-1)/M.max(hist);
-
-		ctx.beginPath();
-		ctx.moveTo(0,plotOpts.H-hist[0]*yScale -1)
-		for(var i=1;i<hist.length;i++){
-			ctx.lineTo(i*xStep,plotOpts.H-hist[i]*yScale -1);
-			//TODO: make it steps not a "smooth" line
-		}
+		var maxCount = M.max(hist);
+    	ctx.beginPath();
+        if(maxCount == 0){
+            ctx.moveTo(0,plotOpts.H-1);
+            ctx.lineTo(plotOpts.W,plotOpts.H-1);
+        }else{
+            var yScale = (plotOpts.H-1)/maxCount;
+    		ctx.moveTo(0,plotOpts.H-hist[0]*yScale -1)
+    		for(var i=1;i<hist.length;i++){
+    			ctx.lineTo(i*xStep,plotOpts.H-hist[i]*yScale -1);
+    			//TODO: make it steps not a "smooth" line
+    		}
+        }
 		ctx.strokeStyle="red";
 		ctx.stroke();
 
@@ -214,7 +219,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
             return; //we only render when we want to see them
 
 		if(isNewCut){
-			workerSlotGeneration.generation = [];
+			workerSlotGeneration = [];
 			theWorker.NewCut();
 		}
 
