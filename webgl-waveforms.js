@@ -319,12 +319,19 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var chanIsToBeRendered = [0,0,0,0]; // We render only those channels that do not yet have (the correct) images, but this is not slot-specific. 
 											// In other words, even if only one slot is missing a given channel, we still end up rendering that channel for all slots in the list.
 		var slotsToRender = []; //slot objects which are chosen to be rendered on this particular run of the Render function
-		var canvasContexts = []; //elements in this array correspond to the slotsToRender array.  Gives the 2d contexts to each of the canvases on which we are to render.
+		var slotsCopyPasted = []; //slot objects which didn't need to be re-rendered, but still have a new canvas consisting of sections copied and pasted from the old canvas
+		var canvasContexts = []; //elements in this array correspond to the slots.  Gives the 2d contexts to each of the canvases on which we are to render or copy/paste.
 		var nDesiredChannels = M.sum(r.desiredChannels);
 
+		// given the desiredChannels, work out what the x offsets should be for each channel in each rendered group (we may not need this till after the main loop below)
+		var xOff = Array(r.desiredChannels.length + 1);
+		xOff[0] = 0;
+		for(var c=0;c<r.desiredChannels.length;c++)
+			xOff[c+1] = xOff[c] + (r.desiredChannels[c]? offCanv.waveW : 0);
+			
 		for(var i=r.firstInd;i<r.nSlots;i++,r.firstInd++)if(r.invalidatedSlots[i]){ //for all slots that have been invalidated...
 
-			if(false /*TODO: need to check if the slotsToRender array is full*/)
+			if(slotsToRender.length == offCanv.xOffsets.length)
 				break;  // because r.firstInd is incremented along with i, next time the Render function is called we will carry on from this iteration
 
 			var s = cCut.GetImmutableSlot(i); //get the latest info on the slot
@@ -346,7 +353,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 				slotsToRender.push(s); //we need to render this slot
 				// create a new canvas of the right size and update all associated properties to reflect the fact the canvas is empty...
 				r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
-				canvasContexts.push(r.$canvases[i] .get(0).getContext('2d')); //we're going to need the 2d context for copying image data from the offscreen canvas
+				canvasContexts[i] = r.$canvases[i] .get(0).getContext('2d'); //we're going to need the 2d context for copying image data from the offscreen canvas
 				r.slotGeneration[i] = NaN;
 				r.slotColMap[i] = NaN;
 				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
@@ -356,42 +363,60 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			// If we've got passed the above two if statements it means the slot contains actual data and the last-rendered generation and colormap are still valid.
 			// So, here we only need to render channels we don't yet have.
 			var mustRenderThisSlot = 0;
-			for(var c = 0;c<chanIsToBeRendered.length;c++)if(r.desiredChannels[i] && !isNum(r.chanXOffset[i][c])){ //if channel-c is desired and we haven't yet rendered it for this slot
+			for(var c = 0;c<chanIsToBeRendered.length;c++)if(r.desiredChannels[c] && !isNum(r.chanXOffset[i][c])){ //if channel-c is desired and we haven't yet rendered it for this slot
 				chanIsToBeRendered[c] = 1; // force render of at least this channel
 				mustRenderThisSlot = 1; // we need to render this slot (see if statement below)
 			}
-			if(mustRenderThisSlot){
+			if(mustRenderThisSlot)
 				slotsToRender.push(s);	
-				// TODO: we need to copy across the good bits from the old canvas and update all the relevant arrays in r
-				r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
-				canvasContexts.push(r.$canvases[i] .get(0).getContext('2d')); //we're going to need the 2d context for copying image data from the offscreen canvas
-				r.slotGeneration[i] = NaN;
-				r.slotColMap[i] = NaN;
-				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
+			else
+				slotsCopyPasted.push(s);
+				
+			// Whether or not we need to render this slot we still need to create a new canvas and copy across any desired channels that were rendered in the old
+			//TODO: would be good to check if the exisitng canvas is exactly what we want, in which case we can continue the loop at this point
+			
+			//before we create a new canvas we need to get a copy of the old one in case we want to copy bits across
+			var $old_canvas = r.$canvases[i];
+			var oldOffsets = r.chanXOffset[i].slice(0);
+			
+			r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
+			var newCtx = r.$canvases[i] .get(0).getContext('2d');
+			canvasContexts[i] = newCtx; //we're going to need the 2d context for copying image data from the offscreen canvas
+			r.slotGeneration[i] = NaN;
+			r.slotColMap[i] = NaN;
+			r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
+			
+			//if we already have any of the desired channels rendered, we should copy them across now
+			for(var c = 0;c<chanIsToBeRendered.length;c++)if(r.desiredChannels[c] && isNum(oldOffsets[c])){
+				newCtx.drawImage($old_canvas.get(0),oldOffsets[c],0,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
+				r.chanXOffset[i][c] = xOff[c];
 			}
+			
 		}
 
 		// setup the gpu for rendering these slots
 		UploadWaveBuffer(slotsToRender); 
 
-		var xOff = Array(r.desiredChannels.length + 1);
-		xOff[0] = 0;
-		for(var c=0;c<r.desiredChannels.length;c++)
-			xOff[c+1] = xOff[c] + (r.desiredChannels[c]? offCanv.waveW : 0);
-
 		// render each of the requested channels, copying all the new images to their individual canvases
 		for(var c=0;c<chanIsToBeRendered.length;c++)if(chanIsToBeRendered[c]){
 			PerformRenderForChannel(c);
-			for(var i=0;i<slotsToRender.length;i++)
-				canvasContexts[i].drawImage(offCanv.el,offCanv.xOffsets[i],offCanv.yOffsets[i]-offCanv.waveH,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
-			//TODO: update the r arrays accordingly
+			for(var i=0;i<slotsToRender.length;i++){
+				var slot_num = slotsToRender[i].num;
+				if(isNaN(r.chanXOffset[slot_num][c])){ //we may already have copied it across
+					canvasContexts[slot_num].drawImage(offCanv.el,offCanv.xOffsets[i],offCanv.yOffsets[i]-offCanv.waveH,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
+					r.chanXOffset[slot_num][c] = xOff[c];
+				}
+			}
 		}
 
-		// trigger a CanvasUpdateCallback for each of the rendered slots
-		while(slotsToRender.length){
-			var s = slotsToRender.pop();
+		// trigger a CanvasUpdateCallback for each of the rendered and copy-pasted slots
+		var newlyPreparedSlots = slotsToRender.concat(slotsCopyPasted);
+		while(newlyPreparedSlots .length){
+			var s = newlyPreparedSlots .pop();
 			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
+			r.slotColMap[s.num] = r.desiredColormap;
+			r.slotGeneration[s.num] = s.generation;
 		}
 
 		// If there are more slots to be rendered, we need to queue another execution of this function (asynchrously)

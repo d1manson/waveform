@@ -305,13 +305,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 
 			 //for binning, we want values on interval [1 P], so use eps (lazy solution):
 			var eps = 0.0000001;
-
-			var factor = (PALETTE.length-1)/(max(map)*(1+eps));
-			var i = 0;
-
-			for(var i=0;i<map.length;i++)
-				im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1+Math.floor(map[i]*factor)];
-
+			var max_map = max(map);
+			if(max_map == 0){
+				for(var i=0;i<map.length;i++)
+					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1];
+			}else{
+				var factor = (PALETTE.length-1)/(max_map*(1+eps));
+				for(var i=0;i<map.length;i++)
+					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1+Math.floor(map[i]*factor)];
+			}
 			return im.buffer; //this is how it's going to be sent back to the main thread
 		}
 	};
