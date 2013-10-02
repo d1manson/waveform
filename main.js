@@ -179,8 +179,8 @@ T.DisplayIsOnClick = function(evt){
 
 	if(evt.ctrlKey){
 		//if ctrl key is down then at least keep the old values
-		setChans = oldChans;
-		setMaps = oldMaps;
+		setChans = oldChans.slice(0);
+		setMaps = oldMaps.slice(0);
 		setTautocorr = oldTautocorr;
 	}else{
 		//if ctr key is not down then we start with a blank slate
@@ -200,7 +200,7 @@ T.DisplayIsOnClick = function(evt){
 		setChans[i] = evt.ctrlKey ? !setChans[i] : 1;
 	}
 		
-	if(evt.ctrlKey && M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0){
+	if(evt.ctrlKey && (M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0)){
 		//if ctrl key was down and we are about to turn off the one and only display we should abort that, and keep what we had
 		setChans = oldChans; 
 		setMaps = oldMaps;

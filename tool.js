@@ -35,24 +35,29 @@ T.$tilewall.on("dblclick",".tile",T.TileDoubleClick);
 T.Tool.TileMouseDown_BeginMerger = function(event){
 	
 	var $h = $(this);
-	var offset = $h.offset();
+	var offset = $h.position();
 	var $parent = $h.parent();
-	var parentOff = $parent.offset();
-	parentOff.scrollTop = $parent.scrollTop();
 	var $p = $h.clone().attr('placeholder',true);
-	T.Tool.activeMerger = {off_left: -parentOff.left + (offset.left-event.clientX) ,
-					off_top: -parentOff.top + (offset.top-event.clientY),
-					$h: $h,
-					$parent: $parent,
-					$placeholder: $p,
-					target: null};
+	T.Tool.activeMerger = { off_left: offset.left-event.clientX,
+							off_top: offset.top-event.clientY,
+							$h: $h,
+							$parent: $parent,
+							$placeholder: $p,
+							$target: null,
+							targetOffX: null,
+							targetOffY: null,
+							extraBorderSize: -parseInt($h.css("border-left-width")),//we assume its got same borders all round
+							lastClientX: event.clientX,
+							lastClientY: event.clientY};
 	$p.insertAfter($h);
 	$h.css({position:'absolute'})
 	  .attr("moving",true); //among other things this means it no longer gets mouse events
-	T.$tilewall.attr('tilemoving',true);
-	
+	T.Tool.activeMerger.extraBorderSize += parseInt($h.css("border-left-width")); //border size should change when we apply the moving attribute
+	T.$tilewall.attr('tilemoving',true)
+				
 	//attach mousemove, mouseup handlers for document 
 	// and mousemove, mouseup, mouseenter, mouseleave for all the tiles (the placeholder and moving tiles are invisible to the mouse)
+	// and scroll for tilewall
 	$(document).mousemove(T.Tool.DocumentMouseMove_Merger)
 			   .mouseup(T.Tool.DocumentMouseUp_Merger);
 	$.each(T.tiles, function(){
@@ -60,11 +65,23 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 							  .on("mouseup",T.Tool.TileMouseUp_MergerTarget)
 							  .on("mousemove",T.Tool.TileMouseMove_MergerTarget);	
 					 });
+	T.$tilewall.on("scroll",T.Tool.DocumentMouseMove_Merger);
+	
+	T.Tool.DocumentMouseMove_Merger(); //call it now to update position
+
 }
 
 T.Tool.DocumentMouseMove_Merger = function(event){
-	var left = event.clientX + T.Tool.activeMerger.off_left;
-	var top = event.clientY + T.Tool.activeMerger.off_top + T.Tool.activeMerger.$parent.scrollTop();
+	var m = T.Tool.activeMerger;
+	
+	m.lastClientX = event && 'clientX' in event ? event.clientX : m.lastClientX;
+	m.lastClientY = event && 'clientY' in event ? event.clientY : m.lastClientY;
+	
+	if(m.$target)
+		return;
+		
+	var left = m.lastClientX + m.off_left - m.extraBorderSize;
+	var top = m.lastClientY + m.off_top + m.$parent.scrollTop() - m.extraBorderSize;
 	T.Tool.activeMerger.$h.css({left: left+'px', top:top+'px'});
 }
 T.Tool.DocumentMouseUp_Merger = function(event){
@@ -75,6 +92,7 @@ T.Tool.DocumentMouseUp_Merger = function(event){
 T.Tool.EndMerger = function(){
 	$(document).off('mousemove mouseup');
 	$.each(T.tiles, function(){this.$.off("mouseenter mouseleave mouseup mousemove")});
+	T.$tilewall.off("scroll");
 	T.Tool.activeMerger.$placeholder.remove();
 	T.Tool.activeMerger.$h.css({left: '',top:'',position:''})
 					.removeAttr('moving')
@@ -86,12 +104,26 @@ T.Tool.EndMerger = function(){
 }
 
 T.Tool.TileMouseLeaveEnter_MergerTarget = function(event){
-	if(event.type == "mouseenter")
-		T.Tool.activeMerger.$h.attr("proximate",true);
-	else
-		T.Tool.activeMerger.$h.removeAttr("proximate");
+	var m = T.Tool.activeMerger;
+	if(event.type == "mouseenter"){
+		m.$h.attr("proximate",true);
+		m.$target = $(this);
+		var pos = m.$target.position();
+		m.targetX = pos.left;
+		m.targetY = pos.top;
+	}else{
+		m.$h.removeAttr("proximate");
+		m.$target = null;
+		m.targetX = null;
+		m.targetY = null;
+	}
 }
 T.Tool.TileMouseMove_MergerTarget = function(event){
+	var m = T.Tool.activeMerger;
+	
+	var left = m.targetX - m.extraBorderSize;
+	var top = m.targetY + m.$parent.scrollTop() - m.extraBorderSize;
+	m.$h.css({left: left+'px', top: top + 'px'});
 	//TODO: snap waveforms together
 	
 	/* relevant old code ... I think?
@@ -151,7 +183,7 @@ T.TileDoubleClick_BeginSeparator = function(event){
                 .wrap($separator_first);
 	T.tiles[g+1].$.attr('separating','true')
                 .wrap($separator_second);
-	T.$tilewall.mousedown(T.Tool.TileWallMouseDown_Separating);
+	T.$rt.mousedown(T.Tool.TileWallMouseDown_Separating);
     T.Tool.separating = {g:g,n_1:n_1,n_2:n_2,increment:1,isFirst:NaN,timer:null};
 }
 

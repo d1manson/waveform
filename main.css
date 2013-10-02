@@ -122,7 +122,7 @@ min-height: 128px;
 }
 .tile[moving]{
 border-width: 10px;
-border-color: #FFAD33;
+border-color: #000;
 background: #888;
 z-index: 100;
 opacity:0.5;
@@ -149,12 +149,12 @@ text-align: center;
 background-color:rgba(255,255,255,0.5);
 border: 1px solid #FFAD33;
 }
-.tile:hover{
+.tile:hover not:[moving]{
 background: #888;
 border-color: #FFAD33;
 }
 .tile[proximate]{
-border-color: #000;
+border-color: #8F8;
 }
 .pending{
 background: #FCC;
