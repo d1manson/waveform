@@ -15,8 +15,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 	// Create an object to hold basic info about the offscreen canvas
 	var offCanv = function(){ 
 		var c = { //The following are all in units of actual pixels
-				   W: 1024, // full width 
-				   H: 1024, // full height
+				   W: 512, // full width 
+				   H: 512, // full height
 				   waveH: 128, //height of a wave
 				   dT: 2, //distance from t to t+1 on the wave
 				   waveGap: 2 } //horizontal gap between waves
@@ -28,7 +28,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		c.xOffsets = new Uint16Array(nSpaces);
 		c.yOffsets = new Uint16Array(nSpaces);
 		var i = 0;
-		for(var y= c.waveH; y<c.H; y+= c.waveH)for(var x = 0;x+c.waveW<c.W;x+= c.waveW+c.waveGap,i++){
+		for(var y= c.waveH; y<=c.H; y+= c.waveH)for(var x = 0;x+c.waveW<c.W;x+= c.waveW+c.waveGap,i++){
 				c.xOffsets[i] = x;
 				c.yOffsets[i] = y;
 		}
@@ -38,7 +38,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		c.yOffsetsInt8 = new Int8Array(nSpaces);
 		for(i=0;i<nSpaces;i++){
 			c.xOffsetsInt8[i] = c.xOffsets[i]/c.W * 255 - 128;
-			c.yOffsetsInt8[i] = 127 - c.yOffsets[i]/c.H * 255;
+			c.yOffsetsInt8[i] = 127 - c.yOffsets[i]/c.H * 255 ;
 		}
 
 		// in addition to all the coordinate stuff we also need to actually create the canvas and store a reference to it
@@ -239,7 +239,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 		// initialise gl context and program
     	gl =  ValidGL(offCanv.el.getContext("experimental-webgl"));
-        gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined); //DEBUG ONLY
+        //gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined); //DEBUG ONLY
 
         prog = gl.createProgram();	
     	gl.attachShader(prog, GetShaderFromString(VERTEX_SHADER_STR, gl.VERTEX_SHADER));
@@ -415,7 +415,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			var s = newlyPreparedSlots .pop();
 			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
-			r.slotColMap[s.num] = r.desiredColormap;
+			r.slotColMap[s.num] = r.desiredColormap; //TODO: something like this:     r.desiredColormap == -1? -1 : s.group_history.slice[-1](0);
 			r.slotGeneration[s.num] = s.generation;
 		}
 
