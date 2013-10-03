@@ -306,64 +306,73 @@ T.CreateTile = function(i){
 	var $ = T.$newTile.clone();
 	
 	$.data("group_num",i);
-    $.hide();	
 	return {$: $,
 			caption: $.find('.tile-caption')
 			}
 
 }
 
-T.SetGroupDataTiles = function(cut,invalidatedSlots,isNew){
+T.SetGroupDataTiles = function(cut,invalidatedSlots_,isNew){
 	//controls the adding, removing, rearanging, and caption-setting for tiles. (Unfortunately the logic is a bit complicated)
 
 	var maxGroupNum = cut.GetProps().G; 
-
+	var invalidatedSlots = M.clone(invalidatedSlots_); //we want our own copy for this function to modify
+	
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
 		T.$tilewall.append(t.$);
+		t.$.hide();
 		T.tiles.push(t);
 	}
 
-	var displaced_tiles = []; //if we move tiles around during the loop (see the nested "if" statement inside the loop), 
-								//we store the displaced tiles in this array so that they can be used by subsequent iterations if needed
-
+	
+	var slotCache = Array(invalidatedSlots.length); //this means we only have to call cut.GetImmutableSlot(k) once for each invalidated slot (even though we have two for loops below)
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
-		var slot_k = cut.GetImmutableSlot(k);
-		var old_tile_ind = T.cutSlotToTileMapping[k];
-
-		if(slot_k.inds == null  ||slot_k.inds.length==0 ){
-			// immutable has been cleared, it may or may not have been previosuly associated to a tile
-				if(isNum(old_tile_ind)){
-					//hide the tile if one was associated to the slot
-					T.tiles[old_tile_ind].$.hide(); 
-					T.cutSlotToTileMapping[k] = null;
-				}
-
-		}else{
-			var new_tile_ind = slot_k.group_history.slice(-1)[0];
-
-			if(isNum(old_tile_ind) && old_tile_ind != new_tile_ind){
-				// We already had a tile for this slot, now there is either a new immutable for the slot or the group on the existing immutable has changed.
-				// In both cases we need to move the tile
-				
-				// there are 3 tiles involved here:
-				displaced_tiles[new_tile_ind] = T.tiles[new_tile_ind]; //store the tile which is about to be displaced (in case we need it in a future iteration of the k-loop)
-				var movingTile = displaced_tiles[old_tile_ind] || T.tiles[old_tile_ind]; //get the tile which we want to move
-				T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
-				movingTile.$.before(T.tiles[old_tile_ind].$); 
-				T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
-				T.tiles[new_tile_ind] = movingTile; 
-				
-
-			} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
-
-			T.tiles[new_tile_ind].$.show()
-								  .data("group_num",new_tile_ind)
-			T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
-			
-			T.cutSlotToTileMapping[k] = new_tile_ind;
+		var slot_k = slotCache[k] = cut.GetImmutableSlot(k); //get the slot
+		if(slot_k.inds == null  || slot_k.inds.length==0 ){ //check if immutable has been cleared (or maybe it never contaiend anything)
+			var old_tile_ind = T.cutSlotToTileMapping[k];
+			if(isNum(old_tile_ind)){
+				//hide the tile if one was associated to the slot
+				T.tiles[old_tile_ind].$.hide(); 
+				T.cutSlotToTileMapping[k] = null;
+			}
+			invalidatedSlots[k] = 0; //by getting rid of any existing tile for the slot we have just validated this slot
 		}
 	}
+	
+	var displaced_tiles = []; //if we move tiles around during the loop we store the displaced tiles in this array so that they can be used by subsequent iterations if needed
+	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every remaining invalidated slot...
+		var slot_k = slotCache[k];
+		var new_tile_ind = slot_k.group_history.slice(-1)[0];
+		var old_tile_ind = T.cutSlotToTileMapping[k];
+		if(isNum(old_tile_ind) && old_tile_ind != new_tile_ind){
+			// We already had a tile for this slot, now there is either a new immutable for the slot or the group on the existing immutable has changed.
+			// In both cases we need to move the tile
+			
+			displaced_tiles[new_tile_ind] = T.tiles[new_tile_ind];  //store the destination group for potential use in a subsequent iteration of k-loop
+			var movingTile;
+			if(!displaced_tiles[old_tile_ind] ){ 
+				//source group has not yet been displaced, need to create a placeholder
+				movingTile = T.tiles[old_tile_ind];
+				var oldTilePlaceholder = T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
+				movingTile.$.before(oldTilePlaceholder.$); //add the placeholder 
+				oldTilePlaceholder.$.hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
+			}else{
+				//source group has already been displaced
+				movingTile = displaced_tiles[old_tile_ind];
+			}
+			T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
+			T.tiles[new_tile_ind] = movingTile; 
+			
+		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
+
+		T.tiles[new_tile_ind].$.show()
+							  .data("group_num",new_tile_ind)
+		T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
+		
+		T.cutSlotToTileMapping[k] = new_tile_ind;
+	}
+
 
 	while(T.tiles.length-1 > maxGroupNum) // if there are too many tiles, delete some (-1 becuase of group 0)
 		T.tiles.pop().$.remove();

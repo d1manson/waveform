@@ -357,8 +357,10 @@ T.CUT = function(){//class factory
 		
 		for (var i=0;i<newOrder.length;i++)if(newOrder[i] != i){
 			var k = m_old[newOrder[i]];
-			s[k].group_history.push(i); // "slot_k now refers to group i" 
-			m[i] = k;
+			if(s[k]){ //TODO: decide if this if-statement is ok, or whether it's hiding a more serious bug
+				s[k].group_history.push(i); // "slot_k now refers to group i" 
+				m[i] = k;
+			}
 			invalidatedSlots[k] = 1; //note that if newOrder[i] == i we avoid invalidating the slot
 		}
 		
