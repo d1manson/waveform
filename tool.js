@@ -10,11 +10,14 @@ T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 T.TileMouseDown = function(event){
 	$(this).toggleClass('shake',false); //clear any existing dragging animation
 	
-	if(event.button == 2 || event.ctrlKey)
-		T.Tool.TileMouseDown_BeginSplitter.call(this,event);
-	else if (event.button == 0)
-		T.Tool.TileMouseDown_BeginMerger.call(this,event);
-
+	if(T.Tool.activeSplitter && (event.button == 2 || event.ctrlKey)){
+		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
+	}else{ 
+		if(event.button == 2 || event.ctrlKey)
+			T.Tool.TileMouseDown_BeginSplitter.call(this,event);
+		else if (event.button == 0)
+			T.Tool.TileMouseDown_BeginMerger.call(this,event);
+	}
     event.preventDefault();
 }
 
@@ -124,23 +127,7 @@ T.Tool.TileMouseMove_MergerTarget = function(event){
 	var left = m.targetX - m.extraBorderSize;
 	var top = m.targetY + m.$parent.scrollTop() - m.extraBorderSize;
 	m.$h.css({left: left+'px', top: top + 'px'});
-	//TODO: snap waveforms together
 	
-	/* relevant old code ... I think?
-	T.Tool.activeMerger.target = null;
-	var pos = T.Tool.activeMerger.allTilePositions;
-	for(var i = 0;i<pos.length;i++) if(pos[i])
-		if(Math.abs(pos[i].left-left-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY && Math.abs(pos[i].top-top-T.TILE_MOVING_BORDER_WIDTH) < T.PROXIMITY){
-			T.Tool.activeMerger.target = i;
-			T.tiles[i].toggleClass('shake',false); //clear this so that it's ready to be reused if we merge
-			T.Tool.activeMerger.$h.attr('proximate',true);
-			T.Tool.activeMerger.$h.find('canvas').eq(0).css({
-								position: 'relative',
-								left: pos[i].left-left-T.TILE_MOVING_BORDER_WIDTH + 'px', 
-								top: pos[i].top-top-T.TILE_MOVING_BORDER_WIDTH + 'px'});
-			return;
-		}
-	*/
 }
 T.Tool.TileMouseUp_MergerTarget = function(event){
 	//Successful merger
@@ -161,7 +148,143 @@ T.Tool.TileMouseUp_MergerTarget = function(event){
 
 
 	
-/* ========================= SEPARATOR ================== */
+	
+	
+	
+	
+	
+/* =================== SPLITTER =================== */
+T.Tool.TileMouseDown_BeginSplitter = function(event){
+
+	var $this = $(this);
+	var g = $this.data('group_num');
+	var $waveCanvas = $this.find('canvas').eq(T.CANVAS_NUM_WAVE);
+
+	var offset = $waveCanvas.offset(); 
+	var x = event.pageX - offset.left;
+	var y = event.pageY - offset.top;
+	var w = $waveCanvas.width();
+	if (x > w) //TODO: what about y?
+		return; //didn't actually click the canvas
+		
+	var pos = $waveCanvas.position();
+	var cut = T.ORG.GetCut();
+	var srcCutInds = cut.GetGroup(g);
+	
+	var $svg_a = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
+	
+	T.Tool.activeSplitter = {usedCtrl: event.button != 2,
+							 a: g,
+							 b: g+1,
+							 srcCutInds: srcCutInds,
+							 $svg_a: $svg_a,
+							 $svg_b: null,
+							 $a: $waveCanvas, //TODO: on all events need to test if $(this) is the parent of $a or $b, or neither (if we've updated the canvas)
+							 $b: null,
+							 cut: cut};
+
+	$.each(T.tiles,function(){this.$.attr('disabled','true');})
+	T.tiles[g].$.removeAttr('disabled')
+				.append($svg_a)
+				.on("mousemove",T.Tool.TileMouseMove_Splitter);	
+	T.$tilewall.on('mousedown',T.Tool.TileWallMouseDown_Splitter);
+	$(document).on('mouseup',T.Tool.DocumentMouseUp_Splitter);
+	event.stopPropagation();
+}
+
+T.Tool.TileMouseDown_ContinueSplitter = function(event){
+	var s = T.Tool.activeSplitter;
+	
+	// reattach the  mousemove and mouseup handlers (which get removed on mouseup)
+	T.tiles[s.a].$.on("mousemove",T.Tool.TileMouseMove_Splitter);	
+	$(document).on('mouseup',T.Tool.DocumentMouseUp_Splitter);
+	
+	T.Tool.TileMouseMove_Splitter.call(this,event); //update the location of the widgets
+	event.stopPropagation();
+}
+
+T.Tool.DocumentMouseUp_Splitter = function(event){
+	var s = T.Tool.activeSplitter;
+	T.tiles[s.a].$.off("mousemove",T.Tool.TileMouseMove_Splitter);
+	$(document).off('mouseup',T.Tool.DocumentMouseUp_Splitter);
+	event.stopPropagation();
+	
+	
+	var offset = s.$a.offset(); 
+	var pos = s.$a.position();
+	var x = event.pageX - offset.left;
+	var y = event.pageY - offset.top;
+	var waveMouseMeaning = T.WV.MouseToVandT(s.$a,x,y);
+	var splitMask = T.Tool.VIsOverThreshAtT_Splitter(s.srcCutInds,waveMouseMeaning.ch,waveMouseMeaning.t,waveMouseMeaning.v);
+	var cutSplit =	s.cut.SplitA(s.a,splitMask); //TODO: need cut.SplitA to return some kind of closure which can let us efficiently modify the split 
+	console.dir(splitMask);
+	//TODO: need to make sure both halfs of the split are not disabled after we do the call to cut.splitA
+	
+	
+}
+
+T.Tool.TileMouseMove_Splitter = function(event){
+	var s = T.Tool.activeSplitter;
+	
+	//TODO: deal with the two tiles not just one
+	var offset = s.$a.offset(); 
+	var pos = s.$a.position();
+	var x = event.pageX - offset.left;
+	var y = event.pageY - offset.top;
+	var w = s.$a.width();
+	
+	var $svg = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
+	s.$svg_a.replaceWith($svg);
+	s.$svg_a = $svg;
+
+}
+
+T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
+	
+	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
+				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+				+ "</svg>";
+	
+}
+
+T.Tool.TileWallMouseDown_Splitter = function(event){
+	var s = T.Tool.activeSplitter;
+	s.$svg_a.remove();
+	if(s.$svg_b)
+		s.$svg_b.remove(); 
+		
+	$.each(T.tiles,function(){this.$.removeAttr('disabled');});
+	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
+	T.Tool.activeSplitter = null;
+	//TODO: if it's the left button then accept the split otherwise cancel it
+}
+
+T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
+	// ch is channel, 0-3
+	// t is offset 0-49
+	// vThresh is voltage threshold to compare against the value in the file
+	// cutInds is the usual list of indicies for spikes
+		
+	var isOverThresh = new Uint8Array(cutInds.length);
+	var buffer = new Int8Array(T.ORG.GetTetBuffer());
+	for (var i=0;i<cutInds.length;i++)
+		isOverThresh[i] = buffer[T.BYTES_PER_SPIKE*cutInds[i] + ch*(50+4) + 4 + t]> vThresh ? 255 : 0;
+	
+	return isOverThresh;
+}
+
+/* =========================== */
+
+
+
+
+
+
+
+
+/* ========================= SEPARATOR ================== 
 T.TileDoubleClick_BeginSeparator = function(event){
 	var $h = $(this);
 
@@ -255,69 +378,7 @@ T.Tool.TileWallMouseDown_Separating = function(event){
 }
 	
 	
-	
-	
-	
-	
-	
-	
-/* =================== SPLITTER =================== */
-T.Tool.GetSplitter = function($tile){
-	var $w = $tile.find('.widget').eq(0);
-	if(!$w.length){
-		$w = $("<div class='widget'><div class='widget-center'></div></div>");
-		$w.mouseup(T.Tool.SplitterMouseUp);
-		$tile.append($w);
-	}
-	return $w;
-}
-
-T.Tool.SplitterMouseUp = function(event){
-	if(T.Tool.activeSplitter && event.button == 2 || T.Tool.activeSplitter.usedCtrl){
-		T.Tool.activeSplitter.$h.remove();
-		$(document).off('mousemove mouseup');
-		delete T.Tool.activeSplitter;
-	}
-}
-
-T.Tool.TileMouseDown_BeginSplitter = function(event){
-	var offset = $(this).offset();
-	var $h = T.Tool.GetSplitter($(this));
-	T.Tool.activeSplitter = {usedCtrl: event.button != 2,
-					off_left:  -offset.left,
-					off_top:  -offset.top,
-					$h: $h};
-
-	$h.toggleClass("widget-moving",true)
-	   .mousemove(T.Tool.SplitterMouseMove);
-	$(document).mousemove(T.Tool.SplitterMouseMove)
-			   .mouseup(T.Tool.SplitterMouseUp);
-	T.Tool.SplitterMouseMove(event);
-}
-
-T.Tool.SplitterMouseMove = function(event){
-	if(T.Tool.activeSplitter){
-		var left = event.pageX+ T.Tool.activeSplitter.off_left - T.WIDGET_CENTRE_RAD;
-		var top = event.pageY + T.Tool.activeSplitter.off_top - T.WIDGET_CENTRE_RAD;
-		top = top<-T.WIDGET_CENTRE_RAD?  - T.WIDGET_CENTRE_RAD : top;
-		top = top>T.CanvasOuterHeight() - T.WIDGET_CENTRE_RAD*2? T.CanvasOuterHeight()  - T.WIDGET_CENTRE_RAD*2: top;
-		left = left<-T.WIDGET_CENTRE_RAD? -T.WIDGET_CENTRE_RAD : left;
-		left = left > T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2? T.CanvasOuterWidth() -T.WIDGET_CENTRE_RAD*2: left;
-		T.Tool.activeSplitter.$h.css({top:top+'px'})
-						  .find('.widget-center').eq(0).css({left:left+'px'});
-	}
-}
-
-
-/* =========================== */
-
-
-
-
-
-
-
-
+	*/
 
 
 

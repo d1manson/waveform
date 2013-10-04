@@ -129,9 +129,9 @@ T.CUT = function(){//class factory
 		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
 		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
 		for(var i=0;i<s.length;i++)if(s[i] && s[i].group_history.slice(-1)[0] >= a){
-			s[i].group_history.push(s[i].group_history(-1)[0] + increment);
-			invalidatedSlots[i] = 1;
-			m[s[i].group_history(-1)[0]] = i;
+			s[i].group_history.push(s[i].group_history.slice(-1)[0] + increment);
+			invalidated[i] = 1;
+			m[s[i].group_history.slice(-1)[0]] = i;
 		}
 		
 		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...

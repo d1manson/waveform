@@ -14,6 +14,9 @@ T.POS_NAN = 1023;
 
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
+T.CANVAS_NUM_WAVE = 0;
+T.CANVAS_NUM_RM = 1;
+T.CANVAS_NUM_TC = 2;
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
 T.DISPLAY_ISON = {CHAN: [1,2,3,4], RM: [101], TC: 201, //value attribute in DOM
@@ -282,15 +285,15 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 		var xF = 1;
 		var yF = 1;
         switch (canvasNum){
-			case 0:
+			case T.CANVAS_NUM_WAVE:
 				xF = T.xFactor*T.SPECIAL_SCALING;
 				yF = T.yFactor*T.SPECIAL_SCALING;
 				break;
-			case 1:
+			case T.CANVAS_NUM_RM:
 				xF = T.SPECIAL_SCALING_RM;
 				yF = T.SPECIAL_SCALING_RM;
 				break;
-			case 2:
+			case T.CANVAS_NUM_TC:
 				// for temporal autocorr leave it at 1
 				break;
 		}

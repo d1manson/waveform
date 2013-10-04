@@ -413,6 +413,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 		var newlyPreparedSlots = slotsToRender.concat(slotsCopyPasted);
 		while(newlyPreparedSlots .length){
 			var s = newlyPreparedSlots .pop();
+			r.$canvases[s.num].data('slot_num',s.num);
 			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
 			r.slotColMap[s.num] = r.desiredColormap == -1? -1 : s.group_history.slice(-1)[0];
@@ -488,6 +489,23 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			InvalidateAll();
     }
 
+	var MouseToVandT = function($canvas,x,y){
+		//for a given $canvas, it returns the voltage time and channel coresponding to canvas coordinates (x,y)
+		var slot_num = $canvas.data('slot_num');
+		var r = slotRenderState;
+		
+		var xOffs = r.chanXOffset[slot_num];
+		var ch;
+		
+		for(var i=0;i<xOffs.length;i++)if(x >= xOffs[i])
+			ch = i;
+		
+		return {ch: ch,
+				t: Math.round((x-xOffs[ch])/offCanv.dT),
+				v: 127- y/offCanv.waveH*255 //TODO: check if this is exactly correct
+				};
+	}
+	
 	// The rest of the functions are fairly boring...
 
 	var FRAGMENT_SHADER_STR = [
@@ -627,8 +645,9 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			SlotsInvalidated: SlotsInvalidated,
 			SetPaletteMode: SetPaletteMode,
 			ShowChannels: ShowChannels,
-			IsReady: IsReady
+			IsReady: IsReady,
+			MouseToVandT: MouseToVandT
 			};
 
-}(T.CutSlotCanvasUpdate,0);
+}(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE);
 

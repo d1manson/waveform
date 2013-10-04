@@ -279,4 +279,4 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		LoadTetrodeData: LoadTetrodeData
     };
 
-}(T.BYTES_PER_SPIKE,T.CutSlotCanvasUpdate, 2);
+}(T.BYTES_PER_SPIKE,T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC);
