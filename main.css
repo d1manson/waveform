@@ -132,6 +132,15 @@ pointer-events: none;
 background: #8F8;
 pointer-events:none;
 }
+#works_with_chrome{
+position: absolute;
+right: 20px;
+bottom: 20px;
+text-align: right;
+}
+#works_with_chrome > img{
+vertical-align: text-top;
+}
 .tile-over{
 visibility: hidden;
 position: absolute;

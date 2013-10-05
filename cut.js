@@ -128,11 +128,12 @@ T.CUT = function(){//class factory
 		
 		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
 		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
-		for(var i=0;i<s.length;i++)if(s[i] && s[i].group_history.slice(-1)[0] >= a){
-			s[i].group_history.push(s[i].group_history.slice(-1)[0] + increment);
-			invalidated[i] = 1;
-			m[s[i].group_history.slice(-1)[0]] = i;
-		}
+		if(increment) //if increment is zero we don't need to touch the other immutables
+			for(var i=0;i<s.length;i++)if(s[i] && s[i].group_history.slice(-1)[0] >= a){ 
+				s[i].group_history.push(s[i].group_history.slice(-1)[0] + increment);
+				invalidated[i] = 1;
+				m[s[i].group_history.slice(-1)[0]] = i;
+			}
 		
 		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...
 		for(var i=2;i<arguments.length;i++)
@@ -252,6 +253,41 @@ T.CUT = function(){//class factory
 		}
 	}
 
+	var ModifySplitA = function(splitMask){
+		//if the last action on the action stack is a split, then this function will allow you to provide a different splitMask and redo the split 
+		//this is equivalent to undoing it and then redoing it with the new mask, but by using this function you avoid messing with all the other groups.
+		
+		var s = this._.actionStack.slice(-1)[0];
+		if(s.type != "split")
+			return; 
+		
+		var a = s.data[0];
+		
+		// recreate full cutInds array
+		var oldSplitMask = s.data[1];
+		var first_half = M.basic(GetGroup.call(this,a));
+		var second_half = M.basic(GetGroup.call(this,a+1));
+		var cut_a = [];
+		for (var i=0;i<splitMask.length;i++)
+			if(oldSplitMask[i])
+				cut_a.push(second_half.shift());
+			else
+				cut_a.push(first_half.shift());	
+				
+		//split the array with the new mask
+		first_half = [];
+		second_half = [];
+		for(var i=0;i<cut_a.length;i++)
+			if(splitMask[i])
+				second_half.push(cut_a[i]);
+			else
+				first_half.push(cut_a[i]);
+				
+		s.data[1] = splitMask; //store the new mask
+		var invalidatedSlots = SpliceImmutables.call(this,a,2,first_half,second_half);
+		TriggerChangeCallbacks.call(this,invalidatedSlots);
+	}
+	
 	var SplitA = function(a,splitMask){
 		var cut_a = GetGroup.call(this,a);
 		var first_half = [];
@@ -485,6 +521,7 @@ T.CUT = function(){//class factory
 	cut.prototype.AddBtoA = AddBtoA;
 	cut.prototype.SwapBandA = SwapBandA;
 	cut.prototype.SplitA = SplitA;
+	cut.prototype.ModifySplitA = ModifySplitA;
 	cut.prototype.ReorderAll = ReorderAll;
 	cut.prototype.Undo = Undo;
 	cut.prototype.ForceChangeCallback = ForceChangeCallback;
@@ -492,6 +529,7 @@ T.CUT = function(){//class factory
 	cut.prototype.GetAsVector = GetAsVector;
 	cut.prototype.GetImmutableSlot = GetImmutableSlot;
 	cut.prototype.GetNImmutables = GetNImmutables;
+	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,
 			AddChangeCallback: AddChangeCallback,

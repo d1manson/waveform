@@ -276,8 +276,8 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	//doesn't need to be re-rendered it will be in the right place.  Also, if rendering paramaters are changed the rendering modules may need
 	//to issue updated canvases without any slot-invalidation events being received by SetGroupDataTiles.
 	//slotInd matches the cut immutables slot thing, canvasNum is 0 for waveforms and 1 for ratemaps.
-
-	var t = T.tiles[T.cutSlotToTileMapping[slotInd]];
+	var g = T.cutSlotToTileMapping[slotInd];
+	var t = T.tiles[g];
 	if(!t)
 		return;
 		
@@ -303,6 +303,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	
 	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
 	
+	T.Tool.CanvasUpdated(canvasNum,$canvas,g);//sometimes the tool needs to know about the arival of a new canvas
 }
 
 T.CreateTile = function(i){
@@ -370,6 +371,7 @@ T.SetGroupDataTiles = function(cut,invalidatedSlots_,isNew){
 		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
 		T.tiles[new_tile_ind].$.show()
+							   .toggleClass('shake',false)
 							  .data("group_num",new_tile_ind)
 		T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
 		

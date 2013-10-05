@@ -32,7 +32,10 @@ T.TileDoubleClick = function(event){
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
 T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
 
-
+T.Tool.CanvasUpdated = function(canvasNum,$canvas,group){
+	if(T.Tool.activeSplitter)
+		T.Tool.CanvasUpdated_Splitter(canvasNum,$canvas,group)
+}
 /* =================== MERGER =================== */
 
 T.Tool.TileMouseDown_BeginMerger = function(event){
@@ -154,6 +157,8 @@ T.Tool.TileMouseUp_MergerTarget = function(event){
 	
 	
 /* =================== SPLITTER =================== */
+//TODO: we need to update stuff when the new tile is created, also need to do something about the user clicking undo during the split.
+	
 T.Tool.TileMouseDown_BeginSplitter = function(event){
 
 	var $this = $(this);
@@ -179,9 +184,10 @@ T.Tool.TileMouseDown_BeginSplitter = function(event){
 							 srcCutInds: srcCutInds,
 							 $svg_a: $svg_a,
 							 $svg_b: null,
-							 $a: $waveCanvas, //TODO: on all events need to test if $(this) is the parent of $a or $b, or neither (if we've updated the canvas)
+							 $a: $waveCanvas, //TODO: on all events need to test if $(this) is the parent of $a or $b, or neither (if we've updated the canvas, possibly even due to changing the view or something)
 							 $b: null,
-							 cut: cut};
+							 cut: cut,
+							 splitDone: false};
 
 	$.each(T.tiles,function(){this.$.attr('disabled','true');})
 	T.tiles[g].$.removeAttr('disabled')
@@ -216,11 +222,12 @@ T.Tool.DocumentMouseUp_Splitter = function(event){
 	var y = event.pageY - offset.top;
 	var waveMouseMeaning = T.WV.MouseToVandT(s.$a,x,y);
 	var splitMask = T.Tool.VIsOverThreshAtT_Splitter(s.srcCutInds,waveMouseMeaning.ch,waveMouseMeaning.t,waveMouseMeaning.v);
-	var cutSplit =	s.cut.SplitA(s.a,splitMask); //TODO: need cut.SplitA to return some kind of closure which can let us efficiently modify the split 
-	console.dir(splitMask);
-	//TODO: need to make sure both halfs of the split are not disabled after we do the call to cut.splitA
-	
-	
+	if(s.splitDone)
+		s.cut.ModifySplitA(splitMask); 
+	else
+		s.cut.SplitA(s.a,splitMask); 
+	s.splitDone = true;
+		
 }
 
 T.Tool.TileMouseMove_Splitter = function(event){
@@ -233,10 +240,35 @@ T.Tool.TileMouseMove_Splitter = function(event){
 	var y = event.pageY - offset.top;
 	var w = s.$a.width();
 	
-	var $svg = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
-	s.$svg_a.replaceWith($svg);
-	s.$svg_a = $svg;
+	var $svg_a = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
+	s.$svg_a.replaceWith($svg_a);
+	s.$svg_a = $svg_a;
 
+	if(s.$svg_b){
+		var $svg_b = $svg_a.clone();
+		s.$svg_b.replaceWith($svg_b);
+		s.$svg_b = $svg_b; //TODO: in theory canvas sizes could be different and thus require different svg
+	}
+}
+
+T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
+	var s = T.Tool.activeSplitter;
+	if(canvasNum != T.CANVAS_NUM_WAVE || !(group == s.a || group == s.b))
+		return;
+	
+	// Note that hopefully by moving around the $svg's means that even if tiles moved around the svgs will always end up on only the correct tiles.
+	if(group == s.a){
+		//TODO: ought to recreate svg in case of new size of canvas
+		T.tiles[s.a].$.prepend(s.$svg_a);
+		s.$a = $canvas;
+	}else{ //group == s.b
+		if(!s.$svg_b){
+			s.$svg_b = s.$svg_a.clone(); //TODO: in theory canvas sizes could be different and thus require different svg
+			//TODO: need to do the stuff for tile b|
+		}
+		T.tiles[s.b].$.prepend(s.$svg_b);
+		s.$b = $canvas;
+	}
 }
 
 T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
@@ -245,6 +277,9 @@ T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
 				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
 				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
 				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
+				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
 				+ "</svg>";
 	
 }
@@ -257,8 +292,12 @@ T.Tool.TileWallMouseDown_Splitter = function(event){
 		
 	$.each(T.tiles,function(){this.$.removeAttr('disabled');});
 	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
+	
+	if(T.Tool.activeSplitter && (event.button == 2 || event.ctrlKey))
+		s.cut.Undo();
+		
 	T.Tool.activeSplitter = null;
-	//TODO: if it's the left button then accept the split otherwise cancel it
+	event.stopPropagation();
 }
 
 T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
