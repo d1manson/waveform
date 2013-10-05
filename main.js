@@ -27,11 +27,12 @@ T.xFactor = 2;
 T.yFactor = 2;
 T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
 T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
+T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here manually
 
 T.$newTile = $("<div class='tile'>" +
-			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" + 
-			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
-			"<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>" +
+			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
+			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
+			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<div class='tile-over'><div class='tile-caption'></div></div>" + 
 			"<div class='blind'></div>" + 
 			"</div>");		//this gets cloned and appended to $tilewall
@@ -266,7 +267,18 @@ T.StoreData = function(){
 
 //for each cut slot, these two arrays track the updates applied during calls to SetGroupDataTiles
 T.cutSlotToTileMapping = [];
-//T.cutSlotGeneration = [];  //we don't care about generation here because whenever the group or immutable changes we have to update the caption regardless
+
+T.canvasUpdatedListeners = []; //this allows T.Tool (and potentially other things) to listen for new canvases
+T.AddCanvasUpdatedListener = function(foo){
+	T.canvasUpdatedListeners.push(foo);
+}
+T.RemoveCanvasUpdatedListener = function(foo){
+	for(var i=0;i<T.canvasUpdatedListeners.length;i++)if(T.canvasUpdatedListeners[i] == foo){
+		T.canvasUpdatedListeners.splice(i,1);
+		return;
+	}
+}
+
 
 T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	//this callback recieves the newly rendered canvases from the waveform rendering and ratemap rendering modules
@@ -299,11 +311,12 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 		}
 		$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
     }else
-		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
+		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 	
 	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
 	
-	T.Tool.CanvasUpdated(canvasNum,$canvas,g);//sometimes the tool needs to know about the arival of a new canvas
+	for(var i=0;i<T.canvasUpdatedListeners.length;i++)
+		T.canvasUpdatedListeners[i](canvasNum,$canvas,g);
 }
 
 T.CreateTile = function(i){
