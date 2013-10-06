@@ -1,20 +1,8 @@
 "use strict";
 
 T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
-        
-    var G_DM_Error = function(s){alert(s);};
-    var L = 1024*6;
-    var groups = 250;
-    var thresholdDist = 900;
-	var joinRatioThreshold = 1.2;
-    var chan = null;
-    var sampInds = [];
-    var remInds = [];
-    var sampLinkage = null;
-    var sampDist = null;
-    var callback;
     
-	var workerLinkage = BuildWorker(function(){
+	var workerCode = function(){
 		"use strict";
 		//Based on : http://figue.googlecode.com/svn/trunk/figue.js
 		//For an "official" paper with a very similar algorithm see the "The generic clustering algorithm" in..
@@ -22,32 +10,13 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		//		http://arxiv.org/pdf/1109.2378.pdf
 
 		var inf32 = Math.pow(2,32)-1;
-		var params = {N:0,S:0};
-		var dist;
-		function vector(n){
-			return new Uint32Array(new ArrayBuffer(n*4));
-		}
-
-		self.onmessage = function(e) {
-			var data = e.data;
-
-			if(data.N !== undefined || data.S !== undefined){
-				params.N = data.N || params.N;
-				params.S = data.S || params.S;
-			}else{
-				// otherwise data is ArrayBuffer
-				var ret = Agglomerate(params.N,new Uint16Array(data),params.S);
-				data = null; //this destroys the distance matrix entierly, since there was only ever one copy (it was passed to the worker and released from the main thread)		
-				self.postMessage(ret);
-			}
-		}
 
 		function MaskedMinSearch(X,mask,S){
 			var min_ind = 0;
 			var min_val = inf32;
 			for(var i=0; i<S; i++) if(mask[i] && X[i] < min_val){
-						min_ind = i;
-						min_val = X[i];
+				min_ind = i;
+				min_val = X[i];
 			}
 			return {val: min_val,ind: min_ind};
 		}
@@ -65,22 +34,22 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 				var S_, i, j, p, childA, childB, min_inds, min_vals, 
 					descendants, wA, wB, wAB, desA, desB,
 					global_min_val, aInd, bInd, min_ind, min_val, P, tmp, joinDist;
-
+				dist = new Uint16Array(dist); //we recieve it as just an ArrayBuffer
 				S_ = S-1;
 
 				//The result will be this list of pairs: (aInd,bInd,aDescendantCount,bDescendantCount,dist_ab)
-				childA = vector(S_);
-				childB = vector(S_);
-				desA = vector(S_);
-				desB = vector(S_);
-				joinDist = vector(S_);
+				childA =  new Uint32Array(S_);
+				childB =  new Uint32Array(S_);
+				desA =  new Uint32Array(S_);
+				desB =  new Uint32Array(S_);
+				joinDist =  new Uint32Array(S_);
 
 				// This will keep track of the minimum for each row
-				min_inds = vector(S);
-				min_vals = vector(S);
+				min_inds =  new Uint32Array(S);
+				min_vals =  new Uint32Array(S);
 
 				// This will keep track of the number of descendants for each of the elements
-				descendants = vector(S);
+				descendants = new Uint32Array(S);
 				for(i=0;i<S;i++)
 					descendants[i] = 1;
 
@@ -139,7 +108,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 
 
 				//number each leaf from 0 to S-1 and each node from S to 2S-2, and rename childA and childB to reflect this scheme
-				P = vector(S);// keep track of which node is held in each slot
+				P =  new Uint32Array(S);// keep track of which node is held in each slot
 				for(i=0;i<S;i++)
 					P[i] = i;
 
@@ -150,10 +119,29 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 					P[tmp] = i+S;
 				}	
 
-				return {aInd: childA, bInd: childB, aDescCount: desA, bDescCount: desB, dist: joinDist};
+				main.AgglomerateDone({aInd: childA.buffer,
+									  bInd: childB.buffer, 
+									  aDescCount: desA.buffer, 
+									  bDescCount: desB.buffer, 
+									  dist: joinDist.buffer},
+									  [childA.buffer,childB.buffer,desA.buffer,desB.buffer,joinDist.buffer]);
 		}
-	});
+	}
+	// ===== END WORKER CODE =====
+	
+	
 		
+	var G_DM_Error = function(s){alert(s);};
+    var L = 1024*6;
+    var groups = 250;
+    var thresholdDist = 900;
+	var joinRatioThreshold = 1.2;
+    var chan = null;
+    var sampInds = [];
+    var remInds = [];
+    var sampLinkage = null;
+    var sampDist = null;
+    var callback;
 		
     var RandomInds = function(n,k,doSort) {
     //returns an array of k unique integers in the range [0 n-1]
@@ -205,22 +193,28 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     	ComputeMatrix(newBuffer,newBuffer,L,L,wave_width_pow2,GotDistMatrix,G_DM_Error,true);
     }
     
+	    
+    var GotDistMatrix = function(dist){
+    	console.timeEnd('GPU distmat');
+        sampDist = dist;
+    	myWorker.Agglomerate(L, dist,sampInds.length,[dist]);
+    	console.time('agglomorate');    	
+    	$caption.text('linkage...');
+    }
     
-    var GotLinkage = function (e){
-    	var vector = function(len){return new Uint32Array(len);}
-    	
-    	sampLinkage = e.data;
+    var AgglomerateDone = function (e){
+    	sampLinkage = {aInd: new Uint32Array(e.aInd),  //arrays transfered as ArrayBuffers, but they need to be used as Uint32Arrays
+					   bInd: new Uint32Array(e.bInd),
+					   aDescCount: new Uint32Array(e.aDescCount),
+					   bDescCount: new Uint32Array(e.bDescCount),
+					   dist: new Uint32Array(e.dist)				};
+					 
     	console.timeEnd('agglomorate');
-    
-    	var A = sampLinkage.aInd;
-    	var B = sampLinkage.bInd;
     	
     	$caption.text('partitioning...');
-    		
-
-    	
-    	var n = sampInds.length;
-				
+    	var A = sampLinkage.aInd;
+    	var B = sampLinkage.bInd;
+    	var n = sampInds.length;				
 		var ds = sampLinkage.dist;
 		var nA = sampLinkage.aDescCount;
     	var nB = sampLinkage.bDescCount;
@@ -304,18 +298,6 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     }
     
     
-    var GotDistMatrix = function(dist){
-    	console.timeEnd('GPU distmat');
-        sampDist = dist;
-    	
-    	workerLinkage.onmessage = GotLinkage;
-    	workerLinkage.postMessage({N: L, S: sampInds.length});
-    	console.time('agglomorate');
-    	
-    	$caption.text('linkage...');
-    	workerLinkage.postMessage(dist,[dist]);
-    }
-    
 	// This last bit is for debugging only 
 	var debugCanvas = null;
 	var ImagescDist = function(){
@@ -343,6 +325,8 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 			
 		})(new Uint16Array(sampDist));
 	}
+	
+	var myWorker = BuildBridgedWorker(workerCode,["Agglomerate*"],["AgglomerateDone*"],[AgglomerateDone]);
 	
     return {
         DoAutoCut: ComputeDistMatrix,

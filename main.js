@@ -637,6 +637,12 @@ T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 
+// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
+key('p',T.TogglePalette);
+key('a',T.RunAutocut);
+key('ctrl+z',T.UndoLastAction);
+key('esc',T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
+		   
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 
