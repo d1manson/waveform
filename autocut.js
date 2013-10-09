@@ -29,7 +29,18 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 			for (var i=0; i<S; i++) if(mask[i])
 				X[i*N +aInd] = X[aInd*N +i] =  ( wA * X[aInd*N +i] + wB * X[bInd*N +i])  * inverseSumWaWb;
 		}
-					
+		
+		function MaskedMaxRowCol(X,mask,aInd,bInd,wA,wB,N,S){
+			//for a symmetrix matrix, X, it replaces column aInd and row aInd with the maximum of the data in aInd and bInd,
+			//mask is a vector, the same length as the sides of X, which specifies which entries in the row/col to modify.
+			
+			for (var i=0; i<S; i++) if(mask[i] && X[bInd*N + i] > X[aInd*N + i])
+				X[i*N +aInd] = X[aInd*N +i] = X[bInd*N + i];
+		}
+		
+		
+		var UpdateFunction = MaskedMaxRowCol; //MaskedWeightedMeanRowCol for mean, MaskedMaxRowCol for max
+		
 		function Agglomerate(N,dist,S) {
 				var S_, i, j, p, childA, childB, min_inds, min_vals, 
 					descendants, wA, wB, wAB, desA, desB,
@@ -88,8 +99,8 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 					descendants[aInd] = wA+wB;
 					descendants[bInd] = 0; //this acts as a flag in the 4 inner loops
 
-					//Overwrite row aInd and col aInd with the wieghted average of the children's dists
-					MaskedWeightedMeanRowCol(dist,descendants,aInd,bInd,wA,wB,N,S);
+					//Overwrite row aInd and col aInd with the combination of the children's dists
+					UpdateFunction(dist,descendants,aInd,bInd,wA,wB,N,S);
 					dist[aInd*N +aInd] = inf32; //set (aInd,aInd) back to inf32
 
 					//Find row-a's new minimum value and its ind
@@ -135,7 +146,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     var L = 1024*6;
     var groups = 250;
     var thresholdDist = 900;
-	var joinRatioThreshold = 1.2;
+	var joinRatioThreshold = 1.4;
     var chan = null;
     var sampInds = [];
     var remInds = [];
@@ -219,10 +230,19 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		var nA = sampLinkage.aDescCount;
     	var nB = sampLinkage.bDescCount;
 		
-		//compute "join ratio" = "new average dist" / "weighted mean of the two constituent average dists"
 		var joinRatio = new Float32Array(n-1);
+		/*
+		// when using mean for updateFunction
+		//compute "join ratio" = "new average dist" / "weighted mean of the two constituent average dists"
 		for(var i=0;i<n-1;i++)
 			joinRatio[i] = ds[i] *(nA[i] + nB[i])/(nA[i] * (A[i]<n? 0 : ds[A[i]-n]) + nB[i] * (B[i]<n? 0 : ds[B[i]-n]))
+		*/
+		
+		
+		//compute "join ratio" = "max dist within A U B " / "larger of {max dist within A, max dist within B}"
+		for(var i=0;i<n-1;i++)
+			joinRatio[i] = ds[i] / (Math.max(A[i]<n? 0 : ds[A[i]-n], B[i]<n? 0 : ds[B[i]-n]));
+		
 		
 		//find first over-threhold node
 		var start = 0;
