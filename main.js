@@ -168,20 +168,23 @@ T.SetDisplayIsOn = function(v){
 	
 }
 
-T.DisplayIsOnClick = function(evt){
+T.DisplayIsOnClick = function(evt,keyboard){
 	//displayIsOn are the 6 buttons: 4xchannel 1xratemap 1xtemporal-autocorr
 	
-	//TODO: change "Channel" in button names to reflect the fact it now includes maps
+	//TODO: change "Channel" in button names to reflect the fact it now includes maps. Also can now be called as a keyboard shortcut
+	// in which case this is not set and keyboard has the info not evt.
+	
 	//Also need to convert buttons to be actuall buttons rather than radio inputs becaues firefox doesn't permit clicking radio buttons with ctrl or alt or shift pressed (I think)
 
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
 	var oldTautocorr = T.tAutocorrIsOn;
 	
-	var thisVal =  parseInt($(this).val());
+	var thisVal = keyboard ? keyboard.val : parseInt($(this).val());
+	var shiftKey = keyboard ? keyboard.shiftKey : evt.shiftKey;
 	var setChans; var setMaps; var setTautocorr;
 
-	if(evt.ctrlKey){
+	if(shiftKey){
 		//if ctrl key is down then at least keep the old values
 		setChans = oldChans.slice(0);
 		setMaps = oldMaps.slice(0);
@@ -195,16 +198,16 @@ T.DisplayIsOnClick = function(evt){
 	
 	if(thisVal == T.DISPLAY_ISON.TC){
 		//clicked temporal autocorr button (there's no array, it's just a single button)
-		setTautocorr = evt.ctrlKey ? !setTautocorr : 1;
+		setTautocorr = shiftKey ? !setTautocorr : 1;
 	}else for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
 		//clicked the i'th ratemap button (there is currently only one available)
-		setMaps[i] = evt.ctrlKey ? !setMaps[i] : 1;
+		setMaps[i] = shiftKey ? !setMaps[i] : 1;
 	}else for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)if(thisVal == T.DISPLAY_ISON.CHAN[i]){
 		//clicked the i'th channel button (of which there are 4)
-		setChans[i] = evt.ctrlKey ? !setChans[i] : 1;
+		setChans[i] = shiftKey ? !setChans[i] : 1;
 	}
 		
-	if(evt.ctrlKey && (M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0)){
+	if(shiftKey && (M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0)){
 		//if ctrl key was down and we are about to turn off the one and only display we should abort that, and keep what we had
 		setChans = oldChans; 
 		setMaps = oldMaps;
@@ -642,7 +645,13 @@ key('p',T.TogglePalette);
 key('a',T.RunAutocut);
 key('ctrl+z',T.UndoLastAction);
 key('esc',T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
-		   
+key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
+key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
+key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],shiftKey:key.shift});});
+key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
+key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
+key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 
