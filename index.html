@@ -81,11 +81,18 @@ you can drag further files onto the window at any point<br>
 </div>
 
 <div class="side_panel_row">
-<div class="toggle_panel" id="action_panel_toggle"></div>
-<B>cut action history</B>
-<div class="collapsable_panel" id="action_panel" state="closed">
-<div class='undo' style="display:none;">Undo</div>
+	<div class="toggle_panel" id="action_panel_toggle"></div>
+	<B>cut action history</B>
+	<div class="collapsable_panel" id="action_panel" state="closed">
+		<div class='undo' style="display:none;">Undo</div>
+	</div>
 </div>
+
+<div class="side_panel_row">
+	<div class="toggle_panel" id="cluster_panel_toggle"></div>
+	<B>cluster plots</B>
+	<div class="collapsable_panel" id="cluster_panel">
+	</div>
 </div>
 
 
@@ -138,6 +145,7 @@ you can drag further files onto the window at any point<br>
 <script src="autocut.js"></script>
 
 <script src="webgl-waveforms.js"></script>
+<script src="cluster-plot.js"></script>
 
 </body>
 </html>

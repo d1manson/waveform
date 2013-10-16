@@ -130,11 +130,11 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 		}
 		
 		// This function doesn't bother doing everything it just reads the experiment name
-		var GetCutFileExpName = function(file,tet){
+		var GetCutFileExpName = function(file,tet,filename){
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
 			var match = REGEX_CUT_B.exec(fullStr);
-    		main.CutFileGotExpName(file.name,match[1],tet);
+    		main.CutFileGotExpName(filename,match[1],tet);
 		}
 		
 	};
@@ -188,7 +188,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 	
 	var GetCutExpNameWithWorker = function(file,tet,callback){
 		callbacks.push(callback);
-		theWorker.GetCutFileExpName(file,tet);
+		theWorker.GetCutFileExpName(file,tet,file.name);
 	}
 	var CutFileGotExpName = function(fileName,expName,tet){
 		callbacks.shift()(fileName,expName,"cut",tet);
@@ -204,13 +204,60 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         return callbacks.length;
     }
     
+    var GetTetrodeTime = function(buffer,header,N){ //get spike times in milliseconds as a Uint32Array 
+        var times = new Uint32Array(N);
+    	var data = new Int32Array(buffer);
+
+		for(var i=0; i<N; i++)
+			times[i] = data[BYTES_PER_SPIKE/4*i]; //we are accessing the buffer as 4byte ints, we want the first 4bytes of the i'th spike
+
+		if (endian == 'L') 
+			for(var i=0;i<N; i++)
+				times[i] = Swap32(times[i]);
+
+		var timebase = parseInt(header.timebase);
+
+		timebase /= 1000; //get it in miliseconds
+		for(var i=0;i<N;i++)
+			times[i] /= timebase;
+            
+        return times;
+    }
+    
+	//TODO: probably want to have a function here which gets waveforms from the tetrode buffer so that other modules do not need to know details of the file format
+	
+	var GetTetrodeAmplitude = function(buffer,header,N){
+		
+		var C = 4; //TODO: generalise this properly everywhere in the code
+		var W = 50; //TODO: generalise this properly everywhere in the code
+		
+		var oldData = new Int8Array(buffer);
+		var NxC = N*C;
+		var amps = new Uint8Array(NxC);
+		
+		for(var i=0,p=0;i<NxC;i++){
+			p += 4; // skip timestamp 
+			var min = 127;
+			var max = -128;
+			for(var t=0;t<W;t++,p++){
+				(oldData[p] > max) && (max = oldData[p]);
+				(oldData[p] < min) && (min = oldData[p]);
+			}
+			amps[i] = max-min; 
+		}
+
+        return amps;
+    }
+	
     return {
         LoadPos: LoadPosWithWorker,
 		LoadTetrode: LoadTetrodeWithWorker,
 		LoadSet: LoadSetWithWorker,
         LoadCut: LoadCutWithWorker,
         LoadCut2: GetCutExpNameWithWorker,
-        GetPendingParseCount: GetPendingParseCount
+        GetPendingParseCount: GetPendingParseCount,
+        GetTetrodeTime: GetTetrodeTime,
+		GetTetrodeAmplitude: GetTetrodeAmplitude
     }
     
 }(T.BYTES_PER_POS_SAMPLE,T.BYTES_PER_SPIKE)

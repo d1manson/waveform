@@ -407,34 +407,7 @@ T.ClearAllTiles = function(){
 }
 
 
-T.DocumentReady = function(){
 
-    T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
-	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
-	T.CUT.AddChangeCallback(T.WV.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.RM.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.TC.SlotsInvalidated);
-	T.CUT.AddActionCallback(T.CutActionCallback);
-
-	if(localStorage.state){
-		T.ORG.SwitchToTet(localStorage.tet || 1);
-		T.xFactor = localStorage.xFactor || 2;
-		T.yFactor = localStorage.yFactor;
-		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
-		T.$rm_bin_size.val(T.binSizeCm);
-		T.$size_input.val(T.xFactor);
-		
-		//TODO: load files into T.cut instances
-
-		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn)});
-		T.RM.SetCmPerBin(T.binSizeCm);
-		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
-			T.ToggleFS();//it starts life in the off state, so this turns it on 
-
-	}else{
-		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
-	}
-}
 
 T.ResetAndRefresh = function(){
 if (!confirm("Do you really want to clear all data and settings and reload the page?"))
@@ -558,21 +531,19 @@ T.ReorderACut = function(){
 			}
 	if(chan == -1){
 		alert("Currently you can only reorder-on-amplitude using a single channel, taking channel 1.");
-		chan = 1;
+		chan = 0;
 	}
 
 	var N = T.ORG.GetN();
-	var amps = new Uint8Array(N);	//TODO: cache amplitdues while tetrode is loaded (for all channels)
-	var buffer = new Int8Array(T.ORG.GetTetBuffer());
-	for (var i=0;i<N;i++){
-		var b = buffer.subarray(T.BYTES_PER_SPIKE*i + chan*(50+4) + 4,T.BYTES_PER_SPIKE*i + (chan+1)*54-1);
-		amps[i] = M.max(b) - M.min(b);
-	}
+	var amps = T.ORG.GetTetAmplitudes(); //we get 1a 1b 1c 1d 2a 2b ... nd, where a-d are the 4 channels
+	var amps_chan = new Uint16Array(N); //but we only want one channel
+	for(var i=0;i<N;i++)
+		amps_chan[i] = amps[i*4 + chan];
+		
+	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps_chan,"mean");
 
-	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps,"mean");
-
-	//TODO: I think there will be a bug if there are any empty groups beyond the end of the last occupied group, need to do an identity transformation for the end or something
-
+	//TODO: I think there will be a bug if there are any empty groups beyond the end of the last occupied group, 
+	
 	var groups = []; //we build an array of (ind,amp) pairs that we can then sort by <amp>.
 	for(var i=0;i<mean_amps.length;i++)
 		groups.push({ind: i,
@@ -610,6 +581,36 @@ T.UndoLastAction = function(){
 	T.ORG.GetCut().Undo();
 }
 
+T.DocumentReady = function(){
+
+    T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
+	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
+	T.CUT.AddChangeCallback(T.WV.SlotsInvalidated);
+	T.CUT.AddChangeCallback(T.RM.SlotsInvalidated);
+	T.CUT.AddChangeCallback(T.TC.SlotsInvalidated);
+	T.CUT.AddChangeCallback(T.CP.SlotsInvalidated);
+	T.CUT.AddActionCallback(T.CutActionCallback);
+
+	if(localStorage.state){
+		T.ORG.SwitchToTet(localStorage.tet || 1);
+		T.xFactor = localStorage.xFactor || 2;
+		T.yFactor = localStorage.yFactor;
+		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
+		T.$rm_bin_size.val(T.binSizeCm);
+		T.$size_input.val(T.xFactor);
+		
+		//TODO: load files into T.cut instances
+
+		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn)});
+		T.RM.SetCmPerBin(T.binSizeCm);
+		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
+			T.ToggleFS();//it starts life in the off state, so this turns it on 
+
+	}else{
+		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
+	}
+}
+
 $('.help_button').each(function(){$(this).click(T.ShowHelp);});
 $('#apply_size').click(T.ApplySizeClick);
 T.$size_input = $('#size_input');
@@ -627,6 +628,7 @@ T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
 $('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
 $('#action_panel_toggle').click(T.ToggleElementState(T.$action_panel));
 $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
+$('#cluster_panel_toggle').click(T.ToggleElementState($('#cluster_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
 $('#reset_button').click(T.ResetAndRefresh);

@@ -190,6 +190,7 @@ T.Tool.TileMouseDown_BeginSplitter = function(event){
 
 	$.each(T.tiles,function(){this.$.attr('disabled','true');})
 	T.tiles[g].$.removeAttr('disabled')
+				.attr('splitting','true')
 				.append($svg_a)
 				.on("mousemove",T.Tool.TileMouseMove_Splitter);	
 	T.$tilewall.on('mousedown',T.Tool.TileWallMouseDown_Splitter);
@@ -263,14 +264,16 @@ T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 	// Note that hopefully by moving around the $svg's means that even if tiles moved around the svgs will always end up on only the correct tiles.
 	if(group == s.a){
 		//TODO: ought to recreate svg in case of new size of canvas
-		T.tiles[s.a].$.prepend(s.$svg_a);
+		T.tiles[s.a].$.prepend(s.$svg_a)
+					  .attr('splitting','true');
 		s.$a = $canvas;
 	}else{ //group == s.b
 		if(!s.$svg_b){
 			s.$svg_b = s.$svg_a.clone(); //TODO: in theory canvas sizes could be different and thus require different svg
 			T.tiles[s.b].$.removeAttr('disabled');
 		}
-		T.tiles[s.b].$.prepend(s.$svg_b);
+		T.tiles[s.b].$.prepend(s.$svg_b)
+					   .attr('splitting','true');
 		
 		s.$b = $canvas;
 	}
@@ -294,7 +297,10 @@ T.Tool.TileWallMouseDown_Splitter = function(event){
 	s.$svg_a.remove();
 	if(s.$svg_b)
 		s.$svg_b.remove(); 
-		
+	
+	T.tiles[s.a].$.removeAttr('splitting');
+	T.tiles[s.b].$.removeAttr('splitting');
+	
 	$.each(T.tiles,function(){this.$.removeAttr('disabled');});
 	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
 	T.RemoveCanvasUpdatedListener(T.Tool.CanvasUpdated_Splitter);
