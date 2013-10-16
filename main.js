@@ -387,7 +387,7 @@ T.SetGroupDataTiles = function(cut,invalidatedSlots_,isNew){
 		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
 		T.tiles[new_tile_ind].$.show()
-							   .toggleClass('shake',false)
+							   .toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
 							  .data("group_num",new_tile_ind)
 		T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
 		

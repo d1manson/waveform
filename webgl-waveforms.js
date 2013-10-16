@@ -197,7 +197,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			for(var t=0;t<50-1;t++){ //for each time point (except the last one)
 				var p = (50+4)*c + 4 + t; //pointer to the t'th voltage sample on channel c for the first spike
 				for(var i=0; i<N; i++){ //for each spike
-					cBuffer[i*2 + 0] = 128 + oldData[p]; //TODO: check that 127 - oldData gives us 0 to 255, with up the way we want.
+					cBuffer[i*2 + 0] = 128 + oldData[p]; 
 					cBuffer[i*2 + 1] = 128 + oldData[p+1];
 					p += (50+4)*4; //step through to the same point in the next spike
 				}
@@ -633,7 +633,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
     }
 
     var IsReady = function(){
-        return SimpleClone(ready); //TODO: change main.js to use the new version of ready that is an object with multiple properties
+        return SimpleClone(ready); 
     }
 
     var error_callback = function(s){console.log(s)};

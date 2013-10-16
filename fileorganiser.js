@@ -337,7 +337,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     	var i, exp;
     	for(i=0, exp=exps[0];i<exps.length;i++,exp=exps[i]){
     		var str = []
-    		str.push("<div class='file_group' data-expind='" + i + "'><div class='file_group_title'>" + exp.name + "</div>");
+    		str.push("<div class='file_group' data-expind='" + i + "'><div class='file_group_title'>trial '" + exp.name + "'</div>");
             for(var j=0;j<exp.tets.length;j++)if(exp.tets[j]){
 				str.push("<div class='tet_group' tet='" + j + "' data-tetind='" + j + "'>")
     			for(var k=0;k<exp.tets[j].cut_names.length;k++)
@@ -356,9 +356,9 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
     		$files_panel.append(exp.$div);
     	}
     	
-    	var str = ["<div class='button_group'>"];
+    	var str = ["<div class='button_group'>tetrode: "];
     	for(i=0;i<available_tets.length;i++)if(available_tets[i])
-    		str.push("<input type='radio' name='tetrode' id='tetrode" + i + "' value='" + i + "'/><label for='tetrode" + i + "'>t" + i +"</label>");
+    		str.push("<input type='radio' name='tetrode' id='tetrode" + i + "' value='" + i + "'/><label for='tetrode" + i + "'>" + i +"</label>");
     	str.push("</div>");
     	$files_panel.prepend($(str.join('\n')));
     	
