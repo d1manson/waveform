@@ -3,29 +3,16 @@
 // T.PAR: consists of several functions that take a file handle and a callback.
 // The functions add the callback to a queue and send the file handle off to a worker to be parsed into a header object [and data buffer, if applicable]. 
 // The worker returns the parsed data to the main thread, which then forwards it on to the callback at the front of the queue.
+// there is a separate worker (each with its own specific code) for set, tet, pos, and cut.
 
 T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         
 	// ==== WORKER CODE ===============================================================================
-	var theWorkerCode = function(){
+	var tetWorkerCode = function(){
 		"use strict";
-		
-		var endian = function(){
-			var b = new ArrayBuffer(2);
-			(new DataView(b)).setInt16(0,256,true);
-			return (new Int16Array(b))[0] == 256? 'L' : 'B';
-		}();
-	
-	    var Swap16 = function (val) {
-			return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
-		}
 		
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
-		var REGEX_CUT_A = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
-		var REGEX_CUT_B = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
-		var REGEX_CUT_C = /[0-9]+/g;
-
 
 		var ParseTetrodeFile = function(file, SPIKE_FORMAT, BYTES_PER_SPIKE){
 		
@@ -58,7 +45,25 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 			
 		}
 		
+	}
 		
+	var posWorkerCode = function(){
+		"use strict";
+		
+		var endian = function(){
+			var b = new ArrayBuffer(2);
+			(new DataView(b)).setInt16(0,256,true);
+			return (new Int16Array(b))[0] == 256? 'L' : 'B';
+		}();
+	
+	    var Swap16 = function (val) {
+			return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
+		}
+		
+		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
+
+
 		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE){
 			// Read the file as a string to get the header and find the data start
 			var reader = new FileReaderSync();
@@ -91,19 +96,16 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 			main.PosFileRead(null,header, buffer,[buffer]);
 			
 		}
+	}
+	
+	var cutWorkerCode = function(){
+		"use strict";
 		
-		var ParseSetFile = function(file){
-			// Read the file as a string to get the header 
-			var reader = new FileReaderSync();
-			var fullStr = reader.readAsBinaryString(file);
-			var header = {};
-			var match;
-    		while (match = REGEX_HEADER_B.exec(fullStr))
-    			header[match[1]] = match[2];
-			main.SetFileRead(null,header,file.name);
-		}
-		
-		
+		var REGEX_CUT_A = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
+		var REGEX_CUT_B = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
+		var REGEX_CUT_C = /[0-9]+/g;
+
+
 		var ParseCutFile = function(file){
 		
 			// Read the file as a string to get the header 
@@ -136,74 +138,89 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 			var match = REGEX_CUT_B.exec(fullStr);
     		main.CutFileGotExpName(filename,match[1],tet);
 		}
-		
-	};
+	}
+	
+	var setWorkerCode = function(){
+		"use strict";
+		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
+
+		var ParseSetFile = function(file){
+			// Read the file as a string to get the header 
+			var reader = new FileReaderSync();
+			var fullStr = reader.readAsBinaryString(file);
+			var header = {};
+			var match;
+    		while (match = REGEX_HEADER_B.exec(fullStr))
+    			header[match[1]] = match[2];
+			main.SetFileRead(null,header,file.name);
+		}
+	}
+	
 	
 	// ================= End Of Worker Code ========================================================================
 	
-	//TODO: we need a way to cancel loading.  In fact the way it works at the moment may actually be buggy if you switch between things too quickly.
-	
+		
     var SPIKE_FORMAT = "t,ch1,t,ch2,t,ch3,t,ch4";
     var POS_FORMAT = "t,x1,y1,x2,y2,numpix1,numpix2";
 
-	var callbacks = [];  //we use a queue of callbacks as the worker has to process files in order
+	var callbacks = {pos:[],cut:[],set:[],tet:[]};  //we use callback cues as the workers have to process files in order
 	
     var LoadTetrodeWithWorker = function(file,callback){
-		callbacks.push(callback); 
-		theWorker.ParseTetrodeFile(file,SPIKE_FORMAT, BYTES_PER_SPIKE);
+		callbacks.tet.push(callback); 
+		tetWorker.ParseTetrodeFile(file,SPIKE_FORMAT, BYTES_PER_SPIKE);
 	}
 	var TetrodeFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.shift()({header:header,buffer:buffer});
+		callbacks.tet.shift()({header:header,buffer:buffer});
 	}	
 	
 	var LoadPosWithWorker = function(file,callback){
-		callbacks.push(callback);
-    	theWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE);
+		callbacks.pos.push(callback);
+    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE);
     }
 	var PosFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.shift()({header:header, buffer:buffer});
+		callbacks.pos.shift()({header:header, buffer:buffer});
 	}	
 	
 	var LoadSetWithWorker = function(file,callback){
-		callbacks.push(callback);
-    	theWorker.ParseSetFile(file);
+		callbacks.set.push(callback);
+    	setWorker.ParseSetFile(file);
     }
 	var SetFileRead = function(errorMessage,header,filename){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.shift()({header:header});
+		callbacks.set.shift()({header:header});
 	}	
 		
 	var LoadCutWithWorker = function(file,callback){
-		callbacks.push(callback);
-		theWorker.ParseCutFile(file);
+		callbacks.cut.push(callback);
+		cutWorker.ParseCutFile(file);
 	}
 	var CutFileRead = function(errorMessage,header,cut){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.shift()({cut:cut, header:header});
+		callbacks.cut.shift()({cut:cut, header:header});
 	}
 	
 	var GetCutExpNameWithWorker = function(file,tet,callback){
-		callbacks.push(callback);
-		theWorker.GetCutFileExpName(file,tet,file.name);
+		callbacks.cut.push(callback);
+		cutWorker.GetCutFileExpName(file,tet,file.name);
 	}
 	var CutFileGotExpName = function(fileName,expName,tet){
-		callbacks.shift()(fileName,expName,"cut",tet);
+		callbacks.cut.shift()(fileName,expName,"cut",tet);
 	}
 	
-	var theWorker = BuildBridgedWorker(theWorkerCode,
-										["ParseTetrodeFile","ParsePosFile", "ParseSetFile","ParseCutFile","GetCutFileExpName"],
-										["TetrodeFileRead*","PosFileRead*","SetFileRead","CutFileRead","CutFileGotExpName"],
-										[TetrodeFileRead, PosFileRead, SetFileRead, CutFileRead, CutFileGotExpName]);	
-    console.log("paresefiles BridgeWorker is:\n  " + theWorker.blobURL);
+	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile"],["TetrodeFileRead*"],[TetrodeFileRead]);	
+	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
+	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
+	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
+
 	
     var GetPendingParseCount = function(){
-        return callbacks.length;
+        return callbacks.cut.length + callbacks.set.length + callbacks.tet.length + callbacks.pos.length;
     }
     
     var GetTetrodeTime = function(buffer,header,N){ //get spike times in milliseconds as a Uint32Array 
