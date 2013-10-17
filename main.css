@@ -19,7 +19,7 @@ background: #c77;
 td{
 font-size: 0.8em;
 }
-canvas{
+canvas, img{
 vertical-align:bottom;
 }
 .tilewall[tilemoving]{
@@ -102,6 +102,7 @@ overflow-x: hidden;
 }
 #info_panel{
 width: 100%;
+max-height: 400px;
 }
 .side_panel_row:last-of-type{
 height: 100%;
@@ -509,4 +510,32 @@ visibility: visible;
 }
 .separator_half{
     display: inline-block;
+}
+#cluster_panel > canvas{
+margin: 2px;
+border: 1px solid #000;
+}
+
+.floatinginfo{
+position: fixed;
+left: 400px;
+top: 20px;
+min-width: 200px;
+max-width: 400px;
+min-height: 80px;
+background-color: rgba(255,255,255,0.8);
+border: solid 2px #000;
+padding: 5px;
+display:none;
+z-index:100;
+
+}
+button:hover + .floatinginfo,
+label:hover + .floatinginfo,
+.floatinginfo[state="closed"]{
+display: block;
+}
+pre{
+font-size: 1.2em;
+margin-left: 15px;
 }

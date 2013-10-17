@@ -21,106 +21,129 @@ you can drag further files onto the window at any point<br>
 <div id="works_with_chrome">Tested with Chrome <img src="chromelogo.png" width="15px"/></div>
 </div>
 
-<div class="side_panel">
-
-<div class="side_panel_row">
-<div class="toggle_panel" id="button_panel_toggle"></div>
-<b>button panel</b>
-
-<div id="button_panel" class="collapsable_panel">
-	<div class="button_group">
-	<button id="reset_button">reset &amp; refresh</button>
-	<button class="help_button">help (wiki)</button>
-	</div>
-
-
-	<div class="button_group">
-		<input type="checkbox" name="channel" id="channel1" value="1" /><label for="channel1">c1</label>
-		<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
-		<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
-		<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
-        <input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rm</label>
-		<input type="checkbox" name="channel" id="tautocorr_chk" value="201"/><label for="tautocorr_chk">t-autocorr*</label>
-		
-	</div>
-	<div class="button_group">
-	<input type="text" id="size_input" value="2" size ="1" style="display:none;">
-	<button id="apply_size" style="display:none;">wave size</button>
-	<input type="text" id="rm_bin_size" value="2.5" size ="1">
-	<button id="apply_rm_size">rm bin cm</button>
-	<button id="toggle_palette">palette</button> 
-	</div>
-
-	<div class="button_group">
-	<button id="reorder_n_button">Reorder n</button>
-	<button id="reorder_A_button">Reorder A</button>
-	<button id="autocut">Autocut**</button>
-	<span id="autocut_caption"></span>
-	</div>
-
-	<div class="notes">
-	*t-autocorr is set at 500ms<br>
-	**autocut only uses about 6000 spikes and only runs on one channel
-	</div>
-</div>
-</div>
-
-<div class="side_panel_row">
-<div class="toggle_panel" id="files_panel_toggle"></div>
-<B>available files</B>
-<div class="collapsable_panel" id="files_panel">
-</div>
-</div>
-
-<div class="side_panel_row">
-<div class="toggle_panel" id="spatial_panel_toggle"></div>
-<B>pos data</B>
-<div style="text-align:center;" class="collapsable_panel" id="spatial_panel" state="closed">
-    <canvas id="posplot" width="200" height="200"></canvas> 
-</div>
-</div>
-
-<div class="side_panel_row">
-	<div class="toggle_panel" id="action_panel_toggle"></div>
-	<B>cut action history</B>
-	<div class="collapsable_panel" id="action_panel" state="closed">
-		<div class='undo' style="display:none;">Undo</div>
-	</div>
-</div>
-
-<div class="side_panel_row">
-	<div class="toggle_panel" id="cluster_panel_toggle"></div>
-	<B>cluster plots</B>
-	<div class="collapsable_panel" id="cluster_panel">
-	</div>
-</div>
-
-
-<div class="side_panel_row">
-	<div class="last_side_panel_row_inner">
-		<div class="last_side_panel_row_head">
-			<B>file headers</B>
-			<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
-		</div>
-		<div class="last_side_panel_row_body">
-				<div id="info_panel" class="scrollable_area">
-					<div id='header_info' class='header_info'>
-					
-					<div class="file_info_title" id="tet_info" style="display:none;"></div>
-					<div class="file_info_title" id="cut_info" style="display:none;"></div>
-					<div class="file_info_title" id="pos_info" style="display:none;"></div>
-					<div class="file_info_title" id="set_info" style="display:none;"></div>
-					</div>
-				</div>
-		</div>
-	</div>
-</div>
-
-
-</div>
 
 <div class="tilewall">
 </div>
+
+<div class="side_panel">
+
+	<div class="side_panel_row">
+		<div class="toggle_panel" id="button_panel_toggle"></div>
+		<b>button panel</b>
+
+		<div id="button_panel" class="collapsable_panel">
+			<div class="button_group">
+				<button class="help_button">help</button>
+				<div class="floatinginfo">
+					<b>Help</b><br>
+					
+					Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> wiki - click to open in a new tab. <br><br>
+					You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
+				</div>
+				
+				<button id='undo_button' disabled>undo</button>
+				<div class="floatinginfo">
+					<b>Action List [undo: ctrl+z]</b>
+					<div class="action_list"></div>
+				</div>
+				
+				<button id='file_headers_button'>headers</button>
+				<div class="floatinginfo file_info">
+					<div>
+						<B>file headers  [h]</B>
+						<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
+					</div>
+					<div id="info_panel" class="scrollable_area">
+						<div id='header_info' class='header_info'>
+							<div class="file_info_title" id="tet_info" style="display:none;"></div>
+							<div class="file_info_title" id="cut_info" style="display:none;"></div>
+							<div class="file_info_title" id="pos_info" style="display:none;"></div>
+							<div class="file_info_title" id="set_info" style="display:none;"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="button_group">
+				<input type="checkbox" name="channel" id="channel1" value="1" /><label for="channel1">c1</label>
+				<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
+				<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
+				<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
+				<input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rm</label>
+				<div class="floatinginfo">
+					<b>Spatial ratemap [r]</b><br><br>
+					Bin size default is 2.5cm.  <br><br>
+					If you need to change this open the command line and type (e.g. 5cm):
+					<pre>T.ApplyRmSize(5)</pre>
+					The smoothing kernel is fixed as a 5x5 "boxcar".
+				</div>
+				<input type="checkbox" name="channel" id="tautocorr_chk" value="201"/><label for="tautocorr_chk">tc</label>		
+				<div class="floatinginfo">
+					<b>Temporal auto correlation [t]</b><br><br>
+					Time window default is set at 500ms.  <br><br>
+					If you need to change this open the command line and type (e.g. 100ms):
+					<pre>T.TC.SetDeltaT(100)</pre>
+				</div>
+				<button id="toggle_palette">palette</button> 
+				<div class="floatinginfo">
+				<b>Toggle waveform palette [p]</b><br><br>
+				There are two palette modes: 
+				<ul>
+				<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
+				<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
+				</ul>
+					
+					
+			</div>
+			</div>
+			
+
+			<div class="button_group">
+			<button id="reorder_n_button">n-order</button>
+			<button id="reorder_A_button">a-order</button>
+			
+			<button id="autocut">autocut</button>
+			<div class="floatinginfo">
+				<b>Autocut [a]</b><br><br>
+				<div id="autocut_caption"></div><br><br>
+				autocut only uses about 6000 spikes and only runs on one channel
+			</div>
+			</div>
+
+		</div>
+	</div>
+
+	<div class="side_panel_row">
+		<div class="toggle_panel" id="files_panel_toggle"></div>
+		<B>available files</B>
+		<div class="collapsable_panel" id="files_panel"></div>
+	</div>
+
+	<div class="side_panel_row">
+		<div class="toggle_panel" id="spatial_panel_toggle"></div>
+		<B>pos data</B>
+		<div style="text-align:center;" class="collapsable_panel" id="spatial_panel" state="closed">
+			<canvas id="posplot" width="200" height="200"></canvas> 
+		</div>
+	</div>
+
+
+	<div class="side_panel_row">
+		<div class="last_side_panel_row_inner">
+			<div class="last_side_panel_row_head">
+				<B>cluster plots</B>
+			</div>		
+			<div class="last_side_panel_row_body">
+				<div id="cluster_panel" class="scrollable_area">
+				
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+</div>
+
 
 <div class="bar">
 </div>

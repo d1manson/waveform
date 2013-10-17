@@ -81,6 +81,7 @@ T.FinishedLoadingFile = function(status,filetype){
 			T.WV.LoadTetrodeData(null);	
 			T.RM.LoadTetData(null);
 			T.TC.LoadTetrodeData(0);
+			T.CP.LoadTetrodeData(0);
 			T.PlotPos();
 		}
 		if(status.cut < 3){
@@ -97,11 +98,13 @@ T.FinishedLoadingFile = function(status,filetype){
 		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
 		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
 		T.RM.LoadTetData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
+		T.CP.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetAmplitudes());
 		
 		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV, T.TC, and T.RM to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
 			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
 			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
+			T.ORG.GetCut().ForceChangeCallback(T.CP.SlotsInvalidated);
 		}
 	}
 
@@ -218,26 +221,22 @@ T.DisplayIsOnClick = function(evt,keyboard){
 }
 
 
-T.ApplySizeClick = function(){
-	var new_scale = Math.floor(T.$size_input.val()); 
+T.ApplyWSize = function(val){
+	var new_scale = Math.floor(val); 
 	new_scale = isNaN(new_scale)? 2 : new_scale;
 	new_scale = new_scale < 1? 1 : new_scale;
 	new_scale = new_scale > 8? 8 : new_scale;
-	T.$size_input.val(new_scale);
 	T.xFactor = new_scale;
 	T.yFactor = new_scale;
-
 	T.ApplyCanvasSizes();
 }
 
-T.ApplyRmSizeClick = function(){
-	var new_scale = Math.floor(T.$rm_bin_size.val()*10)/10; //round to 1 d.p.
+T.ApplyRmSize = function(v){
+	var new_scale = Math.floor(v*10)/10; //round to 1 d.p.
 	new_scale = isNaN(new_scale)? 2.5 : new_scale;
 	new_scale = new_scale < 0.5? 0.5 : new_scale;
 	new_scale = new_scale > 20? 20 : new_scale;
-	T.$rm_bin_size.val(new_scale);
 	T.binSizeCm = new_scale;
-
 	T.RM.SetCmPerBin(new_scale);
 }
 
@@ -250,20 +249,6 @@ T.ApplyCanvasSizes = function(){
 		var $c = T.tiles[i].$.find('canvas').eq(0);
 		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING  + 'px'});
 	}
-}
-
-
-T.StoreData = function(){
-	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
-	localStorage.tet = T.ORG.GetTet();
-	localStorage.xFactor = T.xFactor;
-	localStorage.yFactor = T.yFactor;
-	
-	//TODO store cuts
-	localStorage.FSactive = T.FS.IsActive();
-	localStorage.BIN_SIZE_CM = T.binSizeCm;
-	localStorage.state = 1;
-
 }
 
 
@@ -487,15 +472,14 @@ T.CutActionCallback = function(cut,info){
 
 	if (info.type == "load"){
 		//remove any existing action elements and then go on to add the new one
-		T.$action_ = T.$action_ || [];
-		while(T.$action_.length)
-			T.$action_.pop().remove(); //remove all action elements from page	
-		T.$undo.show();
+		T.$action_ = [];
+		T.$actionList.empty(); //remove all action elements from page	
+		T.$undo.removeAttr('disabled');
 	}
 
 	var $newAction = $("<div class='action' data-action-num='" + info.num + "'><b>" + info.num + "</b>&nbsp;&nbsp;&nbsp;" + info.description + "</div>");
 	T.$action_.push($newAction); //store it in the array
-	T.$undo.after($newAction);
+	T.$actionList.prepend($newAction);
 }
 
 
@@ -578,7 +562,26 @@ T.FilterHeader = function(){
 }
 
 T.UndoLastAction = function(){
-	T.ORG.GetCut().Undo();
+	var c = T.ORG.GetCut();
+	if(c)
+		c.Undo();
+}
+
+T.StoreData = function(){
+	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
+	localStorage.mapIsOn = JSON.stringify(T.mapIsOn);
+	localStorage.tAutocorrIsOn = JSON.stringify(T.tAutocorrIsOn);
+	
+	localStorage.tet = T.ORG.GetTet();
+	localStorage.xFactor = T.xFactor;
+	localStorage.yFactor = T.yFactor;
+	
+	//TODO store cuts
+	localStorage.FSactive = T.FS.IsActive();
+	localStorage.BIN_SIZE_CM = T.binSizeCm;
+	localStorage.state = 1;
+	localStorage.headerFilter = T.$header_search.val();
+
 }
 
 T.DocumentReady = function(){
@@ -596,12 +599,10 @@ T.DocumentReady = function(){
 		T.xFactor = localStorage.xFactor || 2;
 		T.yFactor = localStorage.yFactor;
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
-		T.$rm_bin_size.val(T.binSizeCm);
-		T.$size_input.val(T.xFactor);
-		
+		T.$header_search.val(localStorage.headerFilter || '');
 		//TODO: load files into T.cut instances
 
-		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn)});
+		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.RM.SetCmPerBin(T.binSizeCm);
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
@@ -612,35 +613,31 @@ T.DocumentReady = function(){
 }
 
 $('.help_button').each(function(){$(this).click(T.ShowHelp);});
-$('#apply_size').click(T.ApplySizeClick);
-T.$size_input = $('#size_input');
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
-T.$action_panel = $('#action_panel');
 T.tiles = [];
+T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
-T.$undo = $('.undo').click(T.UndoLastAction);
+T.$undo = $('#undo_button').click(T.UndoLastAction);
 $('.bar').click(T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
 T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
 $('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
-$('#action_panel_toggle').click(T.ToggleElementState(T.$action_panel));
 $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
-$('#cluster_panel_toggle').click(T.ToggleElementState($('#cluster_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
-$('#reset_button').click(T.ResetAndRefresh);
 T.$chanButton_ = $("input[name=channel]:checkbox").click(T.DisplayIsOnClick);
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
-T.$rm_bin_size = $('#rm_bin_size');
 $('#apply_rm_size').click(T.ApplyRmSizeClick);
 T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
+$('#file_headers_button').click(T.ToggleElementState($('.file_info')));
+
 
 // KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 key('p',T.TogglePalette);
@@ -653,6 +650,8 @@ key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],
 key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+key('h',T.ToggleElementState($('.file_info')));
+key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();

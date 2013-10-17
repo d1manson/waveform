@@ -141,6 +141,8 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 	
 	// ================= End Of Worker Code ========================================================================
 	
+	//TODO: we need a way to cancel loading.  In fact the way it works at the moment may actually be buggy if you switch between things too quickly.
+	
     var SPIKE_FORMAT = "t,ch1,t,ch2,t,ch3,t,ch4";
     var POS_FORMAT = "t,x1,y1,x2,y2,numpix1,numpix2";
 

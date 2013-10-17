@@ -1,8 +1,10 @@
 "use strict"; 
 
 
-T.CP = function($canvasParent,ORG){
+T.CP = function($canvasParent){
 
+	//TODO: it may be woth moving the plotting into a worker
+	
 	var cCut = null;
 	var amps = null;
 	var ctxes = [];
@@ -11,7 +13,9 @@ T.CP = function($canvasParent,ORG){
 	var N = null;
 	var chanList = [];
 	var canvS = 128;
-
+	var canvasesAreNew = null;
+	var ready = false;
+	
 	var PALETTE_FLAG = function(){ //duplicated in webgl-waveforms  TODO: put it in main
         var data = new Uint8Array(256*4);
         for(var i=0;i<256;i++)
@@ -53,41 +57,20 @@ T.CP = function($canvasParent,ORG){
 
 	var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
 		
-		if(isNewCut || cCut == null){//TODO: check exactly when isNewCut is true, and check whether we really need to all of the following each time it is true
+		if(!ready)
+			throw new Error('cluster-plot SlotsInvalidated without any voltage data.');
+			
+		if(isNewCut || cCut == null){//TODO: check exactly when isNewCut is true, and check whether we really need to the following each time it is true
 			cCut = cut;
-			
-			// get a reduced precision copy of the amplitudes 
-			amps = M.clone(ORG.GetTetAmplitudes());
-			var factor = 256/canvS; //256 is the maximum amplitude
-			for(var i=0;i<amps.length;i++)
-				amps[i] /= factor;
-				
-			N = ORG.GetN();
-			
-			
-			// work out which channels have non-zero amplitude
-			chanList = [];
-			for(var c=0;c<C;c++){
-				for(var i=0;i<N;i++)if(amps[C*i + c] > 0){ //TODO: maybe we could set a threshold slightly greater than zero
-					chanList.push(c);
-					break;
-				}
-			}
-
-			$canvasParent.empty();			
-			ctxes = [];
-			for(var i=0;i<chanList.length-1;i++)
-				for(var j =i+1;j<chanList.length;j++){
-					var $newCanvas = $("<canvas width='" + canvS + "px' height='" + canvS + "px' style='border:1px solid #000;'/>");
-					$canvasParent.append($newCanvas);
-					ctxes.push($newCanvas.get(0).getContext('2d'));
-				}
+			if(!canvasesAreNew)
+				for(var i=0;i<ctxes.length;i++)
+					ctxes[i].clearRect(0,0,canvS,canvS);
 		}
 
 		if(cut && cut != cCut)
 			throw new Error("cluster-plot SlotsInvalidated with unexpected cut instance argument");
 
-
+		console.time('si cluster');
 		var imData32 = Array(ctxes.length);
 		var imData = Array(ctxes.length);
 		for(var i=0;i<ctxes.length;i++){
@@ -116,19 +99,58 @@ T.CP = function($canvasParent,ORG){
 				}
 			}
 		}
-
 		
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
+		console.timeEnd('si cluster');
+		canvasesAreNew = false;
+	}
 
-
+	var LoadTetrodeData = function(N_val,amps_in){
+		$canvasParent.empty();
+		ctxes = [];
+		chanList = [];
+		N = null;
+		cCut = null;
+		amps = null;
+		ready = false;
 		
+		if(!N_val)	
+			return;
+				
+		console.time('tet cluster');
+		// get a reduced precision copy of the amplitudes 
+		amps = M.clone(amps_in);
+		var factor = 256/canvS; //256 is the maximum amplitude
+		for(var i=0;i<amps.length;i++)
+			amps[i] /= factor;
+			
+		N = N_val;
+				
+		// work out which channels have non-zero amplitude
+		chanList = [];
+		for(var c=0;c<C;c++){
+			for(var i=0;i<N;i++)if(amps[C*i + c] > 0){ //TODO: maybe we could set a threshold slightly greater than zero
+				chanList.push(c);
+				break;
+			}
+		}
+
+		for(var i=0;i<chanList.length-1;i++)
+			for(var j =i+1;j<chanList.length;j++){
+				var $newCanvas = $("<canvas width='" + canvS + "px' height='" + canvS + "px'/>");
+				$canvasParent.append($newCanvas);
+				ctxes.push($newCanvas.get(0).getContext('2d'));
+			}
+		console.timeEnd('tet cluster');
+		canvasesAreNew = true;
+		ready = true;
 		
 	}
 
-
 	return {
-		SlotsInvalidated: SlotsInvalidated
+		SlotsInvalidated: SlotsInvalidated,
+		LoadTetrodeData: LoadTetrodeData
 	};
 	
-} ($('#cluster_panel'),T.ORG);
+} ($('#cluster_panel'));
