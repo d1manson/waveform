@@ -35,7 +35,7 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 	extraWorkerStr.push("self.onmessage = function(e){\n");
 	extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
 	extraWorkerStr.push("\n};\n");
-	
+	extraWorkerStr.push("var console = {\nlog:\n function(str){self.postMessage({foo:'console_log',args:[str]})}\n}\n");
 	var fullWorkerStr = baseWorkerStr + "\n\n/*==== STUFF ADDED BY BuildBridgeWorker ==== */\n\n" + extraWorkerStr.join("");
 
 	// create the worker
@@ -44,6 +44,10 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 					  
 	// buid a funcion for the main part of worker-calls-function-in-main-thread operation
 	theWorker.onmessage = function(e){
+		if(e.data.foo == "console_log"){ 
+			console.log(e.data.args[0]);
+			return;
+		}
 		var fooInd = mainExportNames.indexOf(e.data.foo);
 		if(fooInd != -1)
 			mainExportHandles[fooInd].apply(null, e.data.args);

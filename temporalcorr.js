@@ -94,7 +94,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			histSlotQueue = [];
 		}
 
-		var CreateAllSpikeTimes = function(buffer,N_val,timebase,BYTES_PER_SPIKE){	
+		var CreateAllSpikeTimes = function(buffer,N_val){	
 			ClearQueue();
 			NewCut();
 			if(!N_val){
@@ -102,20 +102,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 				return;
 			}
 
-			var oldData = new Int32Array(buffer);
-			allSpikeTimes = new Uint32Array(N_val);
-
-			for(var i=0; i<N_val; i++) //get the timestamp for each spike
-				allSpikeTimes[i] = oldData[BYTES_PER_SPIKE/4*i]; //we are accessing the buffer as 4byte ints, we want the first 4bytes of the i'th spike
-
-			if (endian == 'L') 
-				for(var i=0;i<N_val; i++)
-					allSpikeTimes[i] = Swap32(allSpikeTimes[i]);
-
-			timebase/= 1000; //get it in miliseconds
-			for(var i=0;i<N_val;i++)
-				allSpikeTimes[i] /= timebase;
-
+			allSpikeTimes = new Uint32Array(buffer); // in miliseconds
 		}
 
 		var GetGroupHist = function(slot){
@@ -164,7 +151,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
 
 
-	var LoadTetrodeData = function(N_val, buffer,timebase){
+	var LoadTetrodeData = function(N_val, tetTimes){
 		cCut = null;
         workerSlotGeneration = [];
 
@@ -174,8 +161,8 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 			return;
 		}
 
-		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
-		theWorker.CreateAllSpikeTimes(buffer, N_val, timebase, BYTES_PER_SPIKE,[buffer]);
+		tetTimes = M.clone(tetTimes); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
+		theWorker.CreateAllSpikeTimes(tetTimes.buffer, N_val,[tetTimes.buffer]);
 
 		// A subtle, but important, point is that because messages on the worker are processed in order we don't need to wait for the createspikes to have completed
 		// before we post a GetGroupHist request (in fact the worker doesn't bother to inform us when it's done with the above call it just sits there waiting to process

@@ -45,6 +45,30 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 			
 		}
 		
+		var GetTetrodeAmplitude = function(buffer,N){
+		
+			var C = 4; //TODO: generalise this properly everywhere in the code
+			var W = 50; //TODO: generalise this properly everywhere in the code
+			
+			var oldData = new Int8Array(buffer);
+			var NxC = N*C;
+			var amps = new Uint8Array(NxC);
+			
+			for(var i=0,p=0;i<NxC;i++){
+				p += 4; // skip timestamp 
+				var min = 127;
+				var max = -128;
+				for(var t=0;t<W;t++,p++){
+					(oldData[p] > max) && (max = oldData[p]);
+					(oldData[p] < min) && (min = oldData[p]);
+				}
+				amps[i] = max-min; 
+			}
+
+			main.GotTetAmps(amps.buffer,[amps.buffer]);
+		}
+	
+		
 	}
 		
 	var posWorkerCode = function(){
@@ -174,6 +198,14 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 			throw(errorMessage);
 		callbacks.tet.shift()({header:header,buffer:buffer});
 	}	
+	var GetTetrodeAmplitudeWithWorker = function(buffer,header,N,callback){
+		callbacks.tet.push(callback); 
+		buffer = buffer.slice(0); //we clone it so there is still a copy in the main thread;
+		tetWorker.GetTetrodeAmplitude(buffer,N,[buffer]);
+    }
+	var GotTetAmps = function(ampsBuffer){
+        callbacks.tet.shift()(new Uint8Array(ampsBuffer));
+	}
 	
 	var LoadPosWithWorker = function(file,callback){
 		callbacks.pos.push(callback);
@@ -213,7 +245,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 		callbacks.cut.shift()(fileName,expName,"cut",tet);
 	}
 	
-	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile"],["TetrodeFileRead*"],[TetrodeFileRead]);	
+	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude*"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
 	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
@@ -245,28 +277,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
     
 	//TODO: probably want to have a function here which gets waveforms from the tetrode buffer so that other modules do not need to know details of the file format
 	
-	var GetTetrodeAmplitude = function(buffer,header,N){
-		
-		var C = 4; //TODO: generalise this properly everywhere in the code
-		var W = 50; //TODO: generalise this properly everywhere in the code
-		
-		var oldData = new Int8Array(buffer);
-		var NxC = N*C;
-		var amps = new Uint8Array(NxC);
-		
-		for(var i=0,p=0;i<NxC;i++){
-			p += 4; // skip timestamp 
-			var min = 127;
-			var max = -128;
-			for(var t=0;t<W;t++,p++){
-				(oldData[p] > max) && (max = oldData[p]);
-				(oldData[p] < min) && (min = oldData[p]);
-			}
-			amps[i] = max-min; 
-		}
 
-        return amps;
-    }
 	
     return {
         LoadPos: LoadPosWithWorker,
@@ -276,7 +287,7 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         LoadCut2: GetCutExpNameWithWorker,
         GetPendingParseCount: GetPendingParseCount,
         GetTetrodeTime: GetTetrodeTime,
-		GetTetrodeAmplitude: GetTetrodeAmplitude
+		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker
     }
     
 }(T.BYTES_PER_POS_SAMPLE,T.BYTES_PER_SPIKE)

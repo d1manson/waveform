@@ -95,16 +95,24 @@ T.FinishedLoadingFile = function(status,filetype){
 	}
 	
 	if(filetype == "tet"){
-		T.WV.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer());
-		T.TC.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
-		T.RM.LoadTetData(T.ORG.GetN(),T.ORG.GetTetBuffer(),parseInt(T.ORG.GetTetHeader().timebase));
-		T.CP.LoadTetrodeData(T.ORG.GetN(),T.ORG.GetTetAmplitudes());
+		var N = T.ORG.GetN();
+		var tetBuffer = T.ORG.GetTetBuffer();
+		var tetTimes = T.ORG.GetTetTimes();
+		T.WV.LoadTetrodeData(N,tetBuffer);
+		T.TC.LoadTetrodeData(N,tetTimes);
+		T.RM.LoadTetData(N,tetTimes);
+		T.ORG.GetTetAmplitudes(function(amps){
+									T.CP.LoadTetrodeData(N,amps);
+										if(status.cut == 3)
+											T.ORG.GetCut().ForceChangeCallback(T.CP.SlotsInvalidated);
+								});
 		
 		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV, T.TC, and T.RM to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
 			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
-			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
-			T.ORG.GetCut().ForceChangeCallback(T.CP.SlotsInvalidated);
+			if(status.pos == 3) //we need pos as well as tet for ratemap
+				T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
+			
 		}
 	}
 
@@ -112,7 +120,7 @@ T.FinishedLoadingFile = function(status,filetype){
 		T.PlotPos();
 		var posHeader = T.ORG.GetPosHeader();
 		T.RM.LoadPosData(parseInt(posHeader.num_pos_samples), T.ORG.GetPosBuffer(),parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre));
-		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.RM to accept it now
+		if(status.cut == 3 && status.tet == 3){ //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
 			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
 		}
 	}
@@ -424,7 +432,7 @@ T.RunAutocut = function(){
 			}
 	if(chan == -1){
 		alert("Currently you can only autocut on a single channel. Using channel 1.");
-		chan = 1;
+		chan = 0;
 	}
 	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
 }
@@ -503,7 +511,11 @@ T.ReorderNCut = function(){
 	cut.ReorderAll(inds);
 }
 
-T.ReorderACut = function(){
+T.ReorderACut = function(amps){
+	if(!amps) //when the button is clicked the function is called with no inputs, so we have to go and get the amplitudes
+		T.ORG.GetTetAmplitudes(T.ReorderACut); //this is asynchrounous
+	
+	//amps is 1a 1b 1c 1d 2a 2b ... nd, where a-d are the 4 channels
 	var chan = -1;
 	for(var i=0;i<4;i++)
 		if(T.chanIsOn[i])
@@ -519,7 +531,6 @@ T.ReorderACut = function(){
 	}
 
 	var N = T.ORG.GetN();
-	var amps = T.ORG.GetTetAmplitudes(); //we get 1a 1b 1c 1d 2a 2b ... nd, where a-d are the 4 channels
 	var amps_chan = new Uint16Array(N); //but we only want one channel
 	for(var i=0;i<N;i++)
 		amps_chan[i] = amps[i*4 + chan];

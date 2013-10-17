@@ -314,7 +314,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 	}
 
 
-	var GetCTetT = function(){ //get the timestamp for each spike
+	var GetCTetT = function(callback){ //get the timestamp for each spike
 		if(!cTetT)
     		cTetT = PAR.GetTetrodeTime(cTetBuffer,cTetHeader,cN);
         // else we already have it
@@ -322,12 +322,11 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
         return cTetT;
 	}
 
-	var GetCTetA = function(){ // get an array of the length waveWidth (= 50 probably), where each element of the array is a typedarray giving the voltage at time t for every wave
+	var GetCTetA = function(callback){ // get an array of the length waveWidth (= 50 probably), where each element of the array is a typedarray giving the voltage at time t for every wave
 		if(!cTetA)
-    		cTetA = PAR.GetTetrodeAmplitude(cTetBuffer,cTetHeader,cN);
-        // else we already have it
-        
-        return cTetA;
+    		cTetA = PAR.GetTetrodeAmplitude(cTetBuffer,cTetHeader,cN,function(amps){cTetA = amps; callback(amps);});
+		else // we already have it, return it asynchrousously for consistency
+			setTimeout(function(){callback(cTetA);},1);
 	}
 
 	//TODO: can do better than this mess of DOM-using functions =================================================

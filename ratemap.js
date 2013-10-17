@@ -87,13 +87,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		}
         // =======================
         
-        var tetFreq = null;
         var posFreq = null;
 		var pixPerM = null;
 		var posValXY = null; // this is the values in pixels
 		var posBinXY = null; // this is posValXY / pixPerM *100/ cmPerBin
-		var spikeTetInd = null; // this is the values expressed in tetFreq
-		var spikePosInd = null; // this is spikeTetInd / tetFreq * posFreq
+		var spikeTimes = null; // this is the spike times expressed in milliseconds
+		var spikePosInd = null; // this is the spke times expressed in pos indices
 		var spikePosBinXY = null; // this is posBinXY(spikePosInd,:)
 		var nBinsX = null;
 		var nBinsY = null;
@@ -125,6 +124,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		}();
 	
 		var SetImmutable = function(inds,slotInd,generation){
+			
 			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,cmPerBin: null};
             QueueSlot(slotInd);
 		}
@@ -169,7 +169,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		}
 
 		var CachePosBinIndsAndDwellMap = function(){
-			
 			if(posValXY == null || spikePosInd == null)
 				return;
 				
@@ -199,42 +198,28 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		}
 		
 		var GetSpikePosInd = function(){	
-			//after loading a new tet and/or pos file we know tetFreq and posFreq and can thus express each spike time as an index into the pos array
-    
-            spikePosInd = new Uint32Array(spikeTetInd.length);
-			var factor = 1/tetFreq * posFreq;
+			//after loading a new tet and/or pos file we know tetTimes and posFreq and can thus express each spike time as an index into the pos array
+            spikePosInd = new Uint32Array(spikeTimes.length);
 			
+			var factor = 1/1000 * posFreq;
     		for(var i=0;i<spikePosInd.length;i++)
-    			spikePosInd[i] = spikeTetInd[i]*factor; //integer result, so implicitly the floor 
-
+    			spikePosInd[i] = spikeTimes[i]*factor; //integer result, so implicitly the floor 
+			
 		}
 
-        var SetTetData = function(buffer,N,tetFreq_val,BYTES_PER_SPIKE){
-			//reads timestamps in units of tetFreq
+        var SetTetData = function(tetTimesBuffer,N){
             NewCut();
-			
             if(!N){
-				tetFreq = null;
-				spikeTetInd = null;
+				spikeTimes = null;
 				spikePosInd = null;
 				spikePosBinXY = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
 				return;
 			}
-			tetFreq = tetFreq_val;
-			spikePosInd = null;
-			
-        	var oldData = new Int32Array(buffer);
-        	spikeTetInd = new Uint32Array(N);
-    
-    		for(var i=0; i<N; i++) //get the timestamp for each spike
-    			spikeTetInd[i] = oldData[BYTES_PER_SPIKE/4*i]; //we are accessing the buffer as 4byte ints, we want the first 4bytes of the i'th spike
-    
-    		if (endian == 'L') 
-    			for(var i=0;i<N; i++)
-    				spikeTetInd[i] = Swap32(spikeTetInd[i]);
-    
+						
+        	spikeTimes = new Uint32Array(tetTimesBuffer);
+   
             if(posFreq != null){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
@@ -244,9 +229,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
         
         var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,BYTES_PER_POS_SAMPLE,POS_NAN){
 			//reads pos pixel coordinates
+
             ClearQueue(); 
             if(!N){
                 posFreq = null;
+				spikeTimes = null;
 				spikePosInd = null;
 				posValXY = null;
 				posBinXY = null;
@@ -272,7 +259,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 			
 			//TODO: filtering and interpolation
 			
-            if(tetFreq != null){
+            if(spikeTimes){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
 			}
@@ -324,7 +311,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
 
 
-	var LoadTetData = function(N_val, buffer,timebase){
+	var LoadTetData = function(N_val, tetTimes,timebase){
 		cCut = null;
         workerSlotGeneration = [];
 		if(!N_val){
@@ -332,8 +319,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 			//TODO: decide whether we need to send null canvases
 			return;
 		}
-		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
-		theWorker.SetTetData(buffer,N_val,timebase,BYTES_PER_SPIKE,[buffer]);
+		tetTimes = M.clone(tetTimes); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
+		
+		theWorker.SetTetData(tetTimes.buffer,N_val,[tetTimes.buffer]);
 
 	}
 
@@ -344,6 +332,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 			return;
 		}
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
+		
 		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,BYTES_PER_POS_SAMPLE,POS_NAN,[buffer]);
 
 	}
@@ -391,7 +380,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 				continue; //worker already has this slot, there is no reason to send it again here
 
 			var inds = M.clone(slot_s.inds); //we need to clone these before transfering them, in order to keep a copy on this thread
-			theWorker.SetImmutable(inds.buffer,s,s,slot_s.generation,[inds.buffer]);
+			
+			theWorker.SetImmutable(inds.buffer,s,slot_s.generation,[inds.buffer]);
 			workerSlotGeneration[s] = slot_s.generation;
 			// Worker will hopefully come back with a ShowIm event for this slot 
 		}
