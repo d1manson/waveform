@@ -20,15 +20,13 @@ T.CUT = function(){//class factory
 	//different purposes and sometimes only the actionCallbacks get triggerd...
 	//the changeCallbacks should not worry about the exact action performed, only what the resulting change was, whereas the actioncallbacks
 	//dont actually care what the change is they just need to know what action occured.
-	var changeCallbacks = []; //callbacks must be of the form foo(cut,invalidatedImmutableSlots,isNewCut){ }, 
-							  //where cut is the current cut object and invalidatedImmutableSlots is a logical vector with a true for each immutable slot that has just
+	var changeCallbacks = $.Callbacks(); //callbacks must be of the form foo(invalidatedImmutableSlots,isNewCut){ }, 
+							  //where this is the current cut object and invalidatedImmutableSlots is a logical vector with a true for each immutable slot that has just
 							  //been invalidated.  The callback should logically OR the invalidation vector with its current invalidation vector (if it has one) and process each of the invalid slots.
 							  //When a cut is constructed the isNewCut parameter is true and the invalidatedImmutablesSlots will all be true.  This means the callbacks
 							  //are expected to already have any other needed data by that point (so you need to provide it separately before the new cut)
 
-	var actionCallbacks = []; //callbacks must be of the form foo(cut,info){} where info is an object with at least a string proeprty named description
-
-    //TODO: modify changeCallbacks to work with the immutable system, and debug any outstanding internal issues here with the immutable system
+	var actionCallbacks = $.Callbacks(); //callbacks must be of the form foo(info){} where this is the current cut object, info is an object with at least a string proeprty named description
 
 	//the undo stack is an array of these objects
 	var action = function(type,data,description){ 
@@ -37,37 +35,14 @@ T.CUT = function(){//class factory
 		this.description=description
 	} 
 
-	var AddChangeCallback = function(fn){
-		changeCallbacks.push(fn);
-	}
-	var AddActionCallback = function(fn){
-		actionCallbacks.push(fn);
-	}
-	//TODO: may want to implement RemoveCallback, which I think you can do by iterating through list and testing for equality of function objects
-
 	var PushAction = function(type,data,description){
 		this._.actionStack.push(new action(type,data,description));
 
-		TriggerActionCallbacks({description:description,type:type,num:this._.actionStack.length});
+		actionCallbacks.fireWith(this,[{description:description,type:type,num:this._.actionStack.length}]);
 	}
-
-	var TriggerActionCallbacks = function(ob){
-		for(var i=0;i<actionCallbacks.length;i++)
-			try{
-				actionCallbacks[i](this,SimpleClone(ob));
-			}catch(err){console.log("Error in TriggerActionCallbacks: " + err.stack)}
-	}
-
-	var TriggerChangeCallbacks = function(invalidatedImmtableSlots,isNew){ 
-		for(var i=0;i<changeCallbacks.length;i++)
-			try{
-				changeCallbacks[i](this,invalidatedImmtableSlots,isNew);
-			}catch(err){console.log("Error in TriggerChangeCallbacks: " + err.stack)}
-	}
-	var ForceChangeCallback = function(fn){ 
-		try{
-			fn(this,M.repvec(1,this._.immutablesSlots.length),false); //force a full change callback on the requested function, but don't claim that it's a new cut
-		}catch(err){console.log("Error in ForceChangeCallback: " + err.stack)}
+	
+	var ForceChangeCallback = function(fn){  //TODO: depreceate this function
+		fn.call(this,M.repvec(1,this._.immutablesSlots.length),false); //force a full change callback on the requested function, but don't claim that it's a new cut
 	}
 
     var NewImmutable = function(inds,group_num){
@@ -192,15 +167,15 @@ T.CUT = function(){//class factory
 		}
 
 		PushAction.call(this,"load",{},description);
-		TriggerChangeCallbacks.call(this,M.repvec(1,this._.immutablesSlots.length),true); 
+		changeCallbacks.fireWith(this,[M.repvec(1,this._.immutablesSlots.length),true]); 
 	}
 
 	var ReTriggerAll = function(){
 		//to be used when restoring to view, i.e. after another cut has been in view
-		TriggerChangeCallbacks.call(this,M.repvec(1,this._.immutablesSlots.length),true);
+		changeCallbacks.fireWith(this,[M.repvec(1,this._.immutablesSlots.length),true]);
 		for(var i=0;i<this._.actionStack.length;i++){
 			var ac = this._.actionStack[i];
-			TriggerActionCallbacks({description:ac.description,type:ac.type,num:i+1}); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
+			actionCallbacks.fireWith(this,[{description:ac.description,type:ac.type,num:i+1}]); //TODO: this is a *really* inefficient way of restoring the action list, ought to deliever a batch of all actions
 		}
 	}
 
@@ -228,7 +203,7 @@ T.CUT = function(){//class factory
 		//this is going to be exported (=made public), it calls the relevant inverse operation (which are private)
 		//the inverse operations make a call to TriggerChangeCallbacks, but this function does the call to TriggerActionCallbacks
 		if (this._.actionStack.length == 0){
-			TriggerActionCallbacks.call(this,{description:"nothing to undo", type:"empty-actions"});
+			actionCallbacks.fireWith(this,[{description:"nothing to undo", type:"empty-actions"}]);
 			return;//nothing to undo
 		}
 
@@ -246,10 +221,10 @@ T.CUT = function(){//class factory
 			undone = false;
 
 		if(undone){
-			TriggerActionCallbacks.call(this,{description:"",type:"undo"});
+			actionCallbacks.fireWith(this,[{description:"",type:"undo"}]);
 		}else{
 			this._.actionStack.push(action);//put it back
-			TriggerActionCallbacks.call(this,{description:"cannot undo '" + action.type + "' actions", type:"no-undo"});
+			actionCallbacks.fireWith(this,[{description:"cannot undo '" + action.type + "' actions", type:"no-undo"}]);
 		}
 	}
 
@@ -285,7 +260,7 @@ T.CUT = function(){//class factory
 				
 		s.data[1] = splitMask; //store the new mask
 		var invalidatedSlots = SpliceImmutables.call(this,a,2,first_half,second_half);
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 	
 	var SplitA = function(a,splitMask){
@@ -301,7 +276,7 @@ T.CUT = function(){//class factory
 		
 		var invalidatedSlots = SpliceImmutables.call(this,a,1,first_half,second_half);
 		PushAction.call(this,"split",[a,splitMask],'split group-' + a + ' in two');
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 	var UndoSplitA = function(data){ 
 		var a = data[0];
@@ -315,7 +290,7 @@ T.CUT = function(){//class factory
 			else
 				cut_a.push(first_half.shift());	
 		var invalidatedSlots = SpliceImmutables.call(this,a,2,cut_a);
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 
 	var AddBtoA = function(a,b){
@@ -334,7 +309,7 @@ T.CUT = function(){//class factory
 		invalidatedSlots[NewImmutable.call(this,M.concat(cut_a,cut_b),a)] = 1;
 		
 		PushAction.call(this,"add",[a,b,lenB],'merge group-' + b + ' into group-' + a);
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 	var UndoAddBtoA = function(data){
 		var a = data[0]; var b = data[1]; var lenB = data[2];
@@ -350,7 +325,7 @@ T.CUT = function(){//class factory
 		invalidatedSlots[NewImmutable.call(this,cut_ab.subarray(0,-lenB),a)] = 1;
 		invalidatedSlots[NewImmutable.call(this,cut_ab.subarray(-lenB),b)] = 1;		
 
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 
 	var SwapBandAHelper = function(a,b){
@@ -376,11 +351,11 @@ T.CUT = function(){//class factory
 	var SwapBandA = function(a,b){
 		var invalidatedSlots = SwapBandAHelper.call(this,a,b);
 		PushAction.call(this,"swap",[a,b],"swap group-" + a + " and group-" + b);
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 	var UndoSwapBandA = function(data){
 		var invalidatedSlots = SwapBandAHelper.call(this,data[0],data[1]);
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 
 	var ReorderAll = function(newOrder){
@@ -401,7 +376,7 @@ T.CUT = function(){//class factory
 		}
 		
 		PushAction.call(this,"reorder",newOrder,"reorder groups");
-		TriggerChangeCallbacks.call(this,invalidatedSlots);
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 
 	var	UndoReorderAll = function(data){
@@ -421,7 +396,7 @@ T.CUT = function(){//class factory
 			invalidatedSlots[k] = 1; //note that if newOrder[i] == i we avoid invalidating the slot
 		}
 				
-		TriggerChangeCallbacks.call(this,invalidatedSlots); 
+		changeCallbacks.fireWith(this,[invalidatedSlots]); 
 	}
 
 	var GetGroup = function(g){
@@ -532,8 +507,10 @@ T.CUT = function(){//class factory
 	
 	// export the cut class together with some explicitly static functions
 	return {cls: cut,
-			AddChangeCallback: AddChangeCallback,
-			AddActionCallback: AddActionCallback
+			AddChangeCallback: changeCallbacks.add,
+			RemoveChangeCallback: changeCallbacks.remove,
+			AddActionCallback: actionCallbacks.add,
+			RemoveActionCallback: actionCallbacks.remove
 			};
 }();
 

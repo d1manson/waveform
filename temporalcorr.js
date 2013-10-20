@@ -194,13 +194,13 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
     }
 
-    var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
+    var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ // this = cut object
 
-        if(cut == null && cCut == null)
+        if(this == null && cCut == null)
             throw(new Error ("SlotsInvalidated temporalcorr with null cut"));
 
-        if(cut != null)
-            cCut = cut;
+        if(this != null)
+            cCut = this;
 
         if(!show)
             return; //we only render when we want to see them
@@ -242,7 +242,7 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
         if(!cCut)
             return;
 		if(v){
-        	SlotsInvalidated(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
+        	SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
 		}else{
 			for(var i=0;i<workerSlotGeneration.length;i++)
 				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);

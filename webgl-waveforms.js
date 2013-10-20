@@ -425,9 +425,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			window.setTimeout(function(){Render(cRender);},1);
 	}
 
-	var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
-		if(!ready.voltage)
-			throw new Error('SlotsInvalidated without any voltage data.');
+	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ // this = cut object
+		if(!ready.voltage){
+			console.warn('T.WV SlotsInvalidated without any voltage data.');
+			return;
+		}
 
 		if(cRender && cRender.alive)
 			cRender.alive = false;  //kill the old render. In a way this is not necessary (due to the fact that rendering tries to use the most up to date information), but it is simpler.
@@ -436,7 +438,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 		var r = slotRenderState;
 		if(isNewCut || cCut == null){//TODO: check exactly when isNewCut is true, and check whether we really need to all of the following each time it is true
-			cCut = cut;
+			cCut = this;
 			r.invalidatedSlots = M.clone(newlyInvalidatedSlots);
 			r.nSlots = newlyInvalidatedSlots.length;
 			r.chanXOffset = Array(r.nSlots);
@@ -448,15 +450,15 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 			M.or(r.invalidatedSlots,newlyInvalidatedSlots,M.IN_PLACE); //slotRenderState.invalidatedSlots |= newlyInvalidatedSlots
 		}
 
-		if(cut && cut != cCut)
-			throw new Error("webgl-waveforms SlotsInvalidated with unexpected cut instance argument");
+		if(this && this != cCut)
+			throw new Error("webgl-waveforms SlotsInvalidated with unexpected cut instance context");
 
 		slotRenderState.firstInd = 0;
 		window.setTimeout(function(){Render(cRender);},1);
 	}
 
 	var InvalidateAll = function(){
-		SlotsInvalidated(null,M.repvec(1,slotRenderState.nSlots)); //invalidate all slots
+		SlotsInvalidated.call(null,M.repvec(1,slotRenderState.nSlots)); //invalidate all slots
 	}
 
 	var ShowChannels = function(newChanIsOn){

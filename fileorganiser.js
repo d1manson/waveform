@@ -236,7 +236,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 
     }
 
-	var CutActionCallback = function(cut,info){
+	var CutActionCallback = function(info){
 		if (!cCutIsFileOrAllZero) return; //once we've moved off from being an actual file there is no going back, having said that TODO: might be nice to respond to undoing back to the orginal file		
 		if (info.type == "load") return; //the load should have been requested by the SwitchToCut function below, where we deal with its implications fully
 

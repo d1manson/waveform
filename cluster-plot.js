@@ -55,19 +55,21 @@ T.CP = function($canvasParent){
     }();
 
 
-	var SlotsInvalidated = function(cut,newlyInvalidatedSlots,isNewCut){
+	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ //this = cut object
 		
-		if(!ready)
-			throw new Error('cluster-plot SlotsInvalidated without any voltage data.');
+		if(!ready){
+			console.warn('cluster-plot SlotsInvalidated without any voltage data.');
+			return;
+		}
 			
 		if(isNewCut || cCut == null){//TODO: check exactly when isNewCut is true, and check whether we really need to the following each time it is true
-			cCut = cut;
+			cCut = this;
 			if(!canvasesAreNew)
 				for(var i=0;i<ctxes.length;i++)
 					ctxes[i].clearRect(0,0,canvS,canvS);
 		}
 
-		if(cut && cut != cCut)
+		if(this && this != cCut)
 			throw new Error("cluster-plot SlotsInvalidated with unexpected cut instance argument");
 
 		console.time('si cluster');

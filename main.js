@@ -86,7 +86,7 @@ T.FinishedLoadingFile = function(status,filetype){
 		}
 		if(status.cut < 3){
 			T.ClearAllTiles();
-			T.CutActionCallback(null,{num:0,type:"load",description:"no active cut"});
+			T.CutActionCallback({num:0,type:"load",description:"no active cut"});
 		}
 		if(status.pos < 3){
 			T.RM.LoadPosData(null);
@@ -325,10 +325,10 @@ T.CreateTile = function(i){
 
 }
 
-T.SetGroupDataTiles = function(cut,invalidatedSlots_,isNew){
+T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 	//controls the adding, removing, rearanging, and caption-setting for tiles. (Unfortunately the logic is a bit complicated)
 
-	var maxGroupNum = cut.GetProps().G; 
+	var maxGroupNum = this.GetProps().G; 
 	var invalidatedSlots = M.clone(invalidatedSlots_); //we want our own copy for this function to modify
 	
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
@@ -341,7 +341,7 @@ T.SetGroupDataTiles = function(cut,invalidatedSlots_,isNew){
 	
 	var slotCache = Array(invalidatedSlots.length); //this means we only have to call cut.GetImmutableSlot(k) once for each invalidated slot (even though we have two for loops below)
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
-		var slot_k = slotCache[k] = cut.GetImmutableSlot(k); //get the slot
+		var slot_k = slotCache[k] = this.GetImmutableSlot(k); //get the slot
 		if(slot_k.inds == null  || slot_k.inds.length==0 ){ //check if immutable has been cleared (or maybe it never contaiend anything)
 			var old_tile_ind = T.cutSlotToTileMapping[k];
 			if(isNum(old_tile_ind)){
@@ -467,7 +467,7 @@ T.ToggleElementState = function(el){
 
 
 
-T.CutActionCallback = function(cut,info){
+T.CutActionCallback = function(info){
 	if(info.type == "undo"){
 		var $oldAction = T.$action_.pop();
 		$oldAction.remove();
