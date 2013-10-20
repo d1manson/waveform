@@ -1,7 +1,10 @@
 "use strict";
 
 // The CUT module, the primary component of which is a class called cut
-T.CUT = function(){//class factory
+var T = T || {};
+T.ORG = T.ORG || {};
+
+T.CUT = function(ORG){//class factory
 
 	//the object this._ is to be considered private, though it is actually public.  
 	//Correct me if I'm wrong, but I think this is considered an ok way of emulating OOP in javascript - DM
@@ -505,12 +508,13 @@ T.CUT = function(){//class factory
 	cut.prototype.GetImmutableSlot = GetImmutableSlot;
 	cut.prototype.GetNImmutables = GetNImmutables;
 	
-	// export the cut class together with some explicitly static functions
-	return {cls: cut,
-			AddChangeCallback: changeCallbacks.add,
-			RemoveChangeCallback: changeCallbacks.remove,
-			AddActionCallback: actionCallbacks.add,
-			RemoveActionCallback: actionCallbacks.remove
-			};
-}();
+	// append these CUT static methods to the ORG module
+	ORG.AddCutChangeCallback = changeCallbacks.add,
+	ORG.RemoveCutChangeCallback = changeCallbacks.remove,
+	ORG.AddCutActionCallback =  actionCallbacks.add,
+	ORG.RemoveCutActionCallback =  actionCallbacks.remove
+	
+	return cut;	// export the cut class
+	
+}(T.ORG);
 

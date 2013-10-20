@@ -1,6 +1,6 @@
 "use strict";
 
-T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
+T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
 	// === WORKER ==================================================
 	var workerFunction = function(){
@@ -256,14 +256,27 @@ T.TC = function(BYTES_PER_SPIKE,CanvasUpdateCallback, TILE_CANVAS_NUM){
 	}
 
 
+	var FileStatusChanged = function(status,filetype){
+		if(filetype == null && status.tet < 3)
+			LoadTetrodeData(0);
+			
+		if(filetype == "tet"){
+			LoadTetrodeData(ORG.GetN(),ORG.GetTetTimes());
+			
+			if(status.cut == 3) //if we happened to have loaded the cut before the tet, we need to accept the cut now
+				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);	
+		}
+	}
+
+	ORG.AddCutChangeCallback(SlotsInvalidated);
+	ORG.AddFileStatusCallback(FileStatusChanged);
+	
 	var theWorker = BuildBridgedWorker(workerFunction,["CreateAllSpikeTimes*","SetImmutable*","NewCut","SetMaxDeltaT"],["PlotHist*"],[PlotHist]);
 	console.log("tmporalcorr BridgeWorker is:\n  " + theWorker.blobURL);
 
     return {
-		SlotsInvalidated: SlotsInvalidated,
 		SetShow: SetShow,
-		SetDeltaT: SetDeltaT,
-		LoadTetrodeData: LoadTetrodeData
+		SetDeltaT: SetDeltaT
     };
 
-}(T.BYTES_PER_SPIKE,T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC);
+}(T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC, T.ORG);

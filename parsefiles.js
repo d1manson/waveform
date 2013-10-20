@@ -4,9 +4,10 @@
 // The functions add the callback to a queue and send the file handle off to a worker to be parsed into a header object [and data buffer, if applicable]. 
 // The worker returns the parsed data to the main thread, which then forwards it on to the callback at the front of the queue.
 // there is a separate worker (each with its own specific code) for set, tet, pos, and cut.
+var T = T || {};
 
-T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
-        
+T.PAR = function(){
+
 	// ==== WORKER CODE ===============================================================================
 	var tetWorkerCode = function(){
 		"use strict";
@@ -183,10 +184,12 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
 	
 	// ================= End Of Worker Code ========================================================================
 	
-		
+	var BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and bnumpix2 repeated
+	var BYTES_PER_SPIKE = 4*(4 + 50);
     var SPIKE_FORMAT = "t,ch1,t,ch2,t,ch3,t,ch4";
     var POS_FORMAT = "t,x1,y1,x2,y2,numpix1,numpix2";
-
+	var POS_NAN = 1023;
+	
 	var callbacks = {pos:[],cut:[],set:[],tet:[]};  //we use callback cues as the workers have to process files in order
 	
     var LoadTetrodeWithWorker = function(file,callback){
@@ -287,7 +290,10 @@ T.PAR = function(BYTES_PER_POS_SAMPLE,BYTES_PER_SPIKE){
         LoadCut2: GetCutExpNameWithWorker,
         GetPendingParseCount: GetPendingParseCount,
         GetTetrodeTime: GetTetrodeTime,
-		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker
+		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker,
+		BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
+		BYTES_PER_SPIKE: BYTES_PER_SPIKE,
+		POS_NAN: POS_NAN
     }
     
-}(T.BYTES_PER_POS_SAMPLE,T.BYTES_PER_SPIKE)
+}();

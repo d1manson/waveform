@@ -1,5 +1,6 @@
 "use strict";
 
+var T = T || {};
 T.FS = function(requestFileSystem,PERSISTANCE){
     var active = 0;
     var FilesInMemory = {};

@@ -1,6 +1,6 @@
 "use strict";
 
-T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallback, TILE_CANVAS_NUM){
+T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallback, TILE_CANVAS_NUM,ORG){
 
 
 	var workerFunction = function(){
@@ -406,16 +406,43 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		theWorker.SetBinSizeCm(v); //the worker will send back one hist for each slot that it has previously been sent
 	}
 
+
+	
+	var FileStatusChanged = function(status,filetype){
+		if(filetype == null){
+			if(status.tet < 3)
+				LoadTetData(null);
+			
+			if(status.pos < 3)
+				LoadPosData(null);
+		}
+		
+		if(filetype == "tet"){
+			LoadTetData(ORG.GetN(),ORG.GetTetTimes());
+			
+			if(status.cut == 3 && status.pos == 3) ///if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
+				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
+		}
+
+		if(filetype == "pos"){
+			var posHeader = ORG.GetPosHeader();
+			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre));
+			if(status.cut == 3 && status.tet == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
+				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
+		}
+			
+	}
+
 	var theWorker = BuildBridgedWorker(workerFunction,["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetImmutable*"],["ShowIm*"],[ShowIm]);
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 	
+	ORG.AddCutChangeCallback(SlotsInvalidated);
+	ORG.AddFileStatusCallback(FileStatusChanged);
+	
 	return {
-		LoadTetData: LoadTetData,
-		SlotsInvalidated: SlotsInvalidated,
-		LoadPosData: LoadPosData,
 		SetShow: SetShow,
 		SetCmPerBin: SetCmPerBin
 	}
 
-}(T.BYTES_PER_SPIKE,T.BYTES_PER_POS_SAMPLE,T.POS_NAN,T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM)
+}(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG)
 

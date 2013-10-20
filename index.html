@@ -149,26 +149,33 @@ you can drag further files onto the window at any point<br>
 </div>
 
 
-
+<!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  
 <script src="keymaster.min.js"></script>  
 <script src="utils.js"></script>
 <script src="worker-bridge.js"></script>
-<script src="Mlib.js"></script>
-<script src="main.js"></script>
-<script src="cut.js"></script>
-<script src="tool.js"></script>
-<script src="parsefiles.js"></script>
 <script src="filesystem.js"></script>
-<script src="ratemap.js"></script>
-<script src="temporalcorr.js"></script>
-<script src="fileorganiser.js"></script>
+<script src="Mlib.js"></script>
 <!-- <script src="webgl-debug.js"></script> -->
 <script src="gpu-distmatrix.js"></script>
-<script src="autocut.js"></script>
 
+<!-- T.PAR, T.CUT, and T.ORG look after the files and cuts-->
+<script src="parsefiles.js"></script>
+<script src="cut.js"></script>
+<script src="fileorganiser.js"></script>
+
+<!-- main and T.Tool deal with the miscellaneous interaction tasks and persistence of settings etc.-->
+<script src="main.js"></script>
+<script src="tool.js"></script>
+
+<!-- T.WV, T.TC, T.RM and T.CP display different plots of the data -->
+<script src="ratemap.js"></script>
+<script src="temporalcorr.js"></script>
 <script src="webgl-waveforms.js"></script>
 <script src="cluster-plot.js"></script>
+
+<!-- T.AC does autocutting -->
+<script src="autocut.js"></script>
 
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 
 //T.WV: uses webgl to render waveforms
-T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
+T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
 //TODO: might consider adding in an indexed version of drawing if the number of waves to be redrawn is small enough compared to N
 //this would hopefully be fairly easy, requiring code to generate the indicies, then upload them, and then use them.
@@ -508,6 +508,22 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 				};
 	}
 	
+	
+	var FileStatusChange = function(status,filetype){
+		if(filetype == null && status.tet < 3)
+			LoadTetrodeData(null);	
+			
+		if(filetype == "tet"){
+			LoadTetrodeData(ORG.GetN(),ORG.GetTetBuffer());
+			if(status.cut == 3) //if we happened to have loaded the cut before the tet, we need to force to accept it now
+				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);  //TODO: just invalidate all here directly
+		}
+		
+	}
+
+
+
+
 	// The rest of the functions are fairly boring...
 
 	var FRAGMENT_SHADER_STR = [
@@ -643,13 +659,14 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM){
 
 	Init(); //initialises all the webgl stuff without actually doing any data-specific stuff
 
-	return {LoadTetrodeData: LoadTetrodeData,
-			SlotsInvalidated: SlotsInvalidated,
-			SetPaletteMode: SetPaletteMode,
+	ORG.AddCutChangeCallback(SlotsInvalidated);
+	ORG.AddFileStatusCallback(FileStatusChange);
+	
+	return {SetPaletteMode: SetPaletteMode,
 			ShowChannels: ShowChannels,
 			IsReady: IsReady,
 			MouseToVandT: MouseToVandT
 			};
 
-}(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE);
+}(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG);
 

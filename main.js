@@ -1,16 +1,12 @@
 "use strict";
 
-var T = {};
+var T = T || {};
 T.Tool = {};
 T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.tAutocorrIsOn = 0;
 T.paletteMode = 0;
 T.binSizeCm = 2.5;
-
-T.BYTES_PER_SPIKE = 4*(4 + 50);
-T.BYTES_PER_POS_SAMPLE = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2);//the last two uint16s are numpix1 and bnumpix2 repeated
-T.POS_NAN = 1023; 
 
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
@@ -22,7 +18,6 @@ T.POS_PLOT_HEIGHT = 200;
 T.DISPLAY_ISON = {CHAN: [1,2,3,4], RM: [101], TC: 201, //value attribute in DOM
 				  CHAN_: [0,1,2,3], RM_: [4], TC_: 5}; //order in DOM
 				  
-T.DISPLAYAUTOCORR_START = 201-1;
 T.xFactor = 2;
 T.yFactor = 2;
 T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
@@ -48,7 +43,7 @@ T.PlotPos = function(){
 
 	var data = new Int16Array(buffer);
 	var header = T.ORG.GetPosHeader();
-	var elementsPerPosSample = T.BYTES_PER_POS_SAMPLE/2;
+	var elementsPerPosSample = T.PAR.BYTES_PER_POS_SAMPLE/2;
 	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
 	var xs = T.POS_PLOT_WIDTH/(parseInt(header.window_max_x)-parseInt(header.window_min_x));
 	var ys = T.POS_PLOT_HEIGHT/(parseInt(header.window_max_y)-parseInt(header.window_min_y));
@@ -57,31 +52,19 @@ T.PlotPos = function(){
 	ctx.strokeStyle = "RGB(0,0,0)";
 	var i = 2;
 	ctx.moveTo(data[i]*s,data[i+1]*s);
-	for(;i<end;i+=elementsPerPosSample)if(data[i] != T.POS_NAN && data[i+1] != T.POS_NAN && data[i] && data[i+1])
+	for(;i<end;i+=elementsPerPosSample)if(data[i] != T.PAR.POS_NAN && data[i+1] != T.PAR.POS_NAN && data[i] && data[i+1])
 		ctx.lineTo(data[i]*s,data[i+1]*s);
 	ctx.stroke();
 }
 
 
 T.FinishedLoadingFile = function(status,filetype){
-	//status is an object with a field for each of the file types ["pos","set","tet","cut"] the values have the following meanings:
-	//	0 - file does not exist
-	//	1 - file exists but has not been delivered here yet
-	//  2 - this is the file currently being delievered - see the data object
-	//  3 - file has already been delivered
-	//  Note that in each round of loading files there will be an initial call with a null filetype, indicating what ui data needs to be flushed.
-	// filetype just tells us which item in status is 2, or is null if none of them are.
-
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 
 	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
 
 	if(filetype == null){
 		if(status.tet < 3){
-			T.WV.LoadTetrodeData(null);	
-			T.RM.LoadTetData(null);
-			T.TC.LoadTetrodeData(0);
-			T.CP.LoadTetrodeData(0);
 			T.PlotPos();
 		}
 		if(status.cut < 3){
@@ -89,47 +72,22 @@ T.FinishedLoadingFile = function(status,filetype){
 			T.CutActionCallback({num:0,type:"load",description:"no active cut"});
 		}
 		if(status.pos < 3){
-			T.RM.LoadPosData(null);
 			T.PlotPos();
 		}
 	}
-	
-	if(filetype == "tet"){
-		var N = T.ORG.GetN();
-		var tetBuffer = T.ORG.GetTetBuffer();
-		var tetTimes = T.ORG.GetTetTimes();
-		T.WV.LoadTetrodeData(N,tetBuffer);
-		T.TC.LoadTetrodeData(N,tetTimes);
-		T.RM.LoadTetData(N,tetTimes);
-		T.ORG.GetTetAmplitudes(function(amps){
-									T.CP.LoadTetrodeData(N,amps);
-										if(status.cut == 3)
-											T.ORG.GetCut().ForceChangeCallback(T.CP.SlotsInvalidated);
-								});
-		
-		if(status.cut == 3){ //if we happened to have loaded the cut before the tet, we need to force T.WV, T.TC, and T.RM to accept it now
-			T.ORG.GetCut().ForceChangeCallback(T.WV.SlotsInvalidated);
-			T.ORG.GetCut().ForceChangeCallback(T.TC.SlotsInvalidated);
-			if(status.pos == 3) //we need pos as well as tet for ratemap
-				T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
-			
-		}
-	}
+
 
 	if(filetype == "pos"){
 		T.PlotPos();
-		var posHeader = T.ORG.GetPosHeader();
-		T.RM.LoadPosData(parseInt(posHeader.num_pos_samples), T.ORG.GetPosBuffer(),parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre));
-		if(status.cut == 3 && status.tet == 3){ //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
-			T.ORG.GetCut().ForceChangeCallback(T.RM.SlotsInvalidated);
-		}
 	}
 		
-	//note that cut is mainly dealt with separetly by the callbacks registered with the T.CUT module
+
 }
 
 
 T.DispHeaders = function(status,filetype){
+	//TODO: move to separate module
+	
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
 	var headerTypeList = ["tet","cut","pos","set"];
 	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
@@ -598,13 +556,10 @@ T.StoreData = function(){
 T.DocumentReady = function(){
 
     T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
-	T.CUT.AddChangeCallback(T.SetGroupDataTiles);
-	T.CUT.AddChangeCallback(T.WV.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.RM.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.TC.SlotsInvalidated);
-	T.CUT.AddChangeCallback(T.CP.SlotsInvalidated);
-	T.CUT.AddActionCallback(T.CutActionCallback);
-
+	T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
+	T.ORG.AddCutActionCallback(T.CutActionCallback);	
+	T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
+		
 	if(localStorage.state){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
 		T.xFactor = localStorage.xFactor || 2;

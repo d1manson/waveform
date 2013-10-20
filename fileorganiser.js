@@ -5,9 +5,12 @@
 // each with an array of tetrodes.
 // It is also responsible for content and interactivity of the files pannel div.
 
+var T = T || {};
 
-T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCallback,CUT){
+T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
+	var fileStatusCallbacks = $.Callbacks();
+	
     var exps = []; //this array only ever grows, elemts can be set to null, but they never get spliced out
 
 	//used for canceling asynchrounus loads/parses, see InternalPARcallback for useage
@@ -160,7 +163,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 
 			if (filetype == "cut"){
 				if(!hLivingTet.alive || !hLivingCut.alive) return;
-				cCut = new CUT.cls(cExp.name,cTet,1,data.cut,"loaded from file");
+				cCut = new CUT(cExp.name,cTet,1,data.cut,"loaded from file");
 				cCutHeader = data.header;
 			}else if(filetype == "tet"){
 				if(!hLivingTet.alive) return;
@@ -168,9 +171,9 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 				cTetHeader = data.header;
 				cN = parseInt(data.header.num_spikes);
 				if(makeNullCutFromN){//SwitchToCut may have requested a null-cut to be generated at this point
-					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
+					cCut = new CUT(cExp.name,cTet,4,cN,"blank slate");
 					cState.cut = 2; 
-					FinishedLoadingFileCallback(cState,"cut"); //it shouldn't matter that we announce the arival of the cut before we announce the arival of the tet (below).
+					fileStatusCallbacks.fireWith(null,[cState,"cut"]); //it shouldn't matter that we announce the arival of the cut before we announce the arival of the tet (below).
 					cState.cut = 3; 
 				}	
 				makeNullCutFromN = false;
@@ -182,7 +185,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			}
 
 			cState[filetype] = 2; // tell the callback that this is the filetype that has just loaded
-			FinishedLoadingFileCallback(cState,filetype);
+			fileStatusCallbacks.fireWith(null,[cState,filetype]);
 			cState[filetype] = 3; //next time we shall tell the callback that it has ben told about this filetype
 		}
 	}
@@ -203,7 +206,7 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
         if(cExp && cExp.set)
             T.FS.ReadFile(cExp.set,PAR.LoadSet,InternalPARcallback("set"));
 
-		SwitchToTet(tet_ind); //load tet and cut if they exist, this will trigger the null call to FinishedLoadingFileCallback
+		SwitchToTet(tet_ind); //load tet and cut if they exist, this will trigger the null call to fileStatusCallbacks
     }
 
     var SwitchToTet = function(tet_ind){
@@ -259,24 +262,24 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			case 0:
 				//no new cut, just get rid of the old
 				cCutIsFileOrAllZero = null;
-				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				fileStatusCallbacks.fireWith(null,[cState,null]); //announce what is about to be loaded
 				break;
 
 			case 1:
 				//data is the index of a cut name in the cut_names array for the cTet on cExp, we retrieve the cut file from T.FS
 				cCutIsFileOrAllZero = true;
 				T.FS.ReadFile(cExp.tets[cTet].cut_names[data],PAR.LoadCut,InternalPARcallback("cut"));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
-				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				fileStatusCallbacks.fireWith(null,[cState,null]); //announce what is about to be loaded
 				MarkCurrentCut(data,null);
 				break;
 
 			case 2:
 				//data is an index into the array of cut instances for the current exp-tet
 				cState.cut = 1;
-				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				fileStatusCallbacks.fireWith(null,[cState,null]); //announce what is about to be loaded
 				cCut = cExp.tets[cTet].cut_instances[data];
 				cState.cut = 2;
-				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+				fileStatusCallbacks.fireWith(null,[cState,"cut"]); //announce that cut has been loaded
 				cCut.ReTriggerAll(); //relive the whole life of the cut again
 				cState.cut = 3;
 				MarkCurrentCut(null,data);
@@ -285,10 +288,10 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			case 3:
 				//data is of the same form as the private cutInds array in the cut class (i.e. this is probably the output from some automated cutting function)
 				cState.cut = 1;
-				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
-				cCut = new CUT.cls(cExp.name,cTet,3,data,"special cut");
+				fileStatusCallbacks.fireWith(null,[cState,null]); //announce what is about to be loaded
+				cCut = new CUT(cExp.name,cTet,3,data,"special cut");
 				cState.cut = 2;
-				FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+				fileStatusCallbacks.fireWith(null,[cState,"cut"]); //announce that cut has been loaded
 				cState.cut = 3;
 				cExp.tets[cTet].cut_instances.push(cCut);
 				ShowCutInstance(cExp.tets[cTet].cut_instances.length-1);
@@ -297,14 +300,14 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 			case 4:
 				//data is null, we need to make an all-zero cut
 				cState.cut = 1;
-				FinishedLoadingFileCallback(cState,null); //announce what is about to be loaded
+				fileStatusCallbacks.fireWith(null,[cState,null]); //announce what is about to be loaded
 				cCutIsFileOrAllZero = true;
 				if(cN == null)
 					makeNullCutFromN = true; //shall have to wait for the tet file to load, it will check this flag and make a cut
 				else{
-					cCut = new CUT.cls(cExp.name,cTet,4,cN,"blank slate");
+					cCut = new CUT(cExp.name,cTet,4,cN,"blank slate");
 					cState.cut = 2;
-					FinishedLoadingFileCallback(cState,"cut"); //announce that cut has been loaded
+					fileStatusCallbacks.fireWith(null,[cState,"cut"]); //announce that cut has been loaded
 					cState.cut = 3;
 				}
 				break;
@@ -476,29 +479,32 @@ T.ORG = function($files_panel,$document,$drop_zone, PAR, FinishedLoadingFileCall
 	// '.file_group[active]>tet_group[active]>.file_brick'
 	//=======================================================
 
-    T.CUT.AddActionCallback(CutActionCallback);
+    ORG.AddCutActionCallback(CutActionCallback); //this function was added to ORG by cut.js
 
-    return { //expose some of the functions, and a few read-only things via simple Get* functions
-            SwitchToTet: SwitchToTet, 
-            SwitchToExpTet: SwitchToExpTet,
-			SwitchToCut: SwitchToCut,
-			RecoverFilesFromStorage: RecoverFilesFromStorage,
-            GetExp: function(ind){return ind === undefined? {name: cExp.name} : {name: exps[ind].name};},
-			GetSetHeader: function(){return cSetHeader;},
-            GetTet: function(){return cTet;},
-			GetN: function(){return cN;},
-			GetTetBuffer: function(){return cTetBuffer;},
-			GetTetHeader: function(){return cTetHeader;},
-			GetTetTimes: GetCTetT,
-			GetTetAmplitudes: GetCTetA,
-			GetPosBuffer: function(){return cPosBuffer;},
-			GetPosHeader: function(){return cPosHeader;},
-			GetCut: function(){return cCut;},
-			GetCutHeader: function(){return cCutHeader;}
-            };
+	
+	//finally, we are ready to add the extra stuff to the ORG namespace
+	ORG.SwitchToTet = SwitchToTet;
+    ORG.SwitchToExpTet = SwitchToExpTet;
+	ORG.SwitchToCut = SwitchToCut;
+	ORG.RecoverFilesFromStorage = RecoverFilesFromStorage;
+    ORG.GetExp = function(ind){return ind === undefined? {name: cExp.name} : {name: exps[ind].name};};
+	ORG.GetSetHeader = function(){return cSetHeader;};
+    ORG.GetTet = function(){return cTet;};
+	ORG.GetN = function(){return cN;};
+	ORG.GetTetBuffer = function(){return cTetBuffer;};
+	ORG.GetTetHeader = function(){return cTetHeader;};
+	ORG.GetTetTimes = GetCTetT;
+	ORG.GetTetAmplitudes = GetCTetA;
+	ORG.GetPosBuffer = function(){return cPosBuffer;};
+	ORG.GetPosHeader = function(){return cPosHeader;};
+	ORG.GetCut = function(){return cCut;};
+	ORG.GetCutHeader = function(){return cCutHeader;};
+	ORG.AddFileStatusCallback = fileStatusCallbacks.add;
+	ORG.RemoveFileStatusCallback = fileStatusCallbacks.remove;
+	
+    return ORG;
 
-}(//Use T.ORG constructor with the following inputs
-$('#files_panel'),$(document),$('.file_drop'),T.PAR,T.FinishedLoadingFile, T.CUT
+}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop')
 );
 
 

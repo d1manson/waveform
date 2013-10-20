@@ -1,7 +1,7 @@
 "use strict"; 
 
 
-T.CP = function($canvasParent){
+T.CP = function($canvasParent,ORG){
 
 	//TODO: it may be woth moving the plotting into a worker
 	
@@ -150,9 +150,24 @@ T.CP = function($canvasParent){
 		
 	}
 
-	return {
-		SlotsInvalidated: SlotsInvalidated,
-		LoadTetrodeData: LoadTetrodeData
-	};
+	var FileStatusChanged = function(status,filetype){
+
+		if(filetype == null && status.tet < 3)
+				LoadTetrodeData(0);
+		
+		if(filetype == "tet"){
+			T.ORG.GetTetAmplitudes(function(amps){
+										LoadTetrodeData(ORG.GetN(),amps);
+										if(status.cut == 3)
+											ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
+									});
+		}
 	
-} ($('#cluster_panel'));
+	}
+
+	ORG.AddCutChangeCallback(SlotsInvalidated);
+	ORG.AddFileStatusCallback(FileStatusChanged);
+	
+	return {}; //there is nothing exported currently
+	
+} ($('#cluster_panel'),T.ORG);

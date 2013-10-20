@@ -353,5 +353,5 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		ImagescDist: ImagescDist //for debugging only
     }
 
-}($('#autocut_caption'),T.BYTES_PER_SPIKE,T.DM.ComputeMatrix)
+}($('#autocut_caption'),T.PAR.BYTES_PER_SPIKE,T.DM.ComputeMatrix)
 
