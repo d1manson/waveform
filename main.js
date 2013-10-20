@@ -554,11 +554,6 @@ T.StoreData = function(){
 }
 
 T.DocumentReady = function(){
-
-    T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
-	T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
-	T.ORG.AddCutActionCallback(T.CutActionCallback);	
-	T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
 		
 	if(localStorage.state){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
@@ -603,7 +598,11 @@ T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 $('#file_headers_button').click(T.ToggleElementState($('.file_info')));
-
+T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
+T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
+T.ORG.AddCutActionCallback(T.CutActionCallback);	
+T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
+	
 
 // KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 key('p',T.TogglePalette);
