@@ -470,7 +470,7 @@ T.ReorderNCut = function(){
 }
 
 T.ReorderACut = function(amps){
-	if(!amps) //when the button is clicked the function is called with no inputs, so we have to go and get the amplitudes
+	if(!amps || !('length' in amps)) //when the button is clicked the function is called with event oject not with an array, so we have to go and get the amplitudes
 		T.ORG.GetTetAmplitudes(T.ReorderACut); //this is asynchrounous
 	
 	//amps is 1a 1b 1c 1d 2a 2b ... nd, where a-d are the 4 channels

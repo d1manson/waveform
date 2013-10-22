@@ -539,3 +539,9 @@ pre{
 font-size: 1.2em;
 margin-left: 15px;
 }
+#filesystem_buttons{
+position: absolute;
+left: 20px;
+bottom: 20px;
+text-align: left;
+}
