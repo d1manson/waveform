@@ -15,8 +15,7 @@ T.CANVAS_NUM_RM = 1;
 T.CANVAS_NUM_TC = 2;
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
-T.DISPLAY_ISON = {CHAN: [1,2,3,4], RM: [101], TC: 201, //value attribute in DOM
-				  CHAN_: [0,1,2,3], RM_: [4], TC_: 5}; //order in DOM
+T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
 				  
 T.xFactor = 2;
 T.yFactor = 2;
@@ -118,20 +117,20 @@ T.SetDisplayIsOn = function(v){
 	if('chanIsOn' in v){
 		T.chanIsOn = v.chanIsOn; //array of 4
 		for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)
-			T.$chanButton_.eq(T.DISPLAY_ISON.CHAN_[i]).prop('checked',T.chanIsOn[i])
+			T.chanIsOn[i] ?  T.$displayButtons.eq(T.DISPLAY_ISON.CHAN[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.CHAN[i]).removeAttr('checked');
 		T.WV.ShowChannels(T.chanIsOn);
 	}
 	
 	if('mapIsOn' in v){
 		T.mapIsOn = v.mapIsOn; //array of 1
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
-			T.$chanButton_.eq(T.DISPLAY_ISON.RM_[i]).prop('checked',T.mapIsOn[i])
+			T.mapIsOn[i] ? T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).removeAttr('checked');
 		T.RM.SetShow(T.mapIsOn);
 	}
 	
 	if('tAutocorrIsOn' in v){
 		T.tAutocorrIsOn = v.tAutocorrIsOn; //1 or 0 (not an array)
-		T.$chanButton_.eq(T.DISPLAY_ISON.TC_).prop('checked',T.tAutocorrIsOn)
+		T.tAutocorrIsOn ? T.$displayButtons.eq(T.DISPLAY_ISON.TC).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.TC).removeAttr('checked');
 		T.TC.SetShow(T.tAutocorrIsOn);
 	}
 	
@@ -149,7 +148,7 @@ T.DisplayIsOnClick = function(evt,keyboard){
 	var oldMaps = T.mapIsOn;
 	var oldTautocorr = T.tAutocorrIsOn;
 	
-	var thisVal = keyboard ? keyboard.val : parseInt($(this).val());
+	var thisVal = keyboard ? keyboard.val : $(this).data('domindex');
 	var shiftKey = keyboard ? keyboard.shiftKey : evt.shiftKey;
 	var setChans; var setMaps; var setTautocorr;
 
@@ -589,7 +588,7 @@ $('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
 $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
-T.$chanButton_ = $("input[name=channel]:checkbox").click(T.DisplayIsOnClick);
+T.$displayButtons = $(".display_button").click(T.DisplayIsOnClick).each(function(i){$(this).data('domindex',i);});
 $('#toggle_palette').click(T.TogglePalette);
 $('#autocut').click(T.RunAutocut);
 $('#apply_rm_size').click(T.ApplyRmSizeClick);

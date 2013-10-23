@@ -298,21 +298,31 @@ background-color: #999;
 
 .button_group {
 width: 100%;
-margin: 10px 3px 10px 3px;
+margin: 3px;
+font-size:0;
 }
-.button_group input[type="checkbox"],
-.button_group input[type="radio"]{
-display: none;
+.button_group > *{
+font-size: 12px;
 }
-.button_group label{
+
+.button{
 background: #CCC;
 text-align: center;
 padding: 5px 10px 5px 10px;
+margin: 2px;
+display: inline-block;
+cursor: default;
 }
-.button_group input[type="radio"]:checked+label,
-.button_group input[type="checkbox"]:checked+label {
+.button:hover{
+font-color: #C77;
+border: 1px #C77 solid;
+padding: 4px 9px 4px 9px;
+}
+.button[checked],
+.button[active]{
 background: #DDD;
 border: 1px #000 solid;
+padding: 4px 9px 4px 9px;
 }
 input[type="text"]{
 text-align: center;
@@ -320,24 +330,7 @@ text-align: center;
 .widget-moving{
 cursor: none;
 }
-.widget{
-background: -moz-linear-gradient(top, rgba(30,87,153,0) 0%, rgba(10,32,35,0.5) 37%, rgba(5,17,3,0.5) 47%, rgba(99,191,34,0.5) 50%, rgba(130,249,44,0.5) 51%, rgba(5,17,3,0.5) 56%, rgba(24,44,39,0.5) 63%, rgba(125,185,232,0) 100%);
-background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(30,87,153,0)), color-stop(37%,rgba(10,32,35,0.5)), color-stop(47%,rgba(5,17,3,0.5)), color-stop(50%,rgba(99,191,34,0.5)), color-stop(51%,rgba(130,249,44,0.5)), color-stop(56%,rgba(5,17,3,0.5)), color-stop(63%,rgba(24,44,39,0.5)), color-stop(100%,rgba(125,185,232,0)));
-background: -webkit-linear-gradient(top, rgba(30,87,153,0) 0%,rgba(10,32,35,0.5) 37%,rgba(5,17,3,0.5) 47%,rgba(99,191,34,0.5) 50%,rgba(130,249,44,0.5) 51%,rgba(5,17,3,0.5) 56%,rgba(24,44,39,0.5) 63%,rgba(125,185,232,0) 100%);position: absolute;
-height: 30px;
-top: 0px;
-left: 0px;
-right: 0px;
-text-align: center;
-position: absolute;
-}
-.widget-center{
-border: #FFAD33 5px solid;
-border-radius: 20px;
-width: 20px;
-height: 20px;
-position: absolute;
-}
+
 /*shake css from daneden.me */
 @-webkit-keyframes shake{0%,100%{-webkit-transform:translateX(0)}10%,30%,50%,70%,90%{-webkit-transform:translateX(-10px)}20%,40%,60%,80%{-webkit-transform:translateX(10px)}}@-moz-keyframes shake{0%,100%{-moz-transform:translateX(0)}10%,30%,50%,70%,90%{-moz-transform:translateX(-10px)}20%,40%,60%,80%{-moz-transform:translateX(10px)}}@-o-keyframes shake{0%,100%{-o-transform:translateX(0)}10%,30%,50%,70%,90%{-o-transform:translateX(-10px)}20%,40%,60%,80%{-o-transform:translateX(10px)}}@keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-10px)}20%,40%,60%,80%{transform:translateX(10px)}}.shake{-webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
 -webkit-animation-duration: 1s;
@@ -349,7 +342,7 @@ button{
 border: 1px solid #900;
 color: #900;
 padding: 5px 15px 5px 15px;
-
+margin: 0px 2px 0px 2px;
 }
 button:hover{
 background: #C77;
@@ -413,20 +406,6 @@ padding-right: 20px;
 }
 .notes{
 font-size:0.8em;
-}
-.file_group{
-background: #ccc;
-padding: 2px;
-margin: 2px;
--webkit-user-select: none;
--khtml-user-select: none;
--moz-user-select: -moz-none;
--o-user-select: none;
-user-select: none;
-}
-.file_group[active]{
-background: #ddd;
-border: 1px solid #000;
 }
 .file_group_title{
 font-weight: bold;
@@ -532,6 +511,7 @@ z-index:100;
 }
 button:hover + .floatinginfo,
 label:hover + .floatinginfo,
+div:hover + .floatinginfo,
 .floatinginfo[state="closed"]{
 display: block;
 }
@@ -544,4 +524,17 @@ position: absolute;
 left: 20px;
 bottom: 20px;
 text-align: left;
+}
+.tetrode_title{
+display: inline-block;
+padding-right: 5px;
+}
+.file_group{
+display: block;
+text-align: left;
+-webkit-user-select: none;
+-khtml-user-select: none;
+-moz-user-select: -moz-none;
+-o-user-select: none;
+user-select: none;
 }

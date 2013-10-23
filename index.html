@@ -66,11 +66,11 @@ you can drag further files onto the window at any point<br>
 			</div>
 			
 			<div class="button_group">
-				<input type="checkbox" name="channel" id="channel1" value="1" /><label for="channel1">c1</label>
-				<input type="checkbox" name="channel" id="channel2" value="2"/><label for="channel2">c2</label>
-				<input type="checkbox" name="channel" id="channel3" value="3"/><label for="channel3">c3</label>
-				<input type="checkbox" name="channel" id="channel4" value="4"/><label for="channel4">c4</label>
-				<input type="checkbox" name="channel" id="ratemaps_chk" value="101"/><label for="ratemaps_chk">rm</label>
+				<div class="button display_button">c1</div>
+				<div class="button display_button">c2</div>
+				<div class="button display_button">c3</div>
+				<div class="button display_button">c4</div>
+				<div class="button display_button">rm</div>
 				<div class="floatinginfo">
 					<b>Spatial ratemap [r]</b><br><br>
 					Bin size default is 2.5cm.  <br><br>
@@ -78,7 +78,7 @@ you can drag further files onto the window at any point<br>
 					<pre>T.ApplyRmSize(5)</pre>
 					The smoothing kernel is fixed as a 5x5 "boxcar".
 				</div>
-				<input type="checkbox" name="channel" id="tautocorr_chk" value="201"/><label for="tautocorr_chk">tc</label>		
+				<div class="button display_button">tc</div>	
 				<div class="floatinginfo">
 					<b>Temporal auto correlation [t]</b><br><br>
 					Time window default is set at 500ms.  <br><br>
