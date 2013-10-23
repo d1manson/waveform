@@ -151,17 +151,21 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
         for(var i =0; i <files.length;i++){
 
             var ext = REGEX_FILE_EXT.exec(files[i].name);
-            ext = ext[1];
-    		var base = files[i].name.slice(0,files[i].name.length-ext.length-1);
-
 			var type = -1;
-			if(ext=="cut") 					type = 1;
-			else if(ext == "pos") 			type = 2;
-    		else if(ext == "set") 			type = 3;
-            else if(!isNaN(parseInt(ext)))	type = 4;
+			var base = "";
+			
+			if (ext){
+			    ext = ext[1];
+				base = files[i].name.slice(0,files[i].name.length-ext.length-1);
 
-			if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
-					FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 
+				if(ext=="cut") 					type = 1;
+				else if(ext == "pos") 			type = 2;
+				else if(ext == "set") 			type = 3;
+				else if(!isNaN(parseInt(ext)))	type = 4;
+
+				if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
+						FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 	
+			}
 
 			switch(type){
 				case 1:
