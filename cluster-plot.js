@@ -72,6 +72,16 @@ T.CP = function($canvasParent,ORG){
 		if(this && this != cCut)
 			throw new Error("cluster-plot SlotsInvalidated with unexpected cut instance argument");
 
+		var renderSlotList = [];
+		for(var i=0;i<newlyInvalidatedSlots.length;i++)if(newlyInvalidatedSlots[i])
+			renderSlotList.push(cCut.GetImmutableSlot(i));
+			
+		RenderSlots(renderSlotList);
+	
+		canvasesAreNew = false;
+	}
+
+	var RenderSlots = function(slots){
 		console.time('si cluster');
 		var imData32 = Array(ctxes.length);
 		var imData = Array(ctxes.length);
@@ -80,8 +90,8 @@ T.CP = function($canvasParent,ORG){
 			imData32[i] = new Uint32Array(imData[i].data.buffer);		
 		}
 		
-		for(var i=0;i<newlyInvalidatedSlots.length;i++)if(newlyInvalidatedSlots[i]){
-			var s = cCut.GetImmutableSlot(i);
+		while(slots.length){
+			var s = slots.shift();
 			
 			if(!s || !s.inds || !s.inds.length)
 				continue;
@@ -105,9 +115,13 @@ T.CP = function($canvasParent,ORG){
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
 		console.timeEnd('si cluster');
-		canvasesAreNew = false;
 	}
-
+	
+	var BringGroupToFront = function(group_num){
+		var slot = cCut.GetGroup(group_num,true);
+		RenderSlots([slot]);
+	}
+	
 	var LoadTetrodeData = function(N_val,amps_in){
 		$canvasParent.empty();
 		ctxes = [];
@@ -168,6 +182,6 @@ T.CP = function($canvasParent,ORG){
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	
-	return {}; //there is nothing exported currently
+	return {BringGroupToFront:BringGroupToFront}; //there is nothing exported currently
 	
 } ($('#cluster_panel'),T.ORG);

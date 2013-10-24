@@ -9,7 +9,7 @@ T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 /* =================== GENERAL =================== */
 T.TileMouseDown = function(event){
 	$(this).toggleClass('shake',false); //clear any existing dragging animation
-	
+	T.CP.BringGroupToFront($(this).data("group_num"))
 	if(T.Tool.activeSplitter && (event.button == 2 || event.ctrlKey)){
 		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
 	}else{ 

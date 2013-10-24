@@ -330,9 +330,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 				tet_buttons[i].$.attr('checked',true);
 			else
 				tet_buttons[i].$.removeAttr('checked');
-				
-    	$files_panel.find('.tet_group[tet=' + (tet_ind+1) + ']').attr("active","")
-														 .siblings().removeAttr("active");
+
+		$files_panel.find('.tet_group')	.removeAttr("active")
+										.filter('[tet=' + (tet_ind+1) + ']').attr("active","");
 	}
 	
 	var CutActionCallback = function(info){

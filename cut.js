@@ -402,9 +402,12 @@ T.CUT = function(ORG){//class factory
 		changeCallbacks.fireWith(this,[invalidatedSlots]); 
 	}
 
-	var GetGroup = function(g){
+	var GetGroup = function(g,asSlot){
         var k = this._.groupToImmutablesMapping[g];
-        return this._.immutablesSlots[k] ? (this._.immutablesSlots[k].inds || []) : [];
+		if(asSlot)
+			return this._.immutablesSlots[k] || {};
+		else //as Inds array only
+			return this._.immutablesSlots[k] ? (this._.immutablesSlots[k].inds || []) : [];
 	}
 
 	var GetAsVector = function(cap){
