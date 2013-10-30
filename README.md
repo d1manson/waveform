@@ -1,4 +1,4 @@
-# Waveform
+# <a name="wiki"> Waveform
 
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
 
