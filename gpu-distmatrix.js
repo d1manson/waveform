@@ -41,16 +41,18 @@ T.DM = function(){
     "	   float a1_y = coord_01.x - oneTexel; 													",
     "	   float a2_y = coord_01.x ; 															",
     "	   float b_y = coord_01.y; 																",
-    "	   float d1=0.;																			",
-    "	   float d2=0.;																			",
+    "	   vec4 d1_= vec4(0.,0.,0.,0.);															",
+	"	   vec4 d2_= vec4(0.,0.,0.,0.);															",
     "	   for(float i = 0.; i< W; i+=4.){														", 
     "	       float i_x = i/4./W_pow2_packed; 													",
     "		   vec4 a1 = texture2D(input_a, vec2(i_x,a1_y)); 									",
     "	       vec4 a2 = texture2D(input_a, vec2(i_x,a2_y)); 									",
     "	       vec4 b = texture2D(input_b, vec2(i_x,b_y)); 										",
-    "		   d1 += abs(a1[0]-b[0]) + abs(a1[1]-b[1]) + abs(a1[2]-b[2]) + abs(a1[3]-b[3]);		",
-    "		   d2 += abs(a2[0]-b[0]) + abs(a2[1]-b[1]) + abs(a2[2]-b[2]) + abs(a2[3]-b[3]);		",
+	"		   d1_ += abs(a1 - b);																",
+	"		   d2_ += abs(a2 - b);																",
     "	   }																					",
+	"		float d1 = d1_[0] + d1_[1] + d1_[2] + d1_[3];										",
+	"		float d2 = d2_[0] + d2_[1] + d2_[2] + d2_[3];										",
     endian =="L" ?
     "	    gl_FragColor = vec4(fract(d1),floor(d1)/256.,fract(d2) ,floor(d2)/256.); 			": // for litte-endian javascript
     "	    gl_FragColor = vec4(floor(d1)/256.,fract(d1),floor(d2)/256.,fract(d2) ); 			", // for big-endian javascript
@@ -114,7 +116,7 @@ T.DM = function(){
        var shader = gl.createShader(type);
        gl.shaderSource(shader, str);
        gl.compileShader(shader);
-       return ValidShader(shader);
+       return ValidShader(shader,str);
     }
     
     var UploadTexture = function(registerInd,data,w,h){
@@ -236,7 +238,7 @@ T.DM = function(){
     		return test_gl;
     }
     
-    var ValidShader = function(shader){
+    var ValidShader = function(shader,str){
        if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0){
           error_callback("Shader failed to compile:\n" + gl.getShaderInfoLog(shader) + "\n\n" + str);
     	  return null;
