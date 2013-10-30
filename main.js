@@ -369,7 +369,7 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 }
 
 T.ShowHelp = function(){
-	window.open("https://github.com/d1manson/waveform/wiki","_blank");
+	window.open("https://github.com/d1manson/waveform/tree/master#wiki","_blank");
 }
 
 T.TogglePalette = function(){
