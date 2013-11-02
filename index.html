@@ -111,16 +111,7 @@ you can drag further files onto the window at any point<br>
 			<div class="floatinginfo autocut_info">
 				<b>Autocut [a]</b><br><br>
 				<div id="autocut_caption"></div><br><br>
-				autocut only uses about 6000 spikes and only runs on one channel.  Tree visualiser in development:
-                <table class="tree">
-                    <tbody>
-                    <tr><td colspan="10" class="node" isroot="" style="font-size:2em;">&#9679;</td></tr>
-                    <tr><td class="node" modtwo="1" colspan="5" style="font-size:1.8em;">&#9679;</td><td class="node" modtwo="0" colspan="5">&#9679;</td></tr>
-                    <tr><td class="node" modtwo="1" colspan="4" style="font-size:1.2em;">&#9679;</td><td class="node" modtwo="0" colspan="1" style="font-size:0.8em;">&#9679;</td><td class="node" modtwo="1" colspan="4">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td></tr>
-                    <tr><td class="node" modtwo="1" colspan="2" style="font-size:0.6em;">&#9679;</td><td class="node" modtwo="0" colspan="2">&#9679;</td><td colspan="1"></td><td class="node" modtwo="1" colspan="2">&#9679;</td><td class="node" modtwo="0" colspan="2">&#9679;</td></tr>
-                    <tr><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td colspan="1"></td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td></tr>
-                    </tbody>
-                    </table>
+				autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
 			</div>
 			</div>
 
@@ -184,7 +175,8 @@ you can drag further files onto the window at any point<br>
 <script src="webgl-waveforms.js"></script>
 <script src="cluster-plot.js"></script>
 
-<!-- T.AC does autocutting -->
+<!-- T.AC does autocutting, uses tree.js to display hierarchy -->
+<script src="tree.js"></script>
 <script src="autocut.js"></script>
 
 </body>

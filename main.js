@@ -425,7 +425,8 @@ T.RunAutocut = function(){
 
 T.AutocutFinished = function(cut,chan){
 	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
-    T.$autocut_info.removeAttr("state"); //TODO: leav it open and press escape to close
+
+	
 }
 
 T.ToggleFS = function(newState){
@@ -576,13 +577,13 @@ T.UndoLastAction = function(){
 T.FloatingInfo_MouseDown = function(event){
     var $this = $(this);
     var offset = $this.position();
-    $this.attr("dragging",true);
     T.FloatInfoMoving = {$: $(this),
                     off_left: offset.left-event.clientX,
     				off_top: offset.top-event.clientY        
                     }
     $(document).mousemove(T.FloatingInfo_DocumentMouseMove)
-               .mouseup(T.FloatingInfo_DocumentMouseUp);   
+               .mouseup(T.FloatingInfo_DocumentMouseUp);	
+	$('html').attr("dragging",true);
     event.preventDefault();
 }
 T.FloatingInfo_DocumentMouseMove = function(e){
@@ -591,9 +592,9 @@ T.FloatingInfo_DocumentMouseMove = function(e){
                             });
 }
 T.FloatingInfo_DocumentMouseUp = function(e){
-    T.FloatInfoMoving.$.removeAttr("dragging");
     T.FloatInfoMoving = null;
     $(document).off('mousemove mouseup');
+	$('html').removeAttr("dragging");
 }
 
 T.StoreData = function(){
