@@ -509,7 +509,11 @@ display:none;
 z-index:100;
 
 }
-.floatinginfo[dragging]{
+
+html[dragging]>* {
+pointer-events: none;
+}
+html[dragging]{
 cursor:move;
 }
 button:hover + .floatinginfo,
@@ -609,3 +613,6 @@ user-select: none;
   z-index:-1;
 }
 
+.autocut_info{
+max-width: none;
+}

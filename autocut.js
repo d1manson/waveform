@@ -1,6 +1,6 @@
 "use strict";
 
-T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
+T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix,TREE){
     
 	var workerCode = function(){
 		"use strict";
@@ -164,7 +164,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     }
     
 
-	//this is way too slow
+	//this is a bit slow, better to have it in the worker
 	var dft = function(dest,source){
 		// computes the real and imaginary components for k=1,2,3,..Nquist  (i.e. doesn't compute k for k<=0)
 		// uses the simple-ft not the fast-ft
@@ -343,8 +343,10 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 			cut[0] = cut[0].concat(cut.pop());
         
         //and we're done
-    	$caption.text('complete');
-    	callback(cut,chan);
+    	$caption.html("");
+		var tree = new TREE(sampLinkage.aInd,sampLinkage.bInd,sampLinkage.aDescCount,sampLinkage.bDescCount)
+		$caption.append(tree.Get$());
+    	callback(cut,chan,tree);
     }
     
     
@@ -383,5 +385,5 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		ImagescDist: ImagescDist //for debugging only
     }
 
-}($('#autocut_caption'),T.PAR.BYTES_PER_SPIKE,T.DM.ComputeMatrix)
+}($('#autocut_caption'),T.PAR.BYTES_PER_SPIKE,T.DM.ComputeMatrix,T.TREE)
 
