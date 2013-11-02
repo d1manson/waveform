@@ -9,25 +9,16 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 		//	Modern hierarchical, agglomerative clustering algorithms, Daniel M?llner 2011.
 		//		http://arxiv.org/pdf/1109.2378.pdf
 
-		var inf32 = Math.pow(2,32)-1;
-
+		var inf16 = Math.pow(2,16)-1;
+		
 		function MaskedMinSearch(X,mask,S){
 			var min_ind = 0;
-			var min_val = inf32;
+			var min_val = inf16;
 			for(var i=0; i<S; i++) if(mask[i] && X[i] < min_val){
 				min_ind = i;
 				min_val = X[i];
 			}
 			return {val: min_val,ind: min_ind};
-		}
-
-		function MaskedWeightedMeanRowCol(X,mask,aInd,bInd,wA,wB,N,S){
-			//for a symmetrix matrix, X, it replaces column aInd and row aInd with the weighted sum of the data in aInd and bInd,
-			//mask is a vector, the same length as the sides of X, which specifies which entries in the row/col to modify.
-			var inverseSumWaWb = 1/(wA + wB);
-			
-			for (var i=0; i<S; i++) if(mask[i])
-				X[i*N +aInd] = X[aInd*N +i] =  ( wA * X[aInd*N +i] + wB * X[bInd*N +i])  * inverseSumWaWb;
 		}
 		
 		function MaskedMaxRowCol(X,mask,aInd,bInd,wA,wB,N,S){
@@ -63,14 +54,14 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 				descendants = new Uint32Array(S);
 				for(i=0;i<S;i++)
 					descendants[i] = 1;
-
+					
 				//Set diagonal of dist matrix to infinity
 				for(i=0;i<S;i++)
-					dist[i*N+i] = inf32;
+					dist[i*N+i] = inf16;
 
 				// Initialise min_inds and min_vals
 				for(i=0;i<S;i++){    
-					min_val = inf32;
+					min_val = inf16;
 					min_ind = 0;
 					for(j=0;j<S;j++)if(dist[i*N+j]<min_val){
 						min_val = dist[i*N+j];
@@ -101,7 +92,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 
 					//Overwrite row aInd and col aInd with the combination of the children's dists
 					UpdateFunction(dist,descendants,aInd,bInd,wA,wB,N,S);
-					dist[aInd*N +aInd] = inf32; //set (aInd,aInd) back to inf32
+					dist[aInd*N +aInd] = inf16; //set (aInd,aInd) back to inf16
 
 					//Find row-a's new minimum value and its ind
 					tmp = MaskedMinSearch(dist.subarray(aInd*N,aInd*N+S),descendants,S); 
@@ -137,6 +128,8 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 									  dist: joinDist.buffer},
 									  [childA.buffer,childB.buffer,desA.buffer,desB.buffer,joinDist.buffer]);
 		}
+	
+		
 	}
 	// ===== END WORKER CODE =====
 	
@@ -145,7 +138,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
 	var G_DM_Error = function(s){alert(s);};
     var L = 1024*6;
     var groups = 250;
-    var thresholdDist = 900;
+    var thresholdDist = 55;
 	var joinRatioThreshold = 1.4;
     var chan = null;
     var sampInds = [];
@@ -170,7 +163,35 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
       return [chosen_inds,rem_inds];
     }
     
-    
+
+	//this is way too slow
+	var dft = function(dest,source){
+		// computes the real and imaginary components for k=1,2,3,..Nquist  (i.e. doesn't compute k for k<=0)
+		// uses the simple-ft not the fast-ft
+		// values are stored as real_1 complex_1 real_2 complex_2 .. complex_N
+		// but the values are scaled by k/4 and shifted by 128 to make them lie roughly uniformly within 0-255.
+		// dest should be a Uint8ClampedArray  Note that since we wanted to weight the diffs by k we can actually dont need to play with the distance matrix code
+		var N = source.length;
+		var q = N/2; //for now let's just assume length is even
+		
+		var kZoomFactor = 20; // rather than compute compents 0,1,2,3,..Nquist, compute 1/kZoomFactor, 2/kZoomFactor, ... Nquist/kZoomFactor
+		var bitDepthFactor = 1/15; // ensures values more or less fall within -128 to + 127
+		
+		for(var k=0;k<q;k++){
+			var r = 0, i=0; 
+			var pi2k_N = 3.1415926*2*(k+1)/kZoomFactor/N; //note the k+1 because we want k from 1 to q not 0 to q-1
+			for(var n=0;n<N;n++){
+				r += source[n] * Math.cos(-pi2k_N *n);
+				i += source[n] * Math.sin(-pi2k_N *n);
+			}	
+			
+			var scale = Math.sqrt((k+1)/kZoomFactor) * bitDepthFactor; 
+			
+			dest[k*2] = 128 + r * scale;
+			dest[k*2+1] = 128 + i * scale;
+		}
+	}
+	
     var ComputeDistMatrix = function(channel,N,buffer,callback_in){
     	$caption.text('dist matrix...');
     	chan = channel;
@@ -189,16 +210,25 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix){
     	var wave_width = 50;
     	var wave_width_pow2 = 64; //have to pad matrix to power of two.
     	var newBuffer = new ArrayBuffer(wave_width_pow2*L);
-    	var newDataView = new Uint8Array(newBuffer);
+    	var newDataView = new Uint8ClampedArray(newBuffer);
     	var oldDataView = new Int8Array(buffer);
     	var offset = (channel-1)*54 + 4; //channel can be 1-4 , WARNING: not 0-3
     
-    	//data matrix is of size [wave_width_pow2 x n]
-    	for(var i=0;i<sampInds.length;i++){
+    	
+		
+		//data matrix is of size [wave_width_pow2 x n]
+    	/*
+		for(var i=0;i<sampInds.length;i++){
     		var i_samp = sampInds[i];
     		for(var j=0; j<wave_width;j++)
     			newDataView[i*wave_width_pow2 + j] = 128+oldDataView[i_samp*BYTES_PER_SPIKE + offset + j];
     	}
+		*/
+		for(var i=0;i<sampInds.length;i++){
+    		var i_samp = sampInds[i];
+			dft(newDataView.subarray(i*wave_width_pow2,i*wave_width_pow2 + wave_width), oldDataView.subarray(i_samp*BYTES_PER_SPIKE + offset,i_samp*BYTES_PER_SPIKE + offset + wave_width));
+    	}
+		
     	//go compute it...good luck!	  
     	console.time('GPU distmat');
     	ComputeMatrix(newBuffer,newBuffer,L,L,wave_width_pow2,GotDistMatrix,G_DM_Error,true);

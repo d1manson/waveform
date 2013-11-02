@@ -509,6 +509,9 @@ display:none;
 z-index:100;
 
 }
+.floatinginfo[dragging]{
+cursor:move;
+}
 button:hover + .floatinginfo,
 label:hover + .floatinginfo,
 div:hover + .floatinginfo,
@@ -538,3 +541,71 @@ text-align: left;
 -o-user-select: none;
 user-select: none;
 }
+
+
+.tree{
+  border: 0px;
+  text-align:center;
+  border-collapse:collapse;
+  cursor: default;
+}
+.tree .node{
+    position: relative;
+}
+.tree .node:hover{
+   color: #F00;
+}
+.tree .node[modtwo="0"]:after{ /* due to empty tds cannot use nth of type selectors */
+  height: 1px;
+  background: #c00;
+  content: "";
+  width: 50%;
+  display: block;  
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+.tree .node[modtwo="1"]:after{
+  height: 1px;
+  background: #c00;
+  content: "";
+  width: 50%;
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  display: block;  
+}
+.tree .node:before{
+  height: 100%;
+  background: #c00;
+  content: "";
+  width: 1px;
+  position: absolute;
+  left:50%;
+  display: block;
+  top:0px;
+  z-index:-1;
+}
+.tree .node[isroot]:before{
+  height: 50%;
+  background: #c00;
+  content: "";
+  width: 1px;
+  position: absolute;
+  left:50%;
+  display: block;
+  top:50%;
+  z-index:-1;
+}
+.tree .node[colspan="1"]:before{
+  height: 50%;
+  background: #c00;
+  content: "";
+  width: 1px;
+  position: absolute;
+  left:50%;
+  display: block;
+  top:0px;
+  z-index:-1;
+}
+

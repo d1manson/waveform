@@ -15,6 +15,7 @@ T.DM = function(){
     }();
         
     var S = 1024;
+	var asComplex = true;
     var gl = null;
     var success_callback, error_callback, Canvas, prog, locCoord_01a,locInput_a,locInput_b;
     
@@ -48,8 +49,9 @@ T.DM = function(){
     "		   vec4 a1 = texture2D(input_a, vec2(i_x,a1_y)); 									",
     "	       vec4 a2 = texture2D(input_a, vec2(i_x,a2_y)); 									",
     "	       vec4 b = texture2D(input_b, vec2(i_x,b_y)); 										",
-	"		   d1_ += abs(a1 - b);																",
-	"		   d2_ += abs(a2 - b);																",
+	asComplex ?
+	"		   d1_ += (a1 - b)*(a1 - b);	 d2_ += (a2 - b)*(a2 - b);							":
+	"		   d1_ += abs(a1 - b);	 d2_ += abs(a2 - b);										",
     "	   }																					",
 	"		float d1 = d1_[0] + d1_[1] + d1_[2] + d1_[3];										",
 	"		float d2 = d2_[0] + d2_[1] + d2_[2] + d2_[3];										",

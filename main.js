@@ -16,7 +16,7 @@ T.CANVAS_NUM_TC = 2;
 T.POS_PLOT_WIDTH = 200;
 T.POS_PLOT_HEIGHT = 200;
 T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
-				  
+
 T.xFactor = 2;
 T.yFactor = 2;
 T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
@@ -79,14 +79,14 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == "pos"){
 		T.PlotPos();
 	}
-		
+
 
 }
 
 
 T.DispHeaders = function(status,filetype){
 	//TODO: move to separate module
-	
+
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
 	var headerTypeList = ["tet","cut","pos","set"];
 	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
@@ -120,34 +120,49 @@ T.SetDisplayIsOn = function(v){
 			T.chanIsOn[i] ?  T.$displayButtons.eq(T.DISPLAY_ISON.CHAN[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.CHAN[i]).removeAttr('checked');
 		T.WV.ShowChannels(T.chanIsOn);
 	}
-	
+
 	if('mapIsOn' in v){
 		T.mapIsOn = v.mapIsOn; //array of 1
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
 			T.mapIsOn[i] ? T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).removeAttr('checked');
 		T.RM.SetShow(T.mapIsOn);
 	}
-	
+
 	if('tAutocorrIsOn' in v){
 		T.tAutocorrIsOn = v.tAutocorrIsOn; //1 or 0 (not an array)
 		T.tAutocorrIsOn ? T.$displayButtons.eq(T.DISPLAY_ISON.TC).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.TC).removeAttr('checked');
 		T.TC.SetShow(T.tAutocorrIsOn);
 	}
-	
+
+}
+
+T.DisplayIsOnMouseDown = function(evt){
+	if(evt.button == 2){
+		var thisVal = $(this).data('domindex');
+		var found = false;
+		if(thisVal == T.DISPLAY_ISON.TC){
+			T.ToggleElementState($('.tc_info'),true);
+			found = true;
+		}
+		if(!found) for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
+			T.ToggleElementState($('.rm_info'),true);
+			found = true;
+			break;
+		}
+		return;
+	}
 }
 
 T.DisplayIsOnClick = function(evt,keyboard){
 	//displayIsOn are the 6 buttons: 4xchannel 1xratemap 1xtemporal-autocorr
 	
-	//TODO: change "Channel" in button names to reflect the fact it now includes maps. Also can now be called as a keyboard shortcut
-	// in which case this is not set and keyboard has the info not evt.
-	
-	//Also need to convert buttons to be actuall buttons rather than radio inputs becaues firefox doesn't permit clicking radio buttons with ctrl or alt or shift pressed (I think)
+	//Can now be called as a keyboard shortcut in which case this is not set and keyboard has the info not evt.
+	//Note click is only triggered with left mouse button, see DisplayIsOnMouseDown for right click.
 
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
 	var oldTautocorr = T.tAutocorrIsOn;
-	
+
 	var thisVal = keyboard ? keyboard.val : $(this).data('domindex');
 	var shiftKey = keyboard ? keyboard.shiftKey : evt.shiftKey;
 	var setChans; var setMaps; var setTautocorr;
@@ -163,25 +178,33 @@ T.DisplayIsOnClick = function(evt,keyboard){
 		setMaps = [0];
 		setTautocorr = 0;
 	}
-	
+
+	var found = false;
 	if(thisVal == T.DISPLAY_ISON.TC){
 		//clicked temporal autocorr button (there's no array, it's just a single button)
 		setTautocorr = shiftKey ? !setTautocorr : 1;
-	}else for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
+		found = true;
+	}
+	if(!found) for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
 		//clicked the i'th ratemap button (there is currently only one available)
 		setMaps[i] = shiftKey ? !setMaps[i] : 1;
-	}else for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)if(thisVal == T.DISPLAY_ISON.CHAN[i]){
+		found = true;
+		break;
+	}
+	if(!found) for(var i=0;i<T.DISPLAY_ISON.CHAN.length;i++)if(thisVal == T.DISPLAY_ISON.CHAN[i]){
 		//clicked the i'th channel button (of which there are 4)
 		setChans[i] = shiftKey ? !setChans[i] : 1;
+		found = true;
+		break;
 	}
-		
+
 	if(shiftKey && (M.sum(setChans) + M.sum(setMaps) + setTautocorr == 0)){
 		//if ctrl key was down and we are about to turn off the one and only display we should abort that, and keep what we had
 		setChans = oldChans; 
 		setMaps = oldMaps;
 		setTautocorr = oldTautocorr;
 	}
-	
+
 	T.SetDisplayIsOn({chanIsOn: setChans, mapIsOn: setMaps, tAutocorrIsOn: setTautocorr});
 }
 
@@ -208,7 +231,7 @@ T.ApplyRmSize = function(v){
 
 
 T.ApplyCanvasSizes = function(){
-	
+
 	var i = T.tiles.length;
 	while(i--)if(T.tiles[i]){
 		var $c = T.tiles[i].$.find('canvas').eq(0);
@@ -245,7 +268,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	var t = T.tiles[g];
 	if(!t)
 		return;
-		
+
 	if($canvas)	{
 		var xF = 1;
 		var yF = 1;
@@ -265,16 +288,16 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 		$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
     }else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
-	
+
 	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
-	
+
 	for(var i=0;i<T.canvasUpdatedListeners.length;i++)
 		T.canvasUpdatedListeners[i](canvasNum,$canvas,g);
 }
 
 T.CreateTile = function(i){
 	var $ = T.$newTile.clone();
-	
+
 	$.data("group_num",i);
 	return {$: $,
 			caption: $.find('.tile-caption')
@@ -287,7 +310,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 
 	var maxGroupNum = this.GetProps().G; 
 	var invalidatedSlots = M.clone(invalidatedSlots_); //we want our own copy for this function to modify
-	
+
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
 		T.$tilewall.append(t.$);
@@ -295,7 +318,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		T.tiles.push(t);
 	}
 
-	
+
 	var slotCache = Array(invalidatedSlots.length); //this means we only have to call cut.GetImmutableSlot(k) once for each invalidated slot (even though we have two for loops below)
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
 		var slot_k = slotCache[k] = this.GetImmutableSlot(k); //get the slot
@@ -309,7 +332,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 			invalidatedSlots[k] = 0; //by getting rid of any existing tile for the slot we have just validated this slot
 		}
 	}
-	
+
 	var displaced_tiles = []; //if we move tiles around during the loop we store the displaced tiles in this array so that they can be used by subsequent iterations if needed
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every remaining invalidated slot...
 		var slot_k = slotCache[k];
@@ -318,7 +341,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		if(isNum(old_tile_ind) && old_tile_ind != new_tile_ind){
 			// We already had a tile for this slot, now there is either a new immutable for the slot or the group on the existing immutable has changed.
 			// In both cases we need to move the tile
-			
+
 			displaced_tiles[new_tile_ind] = T.tiles[new_tile_ind];  //store the destination group for potential use in a subsequent iteration of k-loop
 			var movingTile;
 			if(!displaced_tiles[old_tile_ind] ){ 
@@ -333,14 +356,14 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 			}
 			T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
 			T.tiles[new_tile_ind] = movingTile; 
-			
+
 		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
 		T.tiles[new_tile_ind].$.show()
 							   .toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
 							  .data("group_num",new_tile_ind)
 		T.tiles[new_tile_ind].caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
-		
+
 		T.cutSlotToTileMapping[k] = new_tile_ind;
 	}
 
@@ -377,7 +400,13 @@ T.TogglePalette = function(){
 	T.WV.SetPaletteMode(T.paletteMode*2 - 1);
 }
 
+T.AutocutMouseDown = function(evt){
+	if(evt.button == 2)
+		T.ToggleElementState($('.autocut_info'),true);
+}
+
 T.RunAutocut = function(){
+    T.$autocut_info.attr("state","closed"); //TODO: rename the attribute as closed actually means it's visible
 	var chan = -1;
 	for(var i=0;i<4;i++)
 		if(T.chanIsOn[i])
@@ -396,6 +425,7 @@ T.RunAutocut = function(){
 
 T.AutocutFinished = function(cut,chan){
 	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
+    T.$autocut_info.removeAttr("state"); //TODO: leav it open and press escape to close
 }
 
 T.ToggleFS = function(newState){
@@ -411,15 +441,23 @@ T.ToggleFS = function(newState){
 }
 
 //For a jQuery element or an array of jQuery elements it removes an existing "state" attribute or adds "state=closed"
-T.ToggleElementState = function(el){
-	return function(){
+T.ToggleElementState = function(el,doItNow,onRightClickOnly){
+	var foo =  function(e){
+		if(onRightClickOnly && !e.button == 2)
+			return;
+			
 		el = [].concat(el); //force it to be an array
 		for(var i=0;i<el.length;i++)if(el[i])
 			if(el[i].attr("state"))
 				el[i].removeAttr("state"); 
 			else 
 				el[i].attr("state","closed");
-	}
+	};
+	
+	if(doItNow)
+		foo();
+	else
+		return foo;
 }
 
 
@@ -471,7 +509,7 @@ T.ReorderNCut = function(){
 T.ReorderACut = function(amps){
 	if(!amps || !('length' in amps)) //when the button is clicked the function is called with event oject not with an array, so we have to go and get the amplitudes
 		T.ORG.GetTetAmplitudes(T.ReorderACut); //this is asynchrounous
-	
+
 	//amps is 1a 1b 1c 1d 2a 2b ... nd, where a-d are the 4 channels
 	var chan = -1;
 	for(var i=0;i<4;i++)
@@ -491,11 +529,11 @@ T.ReorderACut = function(amps){
 	var amps_chan = new Uint16Array(N); //but we only want one channel
 	for(var i=0;i<N;i++)
 		amps_chan[i] = amps[i*4 + chan];
-		
+
 	var mean_amps = M.accumarray(T.ORG.GetCut().GetAsVector(),amps_chan,"mean");
 
 	//TODO: I think there will be a bug if there are any empty groups beyond the end of the last occupied group, 
-	
+
 	var groups = []; //we build an array of (ind,amp) pairs that we can then sort by <amp>.
 	for(var i=0;i<mean_amps.length;i++)
 		groups.push({ind: i,
@@ -535,15 +573,38 @@ T.UndoLastAction = function(){
 		c.Undo();
 }
 
+T.FloatingInfo_MouseDown = function(event){
+    var $this = $(this);
+    var offset = $this.position();
+    $this.attr("dragging",true);
+    T.FloatInfoMoving = {$: $(this),
+                    off_left: offset.left-event.clientX,
+    				off_top: offset.top-event.clientY        
+                    }
+    $(document).mousemove(T.FloatingInfo_DocumentMouseMove)
+               .mouseup(T.FloatingInfo_DocumentMouseUp);   
+    event.preventDefault();
+}
+T.FloatingInfo_DocumentMouseMove = function(e){
+    T.FloatInfoMoving.$.css({left: event.clientX + T.FloatInfoMoving.off_left + "px",
+                           top: event.clientY + T.FloatInfoMoving.off_top + "px"
+                            });
+}
+T.FloatingInfo_DocumentMouseUp = function(e){
+    T.FloatInfoMoving.$.removeAttr("dragging");
+    T.FloatInfoMoving = null;
+    $(document).off('mousemove mouseup');
+}
+
 T.StoreData = function(){
 	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
 	localStorage.mapIsOn = JSON.stringify(T.mapIsOn);
 	localStorage.tAutocorrIsOn = JSON.stringify(T.tAutocorrIsOn);
-	
+
 	localStorage.tet = T.ORG.GetTet();
 	localStorage.xFactor = T.xFactor;
 	localStorage.yFactor = T.yFactor;
-	
+
 	//TODO store cuts
 	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.binSizeCm;
@@ -553,7 +614,7 @@ T.StoreData = function(){
 }
 
 T.DocumentReady = function(){
-		
+
 	if(localStorage.state){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
 		T.xFactor = localStorage.xFactor || 2;
@@ -572,41 +633,50 @@ T.DocumentReady = function(){
 	}
 }
 
-$('.help_button').each(function(){$(this).click(T.ShowHelp);});
+$('.help_button').click(T.ShowHelp)
+				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.tiles = [];
 T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
+T.$autocut_info = $('.autocut_info');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
-T.$undo = $('#undo_button').click(T.UndoLastAction);
+T.$undo = $('#undo_button').click(T.UndoLastAction)
+						   .mousedown(T.ToggleElementState($('.action_info'),false,true));
 $('.bar').click(T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
 T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
 $('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
 $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
-T.$displayButtons = $(".display_button").click(T.DisplayIsOnClick).each(function(i){$(this).data('domindex',i);});
-$('#toggle_palette').click(T.TogglePalette);
-$('#autocut').click(T.RunAutocut);
+T.$displayButtons = $(".display_button").each(function(i){$(this).data('domindex',i);})
+										.click(T.DisplayIsOnClick)
+										.mousedown(T.DisplayIsOnMouseDown);
+$('#toggle_palette').click(T.TogglePalette)
+					.mousedown(T.ToggleElementState($('.palette_info'),false,true));
+$('#autocut').click(T.RunAutocut)
+			 .mousedown(T.ToggleElementState(T.$autocut_info,false,true));
 $('#apply_rm_size').click(T.ApplyRmSizeClick);
 T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
-$('#file_headers_button').click(T.ToggleElementState($('.file_info')));
+$('#file_headers_button').mousedown(T.ToggleElementState($('.file_info')));
 T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
 T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
-	
+
+$(document).on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
+$('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 
 // KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 key('p',T.TogglePalette);
 key('a',T.RunAutocut);
-key('ctrl+z',T.UndoLastAction);
+
 key('esc',T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
 key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
 key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
@@ -614,7 +684,14 @@ key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],
 key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
-key('h',T.ToggleElementState($('.file_info')));
+key('h, alt+h',T.ToggleElementState($('.file_info')));
+key('alt+a',T.ToggleElementState(T.$autocut_info));
+key('ctrl+z, z',T.UndoLastAction);
+key('alt+r',T.ToggleElementState($('.rm_info')));
+key('/, alt+/',T.ToggleElementState($('.help_info')));
+key('alt+p',T.ToggleElementState($('.palette_info')));
+key('alt+t',T.ToggleElementState($('.tc_info')));
+key('alt+z',T.ToggleElementState($('.action_info')));
 key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
