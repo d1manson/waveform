@@ -14,7 +14,7 @@
 <div class="file_drop_text">drop one or more of the following data files here: 
 <b><br>tet | cut | pos | set</b><br>
 you can drag further files onto the window at any point<br>
-<button class="help_button">help (wiki)</button>
+<button class="help_button" style="position: relative; top: 20px;">Go to quickstart guide on GitHub</button>
 </div>
 <div id="works_with_chrome">Tested with Chrome <img src="chromelogo.png" width="15px"/></div>
 <div id="filesystem_buttons"> <button id="filesystem_button">turn on FileAPIs</button>
@@ -22,6 +22,10 @@ you can drag further files onto the window at any point<br>
 </div>
 </div>
 
+
+
+<div class="bar">
+</div>
 
 <div class="tilewall">
 </div>
@@ -35,16 +39,16 @@ you can drag further files onto the window at any point<br>
 		<div id="button_panel" class="collapsable_panel">
 			<div class="button_group">
 				<button class="help_button">help</button>
-				<div class="floatinginfo">
-					<b>Help</b><br>
+				<div class="floatinginfo help_info">
+					<b>Help [?]</b><br>
 					
-					Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> wiki - click to open in a new tab. <br><br>
+					Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
 					You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
 				</div>
 				
 				<button id='undo_button' disabled>undo</button>
-				<div class="floatinginfo">
-					<b>Action List [undo: ctrl+z]</b>
+				<div class="floatinginfo action_info">
+					<b>Action List [z]</b><br>
 					<div class="action_list"></div>
 				</div>
 				
@@ -71,7 +75,7 @@ you can drag further files onto the window at any point<br>
 				<div class="button display_button">c3</div>
 				<div class="button display_button">c4</div>
 				<div class="button display_button">rm</div>
-				<div class="floatinginfo">
+				<div class="floatinginfo rm_info">
 					<b>Spatial ratemap [r]</b><br><br>
 					Bin size default is 2.5cm.  <br><br>
 					If you need to change this open the command line and type (e.g. 5cm):
@@ -79,14 +83,14 @@ you can drag further files onto the window at any point<br>
 					The smoothing kernel is fixed as a 5x5 "boxcar".
 				</div>
 				<div class="button display_button">tc</div>	
-				<div class="floatinginfo">
+				<div class="floatinginfo tc_info">
 					<b>Temporal auto correlation [t]</b><br><br>
 					Time window default is set at 500ms.  <br><br>
 					If you need to change this open the command line and type (e.g. 100ms):
 					<pre>T.TC.SetDeltaT(100)</pre>
 				</div>
 				<button id="toggle_palette">palette</button> 
-				<div class="floatinginfo">
+				<div class="floatinginfo palette_info">
 				<b>Toggle waveform palette [p]</b><br><br>
 				There are two palette modes: 
 				<ul>
@@ -104,10 +108,19 @@ you can drag further files onto the window at any point<br>
 			<button id="reorder_A_button">a-order</button>
 			
 			<button id="autocut">autocut</button>
-			<div class="floatinginfo">
+			<div class="floatinginfo autocut_info">
 				<b>Autocut [a]</b><br><br>
 				<div id="autocut_caption"></div><br><br>
-				autocut only uses about 6000 spikes and only runs on one channel
+				autocut only uses about 6000 spikes and only runs on one channel.  Tree visualiser in development:
+                <table class="tree">
+                    <tbody>
+                    <tr><td colspan="10" class="node" isroot="" style="font-size:2em;">&#9679;</td></tr>
+                    <tr><td class="node" modtwo="1" colspan="5" style="font-size:1.8em;">&#9679;</td><td class="node" modtwo="0" colspan="5">&#9679;</td></tr>
+                    <tr><td class="node" modtwo="1" colspan="4" style="font-size:1.2em;">&#9679;</td><td class="node" modtwo="0" colspan="1" style="font-size:0.8em;">&#9679;</td><td class="node" modtwo="1" colspan="4">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td></tr>
+                    <tr><td class="node" modtwo="1" colspan="2" style="font-size:0.6em;">&#9679;</td><td class="node" modtwo="0" colspan="2">&#9679;</td><td colspan="1"></td><td class="node" modtwo="1" colspan="2">&#9679;</td><td class="node" modtwo="0" colspan="2">&#9679;</td></tr>
+                    <tr><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td colspan="1"></td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td><td class="node" modtwo="1" colspan="1">&#9679;</td><td class="node" modtwo="0" colspan="1">&#9679;</td></tr>
+                    </tbody>
+                    </table>
 			</div>
 			</div>
 
@@ -143,10 +156,6 @@ you can drag further files onto the window at any point<br>
 	</div>
 
 
-</div>
-
-
-<div class="bar">
 </div>
 
 

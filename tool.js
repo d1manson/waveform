@@ -10,10 +10,10 @@ T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 T.TileMouseDown = function(event){
 	$(this).toggleClass('shake',false); //clear any existing dragging animation
 	T.CP.BringGroupToFront($(this).data("group_num"))
-	if(T.Tool.activeSplitter && (event.button == 2 || event.ctrlKey)){
+	if(T.Tool.activeSplitter && (event.button == 2 || event.altKey)){
 		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
 	}else{ 
-		if(event.button == 2 || event.ctrlKey)
+		if(event.button == 2 || event.altKey)
 			T.Tool.TileMouseDown_BeginSplitter.call(this,event);
 		else if (event.button == 0)
 			T.Tool.TileMouseDown_BeginMerger.call(this,event);
@@ -305,7 +305,7 @@ T.Tool.TileWallMouseDown_Splitter = function(event){
 	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
 	T.RemoveCanvasUpdatedListener(T.Tool.CanvasUpdated_Splitter);
 	
-	if(T.Tool.activeSplitter && (event.button == 2 || event.ctrlKey))
+	if(T.Tool.activeSplitter && (event.button == 2 || event.altKey))
 		s.cut.Undo();
 	
 	T.Tool.activeSplitter = null;
@@ -424,7 +424,7 @@ T.Tool.TileWallMouseDown_Separating = function(event){
 		clearInterval(T.Tool.separating.timer);
         delete T.Tool.separating;
         
-        if(event.button == 2 || event.ctrlKey)
+        if(event.button == 2 || event.altKey)
             T.ORG.GetCut().Undo();
 }
 	
