@@ -314,7 +314,7 @@ display: inline-block;
 cursor: default;
 }
 .button:hover{
-font-color: #C77;
+color: #C77;
 border: 1px #C77 solid;
 padding: 4px 9px 4px 9px;
 }
@@ -555,6 +555,9 @@ user-select: none;
 }
 .tree .node{
     position: relative;
+}
+.tree td{
+border: 1px solid #0f0;
 }
 .tree .node:hover{
    color: #F00;
