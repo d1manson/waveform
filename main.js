@@ -423,10 +423,15 @@ T.RunAutocut = function(){
 	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
 }
 
-T.AutocutFinished = function(cut,chan){
+T.AutocutFinished = function(cut,chan,tree){
 	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
 
-	
+	tree.OnNode('mouseenter',function(evt,ind){
+		console.log(ind + ": mouseenter");
+	});
+	tree.OnNode('mouseleave',function(evt,ind){
+		console.log(ind + ": mouseleave");
+	});	
 }
 
 T.ToggleFS = function(newState){
