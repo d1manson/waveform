@@ -39,6 +39,11 @@ T.TREE = function(){
 		this._.nodes[2*N-2].$.data('node',this._.nodes[2*N-2]);
 
 		this._.$.on('mousedown','.node',NodeMouseDown(this));
+		
+		//debug
+		//this._.$.on('mouseenter','td',function(){$(this).data('$below').css({border: '3px solid #00F'})})
+		//		.on('mouseleave','td',function(){$(this).data('$below').css({border: ''})});
+				
 
 	}
 
@@ -110,6 +115,7 @@ T.TREE = function(){
 			$right = $newTd;
 		}
 
+		
 		// starting with this node, go up incrementing colspan by 1
 		var $td = node.$;
 		while($td){
@@ -122,7 +128,7 @@ T.TREE = function(){
 		$below.replaceWith(newLeft.$);
 		newLeft.$.after(newRight.$);		
 		node.isExpanded = true;
-		node.$.data('$below',$left);
+		node.$.data('$below',newLeft.$);
 
 	}
     
@@ -175,7 +181,7 @@ T.TREE = function(){
 			$above.data('$below',$newTd); 
 			$node.replaceWith($newTd);
 			if($belowLeftNode)
-				totalRemoved += MergeSiblings.call(this,$belowLeftNode,$above);
+				totalRemoved += MergeSiblings.call(this,$belowLeftNode,$newTd);
 		}else{				
 			$node.remove();
 			if($belowLeftNode)
