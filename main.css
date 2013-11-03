@@ -556,9 +556,7 @@ user-select: none;
 .tree .node{
     position: relative;
 }
-.tree td{
-border: 1px solid #0f0;
-}
+
 .tree .node:hover{
    color: #F00;
 }
