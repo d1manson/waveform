@@ -344,7 +344,7 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix,TREE){
         
         //and we're done
     	$caption.html("");
-		var tree = new TREE(sampLinkage.aInd,sampLinkage.bInd,sampLinkage.aDescCount,sampLinkage.bDescCount)
+		var tree = new TREE(sampLinkage.aInd,sampLinkage.bInd,sampLinkage.aDescCount,sampLinkage.bDescCount,nodeList)
 		$caption.append(tree.Get$());
     	callback(cut,chan,tree);
     }

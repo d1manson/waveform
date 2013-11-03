@@ -6,7 +6,7 @@ T = T || {};
 
 T.TREE = function(){
 
-	var cls = function(aInd,bInd,aDescCount,bDescCount){
+	var cls = function(aInd,bInd,aDescCount,bDescCount,expandToInds){
 
 		// leaf nodes are refered to by the indices 0...N-1, joining nodes are N...N-2
 		// All four inputs are of the same length, which is N-1. The i'th set of 4 values 
@@ -40,11 +40,40 @@ T.TREE = function(){
 
 		this._.$.on('mousedown','.node',NodeMouseDown(this));
 		
+		if(expandToInds){
+			//to make this easier, we convert the list to a logical array saying for eahc node whether or not it is in the list
+			var nodeIsInList = new Uint8Array(N*2-1);
+			for(var i=0;i<expandToInds.length;i++)
+				nodeIsInList[expandToInds[i]] = 1;
+			this._.nodeIsInList = nodeIsInList; //to make it a bit clearer that this doesn't change during the recursion, we save it onto the tree object
+			ExpandToList.call(this,2*N-2);
+			this._.nodeIsInList = null;
+		}
+		
+		
 		//debug
 		//this._.$.on('mouseenter','td',function(){$(this).data('$below').css({border: '3px solid #00F'})})
 		//		.on('mouseleave','td',function(){$(this).data('$below').css({border: ''})});
 				
 
+	}
+
+	var ExpandToList = function(ind){
+		//This function recurses down the tree, only stopping when a node is in the list
+		//this._.nodeIsInList is a logical vector of length 2*N-1
+		
+		var N = this._.N;
+		var leftInd = this._.aInd[ind-N];
+		var rightInd = this._.bInd[ind-N];
+
+		ShowChildren.call(this,this._.nodes[ind]);
+		
+		if(leftInd >= N && !this._.nodeIsInList[leftInd])
+			ExpandToList.call(this,leftInd);
+		
+		if(rightInd >= N && !this._.nodeIsInList[rightInd])
+			ExpandToList.call(this,rightInd);
+			
 	}
 
     var NodeMouseDown = function(tree){
@@ -205,7 +234,10 @@ T.TREE = function(){
     }
 
 	cls.prototype.Get$ = function(){return this._.$;};
-
+	cls.prototype.GetInd$ = function(ind){var n = this._.nodes[ind]; return n ? n.$ : null;}; //returns the jQuery el for the node with the given index. Note that this must be got afresh each time a node is shown
+																								//(i.e. if tree is collapsed and expanded again a new element is used so this handle will be invalid.)
+	cls.prototype.OnNode = function(evtName,foo){this._.$.on(evtName,'.node',function(evt){foo(evt,$(this).data('node').ind)})};  //e.g. x.OnNode('mouseenter',function(evt,ind){console.log('mouse over node-' + ind)});
+	
 	return cls;
 }();
 
