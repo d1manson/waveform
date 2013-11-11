@@ -120,6 +120,8 @@ transform: rotateY(0);
 -webkit-transform: rotateY(0);
 min-width: 98px;
 min-height: 128px;
+left: 0px;
+top: 0px;
 }
 .tile[moving]{
 border-width: 10px;
@@ -313,17 +315,18 @@ margin: 2px;
 display: inline-block;
 cursor: default;
 }
-.button:hover{
-color: #C77;
-border: 1px #C77 solid;
-padding: 4px 9px 4px 9px;
-}
 .button[checked],
 .button[active]{
 background: #DDD;
 border: 1px #000 solid;
 padding: 4px 9px 4px 9px;
 }
+.button:hover{
+color: #C77;
+border: 1px #C77 solid;
+padding: 4px 9px 4px 9px;
+}
+
 input[type="text"]{
 text-align: center;
 }
@@ -409,7 +412,6 @@ font-size:0.8em;
 }
 .file_group_title{
 font-weight: bold;
-color: #900;
 }
 .tet_group{
 display: inline;
@@ -422,10 +424,14 @@ margin: 2px;
 background: #ddd;
 cursor: default;
 }
+
 .cut_file_brick{
 background: #fbb;
 border-color: #500;
 color: #500;
+}
+.tet_file_brick{
+color: #000;
 }
 
 .file_group[active] > .tet_group[active] > .cut_file_brick:hover,
@@ -497,8 +503,10 @@ border: 1px solid #000;
 
 .floatinginfo{
 position: fixed;
-left: 400px;
-top: 20px;
+top: 0px;
+left: 0px;
+transform: translate(400px,20px);
+-webkit-transform: translate(400px, 20px);
 min-width: 200px;
 max-width: 400px;
 min-height: 80px;
@@ -552,6 +560,8 @@ user-select: none;
   text-align:center;
   border-collapse:collapse;
   cursor: default;
+ line-height: 0.65;
+ letter-spacing: -1px;
 }
 .tree .node{
     position: relative;

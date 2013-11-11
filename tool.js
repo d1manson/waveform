@@ -86,7 +86,7 @@ T.Tool.DocumentMouseMove_Merger = function(event){
 		
 	var left = m.lastClientX + m.off_left - m.extraBorderSize;
 	var top = m.lastClientY + m.off_top + m.$parent.scrollTop() - m.extraBorderSize;
-	T.Tool.activeMerger.$h.css({left: left+'px', top:top+'px'});
+	T.Tool.activeMerger.$h.translate(left, top);
 }
 T.Tool.DocumentMouseUp_Merger = function(event){
 	//this happens on an abandonded merge (otherwise the target tile would intercept the event)
@@ -98,11 +98,11 @@ T.Tool.EndMerger = function(){
 	$.each(T.tiles, function(){this.$.off("mouseenter mouseleave mouseup mousemove")});
 	T.$tilewall.off("scroll");
 	T.Tool.activeMerger.$placeholder.remove();
-	T.Tool.activeMerger.$h.css({left: '',top:'',position:''})
+	T.Tool.activeMerger.$h.translate(null)
+                    .css({position:'relative'})
 					.removeAttr('moving')
 					.toggleClass('shake',true)
-					.removeAttr('proximate')
-					.find('canvas').eq(0).css({position: '',left: '',top: ''});
+					.removeAttr('proximate');
 	T.$tilewall.removeAttr('tilemoving');
 	delete T.Tool.activeMerger;
 }
@@ -127,7 +127,7 @@ T.Tool.TileMouseMove_MergerTarget = function(event){
 	
 	var left = m.targetX - m.extraBorderSize;
 	var top = m.targetY + m.$parent.scrollTop() - m.extraBorderSize;
-	m.$h.css({left: left+'px', top: top + 'px'});
+	m.$h.translate(left, top);
 	
 }
 T.Tool.TileMouseUp_MergerTarget = function(event){
