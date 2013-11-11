@@ -28,3 +28,19 @@ var endian = (function(){
 	(new DataView(b)).setInt16(0,256,true);
 	return (new Int16Array(b))[0] == 256? 'L' : 'B';
 })();
+
+
+//Custom jQUery plugin
+$.fn.translate = function(x,y){
+   
+   var str = x==null ? "" : "translate(" + x + "px," + y + "px)";
+   
+   this.css({
+      transform: str,
+      webkitTransform: str,
+      mozTransofrm: str
+   });
+   
+   return this;
+    
+}

@@ -582,6 +582,7 @@ T.UndoLastAction = function(){
 T.FloatingInfo_MouseDown = function(event){
     var $this = $(this);
     var offset = $this.position();
+    
     T.FloatInfoMoving = {$: $(this),
                     off_left: offset.left-event.clientX,
     				off_top: offset.top-event.clientY        
@@ -592,9 +593,9 @@ T.FloatingInfo_MouseDown = function(event){
     event.preventDefault();
 }
 T.FloatingInfo_DocumentMouseMove = function(e){
-    T.FloatInfoMoving.$.css({left: event.clientX + T.FloatInfoMoving.off_left + "px",
-                           top: event.clientY + T.FloatInfoMoving.off_top + "px"
-                            });
+    T.FloatInfoMoving.$.translate(event.clientX + T.FloatInfoMoving.off_left, 
+                                  event.clientY + T.FloatInfoMoving.off_top)
+        
 }
 T.FloatingInfo_DocumentMouseUp = function(e){
     T.FloatInfoMoving = null;
