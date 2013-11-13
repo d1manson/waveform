@@ -96,12 +96,17 @@ var M = {
 		return result;
 	},
 	
-	rdivide: function(numerator,denominator){
-		//note that this returns a float array no matter what class the numerator and denonminator are
-		var result = new Float32Array(numerator.length);
-		for(var i=0;i<numerator.length;i++)
-			result[i] = numerator[i]/denominator[i];
-		return result;
+	rdivide: function(numerator,denominator,flag){
+		if(flag == M.IN_PLACE){
+			for(var i=0;i<numerator.length;i++)
+				numerator[i] /= denominator[i];
+		}else{
+			//note that this returns a float array no matter what class the numerator and denonminator are
+			var result = new Float32Array(numerator.length);
+			for(var i=0;i<numerator.length;i++)
+				result[i] = numerator[i]/denominator[i];
+			return result;
+		}
 	},
 	
 	useMask: function(vector,mask,val){

@@ -54,6 +54,15 @@ T.CP = function($canvasParent,ORG){
         return new Uint32Array(data.buffer); //we're going to want to use it as 4byte words
     }();
 
+	var PALETTE_B = function(){
+	    var data = new Uint8Array(256*4);
+        for(var i=0;i<256;i++){
+			data[i*4 +0] = 256-i;  //decreasing red
+			data[i*4 +1] = i; //increasing green
+		    data[i*4+3] = 255; //set alpha to opaque
+		}
+		return new Uint32Array(data.buffer);
+	}();
 
 	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ //this = cut object
 		
@@ -179,9 +188,58 @@ T.CP = function($canvasParent,ORG){
 	
 	}
 
+
+	var RenderAsMeanTime = function(){
+		var times = ORG.GetTetTimes(); //these are in miliseconds
+		var expLenInSeconds = parseInt(ORG.GetTetHeader().duration);
+		
+		var imData32 = Array(ctxes.length);
+		var imData = Array(ctxes.length);
+		for(var i=0;i<ctxes.length;i++){
+			imData[i] = ctxes[i].getImageData(0,0,canvS,canvS)
+			imData32[i] = new Uint32Array(imData[i].data.buffer);		
+		}
+		
+		console.time('si cluster mean times');
+				
+		for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
+			var c1_ = chanList[c1];
+			var c2_ = chanList[c2];
+
+			//For each pixel in this cluster plot, calculate the mean time
+			// i.e. accumulate tTotal and counts, and divide one by the other
+			var tTotal = new Float32Array(canvS*canvS);
+			var counts = new Float32Array(canvS*canvS);
+			for(var k=0;k<N;k++){
+				var amp1 = amps[k*C + c1_]; //TODO: this could probably be more efficient as we're using every index unlike in the other kind of rendering
+				var amp2 =  amps[k*C + c2_];
+				counts[amp1*canvS + amp2]++;
+				tTotal[amp1*canvS + amp2] += times[k];
+			}
+			
+			//accumulaitons done, now do division
+			M.rdivide(tTotal,counts,M.IN_PLACE); // this is: tTotal /= counts
+			
+			//calculating colormap lookup factor
+			var factor = 256/1000/expLenInSeconds;
+			
+			var im = imData32[m];
+			//apply colormap, leaving 0-alpha in pixels with no counts
+			for(var i=0;i<tTotal.length;i++)
+				im[i] = counts[i] ? PALETTE_B[Math.floor(tTotal[i] * factor)] : 0;
+			
+		}
+		
+		for(var i=0;i<ctxes.length;i++)
+			ctxes[i].putImageData(imData[i], 0, 0);
+		console.timeEnd('si cluster mean times');
+		
+	}
+	
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	
-	return {BringGroupToFront:BringGroupToFront}; //there is nothing exported currently
+	return {BringGroupToFront: BringGroupToFront,
+			RenderAsMeanTime: RenderAsMeanTime};  //TODO: expose this in a more helpful way
 	
 } ($('#cluster_panel'),T.ORG);
