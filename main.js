@@ -449,7 +449,7 @@ T.ToggleFS = function(newState){
 //For a jQuery element or an array of jQuery elements it removes an existing "state" attribute or adds "state=closed"
 T.ToggleElementState = function(el,doItNow,onRightClickOnly){
 	var foo =  function(e){
-		if(onRightClickOnly && !e.button == 2)
+		if(onRightClickOnly && e.button == 0)
 			return;
 			
 		el = [].concat(el); //force it to be an array
@@ -640,6 +640,10 @@ T.DocumentReady = function(){
 	}
 }
 
+T.DriftButtonClick = function(){
+	T.CP.RenderAsMeanTime();
+}
+
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
@@ -676,7 +680,8 @@ T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
 T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
-
+$('#drift_button').click(T.DriftButtonClick)
+				  .mousedown(T.ToggleElementState($('.drift_info'),false,true));
 $(document).on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 
@@ -691,12 +696,14 @@ key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],
 key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+key('d',T.DriftButtonClick);
 key('h, alt+h',T.ToggleElementState($('.file_info')));
 key('alt+a',T.ToggleElementState(T.$autocut_info));
 key('ctrl+z, z',T.UndoLastAction);
 key('alt+r',T.ToggleElementState($('.rm_info')));
 key('/, alt+/',T.ToggleElementState($('.help_info')));
 key('alt+p',T.ToggleElementState($('.palette_info')));
+key('alt+d',T.ToggleElementState($('.drift_info')));
 key('alt+t',T.ToggleElementState($('.tc_info')));
 key('alt+z',T.ToggleElementState($('.action_info')));
 key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
