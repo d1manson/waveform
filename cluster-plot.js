@@ -4,7 +4,7 @@
 T.CP = function($canvasParent,ORG){
 
 	//TODO: it may be woth moving the plotting into a worker
-	
+
 	var cCut = null;
 	var amps = null;
 	var ctxes = [];
@@ -15,7 +15,9 @@ T.CP = function($canvasParent,ORG){
 	var canvS = 128;
 	var canvasesAreNew = null;
 	var ready = false;
-	
+    var meanTMode = false;
+    var meanTModeIsRendered = false;
+    
 	var PALETTE_FLAG = function(){ //duplicated in webgl-waveforms  TODO: put it in main
         var data = new Uint8Array(256*4);
         for(var i=0;i<256;i++)
@@ -65,32 +67,40 @@ T.CP = function($canvasParent,ORG){
 	}();
 
 	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ //this = cut object
-		
+
 		if(!ready){
 			console.warn('cluster-plot SlotsInvalidated without any voltage data.');
 			return;
 		}
-			
+
 		if(isNewCut || cCut == null){//TODO: check exactly when isNewCut is true, and check whether we really need to the following each time it is true
 			cCut = this;
-			if(!canvasesAreNew)
+			if(!canvasesAreNew  && !meanTMode)
 				for(var i=0;i<ctxes.length;i++)
 					ctxes[i].clearRect(0,0,canvS,canvS);
 		}
-
+            
 		if(this && this != cCut)
 			throw new Error("cluster-plot SlotsInvalidated with unexpected cut instance argument");
 
+        if(meanTMode && !meanTModeIsRendered){
+            RenderAsMeanTime();
+        }
+        
 		var renderSlotList = [];
 		for(var i=0;i<newlyInvalidatedSlots.length;i++)if(newlyInvalidatedSlots[i])
 			renderSlotList.push(cCut.GetImmutableSlot(i));
-			
+
 		RenderSlots(renderSlotList);
-	
+
 		canvasesAreNew = false;
 	}
 
 	var RenderSlots = function(slots){
+        
+        if(meanTMode)
+            return;
+            
 		console.time('si cluster');
 		var imData32 = Array(ctxes.length);
 		var imData = Array(ctxes.length);
@@ -98,17 +108,17 @@ T.CP = function($canvasParent,ORG){
 			imData[i] = ctxes[i].getImageData(0,0,canvS,canvS)
 			imData32[i] = new Uint32Array(imData[i].data.buffer);		
 		}
-		
+
 		while(slots.length){
 			var s = slots.shift();
-			
+
 			if(!s || !s.inds || !s.inds.length)
 				continue;
-				
+
 			var group = s.group_history.slice(-1)[0]; 
 			var color = PALETTE_FLAG[group];
 			var inds = s.inds;
-		
+
 			for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
 				var im = imData32[m];
 				var c1_ = chanList[c1];
@@ -120,17 +130,17 @@ T.CP = function($canvasParent,ORG){
 				}
 			}
 		}
-		
+
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
 		console.timeEnd('si cluster');
 	}
-	
+
 	var BringGroupToFront = function(group_num){
 		var slot = cCut.GetGroup(group_num,true);
 		RenderSlots([slot]);
 	}
-	
+
 	var LoadTetrodeData = function(N_val,amps_in){
 		$canvasParent.empty();
 		ctxes = [];
@@ -139,19 +149,20 @@ T.CP = function($canvasParent,ORG){
 		cCut = null;
 		amps = null;
 		ready = false;
-		
+        meanTModeIsRendered = false;
+        
 		if(!N_val)	
 			return;
-				
+
 		console.time('tet cluster');
 		// get a reduced precision copy of the amplitudes 
 		amps = M.clone(amps_in);
 		var factor = 256/canvS; //256 is the maximum amplitude
 		for(var i=0;i<amps.length;i++)
 			amps[i] /= factor;
-			
+
 		N = N_val;
-				
+
 		// work out which channels have non-zero amplitude
 		chanList = [];
 		for(var c=0;c<C;c++){
@@ -167,17 +178,17 @@ T.CP = function($canvasParent,ORG){
 				$canvasParent.append($newCanvas);
 				ctxes.push($newCanvas.get(0).getContext('2d'));
 			}
-		console.timeEnd('tet cluster');
 		canvasesAreNew = true;
-		ready = true;
-		
+        console.timeEnd('tet cluster');
+        ready = true;
+
 	}
 
 	var FileStatusChanged = function(status,filetype){
 
 		if(filetype == null && status.tet < 3)
 				LoadTetrodeData(0);
-		
+
 		if(filetype == "tet"){
 			T.ORG.GetTetAmplitudes(function(amps){
 										LoadTetrodeData(ORG.GetN(),amps);
@@ -185,23 +196,34 @@ T.CP = function($canvasParent,ORG){
 											ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
 									});
 		}
-	
+
 	}
 
+    var SetRenderMode = function(v){
+        switch(v){
+            case 2:
+                meanTMode = true;
+                break;
+            default:
+                meanTMode = false;
+        }
+        meanTModeIsRendered = false; //ie. if requested it needs to be rendered now
+        SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
+    }
 
 	var RenderAsMeanTime = function(){
 		var times = ORG.GetTetTimes(); //these are in miliseconds
 		var expLenInSeconds = parseInt(ORG.GetTetHeader().duration);
-		
+
 		var imData32 = Array(ctxes.length);
 		var imData = Array(ctxes.length);
 		for(var i=0;i<ctxes.length;i++){
 			imData[i] = ctxes[i].getImageData(0,0,canvS,canvS)
 			imData32[i] = new Uint32Array(imData[i].data.buffer);		
 		}
-		
+
 		console.time('si cluster mean times');
-				
+
 		for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
 			var c1_ = chanList[c1];
 			var c2_ = chanList[c2];
@@ -216,30 +238,36 @@ T.CP = function($canvasParent,ORG){
 				counts[amp1*canvS + amp2]++;
 				tTotal[amp1*canvS + amp2] += times[k];
 			}
-			
+
+            //Smooth counts and tTotal
+            var countsSmooth = M.smooth(counts,canvS,canvS);
+            var tTotalSmooth = M.smooth(tTotal,canvS,canvS);
+            
 			//accumulaitons done, now do division
-			M.rdivide(tTotal,counts,M.IN_PLACE); // this is: tTotal /= counts
-			
+			M.rdivide(tTotalSmooth,countsSmooth,M.IN_PLACE); // this is: tTotalSmooth /= countsSmooth
+
 			//calculating colormap lookup factor
 			var factor = 256/1000/expLenInSeconds;
-			
+
 			var im = imData32[m];
 			//apply colormap, leaving 0-alpha in pixels with no counts
 			for(var i=0;i<tTotal.length;i++)
-				im[i] = counts[i] ? PALETTE_B[Math.floor(tTotal[i] * factor)] : 0;
-			
+				im[i] = counts[i] ? PALETTE_B[Math.floor(tTotalSmooth[i] * factor)] : 0;
+
 		}
-		
+
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
+            
+        meanTModeIsRendered = true;
 		console.timeEnd('si cluster mean times');
-		
+
 	}
-	
+
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
-	
+
 	return {BringGroupToFront: BringGroupToFront,
-			RenderAsMeanTime: RenderAsMeanTime};  //TODO: expose this in a more helpful way
-	
+			SetRenderMode: SetRenderMode}; 
+
 } ($('#cluster_panel'),T.ORG);

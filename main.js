@@ -641,7 +641,8 @@ T.DocumentReady = function(){
 }
 
 T.DriftButtonClick = function(){
-	T.CP.RenderAsMeanTime();
+    T.clusterMode = T.clusterMode ? 0 : 2;
+    T.CP.SetRenderMode(T.clusterMode);
 }
 
 $('.help_button').click(T.ShowHelp)

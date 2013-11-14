@@ -161,6 +161,28 @@ var M = {
 		}
 		
 	},
+    
+    smooth: function(matrix,nX,nY){
+        //Note that there is no normalisation (for nan smooth user can smooth a counts matrix and then use rdivide)!!
+        
+		var result = new matrix.constructor(matrix.length);
+        var counts = new Uint32Array(matrix.length);
+		var W = 2; //kernle is box-car of size 2W+1
+
+		for(var ky=-W;ky<=W;ky++)for(var kx=-W;kx<=W;kx++){//for each offset within the kernel square
+			var y0 = ky<0? 0 : ky;
+			var x0 = kx<0? 0 : kx;
+			var yend = ky>0? nY : nY+ky;
+			var xend = kx>0? nX : nX+kx;
+            
+			for(var y=y0;y<yend;y++)for(var x=x0;x<xend;x++)
+				result[y*nX +x] += matrix[(y-ky)*nX +(x-kx)];
+
+		}	
+        
+		return result; 
+	},
+        
 	
 	basic: function(typedArr){
 		return Array.apply([],typedArr);//turns typed array into a basic javascript array
