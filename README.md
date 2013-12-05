@@ -80,6 +80,7 @@ If you are a proficient programmer and know a bit of HTML but no JavaScript, you
 * [closures](http://stackoverflow.com/questions/111102/how-do-javascript-closures-work)
 * [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays)
 * [Workers](http://www.w3schools.com/html/html5_webworkers.asp)   
+* WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3))
 * FileSystem API
 * JavaScript Blobs
 * V8 optimization in Chrome     
