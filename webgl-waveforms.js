@@ -303,7 +303,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
 			throw new Error("gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE");
 		}
-		offCanv.offBuff = texture;
+		offCanv.offTexture = texture;
+		offCanv.offFBO = fbo;
 		
 		ToggleBlend(); //yeah
 				
@@ -428,7 +429,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		// render each of the requested channels, copying all the new images to their individual canvases
 		for(var c=0;c<chanIsToBeRendered.length;c++)if(chanIsToBeRendered[c]){
 			PerformRenderForChannel(c);
-			CopyTexture(offCanv.offBuff);
+			CopyTexture();
 					
 			for(var i=0;i<slotsToRender.length;i++){
 				var slot_num = slotsToRender[i].num;
@@ -699,12 +700,14 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
     }
 
 
-	var CopyTexture = function(src){
+	var CopyTexture = function(){
 		var VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
 								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
 		var FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord;void main() {" + 
 			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
-			"gl_FragColor = vec4(src.r > 0.5 ? 2.*(src.r - 0.5) : 0. ,src.r < 0.5 ? 2.*src.r : 0.,0.,src.a);" + 
+			"gl_FragColor = vec4(src.r > 0.5 ? src.r > 0.75 ? 4. - 4.*src.r : 4.*src.r-2. : src.r > 0.25 ? 2. - 4.*src.r : src.r*4.," + 
+								"src.r < 0.5 ? 2.*src.r : 2.-2.*src.r," + 
+								"src.r,src.a);" + 
 			"}";
 
 		var copyProg = gl.createProgram();	
@@ -726,15 +729,32 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		gl.enableVertexAttribArray( gl.getAttribLocation(copyProg, "a_texCoord"));
 		gl.vertexAttribPointer( gl.getAttribLocation(copyProg, "a_texCoord"), 2, gl.FLOAT, false, 0, 0);
   
-		//prepare texture in register 3 (randomly chose 3)
-    	gl.uniform1i(gl.getUniformLocation(copyProg, "u_src"), 3); 
-		gl.activeTexture(gl.TEXTURE0 + 3);
-		gl.bindTexture(gl.TEXTURE_2D, src); 
+		//prepare texture in register 0 
+    	gl.uniform1i(gl.getUniformLocation(copyProg, "u_src"), 0); 
+		gl.activeTexture(gl.TEXTURE0 );
+		gl.bindTexture(gl.TEXTURE_2D, offCanv.offTexture); 
 		
+		gl.disable(gl.BLEND); 
+				
+		//do it
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
-		gl.useProgram(prog);
 		
+		//restore everything
+		gl.useProgram(prog);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, offCanv.offFBO);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, offCanv.offTexture, 0);
+		gl.enableVertexAttribArray(locs.waveXYOffset);
+		gl.enableVertexAttribArray(locs.isTPlusOne);
+		gl.enableVertexAttribArray(locs.waveColorTex);
+		gl.enableVertexAttribArray(locs.voltage);
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffs.isTPlusOne);
+		gl.vertexAttribPointer(locs.isTPlusOne, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
+		// gl.uniform1i(locs.palette, PALETTE_FLAG_REGISTER_IND); //note need to do the proper switching based on palette mode
+		 
+		ToggleBlend(); //yeah
+		// set the viewport on the offscreen canvas
+        gl.viewport(0, 0, offCanv.W,offCanv.H);
 	}
 
     var error_callback = function(s){console.log(s)};
@@ -752,7 +772,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 			ToggleBlend: ToggleBlend,
 			ToggleOffCanv: function(v){
 					if(v) 
-						$('body').prepend($(offCanv.el).css({zIndex: 200, border: '#0f0 4px dashed', position: 'fixed', left: '400px'}));
+						$('body').prepend($(offCanv.el).css({zIndex: 200, border: '#0f0 4px dashed', position: 'fixed', left: '800px',backgroundColor: '#fff'}));
 					else 
 						$(offCanv.el).remove();
 					}
