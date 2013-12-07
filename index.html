@@ -73,9 +73,7 @@ you can drag further files onto the window at any point<br>
 					<b>Drift [d]</b><br><br>
 					Render the cluster plots using a palette that shows the average time for spikes in each bin. <br><br>
 					<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-					So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br><br>
-					
-					This is a fairly new feature that hasn't been all that fleshed out yet.
+					So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
 				</div>
 			</div>
 			
@@ -102,10 +100,11 @@ you can drag further files onto the window at any point<br>
 				<button id="toggle_palette">palette</button> 
 				<div class="floatinginfo palette_info">
 				<b>Toggle waveform palette [p]</b><br><br>
-				There are two palette modes: 
+				There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
 				<ul>
 				<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
 				<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
+				<li>render each pixel based on how many waves cross that pixel</li>
 				</ul>
 					
 					
@@ -167,7 +166,7 @@ you can drag further files onto the window at any point<br>
 <script src="worker-bridge.js"></script>
 <script src="filesystem.js"></script>
 <script src="Mlib.js"></script>
-<!-- <script src="webgl-debug.js"></script> -->
+<!--<script src="webgl-debug.js"></script> -->
 <script src="gpu-distmatrix.js"></script>
 
 <!-- T.PAR, T.CUT, and T.ORG look after the files and cuts-->
