@@ -12,7 +12,7 @@ To use the application, just download the code and open index.html in your brows
 **Viewing the data.**
 You can select to view a single channel, ratemap, or temporal autocorrelogram by clicking the relevant button in the button panel.  Hold down shift to select multiple views.
 
-**Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.
+**Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.  Note that it is very much a work in progress.
 
 **Merge groups.** You can drag a tile onto another tile in order to merge two groups together.  
 
@@ -22,14 +22,21 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Save the cut.** Drag the cut file from the file panel to your operating system's file explorer.  It will be given the standard name for a cut file.
 
-**Keyboard shortcuts.** `escape` open/close side pannel. `a`  do autocut. `p` toggle palette. `ctrl+z` undo. `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr (can use `shift` to show multiple views as with the mouse).  `ctrl+shift+q` reset everything and refresh the page.
+**Using the floating panes**
+There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
+
+**Keyboard shortcuts.** `escape` open/close side pannel. `a`  do autocut. `p` cycle palette. `ctrl+z` undo. `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr (can use `shift` to show multiple views as with the mouse).  `d` toggle drift mode rendering of the cluster plots. `ctrl+shift+q` reset everything and refresh the page.
+
+**Right clicking with a touchpad**
+In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
 
 Merger tool: ![mergetool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/mergertool.png)
 Splitter tool: ![splittertool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/splittertool.png)   
-
-
+Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/countmode.png) 
 
 ## Change Log
+* Added a new wave rendering mode which shows the densities.
+* Created a drift mode for rendering cluster plots.
 * Re-worked the `T.ORG` module so that you can now switch cuts/tets/exps more easily.
 * Each module now registers its own handlers with `T.ORG` rather than letting `main.js` do it.
 * Added the cluster plots (not yet interactive).
