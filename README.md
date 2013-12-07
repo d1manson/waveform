@@ -22,6 +22,9 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Save the cut.** Drag the cut file from the file panel to your operating system's file explorer.  It will be given the standard name for a cut file.
 
+**Checking for drift**
+Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).
+
 **Using the floating panes**
 There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
 
@@ -30,9 +33,10 @@ There are several floating info panes that appear when you put your cursor over 
 **Right clicking with a touchpad**
 In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
 
-Merger tool: ![mergetool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/mergertool.png)
-Splitter tool: ![splittertool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/splittertool.png)   
-Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/countmode.png) 
+Merger tool: ![mergetool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/mergertool.png)   
+Splitter tool: ![splittertool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/splittertool.png)      
+Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/countmode.png)     
+Cluster rendering in "drift" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/drift.png)      
 
 ## Change Log
 * Added a new wave rendering mode which shows the densities.
