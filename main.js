@@ -5,7 +5,7 @@ T.Tool = {};
 T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.tAutocorrIsOn = 0;
-T.paletteMode = 0;
+T.paletteMode = -1;
 T.binSizeCm = 2.5;
 
 T.BASE_CANVAS_WIDTH = 4*49;
@@ -395,9 +395,27 @@ T.ShowHelp = function(){
 	window.open("https://github.com/d1manson/waveform/tree/master#wiki","_blank");
 }
 
-T.TogglePalette = function(){
-	T.paletteMode = T.paletteMode  ? 0: 1;
-	T.WV.SetPaletteMode(T.paletteMode*2 - 1);
+T.TogglePalette = function(val){
+	if(typeof val === "number"){
+		T.paletteMode = val;
+	}else{
+		switch (T.paletteMode){
+			case -1:
+				T.paletteMode = 1;
+				break;
+			case -2:
+				T.paletteMode = -1;
+				break;
+			case 1:
+				T.paletteMode = -2;
+				if(T.WV.canDoComplexRender())
+					break; //set it to -1 instead
+			default:
+				T.paletteMode = -1;
+		} 
+	}
+		
+	T.WV.SetPaletteMode(T.paletteMode);
 }
 
 T.AutocutMouseDown = function(evt){
@@ -617,7 +635,7 @@ T.StoreData = function(){
 	localStorage.BIN_SIZE_CM = T.binSizeCm;
 	localStorage.state = 1;
 	localStorage.headerFilter = T.$header_search.val();
-
+	localStorage.paletteMode = T.paletteMode;
 }
 
 T.DocumentReady = function(){
@@ -628,6 +646,7 @@ T.DocumentReady = function(){
 		T.yFactor = localStorage.yFactor;
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$header_search.val(localStorage.headerFilter || '');
+		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
 		//TODO: load files into T.cut instances
 
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});

@@ -68,6 +68,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	var PALETTE_HOT_REGISTER_IND = 1;
 	var PALETTE_FLAG_REGISTER_IND = 2;
 	var FLOAT_TEXTURE_REGISTER_IND = 0; //this may need to be fixed at 0, not sure
+	var canDoComplexRender = undefined; //will be set to true or false during Init()
 	
 	var ready = {gl: false,
 				 voltage: false,
@@ -98,7 +99,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	"   attribute vec2 waveXYOffset;																  ", // x_1 y_1  #  x_1 y_1  #  x_2 y_2  #  x_2 y_2  #  ... x_n y_n  #  x_n y_n  #
 	"   attribute float waveColorTex;																  ", //  #   #  c_1  #   #  c_1  #   #  c_2  #   #  c_2 ...  #   #  c_n  #   #  c_n
 	"   uniform mediump float tXOffset;																  ", // canavas x-coordiantes from the leftmost point of the wave to point t
-	"	uniform bool countMode;																	  ",
+	"	uniform bool countMode;																	      ",
+	"	uniform highp vec4 countModeColor;																  ",
     "   varying lowp vec4 vCol;                                                                  	  ",
     "   uniform sampler2D palette;                                                  	       		  ",
 	"   const mediump float deltaTXOffset = " + (offCanv.dT/offCanv.W*2).toPrecision(3) + ";		  ", // canvas x-coordinates from point t to point t+1
@@ -108,7 +110,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
     "       vCol = countMode ? 																		  ",
 			// when countMode is true the blend mode will be ADD and we just render a tiny increment to each pixel
-	"				vec4(0.00001,0.,0.,1.) :																		  ",
+	"				countModeColor :																		  ",
 			//apply the palette. The colormap index was computed in javascript and either represents group number or order within the group (each case uses a different palette).
 	"				texture2D(palette,vec2(waveColorTex,0.));                           			  ", 
 
@@ -238,6 +240,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
 		UploadVoltage(buffer);
 		UploadIsTPlusOne(); //only needs to know N
+		SetCountModeColor(); //needs to know N (is only actually used when colormap is count mode)
         ready.voltage = true;
 
 		//Clear all the data that is obviously now out of date (we may not need to do this but it makes life easier)
@@ -255,7 +258,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
 		// initialise gl context and program
     	gl =  ValidGL(offCanv.el.getContext("experimental-webgl"));
-        gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined); //DEBUG ONLY
+       // gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined); //DEBUG ONLY
 
         prog = gl.createProgram();	
     	gl.attachShader(prog, GetShaderFromString(VERTEX_SHADER_STR, gl.VERTEX_SHADER));
@@ -272,6 +275,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		locs.tXOffset = gl.getUniformLocation(prog, "tXOffset");
 		locs.palette = gl.getUniformLocation(prog, "palette");
 		locs.countMode = gl.getUniformLocation(prog, "countMode");
+		locs.countModeColor = gl.getUniformLocation(prog, "countModeColor");
 		
 		// create all the neccessarry buffers (no space is actually allocated at this stage for data)
 		buffs.wave = gl.createBuffer();
@@ -288,10 +292,27 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
     	gl.disable(gl.DEPTH_TEST);
 
 		// prepare the special floating point render taret for colormap-count-mode
-		// TODO: if this doesn't work on the given user's browser then disable it 
+		canDoComplexRender = InitCopyProg();
+  
+		slotRenderState.desiredColormap = -1; //default
+		SwitchToMainProg(); //we call this now and then mid-rendering if we are using the colormap-count-mode
+		ready.gl = true;
+	}
+	
+	var InitCopyProg = function(){
+		var COPY_VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
+								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
+		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord;void main() {" + 
+			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
+			"gl_FragColor = vec4(src.r > 0.5 ? src.r > 0.75 ? 4. - 4.*src.r : 4.*src.r-2. : src.r > 0.25 ? 2. - 4.*src.r : src.r*4.," + 
+								"src.r < 0.5 ? 2.*src.r : 2.-2.*src.r," + 
+								"src.r,src.a);" + 
+			"}";
+			
 		var OES_texture_float = gl.getExtension('OES_texture_float');
 		if (!OES_texture_float) {
-			throw new Error("No support for OES_texture_float");
+			console.log("No support for OES_texture_float");
+			return false;
 		}
 		var texture = gl.createTexture();
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
@@ -305,19 +326,30 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + FLOAT_TEXTURE_REGISTER_IND, gl.TEXTURE_2D, texture, 0);
 		if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-			throw new Error("gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE");
+			console.log("gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE");
+			return false;
 		}
 		offCanv.offTexture = texture;
 		offCanv.offFBO = fbo;
 		copyProg = gl.createProgram();	
-		gl.attachShader(copyProg , GetShaderFromString(VERTEX_SHADER_STR, gl.VERTEX_SHADER));
-    	gl.attachShader(copyProg , GetShaderFromString(FRAGMENT_SHADER_STR, gl.FRAGMENT_SHADER));
+
+		gl.attachShader(copyProg , GetShaderFromString(COPY_VERTEX_SHADER_STR, gl.VERTEX_SHADER));
+    	gl.attachShader(copyProg , GetShaderFromString(COPY_FRAGMENT_SHADER_STR, gl.FRAGMENT_SHADER));
      	gl.linkProgram(copyProg)
         ValidProgram(copyProg);
 
-		slotRenderState.desiredColormap = -1; //default
-		SwitchToMainProg(); //we call this now and then mid-rendering if we are using the colormap-count-mode
-		ready.gl = true;
+		//prepare data for copy program
+		locs.copy_a_position = gl.getAttribLocation(copyProg, "a_position");
+		locs.copy_a_texCoord = gl.getAttribLocation(copyProg, "a_texCoord");
+		locs.copy_u_src =  gl.getUniformLocation(copyProg, "u_src");
+		buffs.copy_a_position = gl.createBuffer();
+		buffs.copy_a_texCoord = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER,buffs.copy_a_position);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0,offCanv.W, 0,0, offCanv.H,0,offCanv.H,offCanv.W, 0,offCanv.W, offCanv.H]), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffs.copy_a_texCoord);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0.0,  0.0,1.0,  0.0,0.0,  1.0,0.0,  1.0,1.0,  0.0,1.0,  1.0]), gl.STATIC_DRAW);
+		
+		return true;
 	}
 	
 	var SwitchToMainProg = function(){
@@ -357,6 +389,10 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		gl.vertexAttribPointer(locs.isTPlusOne, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
 	}
 
+	var SetCountModeColor = function(){
+		gl.uniform4fv(locs.countModeColor, [1/N*10,0,0,1]);
+	}
+	
 	var Render = function(hRender){
 		// This function is pretty complicated.  To understand it, you need to remember that although the function has been called asynchronously, no 
 		// other javascript executes until it completes ("javascript is single-threaded").  Most of the complications of asynchronisity are dealt with
@@ -557,6 +593,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 			// Re-bind the special floating point render target
 			gl.bindFramebuffer(gl.FRAMEBUFFER, offCanv.offFBO);
 			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + FLOAT_TEXTURE_REGISTER_IND, gl.TEXTURE_2D, offCanv.offTexture, 0);
+			SetCountModeColor();
 		}else
 			throw new Error('palette mode can only be -1, +1, or -2');
 
@@ -597,31 +634,18 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	var CrossRenderCounts = function(){
 		//runs a kernel which copies data from a floating point texture to the off screen canvas itself, rather than copy the data directly it 
 		// applies a colorscale to the floating point data.
-		var VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
-								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
-		var FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord;void main() {" + 
-			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
-			"gl_FragColor = vec4(src.r > 0.5 ? src.r > 0.75 ? 4. - 4.*src.r : 4.*src.r-2. : src.r > 0.25 ? 2. - 4.*src.r : src.r*4.," + 
-								"src.r < 0.5 ? 2.*src.r : 2.-2.*src.r," + 
-								"src.r,src.a);" + 
-			"}";
-
-		gl.useProgram(copyProg);  //TODO: cache locs for copyProg
+		gl.useProgram(copyProg);  //TODO: cache locs for copyProg and don't need to reupload buffer data each time
 		
-		//prepare position data
-		gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0,offCanv.W, 0,0, offCanv.H,0,offCanv.H,offCanv.W, 0,offCanv.W, offCanv.H]), gl.STATIC_DRAW);
-		gl.enableVertexAttribArray(gl.getAttribLocation(copyProg, "a_position"));
-		gl.vertexAttribPointer(gl.getAttribLocation(copyProg, "a_position"), 2, gl.FLOAT, false, 0, 0);
-		
-		//prepare texture coordinate data
-		gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0.0,  0.0,1.0,  0.0,0.0,  1.0,0.0,  1.0,1.0,  0.0,1.0,  1.0]), gl.STATIC_DRAW);
-		gl.enableVertexAttribArray( gl.getAttribLocation(copyProg, "a_texCoord"));
-		gl.vertexAttribPointer( gl.getAttribLocation(copyProg, "a_texCoord"), 2, gl.FLOAT, false, 0, 0);
+		//switch on data
+		gl.enableVertexAttribArray(locs.copy_a_position);
+		gl.enableVertexAttribArray(locs.copy_a_texCoord);
+		gl.bindBuffer(gl.ARRAY_BUFFER,buffs.copy_a_position);
+		gl.vertexAttribPointer(locs.copy_a_position, 2, gl.FLOAT, false, 0, 0);
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffs.copy_a_texCoord);
+		gl.vertexAttribPointer( locs.copy_a_texCoord, 2, gl.FLOAT, false, 0, 0);
   
 		//prepare texture in register FLOAT_TEXTURE_REGISTER_IND
-    	gl.uniform1i(gl.getUniformLocation(copyProg, "u_src"), FLOAT_TEXTURE_REGISTER_IND); 
+    	gl.uniform1i(locs.copy_u_src,FLOAT_TEXTURE_REGISTER_IND); 
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
 		gl.bindTexture(gl.TEXTURE_2D, offCanv.offTexture); 
 		
@@ -776,11 +800,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChange);
 	
-	return {SetPaletteMode: SetPaletteMode,
+	return {canDoComplexRender : function(){return canDoComplexRender;},
+			SetPaletteMode: SetPaletteMode,
 			ShowChannels: ShowChannels,
 			IsReady: IsReady,
 			MouseToVandT: MouseToVandT,
-			ToggleOffCanv: function(v){
+			ToggleOffCanv: function(v){//for debugging
 					if(v) 
 						$('body').prepend($(offCanv.el).css({zIndex: 200, border: '#0f0 4px dashed', position: 'fixed', left: '800px',backgroundColor: '#fff'}));
 					else 

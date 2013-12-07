@@ -100,10 +100,11 @@ you can drag further files onto the window at any point<br>
 				<button id="toggle_palette">palette</button> 
 				<div class="floatinginfo palette_info">
 				<b>Toggle waveform palette [p]</b><br><br>
-				There are two palette modes: 
+				There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
 				<ul>
 				<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
 				<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
+				<li>render each pixel based on how many waves cross that pixel</li>
 				</ul>
 					
 					
@@ -165,7 +166,7 @@ you can drag further files onto the window at any point<br>
 <script src="worker-bridge.js"></script>
 <script src="filesystem.js"></script>
 <script src="Mlib.js"></script>
-<!-- <script src="webgl-debug.js"></script> -->
+<!--<script src="webgl-debug.js"></script> -->
 <script src="gpu-distmatrix.js"></script>
 
 <!-- T.PAR, T.CUT, and T.ORG look after the files and cuts-->
