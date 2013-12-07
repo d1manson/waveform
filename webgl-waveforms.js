@@ -439,7 +439,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
 			// if either of the following two tests are false we will need to force a render of all desired channels and add this slot to the render list
 			var generationIsCorrect = r.slotGeneration[i] === s.generation;
-			var colMapIsCorrect = (r.desiredColormap == -1 && r.slotColMap[i] == -1) || (r.desiredColormap == +1 && r.slotColMap[i] == s.group_history.slice(-1)[0]);
+			var colMapIsCorrect = (r.desiredColormap < 0 && r.slotColMap[i] == r.desiredColormap) || (r.desiredColormap == +1 && r.slotColMap[i] == s.group_history.slice(-1)[0]);
 			if(!generationIsCorrect || !colMapIsCorrect){
 				M.useMask(chanIsToBeRendered,r.desiredChannels,1); //force render of all desired channels
 				slotsToRender.push(s); //we need to render this slot
@@ -511,7 +511,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 			r.$canvases[s.num].data('slot_num',s.num);
 			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
-			r.slotColMap[s.num] = r.desiredColormap == -1? -1 : s.group_history.slice(-1)[0];
+			r.slotColMap[s.num] = r.desiredColormap < 0? r.desiredColormap : s.group_history.slice(-1)[0];
 			r.slotGeneration[s.num] = s.generation;
 		}
 
