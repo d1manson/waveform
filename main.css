@@ -627,3 +627,11 @@ user-select: none;
 .autocut_info{
 max-width: none;
 }
+.tile-sticker{
+position: absolute;
+right: 2px;
+top: 2px;
+width: 20px;
+height: 20px;
+border: 1px solid #000;
+}

@@ -2,7 +2,7 @@
 
 
 //T.WV: uses webgl to render waveforms
-T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
+T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 //TODO: might consider adding in an indexed version of drawing if the number of waves to be redrawn is small enough compared to N
 //this would hopefully be fairly easy, requiring code to generate the indicies, then upload them, and then use them.
@@ -302,13 +302,25 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	var InitCopyProg = function(){
 		var COPY_VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
 								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
-		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord;void main() {" + 
+		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; void main() {" + 
 			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
-			"gl_FragColor = vec4(src.r > 0.5 ? src.r > 0.75 ? 4. - 4.*src.r : 4.*src.r-2. : src.r > 0.25 ? 2. - 4.*src.r : src.r*4.," + 
-								"src.r < 0.5 ? 2.*src.r : 2.-2.*src.r," + 
-								"src.r,src.a);" + 
+			"highp float counts = src.r;" + 
+			"gl_FragColor = vec4(counts > 0.5 ? counts > 0.75 ? 4. - 4.*counts : 4.*counts-2. : counts > 0.25 ? 2. - 4.*counts : counts*4.," + 
+								"counts < 0.5 ? 2.*counts : 2.-2.*counts," + 
+								"counts,src.a);" + 
 			"}";
-			
+		/*var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
+			"highp vec4 src_p1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + oneTex));" + 
+			"highp vec4 src_m1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - oneTex));" + 
+			"highp float dc_dV= src_p1v.r-src_m1v.r;" + 
+			"highp vec4 src_p1t = texture2D(u_src, vec2(v_texCoord[0]+ oneTex,v_texCoord[1]));" + 
+			"highp vec4 src_m1t = texture2D(u_src, vec2(v_texCoord[0] - oneTex,v_texCoord[1]));" + 
+			"highp float dc_dt= src_p1t.r	-src_m1t.r;" + 
+			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
+			"highp float counts = src.r;" + 
+			"gl_FragColor = src.a > 0.? vec4(dc_dt/counts + 0.5,0.,dc_dV/counts + 0.5,1.) : vec4(0.,0.,0.,0.);" + 
+			"}";
+		*/
 		var OES_texture_float = gl.getExtension('OES_texture_float');
 		if (!OES_texture_float) {
 			console.log("No support for OES_texture_float");
@@ -342,6 +354,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		locs.copy_a_position = gl.getAttribLocation(copyProg, "a_position");
 		locs.copy_a_texCoord = gl.getAttribLocation(copyProg, "a_texCoord");
 		locs.copy_u_src =  gl.getUniformLocation(copyProg, "u_src");
+		//locs.copy_oneTex = gl.getUniformLocation(copyProg, "oneTex");
 		buffs.copy_a_position = gl.createBuffer();
 		buffs.copy_a_texCoord = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER,buffs.copy_a_position);
@@ -649,6 +662,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
 		gl.bindTexture(gl.TEXTURE_2D, offCanv.offTexture); 
 		
+		//gl.uniform1f(locs.copy_oneTex,1/offCanv.W); 
 		gl.disable(gl.BLEND); 
 				
 		//do it
@@ -695,44 +709,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
         return data;
     }();
 
-    var PALETTE_FLAG = function(){
-        var data = new Uint8Array(256*4);
-        for(var i=0;i<256;i++)
-    		data[i*4+3] = 255; //alpha to full opaque
-        data[0*4+0] = 190;    data[0*4+1] = 190;    data[0*4+2] = 190; //was 220 for all three
-        data[1*4+2] = 200;
-    	data[2*4+0] = 80;	data[2*4+1] = 255;
-        data[3*4+0] = 255;
-        data[4*4+0] = 245;	data[4*4+2] = 255;
-    	data[5*4+1] = 75;	data[5*4+1] = 200;	data[5*4+2] = 255;
-        data[6*4+1] = 185;
-    	data[7*4+0] = 255;	data[7*4+1] = 185;	data[7*4+2] = 50;
-        data[8*4+1] = 150;	data[8*4+2] = 175;
-        data[9*4+0] = 150;	data[9*4+2] = 175;
-    	data[10*4+0] = 170;	data[10*4+1] = 170;
-    	data[11*4+0] = 200;
-    	data[12*4+0] = 255;	data[12*4+1] = 255;
-    	data[13*4+0] = 140;	data[13*4+1] = 140;	data[13*4+2] = 140;
-    	data[14*4+1] = 255; data[14*4+2] = 235;
-    	data[15*4+0] = 255; data[15*4+2] = 160;
-    	data[16*4+0] = 175; data[16*4+1] = 75; data[16*4+2] = 75;
-    	data[17*4+0] = 255; data[17*4+1] = 155; data[17*4+2] = 175;
-    	data[18*4+0] = 190; data[18*4+1] = 190; data[18*4+2] = 160;
-    	data[19*4+0] = 255; data[19*4+1] = 255; data[19*4+2] = 75;
-    	data[20*4+0] = 154; data[20*4+1] = 205; data[20*4+2] = 50;
-    	data[21*4+0] = 255; data[21*4+1] = 99; data[21*4+2] = 71;
-    	data[22*4+1] = 255; data[22*4+2] = 127;
-    	data[23*4+0] = 255; data[23*4+1] = 140;
-    	data[24*4+0] = 32; data[24*4+1] = 178; data[24*4+2] = 170;
-    	data[25*4+0] = 255; data[25*4+1] = 69; 
-    	data[26*4+0] = 240; data[26*4+1] = 230; data[26*4+2] = 140;
-    	data[27*4+0] = 100; data[27*4+1] = 149; data[27*4+2] = 237;
-    	data[28*4+0] = 255; data[28*4+1] = 218; data[28*4+2] = 185;
-    	data[29*4+0] = 153; data[29*4+1] = 50; data[29*4+2] = 204;
-    	data[30*4+0] = 250; data[30*4+1] = 128; data[30*4+2] = 114;
-        return data;
-    }();
-
+   
     var UploadPalette = function(registerInd,data){
     	gl.activeTexture(gl.TEXTURE0 + registerInd);
         gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
@@ -813,5 +790,5 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 					}
 			};
 
-}(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG);
+}(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG, T.PALETTE_FLAG);
 
