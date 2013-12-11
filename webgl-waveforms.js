@@ -228,6 +228,34 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		//note that unlike in UploadWaveBuffer and UploadIsTPlusOne we cannot call vertexAttribPointer here.  Instead that happens inside a loop when we come to do the render.
     }
 
+	var dft = function(dest,source){
+		// computes the real and imaginary components for k=1,2,3,..Nquist  (i.e. doesn't compute k for k<=0)
+		// uses the simple-ft not the fast-ft
+		// values are stored as real_1 complex_1 real_2 complex_2 .. complex_N
+		// but the values are scaled by k/4 and shifted by 128 to make them lie roughly uniformly within 0-255.
+		// dest should be a Uint8ClampedArray  Note that since we wanted to weight the diffs by k we can actually dont need to play with the distance matrix code
+		var N = source.length;
+		var q = N/2; //for now let's just assume length is even
+		
+		var kZoomFactor = 20; // rather than compute compents 0,1,2,3,..Nquist, compute 1/kZoomFactor, 2/kZoomFactor, ... Nquist/kZoomFactor
+		var bitDepthFactor = 1/10; // ensures values more or less fall within -128 to + 127
+		
+		for(var k=0;k<q*2;k++){
+			var r = 0, i=0; 
+			var pi2k_N = 3.1415926*2*(k+1)/kZoomFactor/N; //note the k+1 because we want k from 1 to q not 0 to q-1
+			for(var n=0;n<N;n++){
+				r += source[n] * Math.cos(-pi2k_N *n);
+				i += source[n] * Math.sin(-pi2k_N *n);
+			}	
+			
+			var scale = Math.sqrt((k+1)/kZoomFactor) * bitDepthFactor* bitDepthFactor* bitDepthFactor* bitDepthFactor; 
+			
+			var val = (r*r + i*i)*scale - 128;
+			dest[k] = val < -127 ? -127 : val > 127 ? 127 : val;
+			//dest[k*2] = 128 + i * scale;
+		}
+	}
+	
 	var LoadTetrodeData = function(N_val, buffer){
 		//TODO: if N is zero then we should clear everything (we have no tetrode data)
 
@@ -237,7 +265,14 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 		N = N_val;
         if(!ValidN(N)) return;
-
+//###########################
+/*		var newView = new Int8Array(buffer.byteLength);
+		var oldView = new Int8Array(buffer);
+		for(var i=0;i<N*4;i++){
+			dft(newView.subarray(i*(50+4),i*(50+4)+50), oldView.subarray(i*(50+4),i*(50+4)+50));
+    	}
+		buffer = newView.buffer;*/
+//###########################
 		UploadVoltage(buffer);
 		UploadIsTPlusOne(); //only needs to know N
 		SetCountModeColor(); //needs to know N (is only actually used when colormap is count mode)
@@ -302,14 +337,15 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 	var InitCopyProg = function(){
 		var COPY_VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
 								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
-		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; void main() {" + 
+		/*var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; void main() {" + 
 			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
 			"highp float counts = src.r;" + 
 			"gl_FragColor = vec4(counts > 0.5 ? counts > 0.75 ? 4. - 4.*counts : 4.*counts-2. : counts > 0.25 ? 2. - 4.*counts : counts*4.," + 
 								"counts < 0.5 ? 2.*counts : 2.-2.*counts," + 
 								"counts,src.a);" + 
 			"}";
-		/*var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
+		*/
+		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
 			"highp vec4 src_p1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + oneTex));" + 
 			"highp vec4 src_m1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - oneTex));" + 
 			"highp float dc_dV= src_p1v.r-src_m1v.r;" + 
@@ -320,7 +356,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			"highp float counts = src.r;" + 
 			"gl_FragColor = src.a > 0.? vec4(dc_dt/counts + 0.5,0.,dc_dV/counts + 0.5,1.) : vec4(0.,0.,0.,0.);" + 
 			"}";
-		*/
+		
 		var OES_texture_float = gl.getExtension('OES_texture_float');
 		if (!OES_texture_float) {
 			console.log("No support for OES_texture_float");
@@ -354,7 +390,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		locs.copy_a_position = gl.getAttribLocation(copyProg, "a_position");
 		locs.copy_a_texCoord = gl.getAttribLocation(copyProg, "a_texCoord");
 		locs.copy_u_src =  gl.getUniformLocation(copyProg, "u_src");
-		//locs.copy_oneTex = gl.getUniformLocation(copyProg, "oneTex");
+		locs.copy_oneTex = gl.getUniformLocation(copyProg, "oneTex");
 		buffs.copy_a_position = gl.createBuffer();
 		buffs.copy_a_texCoord = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER,buffs.copy_a_position);
@@ -662,7 +698,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
 		gl.bindTexture(gl.TEXTURE_2D, offCanv.offTexture); 
 		
-		//gl.uniform1f(locs.copy_oneTex,1/offCanv.W); 
+		gl.uniform1f(locs.copy_oneTex,1/offCanv.W); 
 		gl.disable(gl.BLEND); 
 				
 		//do it
