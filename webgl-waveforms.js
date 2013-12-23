@@ -237,7 +237,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 		N = N_val;
         if(!ValidN(N)) return;
-
+		
 		UploadVoltage(buffer);
 		UploadIsTPlusOne(); //only needs to know N
 		SetCountModeColor(); //needs to know N (is only actually used when colormap is count mode)
@@ -299,7 +299,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		ready.gl = true;
 	}
 	
-	var InitCopyProg = function(){
+	var InitCopyProg = function(withDiffs){
 		var COPY_VERTEX_SHADER_STR = "attribute vec2 a_texCoord;varying vec2 v_texCoord;attribute vec2 a_position;const vec2 u_resolution = vec2(" + offCanv.W + ".0," + offCanv.H + ".0);void main() {" + 
 								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
 		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; void main() {" + 
@@ -309,24 +309,44 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 								"counts < 0.5 ? 2.*counts : 2.-2.*counts," + 
 								"counts,src.a);" + 
 			"}";
-		/*var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
-			"highp vec4 src_p1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + oneTex));" + 
-			"highp vec4 src_m1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - oneTex));" + 
-			"highp float dc_dV= src_p1v.r-src_m1v.r;" + 
-			"highp vec4 src_p1t = texture2D(u_src, vec2(v_texCoord[0]+ oneTex,v_texCoord[1]));" + 
-			"highp vec4 src_m1t = texture2D(u_src, vec2(v_texCoord[0] - oneTex,v_texCoord[1]));" + 
-			"highp float dc_dt= src_p1t.r	-src_m1t.r;" + 
-			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
-			"highp float counts = src.r;" + 
-			"gl_FragColor = src.a > 0.? vec4(dc_dt/counts + 0.5,0.,dc_dV/counts + 0.5,1.) : vec4(0.,0.,0.,0.);" + 
-			"}";
-		*/
+		
+		if(withDiffs){
+			COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
+				"highp vec4 src_p1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + oneTex));" + 
+				"highp vec4 src_m1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - oneTex));" + 
+				"highp float dc_dV= src_p1v.r-src_m1v.r;" + 
+				"highp vec4 src_p1t = texture2D(u_src, vec2(v_texCoord[0]+ oneTex,v_texCoord[1]));" + 
+				"highp vec4 src_m1t = texture2D(u_src, vec2(v_texCoord[0] - oneTex,v_texCoord[1]));" + 
+				"highp float dc_dt= src_p1t.r	-src_m1t.r;" + 
+				"highp vec4 src = texture2D(u_src, v_texCoord);" + 
+				"highp float counts = src.r;" + 
+				"gl_FragColor = src.a > 0.? vec4(dc_dt/counts + 0.5,0.,dc_dV/counts + 0.5,1.) : vec4(0.,0.,0.,0.);" + 
+				"}";
+		}
+		if(withDiffs == 2){
+			COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; uniform highp float oneTex; void main() {" + 
+				"highp vec4 src = texture2D(u_src, v_texCoord);" +
+				"highp float src_ = src.r;" +
+				"highp float src_p1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + oneTex)).r;" + 
+				"highp float src_m1v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - oneTex)).r;" + 
+				"highp float src_p2v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] + 2.*oneTex)).r;" + 
+				"highp float src_m2v = texture2D(u_src, vec2(v_texCoord[0],v_texCoord[1] - 2.*oneTex)).r;" + 
+				"highp float gV= src_/(src_p1v-src_m1v)*((src_p2v-src_)/src_p1v -(src_-src_m2v)/src_m1v);" + 
+				"highp vec4 src_p1t = texture2D(u_src, vec2(v_texCoord[0]+ oneTex,v_texCoord[1]));" + 
+				"highp vec4 src_m1t = texture2D(u_src, vec2(v_texCoord[0] - oneTex,v_texCoord[1]));" + 
+				"highp float dc_dt= src_p1t.r	-src_m1t.r;" + 
+				"highp float counts = src.r;" + 
+				"gl_FragColor = src.a > 0.? vec4(" /*dc_dt/counts + */ + "0.5,0.,gV + 0.5,1.) : vec4(0.,0.,0.,0.);" + 
+				"}";
+		}
+		
 		var OES_texture_float = gl.getExtension('OES_texture_float');
 		if (!OES_texture_float) {
 			console.log("No support for OES_texture_float");
 			return false;
 		}
-		var texture = gl.createTexture();
+		
+		var texture = offCanv.offTexture || gl.createTexture();
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
 		gl.bindTexture(gl.TEXTURE_2D, texture);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -334,7 +354,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, offCanv.W, offCanv.H, 0, gl.RGBA,  gl.FLOAT, null);
-		var fbo = gl.createFramebuffer();
+		var fbo = offCanv.offFBO || gl.createFramebuffer();
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + FLOAT_TEXTURE_REGISTER_IND, gl.TEXTURE_2D, texture, 0);
 		if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
@@ -354,7 +374,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		locs.copy_a_position = gl.getAttribLocation(copyProg, "a_position");
 		locs.copy_a_texCoord = gl.getAttribLocation(copyProg, "a_texCoord");
 		locs.copy_u_src =  gl.getUniformLocation(copyProg, "u_src");
-		//locs.copy_oneTex = gl.getUniformLocation(copyProg, "oneTex");
+		locs.copy_oneTex = gl.getUniformLocation(copyProg, "oneTex");
 		buffs.copy_a_position = gl.createBuffer();
 		buffs.copy_a_texCoord = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER,buffs.copy_a_position);
@@ -637,7 +657,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			LoadTetrodeData(null);	
 			
 		if(filetype == "tet"){
-			LoadTetrodeData(ORG.GetN(),ORG.GetTetBuffer());
+			LoadTetrodeData(ORG.GetN(),ORG.GetTetBufferProjected());
 			if(status.cut == 3) //if we happened to have loaded the cut before the tet, we need to force to accept it now
 				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);  //TODO: just invalidate all here directly
 		}
@@ -662,7 +682,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		gl.activeTexture(gl.TEXTURE0 + FLOAT_TEXTURE_REGISTER_IND);
 		gl.bindTexture(gl.TEXTURE_2D, offCanv.offTexture); 
 		
-		//gl.uniform1f(locs.copy_oneTex,1/offCanv.W); 
+		gl.uniform1f(locs.copy_oneTex,1/offCanv.W); 
 		gl.disable(gl.BLEND); 
 				
 		//do it
@@ -787,7 +807,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 						$('body').prepend($(offCanv.el).css({zIndex: 200, border: '#0f0 4px dashed', position: 'fixed', left: '800px',backgroundColor: '#fff'}));
 					else 
 						$(offCanv.el).remove();
-					}
+					},
+			InitCopyProg: InitCopyProg //for experimenting only, this is only supposed to be called once in normal operation
 			};
 
 }(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG, T.PALETTE_FLAG);

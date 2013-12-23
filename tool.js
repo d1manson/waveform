@@ -319,7 +319,7 @@ T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
 	// cutInds is the usual list of indicies for spikes
 		
 	var isOverThresh = new Uint8Array(cutInds.length);
-	var buffer = new Int8Array(T.ORG.GetTetBuffer());
+	var buffer = new Int8Array(T.ORG.GetTetBufferProjected());
 	for (var i=0;i<cutInds.length;i++)
 		isOverThresh[i] = buffer[T.PAR.BYTES_PER_SPIKE*cutInds[i] + ch*(50+4) + 4 + t]> vThresh ? 255 : 0;
 	

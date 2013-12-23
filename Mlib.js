@@ -186,5 +186,90 @@ var M = {
 	
 	basic: function(typedArr){
 		return Array.apply([],typedArr);//turns typed array into a basic javascript array
+	},
+	
+	SGolayGeneralised: function(data,m,n,s){
+		//Does a least-squares fit of nth order polynomials to the 2m+1 data points centered on each point of data.X and returns the 
+		//s order derivative evaluated at each point of data.X.
+		//
+		// data.X contains contiguous blocks of "vectors" each of which should be independently SGolay'ed.
+		// the total number of vectors is data.N, the length of the vectors is data.W.
+		// In order to account for blocks of non-relevant data within X, you also specify the full step size
+		// to get from one vector to the next, data.S. The offset from the start to the first vector is given
+		// by data.off.  The output will have the same form as the input.
+		//  
+		//  [data.off data.W ???] [data.off data.W ???] [data.off data.W ???]    data.off + data.W + ??? = data.S
+		//
+		//
+		//See [http://pubs.acs.org/doi/pdf/10.1021/ac00205a007]
+		// "General Least-Squares Smoothing and Differentiation by the Convolution (Savitzky-Golay) Method. P. Gorry 1989."
+		
+		var GramPoly = function (i,m,k,s){
+			//Recursively calculates the Gram Polynomial (s=0), or its s'th derivative, evaluated at i, order k, over 2m+l points
+			if(k>0)
+				return (4*k-2)/(k*(2*m-k+1))*(i *GramPoly(i,m,k-1,s) + s*GramPoly(i,m,k-1,s-1))
+						- ((k-1)*(2*m+k))/(k*(2*m-k+1))*GramPoly(i,m,k-2,s) 
+			else 
+				return k==0 && s== 0? 1 : 0 
+		};
+		
+		var GenFact =  function(a,b) {
+			//Calculates the generalised factorial (a)(a-l) ... (a-b+l) 
+			for (var gf=1,j=(a-b+1);j<=a;j++)
+					gf *= j;
+			return gf;
+		};
+		
+		var Weight =  function(i,t,m,n,s){ 
+			//Calculates the weight of the i'th data point for the t'th Least-Square point of the s'th derivative, over 2m+1 points order n
+			var sum = 0;
+			for (var k=0;k<=n;k++)
+				sum += (2*k+1)*(GenFact(2*m,k)/GenFact(2*m+k+1,k+1)) *GramPoly(i,m,k,0)*GramPoly(t,m,k,s);
+			return sum;
+		};
+
+		var T = data.W;
+		var Yfull = new Float32Array(data.X.length);
+			
+		//calculate weights for the first m Y values using the first 2m+1 X values
+		var weight_it_start = new Float32Array(m*(2*m+1));
+		for(var t=-m;t<0;t++)
+			for(var i=-m;i<=m;i++)
+				weight_it_start[(t+m)*(2*m+1) + i+m] = Weight(i,t,m,n,s);
+				
+		//calculate weights for Y values m+1 to T-m-1 using all the X values	
+		var weight_i = new Float32Array(2*m+1);
+		for(var i=-m;i<=m;i++)
+			weight_i[i+m] = Weight(i,0,m,n,s); //With t=0, this is a standard S-G filter
+
+		//calculate weights for the last m Y values using the last 2m+1 X values
+		var weight_it_end = new Float32Array(m*(2*m+1));
+		for(var t=1;t<=m;t++)
+			for(var i=-m;i<=m;i++)
+				weight_it_end[(t-1)*(2*m+1) +i+m] = Weight(i,t,m,n,s);
+
+
+		for(var xx=0;xx<data.N;xx++){
+			var X = data.X.subarray(data.off + data.S*xx, data.off + data.S*xx + data.W);
+			var Y = Yfull.subarray(data.off + data.S*xx, data.off + data.S*xx + data.W);
+			
+			//calculate the first m Y values using the first 2m+1 X values
+			for(var t=-m;t<0;t++)
+				for(var i=-m;i<=m;i++)
+					Y[t+m] += X[i+m] * weight_it_start[(t+m)*(2*m+1) + i+m];
+
+			//calculate Y values m+1 to T-m-1 using all the X values					
+			for(var yy=m+1;yy<=T-m;yy++)
+				for(var i=-m;i<=m;i++)
+					Y[yy-1] += X[yy+i-1] * weight_i[i+m];
+			
+			//calculate the last m Y values using the last 2m+1 X values
+			for(var t=1;t<=m;t++)
+				for(var i=-m;i<=m;i++)
+					Y[t+ T-m-1] += X[i+T-m-1] * weight_it_end[(t-1)*(2*m+1) +i+m];
+		}
+		
+		return Yfull;
 	}
+
 }

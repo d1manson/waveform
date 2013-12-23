@@ -25,6 +25,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 	var makeNullCutFromN = false; //when we recieve a tetrode file we shall generate a null cut if this is true, otherwise we leave the cut generation up to SwitchToCut
 	var cCutHeader = null; //object with key name pairs
 	var cTetBuffer = null; //arraybuffer
+	var cTetBufferProjected  = null; //arraybuffer
 	var cTetT = null; //uint32array
 	var cTetA = null; //uint16array of form A_11 A_12 A_13 A_14 A_21 A_22 ... A_n4 giving max-min on each wave
 	var cTetHeader = null; //object with key name pairs
@@ -155,7 +156,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 			var base = "";
 			
 			if (ext){
-			    ext = ext[1];
+			    ext = ext[1].toLowerCase();
 				base = files[i].name.slice(0,files[i].name.length-ext.length-1);
 
 				if(ext=="cut") 					type = 1;
@@ -182,8 +183,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 					break;
 				default:
 					pendingNewFiles--;//unknown file type
-					if(pendingNewFiles == 0 && exp == cExp)
-						SwitchToExpTet(exp_name,cTet.num,true);
+                    if(pendingNewFiles == 0 && $.isEmptyObject(cExp))
+                        ReadAndApplyURL();
 			}
 
         }      
@@ -214,8 +215,11 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 		
 		pendingNewFiles--;
-		if(pendingNewFiles == 0 && exp == cExp)
-			SwitchToExpTet(exp_name,cTet.num,true);
+		if(pendingNewFiles == 0)
+            if($.isEmptyObject(cExp))
+                ReadAndApplyURL();
+            else if(exp == cExp)
+			    SwitchToExpTet(exp_name,cTet.num,true);
 		
     }
 
@@ -262,6 +266,35 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 		}
 	}
 
+    var UpdateURLHistory= function(exp_name,tet_num){
+        if(!exp_name || !tet_num)
+            return; //don't update if the thing to update is nonsense
+            
+        try{
+            history.replaceState({},exp_name + ' [Cutting GUI]',"?exp=" + encodeURIComponent(exp_name) + "&tet=" + encodeURIComponent(tet_num));
+        }catch(e){};
+    }
+    
+    function GetUrlParameters(){
+        var paramArray =  window.location.search.substr(1).split("&");
+        var paramOb = {};
+        while(paramArray.length){
+            var parts = paramArray.pop().split("=");
+            paramOb[decodeURIComponent(parts[0])] = parts[1] ? decodeURIComponent(parts[1]) : "";
+       }
+       return paramOb;  
+    }
+
+    var ReadAndApplyURL = function(){
+        //when the page loads its possible there will be state informaiton in the url from last time (e.g. if the user reloads the page)
+        //if so, then once the user has loaded some files into the page, and before they have selected an exp, let see if the old exp is available
+        //if so lets select it for the user.
+        var params = GetUrlParameters();
+        if(params.exp && params.exp in exps && params.tet && !isNaN(parseInt(params.tet)))
+            SwitchToExpTet(params.exp,parseInt(params.tet));
+        
+    }
+    
     var SwitchToExpTet = function(exp_name,tet_num,force){
 		if(!force && exp_name == cExp.name){
 			if(tet_num == cTet.num)
@@ -270,6 +303,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 			cExp = exps[exp_name];	
 			
 			document.title = cExp.name + ' [Cutting GUI]';
+            
 			cExp.$.attr("active","")
 				  .siblings().removeAttr("active");
 
@@ -293,10 +327,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 			
 		var tet_ind = tet_num -1;
 		MarkTet(tet_ind);
-
+        UpdateURLHistory(cExp.name,tet_num);
 		cLoadingTet.alive = false; //if there were any tet or cut files loading we need to stop them
 		cN = null;
-		cTetHeader = null; cTetBuffer = null; cTetT = null; cTetA = null;
+		cTetHeader = null; cTetBuffer = null; cTetT = null; cTetA = null; cTetBufferProjected = null;
 		cState.tet = 0; //we leave pos and set alone, and we put out a call to SwitchToCut which deals with cState.cut
 		cLoadingTet = new living(); 
 
@@ -434,13 +468,49 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 	}
 
 	var GetCTetA = function(callback){ // get an array of the length waveWidth (= 50 probably), where each element of the array is a typedarray giving the voltage at time t for every wave
+ 
 		if(!cTetA)
-    		cTetA = PAR.GetTetrodeAmplitude(cTetBuffer,cTetHeader,cN,function(amps){cTetA = amps; callback(amps);});
+    		cTetA = PAR.GetTetrodeAmplitude(GetTetBufferProjected(),cTetHeader,cN,function(amps){cTetA = amps; callback(amps);});
 		else // we already have it, return it asynchrousously for consistency
 			setTimeout(function(){callback(cTetA);},1);
 	}
 
+	var GetTetBufferProjected = function(){
+		if(ORG.noProjection)
+			return cTetBuffer;
+		
+		if(cTetBufferProjected)
+			return cTetBufferProjected ;
+			
+		/*
+		var oldInt8 = new Int8Array(cTetBuffer);
+		var newInt8 = new Int8Array(cTetBuffer.byteLength);
+		var project = function(dest,src){
+			for(var i=0;i<50;i++){
+				var v = (src[i + 3] - src[i+1])*2 + (src[i+4]-src[i]);
+				dest[i] = v < -127 ? -127 : v> 127? 127 : v;
+			}
+		}
+	
+		for(var i=0;i<cN*4;i++)
+			project(newInt8.subarray(i*(4+50),i*(4+50) + 50),oldInt8.subarray(i*(4+50),i*(4+50) + 50));
+		cTetBufferProjected  = newInt8.buffer
+		*/
+		var oldInt8 = new Int8Array(cTetBuffer);
+		var x_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},12,4,0);
+		var dxdt_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,1);
+		var d2xdt2_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,2);
 
+				
+		//cast from float to int8 and normalise
+		var projI8 = new Int8Array(dxdt_f32.length);
+		for(var i=0;i<projI8.length;i++){
+			var v = x_f32[i];
+			projI8[i] = v<-127? -127 : v>127? 127 : v;
+		}
+		cTetBufferProjected  = projI8.buffer;
+		return cTetBufferProjected ;
+	}
 
 
 
@@ -543,7 +613,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 	ORG.GetCutHeader = function(){return cCutHeader;};
 	ORG.AddFileStatusCallback = fileStatusCallbacks.add;
 	ORG.RemoveFileStatusCallback = fileStatusCallbacks.remove;
-
+	ORG.GetTetBufferProjected = GetTetBufferProjected;
+	ORG.noProjection = true;
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS
