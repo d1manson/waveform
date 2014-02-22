@@ -124,7 +124,7 @@ T.CP = function($canvasParent,ORG){
 				var c1_ = chanList[c1];
 				var c2_ = chanList[c2];
 				for(var k=0;k<inds.length;k++){
-					var amp1 = amps[inds[k]*C + c1_];
+					var amp1 = canvS - 1 - amps[inds[k]*C + c1_];
 					var amp2 =  amps[inds[k]*C + c2_];
 					im[amp1*canvS + amp2] = color;
 				}
@@ -133,6 +133,14 @@ T.CP = function($canvasParent,ORG){
 
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
+        
+        for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
+    			ctxes[m].textAlign = "left";
+				ctxes[m].fillText((chanList[c1]+1) + "A" ,3,10);
+				ctxes[m].textAlign = "right";
+				ctxes[m].fillText((chanList[c2]+1) + "A",canvS-4,canvS- 2);
+		}
+        
 		console.timeEnd('si cluster');
 	}
 
@@ -233,8 +241,8 @@ T.CP = function($canvasParent,ORG){
 			var tTotal = new Float32Array(canvS*canvS);
 			var counts = new Float32Array(canvS*canvS);
 			for(var k=0;k<N;k++){
-				var amp1 = amps[k*C + c1_]; //TODO: this could probably be more efficient as we're using every index unlike in the other kind of rendering
-				var amp2 =  amps[k*C + c2_];
+				var amp1 = canvS - 1 -amps[k*C + c1_]; //TODO: this could probably be more efficient as we're using every index unlike in the other kind of rendering
+				var amp2 = amps[k*C + c2_];
 				counts[amp1*canvS + amp2]++;
 				tTotal[amp1*canvS + amp2] += times[k];
 			}
@@ -258,7 +266,14 @@ T.CP = function($canvasParent,ORG){
 
 		for(var i=0;i<ctxes.length;i++)
 			ctxes[i].putImageData(imData[i], 0, 0);
-            
+         
+        for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
+    			ctxes[m].textAlign = "left";
+				ctxes[m].fillText((chanList[c1]+1) + "A",3,10);
+				ctxes[m].textAlign = "right";
+				ctxes[m].fillText((chanList[c2]+1) + "A",canvS-4,canvS- 2);
+		}
+        
         meanTModeIsRendered = true;
 		console.timeEnd('si cluster mean times');
 

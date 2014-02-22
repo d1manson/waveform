@@ -314,6 +314,8 @@ padding: 5px 10px 5px 10px;
 margin: 2px;
 display: inline-block;
 cursor: default;
+box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 -1px 0 rgba(255, 255, 255, 0.3) inset;
+border-radius: 4px;
 }
 .button[checked],
 .button[active]{
@@ -346,6 +348,8 @@ border: 1px solid #900;
 color: #900;
 padding: 5px 15px 5px 15px;
 margin: 0px 2px 0px 2px;
+box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 -1px 0 rgba(255, 255, 255, 0.3) inset;
+border-radius: 4px;
 }
 button:hover{
 background: #C77;

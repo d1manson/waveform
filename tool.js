@@ -27,10 +27,20 @@ T.TileDoubleClick = function(event){
 	T.TileDoubleClick_BeginSeparator.call(this,event);
 }
 
+T.StickerMouseDown = function(event){
+    event.stopPropagation();
+    var g = $(this).parent().data('group_num');
+    var ng = parseInt(prompt("Swap group " + g + " with:",g+""));
+    if(ng >=0 && ng <= 256)
+        T.ORG.GetCut().SwapBandA(g,ng);
+        
+}
 // These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
 // temporarily registerd on $tile's, $tilewall, and $document.
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
 T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
+
+T.$tilewall.on("mousedown",".tile-sticker",T.StickerMouseDown); 
 
 
 

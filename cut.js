@@ -337,17 +337,24 @@ T.CUT = function(ORG){//class factory
 		var k_a = this._.groupToImmutablesMapping[a];
 		var k_b = this._.groupToImmutablesMapping[b];
 		
+        k_a = k_a === undefined ? null : k_a;
+        k_b = k_b === undefined ? null : k_b;
+        
 		// add the updated group numbers to both sets of inds
-		this._.immutablesSlots[k_b].group_history.push(a);  // "slot k_b now refers to group a"
-		this._.immutablesSlots[k_a].group_history.push(b);  // "slot k_a now refers to group b"
+        if(k_b !== null)
+    		this._.immutablesSlots[k_b].group_history.push(a);  // "slot k_b now refers to group a"
+        if(k_a !== null)
+    		this._.immutablesSlots[k_a].group_history.push(b);  // "slot k_a now refers to group b"
 		
 		// keep the groupToImmutablesMapping up to date
-		this._.groupToImmutablesMapping[a] = k_b;
-		this._.groupToImmutablesMapping[b] = k_a;
+        this._.groupToImmutablesMapping[a] = k_b;
+    	this._.groupToImmutablesMapping[b] = k_a;
 		
 		var invalidatedSlots = M.repvec(0,this._.immutablesSlots.length);
-		invalidatedSlots[k_a] = 1;
-		invalidatedSlots[k_b] = 1;
+        if(k_a !== null)
+    		invalidatedSlots[k_a] = 1;
+        if(k_b !== null)
+    		invalidatedSlots[k_b] = 1;
 		
 		return invalidatedSlots;
 	}

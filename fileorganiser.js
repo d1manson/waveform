@@ -162,7 +162,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 				if(ext=="cut") 					type = 1;
 				else if(ext == "pos") 			type = 2;
 				else if(ext == "set") 			type = 3;
-				else if(!isNaN(parseInt(ext)))	type = 4;
+				else if(!isNaN(parseInt(ext)) && !base.match(/\.(klg|clu|fet)$/)) 
+                                                type = 4;
 
 				if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
 						FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 	
@@ -170,7 +171,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			switch(type){
 				case 1:
-					PAR.LoadCut2(files[i],parseInt(base.slice(-1)),GotFileDetails); //reads the header to find out the experiment name (done asynchrously)
+					PAR.LoadCut2(files[i],parseInt(base.match(/\d*$/)[0]),GotFileDetails); //reads the header to find out the experiment name (done asynchrously)
 					break;
 				case 2:
 					GotFileDetails(files[i].name,base,"pos");

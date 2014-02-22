@@ -304,7 +304,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 								"vec2 zeroToOne = a_position / u_resolution;vec2 zeroToTwo = zeroToOne * 2.0;vec2 clipSpace = zeroToTwo - 1.0;gl_Position = vec4(clipSpace, 0, 1);v_texCoord = a_texCoord;}"
 		var COPY_FRAGMENT_SHADER_STR ="precision mediump float;uniform sampler2D u_src;varying vec2 v_texCoord; void main() {" + 
 			"highp vec4 src = texture2D(u_src, v_texCoord);" + 
-			"highp float counts = src.r;" + 
+			"highp float counts = sqrt(src.r);" + 
 			"gl_FragColor = vec4(counts > 0.5 ? counts > 0.75 ? 4. - 4.*counts : 4.*counts-2. : counts > 0.25 ? 2. - 4.*counts : counts*4.," + 
 								"counts < 0.5 ? 2.*counts : 2.-2.*counts," + 
 								"counts,src.a);" + 
