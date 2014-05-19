@@ -22,8 +22,9 @@ T.yFactor = 2;
 T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
 T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
 T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here manually
+T.floatingTopZ = 100;
 
-T.$newTile = $("<div class='tile'>" +
+T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
@@ -607,7 +608,14 @@ T.UndoLastAction = function(){
 T.FloatingInfo_MouseDown = function(event){
     var $this = $(this);
     var offset = $this.position();
-    
+	if(T.Tool.GrabIt_active){
+		if($this.hasClass('grabbed_info'))
+			$this.remove();
+		else
+			T.ToggleElementState($this,true);
+		return;
+	}
+    $this.css({zIndex: ++T.floatingTopZ})
     T.FloatInfoMoving = {$: $(this),
                     off_left: offset.left-event.clientX,
     				off_top: offset.top-event.clientY        

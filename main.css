@@ -110,6 +110,7 @@ height: 100%;
 .scrollable_area{
 overflow-y: scroll;
 height: 100%;
+position: relative;
 }
 .tile{
 border: 1px solid #CCC;
@@ -519,9 +520,11 @@ border: solid 2px #000;
 padding: 5px;
 display:none;
 z-index:100;
-
 }
-
+.grabbed_info{
+min-width: initial;
+max-width: initial;
+}
 html[dragging]>* {
 pointer-events: none;
 }

@@ -9,6 +9,7 @@ T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 /* =================== GENERAL =================== */
 T.TileMouseDown = function(event){
 	$(this).toggleClass('shake',false); //clear any existing dragging animation
+	if(T.Tool.GrabIt_active) return; //TODO: this is a bit of a clumsy hack, but it'll work for now.
 	T.CP.BringGroupToFront($(this).data("group_num"))
 	if(T.Tool.activeSplitter && (event.button == 2 || event.altKey)){
 		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
@@ -338,11 +339,52 @@ T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
 
 /* =========================== */
 
+/* ========================= PLOT-GRABBER ================== */
+T.Tool.GrabIt_active = false;
 
+T.Tool.$GrabIt_Css = $("<style>.grabbable:hover:after, .floatinginfo:hover:after{position: absolute; left:0px; top:0px; display: block; width: 100%; height: 100%; border: 3px solid #F00; box-sizing:border-box;-moz-box-sizing:border-box;background: rgba(255,255,255,0.5); content: ' ';}.floatinginfo:hover:after{background: rgba(255,200,200,0.5);}</style>");
 
+T.Tool.GrabIt = function(){
+	// clones $this into a floating info pane
+	var $clone = $(this).clone()
+	var $srcCanvs = $(this).find('canvas');
+	var $destCanvs = $clone.find('canvas');
+	for (var i=0;i<$srcCanvs.length;i++)
+		$destCanvs[i].getContext('2d').drawImage($srcCanvs[i],0,0);	
+	$clone.toggleClass('grabbable',false).css({position:'',
+												webkitTransform: '',
+												width: $(this).width() + 'px',
+												height: $(this).height() + 'px',
+												display: 'block'});
+	var p = $(this).offset();
+	var $pane = $("<div class='floatinginfo grabbed_info'><b>" + T.ORG.GetExpName() + " (Grabbed)</b> </div>")
+			.append($clone)
+			.translate(p.left +30,p.top +30)
+			.show();
+	
+	$('body').append($pane);
+	
+}
 
+T.Tool.GrabIt_DocumentKeyDown = function(e){
+	if (e.which != 32 || T.Tool.GrabIt_active)
+		return;
+	T.Tool.GrabIt_active = true
+	$('head').append(T.Tool.$GrabIt_Css);
+	$('body').on('mouseup','.grabbable',T.Tool.GrabIt);
+}
+T.Tool.GrabIt_DocumentKeyUp = function(e){
+	if (e.which != 32)
+		return;
+	T.Tool.GrabIt_active = false;
+	$('body').off('mouseup','.grabbable',T.Tool.GrabIt);
+	T.Tool.$GrabIt_Css.remove();
+}
 
+$(document).on("keydown",T.Tool.GrabIt_DocumentKeyDown)
+$(document).on("keyup",T.Tool.GrabIt_DocumentKeyUp)
 
+/* =========================== */
 
 
 /* ========================= SEPARATOR ================== 
