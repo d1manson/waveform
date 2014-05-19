@@ -26,7 +26,10 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).
 
 **Using the floating panes**
-There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
+There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.  To get rid of a pane, hold down space and then click it.
+
+**Grabbing plots**
+If you hold down space, you then click the cluster plots or one of the tiles, the relevant item will be "grabbed" and copied into a floating pane.
 
 **Keyboard shortcuts.** `escape` open/close side pannel. `a`  do autocut. `p` cycle palette. `ctrl+z` undo. `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr (can use `shift` to show multiple views as with the mouse).  `d` toggle drift mode rendering of the cluster plots. `ctrl+shift+q` reset everything and refresh the page.
 
@@ -39,6 +42,7 @@ Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2Qf
 Cluster rendering in "drift" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/drift.png)      
 
 ## Change Log
+* Added plot-grabbing feature.
 * Added a new wave rendering mode which shows the densities.
 * Created a drift mode for rendering cluster plots.
 * Re-worked the `T.ORG` module so that you can now switch cuts/tets/exps more easily.
