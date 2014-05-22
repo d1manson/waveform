@@ -340,9 +340,10 @@ T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
 /* =========================== */
 
 /* ========================= PLOT-GRABBER ================== */
+//TODO: this shouldnt really be in this file. it is really better grouped with main
 T.Tool.GrabIt_active = false;
 
-T.Tool.$GrabIt_Css = $("<style>.grabbable:hover:after, .floatinginfo:hover:after{position: absolute; left:0px; top:0px; display: block; width: 100%; height: 100%; border: 3px solid #F00; box-sizing:border-box;-moz-box-sizing:border-box;background: rgba(255,255,255,0.5); content: ' ';}.floatinginfo:hover:after{background: rgba(255,200,200,0.5);}</style>");
+T.Tool.$GrabIt_Css = $("<style>.grabbable:hover:after, .floatinginfo:hover:after{position: absolute; left:0px; top:0px; display: block; width: 100%; height: 100%; border: 3px solid #F00; box-sizing:border-box;-moz-box-sizing:border-box;background: rgba(255,255,255,0.5); content: ' ';cursor:pointer !important;}.floatinginfo:hover:after{background: rgba(255,200,200,0.5);}</style>");
 
 T.Tool.GrabIt = function(){
 	// clones $this into a floating info pane
@@ -372,6 +373,11 @@ T.Tool.GrabIt_DocumentKeyDown = function(e){
 	T.Tool.GrabIt_active = true
 	$('head').append(T.Tool.$GrabIt_Css);
 	$('body').on('mouseup','.grabbable',T.Tool.GrabIt);
+	e.preventDefault();
+}
+T.Tool.GrabIt_DocumentKeyPress = function(e){
+	if (e.which == 32 )
+		e.preventDefault(); // this is needed to prevent scrolling with space
 }
 T.Tool.GrabIt_DocumentKeyUp = function(e){
 	if (e.which != 32)
@@ -383,6 +389,156 @@ T.Tool.GrabIt_DocumentKeyUp = function(e){
 
 $(document).on("keydown",T.Tool.GrabIt_DocumentKeyDown)
 $(document).on("keyup",T.Tool.GrabIt_DocumentKeyUp)
+$(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
+/* =========================== */
+
+
+
+/* ================== CLUSTER PAINTER ========= */
+
+
+T.Tool.MakeSVGStr_Painter = function(x,y,r){
+	if (r== 0 || T.Tool.GrabIt_active)
+		return "<svg style='display:none;pointer-events:none;'></svg>";
+	else
+		return "<svg height=" + (y+r+3) + " style='position:absolute;left:0px;top:0px;pointer-events:none;z-index:100;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
+				+ "</svg>";
+	
+}
+
+T.Tool.PAINTER_COLOR = '#003300';
+
+T.Tool.Painter_ClusterMouseDown = function(e){
+	var offset = T.$cluster_panel.offset();
+	var x = event.pageX - offset.left; 
+	var y = event.pageY - offset.top + T.$cluster_panel.scrollTop();
+	
+	var $canvs = T.$cluster_panel.find('canvas');
+	if(T.Tool.GrabIt_active)
+        return; //TODO: this is a nasty hack
+	var dists = $.map($canvs,function($canvas){
+		var toLeft = $canvas.offsetLeft - x;
+		var toRight = x-$canvas.offsetLeft - $canvas.offsetWidth;
+		var above = $canvas.offsetTop- y;
+		var below = y-$canvas.offsetTop - $canvas.offsetHeight;
+		
+		var xDist = toLeft < 0 && toRight < 0 ? 0 :
+					toLeft > 0 ? toLeft : toRight;
+									   
+		var yDist = above < 0 && below < 0 ? 0 :
+					above > 0 ? above : below;
+									   
+		return xDist*xDist + yDist*yDist;
+				
+	})
+	
+	var canv_i = T.Tool.painterCanvIndex = dists.indexOf(Math.min.apply(Math,dists));
+	
+	var $c = T.Tool.$painterCanv = $canvs.eq(canv_i);
+	
+	var b = parseFloat($c.css('margin')) + parseFloat($c.css('border-width'));
+	$c.wrap($("<div style='display:inline-flex;position:relative;margin:" + b +  "px'></div>")); 
+	var $c2 = T.Tool.$painterCanv2 = $("<canvas class='cluster_canv' width=" + $c.get(0).width + " height=" + $c.get(0).height + "/>")
+				.insertAfter($c)
+				.css({position: 'absolute',
+					left: '0px',
+					opacity: '0.4'});
+	
+	var ctx = T.Tool.painterCtx = $c2.get(0).getContext('2d');
+	var pos = T.Tool.Painter_GetXY(e);
+	T.Tool.painterPrevX = pos.x;
+	T.Tool.painterPrevY = pos.y;
+    T.Tool.painterIsNegative = (event.button == 2 || event.altKey);
+    if (T.Tool.painterIsNegative){
+        ctx.fillStyle=T.Tool.PAINTER_COLOR;
+        ctx.fillRect(0,0,$c.get(0).width,$c.get(0).height);
+        ctx.globalCompositeOperation = "destination-out";
+    }
+	T.Tool.Painter_ClusterMouseMove(event);
+	$(document).on("mouseup",T.Tool.Painter_DocumentMouseUp);
+}
+T.Tool.Painter_GetXY = function(e){
+    var $c2 = T.Tool.$painterCanv2;
+    var offset = $c2.offset();
+    var scale = $c2.get(0).width / $c2.width();
+    return {
+            x: (e.pageX - offset.left)*scale,
+	        y: (e.pageY - offset.top + T.$cluster_panel.scrollTop())*scale
+    };
+}
+T.Tool.painterSrcGroups = [0];
+T.Tool.painterDestGroup = 1;
+
+T.Tool.Painter_DocumentMouseUp = function(e){
+    var $c2 = T.Tool.$painterCanv2;    
+    var rgbaData = T.Tool.painterCtx.getImageData(0,0,$c2.get(0).width,$c2.get(0).height).data;
+    var mask = new Uint8Array(rgbaData.length/4);
+    for(var i=0;i<mask.length;i++)
+        mask[i] = rgbaData[i*4 +3]; //reduce rgba data to just alpha, which tells us what is non-transparent.
+        
+    var $c = T.Tool.$painterCanv;    
+	$c.parent().replaceWith($c);
+	T.Tool.$painterCanv = undefined;
+	T.Tool.$painterCanv2 = undefined;
+	$(document).off("mouseup",T.Tool.Painter_DocumentMouseUp);
+    var splitMasks = T.CP.ClusterMaskToSpikeMask(mask,T.Tool.painterCanvIndex,T.Tool.painterSrcGroups);
+    var cut = T.ORG.GetCut();
+    cut.TransplantFromAsToB(T.Tool.painterSrcGroups,splitMasks,T.Tool.painterDestGroup); 
+}
+
+T.Tool.Painter_ClusterMouseMove = function(event){
+	var offset = T.$cluster_panel.offset();
+	var x = event.pageX - offset.left; 
+	var y = event.pageY - offset.top + T.$cluster_panel.scrollTop();
+	
+	var $oldSvg = T.Tool.$painterSvg;
+    T.Tool.$painterSvg  = $(T.Tool.MakeSVGStr_Painter(x,y,T.Tool.painterR));
+	$oldSvg.replaceWith(T.Tool.$painterSvg);
+	
+	var $c2 = T.Tool.$painterCanv2;
+	if($c2){
+		//TODO: currently doesn't work when this is called via scroll
+        var pos = T.Tool.Painter_GetXY(event);
+        var $c2 = T.Tool.$painterCanv2; 
+        var scale = $c2.get(0).width / $c2.width();
+
+		var ctx = T.Tool.painterCtx
+		ctx.beginPath();
+		ctx.lineWidth = T.Tool.painterR*2*scale;
+		ctx.strokeStyle = T.Tool.PAINTER_COLOR;
+		ctx.lineCap = 'round';
+		ctx.moveTo(T.Tool.painterPrevX, T.Tool.painterPrevY);
+		ctx.lineTo(pos.x, pos.y);
+		ctx.stroke();
+		ctx.closePath();
+		T.Tool.painterPrevX = pos.x;
+		T.Tool.painterPrevY = pos.y;
+	}
+}
+
+T.Tool.Painter_ClusterMouseLeave = function(e){
+	var $oldSvg = T.Tool.$painterSvg;
+	T.Tool.$painterSvg  = $(T.Tool.MakeSVGStr_Painter(0,0,0));
+	$oldSvg.replaceWith(T.Tool.$painterSvg);
+}
+
+T.Tool.Painter_ClusterMouseWheel = function(e){
+	T.Tool.painterR += e.deltaY * 3;
+	T.Tool.painterR = T.Tool.painterR < 3 ? 3 :
+					  T.Tool.painterR  > 39 ? 39 : T.Tool.painterR;
+	T.Tool.Painter_ClusterMouseMove(e);
+	e.preventDefault();
+}
+
+T.Tool.painterR = 20;
+T.Tool.$painterSvg = $(T.Tool.MakeSVGStr_Painter(0,0,0)).appendTo(T.$cluster_panel);
+
+T.$cluster_panel.on("mousemove",T.Tool.Painter_ClusterMouseMove)
+				.on("mouseleave",T.Tool.Painter_ClusterMouseLeave)
+				.on("mousewheel",T.Tool.Painter_ClusterMouseWheel)
+				.on("mousedown",T.Tool.Painter_ClusterMouseDown);
 
 /* =========================== */
 

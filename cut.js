@@ -84,6 +84,9 @@ T.CUT = function(ORG){//class factory
 
     var DeleteImmutable = function(group_num){
         var k = this._.groupToImmutablesMapping[group_num];
+		if(!(k>0 || k==0))
+			return;
+			
         var slot_k = this._.immutablesSlots[k];
         if(slot_k){
             slot_k.inds = null;
@@ -121,7 +124,6 @@ T.CUT = function(ORG){//class factory
 	}
 	
 	var GetImmutableSlot = function(k){
-		// the calling function *must* check the generation value is what it expected
 		return this._.immutablesSlots[k] || {};
 	}
 	
@@ -220,6 +222,8 @@ T.CUT = function(ORG){//class factory
 			UndoReorderAll.call(this,action.data);
 		else if(action.type=="split")
 			UndoSplitA.call(this,action.data);
+		else if(action.type == "transplant")
+			UndoTransplantFromAsToB.call(this,action.data);
 		else
 			undone = false;
 
@@ -296,6 +300,76 @@ T.CUT = function(ORG){//class factory
 		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
 
+var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
+		var invalidatedSlots =  M.repvec(0,this._.immutablesSlots.length);
+		var cut_b_inds = M.basic(GetGroup.call(this,b)); //this may be an empty array, or an array of existing inds
+		
+		for (var k=0;k<a_arr.length;k++){		
+			// for each group in the list of As, apply the corresponding splitMask, to A
+			// and add the extra inds to the cut_b_inds, which we will later "comit" to a new immutable
+			// following this loop.
+			
+			var cut_a_inds = GetGroup.call(this,a_arr[k]);
+			var cut_a_remainder_inds = [];
+
+			for(var i=0;i<cut_a_inds.length;i++)
+				if(splitMask_arr[k][i])
+					cut_b_inds.push(cut_a_inds[i]);
+				else
+					cut_a_remainder_inds.push(cut_a_inds[i]);
+					
+			//delete the old a_arr[k] immutable
+			invalidatedSlots[DeleteImmutable.call(this,a_arr[k])] = 1;
+			//and make a new one using just the cut_a_remainder_inds
+			invalidatedSlots[NewImmutable.call(this,cut_a_remainder_inds,a_arr[k])] = 1;
+		}
+		
+		//delete the old b immutable
+		invalidatedSlots[DeleteImmutable.call(this,b)] = 1;
+		//and make a new one using the new cut_b_inds
+		invalidatedSlots[NewImmutable.call(this,cut_b_inds,b)] = 1;
+		
+		PushAction.call(this,"transplant",[a_arr,splitMask_arr,b],'transplant into group-' + b + ' from ' + a_arr.join(', '));
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
+	}
+	
+	var UndoTransplantFromAsToB = function(data){
+		var a_arr = data[0];
+		var splitMask_arr = data[1];
+		var b = data[2];
+		
+		var invalidatedSlots =  M.repvec(0,this._.immutablesSlots.length);
+		var cut_b_remainder = M.basic(GetGroup.call(this,b));
+		
+		for (var k=a_arr.length-1;k>=0;k--){		
+			// for each group in the list of As, going in reverse order,
+			// pick the inds off b and add them into a's inds
+			
+			var cut_a_remainder = M.basic(GetGroup.call(this,a_arr[k]));
+			var cut_a_inds = [];
+			var splitMask = splitMask_arr[k];
+			
+			for(var i=splitMask.length-1;i>=0;i--)
+				if(splitMask_arr[k][i])
+					cut_a_inds.unshift(cut_b_remainder.pop());
+				else
+					cut_a_inds.unshift(cut_a_remainder.pop());
+					
+			//delete the old a_arr[k] immutable
+			invalidatedSlots[DeleteImmutable.call(this,a_arr[k])] = 1;
+			//and make a new one using just the cut_a_remainder_inds
+			invalidatedSlots[NewImmutable.call(this,cut_a_inds,a_arr[k])] = 1;
+		}
+		
+		//delete the old b immutable
+		invalidatedSlots[DeleteImmutable.call(this,b)] = 1;
+		//and make a new one using the new cut_b_remainder
+		invalidatedSlots[NewImmutable.call(this,cut_b_remainder,b)] = 1;
+		
+		changeCallbacks.fireWith(this,[invalidatedSlots]);
+	}
+	
+	
 	var AddBtoA = function(a,b){
 		var cut_a = GetGroup.call(this,a);
 		var cut_b = GetGroup.call(this,b);
@@ -517,6 +591,7 @@ T.CUT = function(ORG){//class factory
 	cut.prototype.GetAsVector = GetAsVector;
 	cut.prototype.GetImmutableSlot = GetImmutableSlot;
 	cut.prototype.GetNImmutables = GetNImmutables;
+	cut.prototype.TransplantFromAsToB = TransplantFromAsToB;
 	
 	// append these CUT static methods to the ORG module
 	ORG.AddCutChangeCallback = changeCallbacks.add,

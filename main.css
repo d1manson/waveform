@@ -22,6 +22,10 @@ font-size: 0.8em;
 canvas, img{
 vertical-align:bottom;
 }
+.grabbable{
+position: relative;
+}
+
 .tilewall[tilemoving]{
 cursor: move;
 }
@@ -501,11 +505,16 @@ visibility: visible;
 .separator_half{
     display: inline-block;
 }
+.last_side_panel_row_body > #cluster_panel{
+cursor: none;
+}
+#cluster_panel{
+	text-align: center;
+}
 #cluster_panel > canvas{
 margin: 2px;
 border: 1px solid #000;
 }
-
 .floatinginfo{
 position: fixed;
 top: 0px;

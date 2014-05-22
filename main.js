@@ -608,13 +608,8 @@ T.UndoLastAction = function(){
 T.FloatingInfo_MouseDown = function(event){
     var $this = $(this);
     var offset = $this.position();
-	if(T.Tool.GrabIt_active){
-		if($this.hasClass('grabbed_info'))
-			$this.remove();
-		else
-			T.ToggleElementState($this,true);
-		return;
-	}
+	event.preventDefault();
+	
     $this.css({zIndex: ++T.floatingTopZ})
     T.FloatInfoMoving = {$: $(this),
                     off_left: offset.left-event.clientX,
@@ -623,7 +618,6 @@ T.FloatingInfo_MouseDown = function(event){
     $(document).mousemove(T.FloatingInfo_DocumentMouseMove)
                .mouseup(T.FloatingInfo_DocumentMouseUp);	
 	$('html').attr("dragging",true);
-    event.preventDefault();
 }
 T.FloatingInfo_DocumentMouseMove = function(e){
     T.FloatInfoMoving.$.translate(event.clientX + T.FloatInfoMoving.off_left, 
@@ -631,9 +625,16 @@ T.FloatingInfo_DocumentMouseMove = function(e){
         
 }
 T.FloatingInfo_DocumentMouseUp = function(e){
+	var $this = T.FloatInfoMoving.$;
     T.FloatInfoMoving = null;
     $(document).off('mousemove mouseup');
 	$('html').removeAttr("dragging");
+	if(T.Tool.GrabIt_active){
+		if($this.hasClass('grabbed_info'))
+			$this.remove();
+		else
+			T.ToggleElementState($this,true);
+	}
 }
 
 T.StoreData = function(){
@@ -651,6 +652,8 @@ T.StoreData = function(){
 	localStorage.state = 1;
 	localStorage.headerFilter = T.$header_search.val();
 	localStorage.paletteMode = T.paletteMode;
+    localStorage.painterR = T.Tool.painterR;
+    localStorage.clusterPlotSize = T.CP.GetSize();
 }
 
 T.DocumentReady = function(){
@@ -662,6 +665,8 @@ T.DocumentReady = function(){
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$header_search.val(localStorage.headerFilter || '');
 		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
+        T.Tool.painterR = parseInt(localStorage.painterR) || 20;
+        T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		//TODO: load files into T.cut instances
 
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
@@ -688,6 +693,7 @@ T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
 T.$autocut_info = $('.autocut_info');
+T.$cluster_panel = $('#cluster_panel');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('#undo_button').click(T.UndoLastAction)
@@ -742,6 +748,10 @@ key('alt+d',T.ToggleElementState($('.drift_info')));
 key('alt+t',T.ToggleElementState($('.tc_info')));
 key('alt+z',T.ToggleElementState($('.action_info')));
 key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
+key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
+key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
+key('enter',function(){T.Tool.painterDestGroup++;});
+key('shift+enter',function(){T.Tool.painterDestGroup--;});
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();

@@ -136,7 +136,7 @@ you can drag further files onto the window at any point<br>
 	<div class="side_panel_row">
 		<div class="toggle_panel" id="spatial_panel_toggle"></div>
 		<B>pos data</B>
-		<div style="text-align:center;" class="collapsable_panel" id="spatial_panel" state="closed">
+		<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" state="closed">
 			<canvas id="posplot" width="200" height="200"></canvas> 
 		</div>
 	</div>
@@ -161,6 +161,7 @@ you can drag further files onto the window at any point<br>
 
 <!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  
+<script src="jquery.mousewheel.min.js"></script>
 <script src="keymaster.min.js"></script>  
 <script src="utils.js"></script>
 <script src="worker-bridge.js"></script>

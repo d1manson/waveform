@@ -13,6 +13,7 @@ T.CP = function($canvasParent,ORG){
 	var N = null;
 	var chanList = [];
 	var canvS = 128;
+    var cssSize;
 	var canvasesAreNew = null;
 	var ready = false;
     var meanTMode = false;
@@ -95,7 +96,35 @@ T.CP = function($canvasParent,ORG){
 
 		canvasesAreNew = false;
 	}
+    var ClusterMaskToSpikeMask = function(clusterMask,plotInd,srcGroups){
+        //This is for use by the painter tool.
+        
+        // this is a very lazy way of getting at c1 and c2 from plotInd
+        outerLoop: for(var c1=0,m=0;c1<chanList.length-1;c1++)
+            innerLoop: for(var c2 =c1+1;c2<chanList.length;c2++,m++)
+                if(m == plotInd)
+                    break outerLoop;
+                
+        var c1_ = chanList[c1];
+        var c2_ = chanList[c2];
 
+        
+		var allMasks = []
+		for(var g=0;g<srcGroups.length;g++){		
+			var inds = cCut.GetGroup(srcGroups[g]); 
+			var spikeMask = new Uint8Array(inds.length);
+			for (var k=0;k<inds.length;k++){
+				var amp1 = canvS - 1 - amps[inds[k]*C + c1_];
+				var amp2 =  amps[inds[k]*C + c2_];
+				spikeMask[k] = clusterMask[amp1*canvS + amp2]
+			}
+			allMasks.push(spikeMask);
+        }
+        return allMasks;
+
+    }
+    
+    
 	var RenderSlots = function(slots){
         
         if(meanTMode)
@@ -150,7 +179,7 @@ T.CP = function($canvasParent,ORG){
 	}
 
 	var LoadTetrodeData = function(N_val,amps_in){
-		$canvasParent.empty();
+		$canvasParent.find('canvas').remove();
 		ctxes = [];
 		chanList = [];
 		N = null;
@@ -182,7 +211,7 @@ T.CP = function($canvasParent,ORG){
 
 		for(var i=0;i<chanList.length-1;i++)
 			for(var j =i+1;j<chanList.length;j++){
-				var $newCanvas = $("<canvas width='" + canvS + "px' height='" + canvS + "px'/>");
+				var $newCanvas = $("<canvas class='cluster_canv' width='" + canvS + "px' height='" + canvS + "px'/>");
 				$canvasParent.append($newCanvas);
 				ctxes.push($newCanvas.get(0).getContext('2d'));
 			}
@@ -279,10 +308,24 @@ T.CP = function($canvasParent,ORG){
 
 	}
 
+    var $cssBlock = $("<style>.cluster_canv{width:" + canvS + "px;}</style>").appendTo($('head'));
+    cssSize = canvS;
+    
+    var SetSize = function(s){
+        s = s< 64 ? 64 : s > 512 ? 512 : s;
+        var $oldCss = $cssBlock; 
+        $cssBlock = $("<style>.cluster_canv{width:" + s + "px;}</style>"); 
+        $oldCss.replaceWith($cssBlock);
+        cssSize = s;
+    }
+    
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 
 	return {BringGroupToFront: BringGroupToFront,
-			SetRenderMode: SetRenderMode}; 
+			SetRenderMode: SetRenderMode,
+            ClusterMaskToSpikeMask: ClusterMaskToSpikeMask,
+            SetSize: SetSize,
+            GetSize: function(){return cssSize;}}; 
 
-} ($('#cluster_panel'),T.ORG);
+} (T.$cluster_panel,T.ORG);
