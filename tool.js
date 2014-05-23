@@ -43,7 +43,17 @@ T.Tool.Button_PainterDest = function(event){
 
 T.Tool.Button_PainterSrc = function(event){
 	var g = $(this).parent().parent().parent().data('group_num');
-	T.Tool.painterSrcGroups = [g]; //TODO: need to dhow something, also need to follow slot not group.
+	
+	//TODO: need to dhow something, also need to follow slot not group.
+	if(key.shift){
+		var ind = T.Tool.painterSrcGroups.indexOf(g);
+		if (ind == -1)
+			T.Tool.painterSrcGroups.push(g); 
+		else
+			T.Tool.painterSrcGroups.splice(ind,1); 
+	}else{
+		T.Tool.painterSrcGroups = [g]; 
+	}
 }
 
 
@@ -51,8 +61,6 @@ T.Tool.Button_PainterSrc = function(event){
 // temporarily registerd on $tile's, $tilewall, and $document.
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
 T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
-
-T.$tilewall.on("mousedown",".tile-button-swap",T.Tool.SwapMouseDown); 
 
 T.Tool.StopProgagation = function(e){e.stopPropagation();}
 
