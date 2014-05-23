@@ -173,6 +173,69 @@ T.CP = function($canvasParent,ORG){
 		console.timeEnd('si cluster');
 	}
 
+	var hoverG = null;
+	
+	var ClusterPlot_MouseMove = function(e){
+		if(meanTMode)
+			return;
+		
+		var allCanvs = $(this).parent().find('canvas');
+		for(var plotInd=0;plotInd<allCanvs.length;plotInd++)
+			if(allCanvs[plotInd] == this)
+				break;
+		// this is a very lazy way of getting at c1 and c2 from plotInd
+        outerLoop: for(var c1=0,m=0;c1<chanList.length-1;c1++)
+            innerLoop: for(var c2 =c1+1;c2<chanList.length;c2++,m++)
+                if(m == plotInd)
+                    break outerLoop;
+		
+		var offset = $(this).offset();
+		var x = e.clientX - offset.left;
+		var y = e.clientY - offset.top; //TODO: plus some scroll top?
+		var scale = this.width / $(this).width();
+		x *= scale;
+		y *= scale;
+		
+		var rgbaData = new Uint32Array(this.getContext('2d').getImageData(0,0,this.width,this.height).data.buffer);
+		
+		// get a histogram of the colors in a 4x4 square around the cursor
+		var hist = {}
+		var W = 8;
+		for (var dx=-W;dx<=W;dx++)for(var dy=-W;dy<=W;dy++){
+			if (x-dx < 0 || x+dx > canvS -1|| y-dy < 0 || y+dy > canvS-1)
+				continue;
+			var c = rgbaData[canvS*Math.round(y+dy) + Math.round(x+dx)];
+			hist[c] = (hist[c] || 0) + 1;
+		}
+		
+		//find the modal color
+		var c = null;
+		var n = 0;
+		for (var c_k in hist) if (hist[c_k]>n && c_k != 0){
+			n = hist[c_k];
+			c = c_k;
+		}
+		
+		//find the group corresponding to the modal colour
+		for(var g=0;g<PALETTE_FLAG.length;g++)
+			if(c == PALETTE_FLAG[g]) break;
+			
+		//deactive the previously active group if it's not the newly acitve one
+		if(g==PALETTE_FLAG.length || g != hoverG){
+			if(hoverG != null)
+				T.tiles[hoverG].$.removeAttr('active');
+			hoverG = null;
+		}
+		
+		//activate the newly active group
+		if(g < PALETTE_FLAG.length){
+			T.tiles[g].$.attr('active',true);
+			hoverG = g;
+		}
+		console.log(g)
+		
+	}
+	
 	var BringGroupToFront = function(group_num){
 		var slot = cCut.GetGroup(group_num,true);
 		RenderSlots([slot]);
@@ -321,7 +384,9 @@ T.CP = function($canvasParent,ORG){
     
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
-
+	T.$cluster_panel.on("mousemove","canvas",ClusterPlot_MouseMove);
+	T.$cluster_panel.on("mouseout","canvas",function(){	if(hoverG != null) T.tiles[hoverG].$.removeAttr('active'); hoverG = null;});
+	
 	return {BringGroupToFront: BringGroupToFront,
 			SetRenderMode: SetRenderMode,
             ClusterMaskToSpikeMask: ClusterMaskToSpikeMask,

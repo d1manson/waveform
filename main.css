@@ -168,7 +168,8 @@ background-color:rgba(255,255,255,0.85);
 padding-top: 3px;
 padding-bottom: 3px;
 }
-.tile:hover:not([moving]):not([splitting]){
+.tile:hover:not([moving]):not([splitting]),
+.tile[active]{
 background: #ccc;
 border-color: #FFAD33;
 }
@@ -181,7 +182,8 @@ background: #FCC;
 .pending:hover{
 background: #FAA;
 }
-.tile:hover .tile-over{
+.tile:hover .tile-over,
+.tile[active] .tile-over{
 visibility: visible;
 }
 
