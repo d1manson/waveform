@@ -308,13 +308,13 @@ T.CP = function($canvasParent,ORG){
 
 	}
 
-    var $cssBlock = $("<style>.cluster_canv{width:" + canvS + "px;}</style>").appendTo($('head'));
+    var $cssBlock = $("<style>.cluster_canv{width:" + canvS + "px; height:" + canvS + "px;}</style>").appendTo($('head'));
     cssSize = canvS;
     
     var SetSize = function(s){
         s = s< 64 ? 64 : s > 512 ? 512 : s;
         var $oldCss = $cssBlock; 
-        $cssBlock = $("<style>.cluster_canv{width:" + s + "px;}</style>"); 
+        $cssBlock = $("<style>.cluster_canv{width:" + s + "px;height:" + s + "px}</style>"); 
         $oldCss.replaceWith($cssBlock);
         cssSize = s;
     }

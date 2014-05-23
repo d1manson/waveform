@@ -28,8 +28,15 @@ T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<div class='tile-over'><div class='tile-caption'></div></div>" +
 			"<div class='tile-sticker'></div>" + 
+			"<div class='tile-over'>" +
+				"<div class='tile-caption'></div>" + 
+				"<div class='tile-buttons'>" +
+					"<button class='tile-button-swap'></button>" +
+					"<button class='tile-button-dest'></button>" +
+					"<button class='tile-button-src'></button>" +
+				"</div>" + 
+			"</div>" +
 			"<div class='blind'></div>" + 
 			"</div>");		//this gets cloned and appended to $tilewall
 

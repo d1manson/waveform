@@ -28,22 +28,38 @@ T.TileDoubleClick = function(event){
 	T.TileDoubleClick_BeginSeparator.call(this,event);
 }
 
-T.StickerMouseDown = function(event){
-    event.stopPropagation();
-    var g = $(this).parent().data('group_num');
+T.Tool.Button_Swap = function(event){
+    var g = $(this).parent().parent().parent().data('group_num');
     var ng = parseInt(prompt("Swap group " + g + " with:",g+""));
     if(ng >=0 && ng <= 256)
         T.ORG.GetCut().SwapBandA(g,ng);
         
 }
+
+T.Tool.Button_PainterDest = function(event){
+	var g = $(this).parent().parent().parent().data('group_num');
+	T.Tool.painterDestGroup = g; //TODO: need to dhow something, also need to follow slot not group.
+}
+
+T.Tool.Button_PainterSrc = function(event){
+	var g = $(this).parent().parent().parent().data('group_num');
+	T.Tool.painterSrcGroups = [g]; //TODO: need to dhow something, also need to follow slot not group.
+}
+
+
 // These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
 // temporarily registerd on $tile's, $tilewall, and $document.
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
 T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
 
-T.$tilewall.on("mousedown",".tile-sticker",T.StickerMouseDown); 
+T.$tilewall.on("mousedown",".tile-button-swap",T.Tool.SwapMouseDown); 
 
+T.Tool.StopProgagation = function(e){e.stopPropagation();}
 
+T.$tilewall.on("click",".tile-button-swap",T.Tool.Button_Swap); 
+T.$tilewall.on("click",".tile-button-dest",T.Tool.Button_PainterDest); 
+T.$tilewall.on("click",".tile-button-src",T.Tool.Button_PainterSrc); 
+T.$tilewall.on("mousedown",'.tile-buttons',T.Tool.StopProgagation);
 
 /* =================== MERGER =================== */
 
