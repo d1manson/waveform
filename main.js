@@ -661,6 +661,8 @@ T.StoreData = function(){
 	localStorage.paletteMode = T.paletteMode;
     localStorage.painterR = T.Tool.painterR;
     localStorage.clusterPlotSize = T.CP.GetSize();
+	
+	localStorage.side_panel_width = 100*T.$side_panel.width()/$(document).width();
 }
 
 T.DocumentReady = function(){
@@ -678,6 +680,10 @@ T.DocumentReady = function(){
 
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.RM.SetCmPerBin(T.binSizeCm);
+		
+		var wPc = localStorage.side_panel_width || 25;
+		T.$side_panel.css({width: wPc + '%'});
+		
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
 
@@ -691,21 +697,49 @@ T.DriftButtonClick = function(){
     T.CP.SetRenderMode(T.clusterMode);
 }
 
+T.BarMouseDown = function(e){
+	if (e.button != 0)
+		return;
+	T.barDrag_xOff = e.screenX - T.$side_panel.width()
+	$(document).on("mousemove",T.BarDrag_DocumentMouseMove)
+			   .on("mouseup",T.BarDrag_DocumentMouseUp);
+	T.$mask.css({cursor: "ew-resize",
+				 pointerEvents: "initial"})
+			
+}
+
+T.BarDrag_DocumentMouseMove = function(e){
+	var wPx = (e.screenX-T.barDrag_xOff);
+	var wPc = 100*wPx/$(document).width();
+	wPc = wPc > 80 ? 80 : wPc < 15 ? 15 : wPc;
+	T.$side_panel.css({width: wPc + '%'});
+}
+T.BarDrag_DocumentMouseUp = function(e){
+	$(document).off("mousemove",T.BarDrag_DocumentMouseMove)
+			   .off("mouseup",T.BarDrag_DocumentMouseUp);
+	T.$mask.css({cursor: "",
+				pointerEvents: ""});
+}
+
+
+
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
+T.$mask = $('.mask');
 T.tiles = [];
 T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');				 			 
 T.$info_panel = $('#info_panel');
 T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
+T.$side_panel = $('.side_panel');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('#undo_button').click(T.UndoLastAction)
 						   .mousedown(T.ToggleElementState($('.action_info'),false,true));
-$('.bar').click(T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
+$('.bar').on("mousedown", T.BarMouseDown);
 T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
 $('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
 $('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));

@@ -24,147 +24,152 @@ you can drag further files onto the window at any point<br>
 
 
 
-<div class="bar">
-</div>
 
-<div class="tilewall">
-</div>
+<div class="main_wrapper">
 
-<div class="side_panel">
+	<div class="side_panel">
 
-	<div class="side_panel_row">
-		<div class="toggle_panel" id="button_panel_toggle"></div>
-		<b>button panel</b>
+		<div class="side_panel_row">
+			<div class="row_title" id="button_panel_toggle">button panel</div>
 
-		<div id="button_panel" class="collapsable_panel">
-			<div class="button_group">
-				<button class="help_button">help</button>
-				<div class="floatinginfo help_info">
-					<b>Help [?]</b><br>
-					
-					Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
-					You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-					
-					<br><br>
-					Some shortcuts:
-					<ul>
-					<li><b>d</b> toggle drift rendering on/off</li>
-					<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-					<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-					<li><b>enter</b> paint into new destination group (TODO: this isn't quite true at the moment)</li>
-					</ul>
-					
-				</div>
-				
-				<button id='undo_button' disabled>undo</button>
-				<div class="floatinginfo action_info">
-					<b>Action List [z]</b><br>
-					<div class="action_list"></div>
-				</div>
-				
-				<button id='file_headers_button'>headers</button>
-				<div class="floatinginfo file_info">
-					<div>
-						<B>file headers  [h]</B>
-						<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
+			<div id="button_panel" class="collapsable_panel">
+				<div class="button_group">
+					<button class="help_button">help</button>
+					<div class="floatinginfo help_info">
+						<b>Help [?]</b><br>
+						
+						Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
+						You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
+						
+						<br><br>
+						Some shortcuts:
+						<ul>
+						<li><b>d</b> toggle drift rendering on/off</li>
+						<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+						<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+						<li><b>enter</b> paint into new destination group (TODO: this isn't quite true at the moment)</li>
+						</ul>
+						
 					</div>
-					<div id="info_panel" class="scrollable_area">
-						<div id='header_info' class='header_info'>
-							<div class="file_info_title" id="tet_info" style="display:none;"></div>
-							<div class="file_info_title" id="cut_info" style="display:none;"></div>
-							<div class="file_info_title" id="pos_info" style="display:none;"></div>
-							<div class="file_info_title" id="set_info" style="display:none;"></div>
+					
+					<button id='undo_button' disabled>undo</button>
+					<div class="floatinginfo action_info">
+						<b>Action List [z]</b><br>
+						<div class="action_list"></div>
+					</div>
+					
+					<button id='file_headers_button'>headers</button>
+					<div class="floatinginfo file_info">
+						<div>
+							<B>file headers  [h]</B>
+							<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
+						</div>
+						<div id="info_panel" class="scrollable_area">
+							<div id='header_info' class='header_info'>
+								<div class="file_info_title" id="tet_info" style="display:none;"></div>
+								<div class="file_info_title" id="cut_info" style="display:none;"></div>
+								<div class="file_info_title" id="pos_info" style="display:none;"></div>
+								<div class="file_info_title" id="set_info" style="display:none;"></div>
+							</div>
 						</div>
 					</div>
+					
+					<button id="drift_button">drift</button>
+					<div class="floatinginfo drift_info">
+						<b>Drift [d]</b><br><br>
+						Render the cluster plots using a palette that shows the average time for spikes in each bin. <br><br>
+						<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+						So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+					</div>
 				</div>
 				
-				<button id="drift_button">drift</button>
-				<div class="floatinginfo drift_info">
-					<b>Drift [d]</b><br><br>
-					Render the cluster plots using a palette that shows the average time for spikes in each bin. <br><br>
-					<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-					So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+				<div class="button_group">
+					<div class="button display_button">c1</div>
+					<div class="button display_button">c2</div>
+					<div class="button display_button">c3</div>
+					<div class="button display_button">c4</div>
+					<div class="button display_button">rm</div>
+					<div class="floatinginfo rm_info">
+						<b>Spatial ratemap [r]</b><br><br>
+						Bin size default is 2.5cm.  <br><br>
+						If you need to change this open the command line and type (e.g. 5cm):
+						<pre>T.ApplyRmSize(5)</pre>
+						The smoothing kernel is fixed as a 5x5 "boxcar".
+					</div>
+					<div class="button display_button">tc</div>	
+					<div class="floatinginfo tc_info">
+						<b>Temporal auto correlation [t]</b><br><br>
+						Time window default is set at 500ms.  <br><br>
+						If you need to change this open the command line and type (e.g. 100ms):
+						<pre>T.TC.SetDeltaT(100)</pre>
+					</div>
+					<button id="toggle_palette">palette</button> 
+					<div class="floatinginfo palette_info">
+					<b>Toggle waveform palette [p]</b><br><br>
+					There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
+					<ul>
+					<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
+					<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
+					<li>render each pixel based on how many waves cross that pixel</li>
+					</ul>
+						
+						
 				</div>
-			</div>
-			
-			<div class="button_group">
-				<div class="button display_button">c1</div>
-				<div class="button display_button">c2</div>
-				<div class="button display_button">c3</div>
-				<div class="button display_button">c4</div>
-				<div class="button display_button">rm</div>
-				<div class="floatinginfo rm_info">
-					<b>Spatial ratemap [r]</b><br><br>
-					Bin size default is 2.5cm.  <br><br>
-					If you need to change this open the command line and type (e.g. 5cm):
-					<pre>T.ApplyRmSize(5)</pre>
-					The smoothing kernel is fixed as a 5x5 "boxcar".
 				</div>
-				<div class="button display_button">tc</div>	
-				<div class="floatinginfo tc_info">
-					<b>Temporal auto correlation [t]</b><br><br>
-					Time window default is set at 500ms.  <br><br>
-					If you need to change this open the command line and type (e.g. 100ms):
-					<pre>T.TC.SetDeltaT(100)</pre>
-				</div>
-				<button id="toggle_palette">palette</button> 
-				<div class="floatinginfo palette_info">
-				<b>Toggle waveform palette [p]</b><br><br>
-				There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
-				<ul>
-				<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
-				<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
-				<li>render each pixel based on how many waves cross that pixel</li>
-				</ul>
-					
-					
-			</div>
-			</div>
-			
-
-			<div class="button_group">
-			<button id="reorder_n_button">n-order</button>
-			<button id="reorder_A_button">a-order</button>
-			
-			<button id="autocut">autocut</button>
-			<div class="floatinginfo autocut_info">
-				<b>Autocut [a]</b><br><br>
-				<div id="autocut_caption"></div><br><br>
-				autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
-			</div>
-			</div>
-
-		</div>
-	</div>
-
-	<div class="side_panel_row">
-		<div class="toggle_panel" id="files_panel_toggle"></div>
-		<B>available files</B>
-		<div class="collapsable_panel" id="files_panel"></div>
-	</div>
-
-	<div class="side_panel_row">
-		<div class="toggle_panel" id="spatial_panel_toggle"></div>
-		<B>pos data</B>
-		<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" state="closed">
-			<canvas id="posplot" width="200" height="200"></canvas> 
-		</div>
-	</div>
-
-
-	<div class="side_panel_row">
-		<div class="last_side_panel_row_inner">
-			<div class="last_side_panel_row_head">
-				<B>cluster plots</B>
-			</div>		
-			<div class="last_side_panel_row_body">
-				<div id="cluster_panel" class="scrollable_area grabbable">
 				
+
+				<div class="button_group">
+				<button id="reorder_n_button">n-order</button>
+				<button id="reorder_A_button">a-order</button>
+				
+				<button id="autocut">autocut</button>
+				<div class="floatinginfo autocut_info">
+					<b>Autocut [a]</b><br><br>
+					<div id="autocut_caption"></div><br><br>
+					autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
+				</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="side_panel_row">
+			<div class="row_title" id="files_panel_toggle">available files</div>
+			<div class="collapsable_panel" id="files_panel"></div>
+		</div>
+
+		<div class="side_panel_row">
+			<div class="row_title"  id="spatial_panel_toggle">pos data</div>
+			<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" state="closed">
+				<br>
+				<canvas id="posplot" width="200" height="200"></canvas> 
+			</div>
+		</div>
+
+
+		<div class="side_panel_row">
+			<div class="last_side_panel_row_inner">
+				<div class="last_side_panel_row_head row_title">
+					cluster plots
+				</div>		
+				<div class="last_side_panel_row_body">
+					<div id="cluster_panel" class="scrollable_area grabbable">
+					
+					</div>
 				</div>
 			</div>
 		</div>
+
+
 	</div>
 
+	<div class="bar">
+	</div>
+
+	<div class="tilewall">
+	</div>
+	
+	<div class="mask"></div>
 
 </div>
 

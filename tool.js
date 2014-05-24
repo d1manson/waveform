@@ -489,7 +489,7 @@ T.Tool.Painter_GetXY = function(e){
     var scale = $c2.get(0).width / $c2.width();
     return {
             x: (e.pageX - offset.left)*scale,
-	        y: (e.pageY - offset.top + T.$cluster_panel.scrollTop())*scale
+	        y: (e.pageY - offset.top /*+ T.$cluster_panel.scrollTop()*/)*scale
     };
 }
 T.Tool.painterSrcGroups = [0];
