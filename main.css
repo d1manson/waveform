@@ -31,7 +31,7 @@ top: 0px;
 z-index: 999;
 height: 100%; 
 width: 100%; 
-pointer-events: none;
+display: none;
 }
 
 .tilewall[tilemoving]{
@@ -291,6 +291,7 @@ overflow-x:hidden;
 -o-user-select: none;
 user-select: none;
 cursor: default;
+height: 100%;
 }
 .row_title{
 font-weight: bold;

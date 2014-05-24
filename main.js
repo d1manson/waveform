@@ -704,7 +704,7 @@ T.BarMouseDown = function(e){
 	$(document).on("mousemove",T.BarDrag_DocumentMouseMove)
 			   .on("mouseup",T.BarDrag_DocumentMouseUp);
 	T.$mask.css({cursor: "ew-resize",
-				 pointerEvents: "initial"})
+				 pointerEvents: "block"})
 			
 }
 
@@ -718,7 +718,7 @@ T.BarDrag_DocumentMouseUp = function(e){
 	$(document).off("mousemove",T.BarDrag_DocumentMouseMove)
 			   .off("mouseup",T.BarDrag_DocumentMouseUp);
 	T.$mask.css({cursor: "",
-				pointerEvents: ""});
+				display: "none"});
 }
 
 
