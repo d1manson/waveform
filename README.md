@@ -12,13 +12,13 @@ To use the application, just download the code and open index.html in your brows
 **Viewing the data.**
 You can select to view a single channel, ratemap, or temporal autocorrelogram by clicking the relevant button in the button panel.  Hold down shift to select multiple views.
 
-**Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.  Note that it is very much a work in progress.
-
 **Merge groups.** You can drag a tile onto another tile in order to merge two groups together.  
 
 **Split a group.** Right click a group (and drag) to use the split tool.  This tool lets you specify a time and voltage threshold on which to split up a group (voltage threshold applied on a single channel).   The split is shown when you release the right mouse button, but you can right click again to adjust it. To finalise the split left click on the tilewall outside the two active tiles (or right click the tilewall to cancel the split).
 
 **Reorder the groups.** The button panel has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
+
+**Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.  Note that it is very much a work in progress, or rather an abandoned piece of work.
 
 **Save the cut.** Drag the cut file from the file panel to your operating system's file explorer.  It will be given the standard name for a cut file.
 
@@ -39,6 +39,7 @@ Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2Qf
 Cluster rendering in "drift" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/drift.png)      
 
 ## Change Log
+* Added cluster painter tool.
 * Added a new wave rendering mode which shows the densities.
 * Created a drift mode for rendering cluster plots.
 * Re-worked the `T.ORG` module so that you can now switch cuts/tets/exps more easily.
