@@ -704,7 +704,7 @@ T.BarMouseDown = function(e){
 	$(document).on("mousemove",T.BarDrag_DocumentMouseMove)
 			   .on("mouseup",T.BarDrag_DocumentMouseUp);
 	T.$mask.css({cursor: "ew-resize",
-				 pointerEvents: "block"})
+				 display: "block"})
 			
 }
 
