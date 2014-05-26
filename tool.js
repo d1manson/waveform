@@ -38,21 +38,22 @@ T.Tool.Button_Swap = function(event){
 
 T.Tool.Button_PainterDest = function(event){
 	var g = $(this).parent().parent().parent().data('group_num');
-	T.Tool.painterDestGroup = g; //TODO: need to dhow something, also need to follow slot not group.
+	T.Tool.SetPainterDestGroup(g);
 }
 
 T.Tool.Button_PainterSrc = function(event){
 	var g = $(this).parent().parent().parent().data('group_num');
 	
-	//TODO: need to dhow something, also need to follow slot not group.
 	if(key.shift){
 		var ind = T.Tool.painterSrcGroups.indexOf(g);
+		var newGs = T.Tool.painterSrcGroups.slice(0);
 		if (ind == -1)
-			T.Tool.painterSrcGroups.push(g); 
+			newGs.push(g); 
 		else
-			T.Tool.painterSrcGroups.splice(ind,1); 
+			newGs.splice(ind,1); 
+		T.Tool.SetPainterSrcGroups(newGs); 
 	}else{
-		T.Tool.painterSrcGroups = [g]; 
+		T.Tool.SetPainterSrcGroups([g]); 
 	}
 }
 
@@ -435,6 +436,9 @@ T.Tool.MakeSVGStr_Painter = function(x,y,r){
 T.Tool.PAINTER_COLOR = '#003300';
 
 T.Tool.Painter_ClusterMouseDown = function(e){
+	if(T.Tool.$painterCanv)
+		return; //this can happen if you press one mouse button down and then the other
+		
 	var offset = T.$cluster_panel.offset();
 	var x = event.pageX - offset.left; 
 	var y = event.pageY - offset.top + T.$cluster_panel.scrollTop();
@@ -492,8 +496,30 @@ T.Tool.Painter_GetXY = function(e){
 	        y: (e.pageY - offset.top /*+ T.$cluster_panel.scrollTop()*/)*scale
     };
 }
-T.Tool.painterSrcGroups = [0];
-T.Tool.painterDestGroup = 1;
+
+T.Tool.SetPainterDestGroup = function(g){
+	if (g==-1){
+		g = T.Tool.painterDestGroup + 1;
+		//TODO: want this to mean assign to unused group rather than enxt group.
+	}
+	T.$painter_dest.text(g)
+				   .css({backgroundColor: T.PALETTE_FLAG_CSS[g],
+											color: T.PALETTE_FLAG_CSS_TEXT[g]});
+	T.Tool.painterDestGroup = g;
+}
+
+T.Tool.SetPainterSrcGroups = function(gs){
+	var str = [];
+	for(var i=0;i<gs.length;i++)
+		str.push("<div class='cluster-sticker' style='background: " 
+					+ T.PALETTE_FLAG_CSS[gs[i]] + "; color:" + T.PALETTE_FLAG_CSS_TEXT[gs[i]] 
+					+ "'>" + gs[i] + "</div>");
+	T.$painter_src.html(str.join(""));
+	T.Tool.painterSrcGroups = gs;
+}
+
+T.Tool.SetPainterDestGroup(1);
+T.Tool.SetPainterSrcGroups([0]);
 
 T.Tool.Painter_DocumentMouseUp = function(e){
     var $c2 = T.Tool.$painterCanv2;    

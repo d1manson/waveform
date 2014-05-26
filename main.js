@@ -737,6 +737,8 @@ T.$info_panel = $('#info_panel');
 T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
 T.$side_panel = $('.side_panel');
+T.$painter_dest = $('#painter-dest');
+T.$painter_src = $('#painter-src');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('#undo_button').click(T.UndoLastAction)
@@ -793,8 +795,7 @@ key('alt+z',T.ToggleElementState($('.action_info')));
 key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
 key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
 key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
-key('enter',function(){T.Tool.painterDestGroup++;});
-key('shift+enter',function(){T.Tool.painterDestGroup--;});
+key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
 
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
