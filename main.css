@@ -682,6 +682,7 @@ top: 2px;
 .cluster-sticker{
 margin: 2px;
 display: inline-block;
+cursor: default;
 }
 .cluster_painter{
 float:left;
@@ -691,6 +692,7 @@ display: inline-block;
 }
 .cluster_others{
 text-align: right;
+min-height: 26px;
 }
 .tile-buttons{
 position: absolute;

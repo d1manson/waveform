@@ -222,17 +222,16 @@ T.CP = function($canvasParent,ORG){
 			
 		//deactive the previously active group if it's not the newly acitve one
 		if(g==PALETTE_FLAG.length || g != hoverG){
-			if(hoverG != null)
+			if(hoverG != null && T.tiles[hoverG])
 				T.tiles[hoverG].$.removeAttr('active');
 			hoverG = null;
 		}
 		
 		//activate the newly active group
-		if(g < PALETTE_FLAG.length){
+		if(T.tiles[g]){
 			T.tiles[g].$.attr('active',true);
 			hoverG = g;
 		}
-		console.log(g)
 		
 	}
 	

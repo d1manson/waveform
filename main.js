@@ -739,6 +739,7 @@ T.$cluster_panel = $('#cluster_panel');
 T.$side_panel = $('.side_panel');
 T.$painter_dest = $('#painter-dest');
 T.$painter_src = $('#painter-src');
+T.$cluster_others = $('.cluster_others');
 $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('#undo_button').click(T.UndoLastAction)

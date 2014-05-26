@@ -506,6 +506,11 @@ T.Tool.SetPainterDestGroup = function(g){
 				   .css({backgroundColor: T.PALETTE_FLAG_CSS[g],
 											color: T.PALETTE_FLAG_CSS_TEXT[g]});
 	T.Tool.painterDestGroup = g;
+	var c = T.ORG.GetCut();
+	if(c){
+		c.GetExtraStuff().painterDest = g;
+		T.Tool.ClusterOthersUpdate(c);
+	}
 }
 
 T.Tool.SetPainterSrcGroups = function(gs){
@@ -516,8 +521,33 @@ T.Tool.SetPainterSrcGroups = function(gs){
 					+ "'>" + gs[i] + "</div>");
 	T.$painter_src.html(str.join(""));
 	T.Tool.painterSrcGroups = gs;
+	var c = T.ORG.GetCut();
+	if(c){
+		c.GetExtraStuff().painterSrc = gs;
+		T.Tool.ClusterOthersUpdate(c);
+	}
 }
 
+T.Tool.ClusterOthersUpdate = function(c){
+	var gs = c.GetGroupList();
+	var str = [];
+	for(var i=0;i<gs.length;i++)if(!(T.Tool.painterDestGroup == gs[i] || T.Tool.painterSrcGroups.indexOf(gs[i])>-1))
+		str.push("<div class='cluster-sticker' style='background: " 
+					+ T.PALETTE_FLAG_CSS[gs[i]] + "; color:" + T.PALETTE_FLAG_CSS_TEXT[gs[i]] 
+					+ "'>" + gs[i] + "</div>");
+	T.$cluster_others.html(str.join(""));
+}
+
+T.Tool.ClusterPlotChangeCallback = function(invalidatedSlots_,isNew){
+	if(isNew){
+		var extra = this.GetExtraStuff();
+		T.Tool.SetPainterSrcGroups( 'painterSrc' in extra ? extra.painterSrc : [0])
+		T.Tool.SetPainterDestGroup( 'painterDest' in extra ? extra.painterDest : 1)
+	}
+	T.Tool.ClusterOthersUpdate(this);
+}
+
+T.ORG.AddCutChangeCallback(T.Tool.ClusterPlotChangeCallback);
 T.Tool.SetPainterDestGroup(1);
 T.Tool.SetPainterSrcGroups([0]);
 

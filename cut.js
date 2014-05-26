@@ -320,15 +320,18 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
 					
 			//delete the old a_arr[k] immutable
 			invalidatedSlots[DeleteImmutable.call(this,a_arr[k])] = 1;
-			//and make a new one using just the cut_a_remainder_inds
-			invalidatedSlots[NewImmutable.call(this,cut_a_remainder_inds,a_arr[k])] = 1;
+			if(cut_a_remainder_inds.length){
+				//and make a new one using just the cut_a_remainder_inds
+				invalidatedSlots[NewImmutable.call(this,cut_a_remainder_inds,a_arr[k])] = 1;
+			}
 		}
 		
 		//delete the old b immutable
 		invalidatedSlots[DeleteImmutable.call(this,b)] = 1;
-		//and make a new one using the new cut_b_inds
-		invalidatedSlots[NewImmutable.call(this,cut_b_inds,b)] = 1;
-		
+		if(cut_b_inds.length){
+			//and make a new one using the new cut_b_inds
+			invalidatedSlots[NewImmutable.call(this,cut_b_inds,b)] = 1;
+		}
 		PushAction.call(this,"transplant",[a_arr,splitMask_arr,b],'transplant into group-' + b + ' from ' + a_arr.join(', '));
 		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
@@ -357,14 +360,18 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
 					
 			//delete the old a_arr[k] immutable
 			invalidatedSlots[DeleteImmutable.call(this,a_arr[k])] = 1;
-			//and make a new one using just the cut_a_remainder_inds
-			invalidatedSlots[NewImmutable.call(this,cut_a_inds,a_arr[k])] = 1;
+			if(cut_a_inds.length){
+				//and make a new one using just the cut_a_remainder_inds
+				invalidatedSlots[NewImmutable.call(this,cut_a_inds,a_arr[k])] = 1;
+			}
 		}
 		
 		//delete the old b immutable
 		invalidatedSlots[DeleteImmutable.call(this,b)] = 1;
-		//and make a new one using the new cut_b_remainder
-		invalidatedSlots[NewImmutable.call(this,cut_b_remainder,b)] = 1;
+		if(cut_b_remainder.length){
+			//and make a new one using the new cut_b_remainder
+			invalidatedSlots[NewImmutable.call(this,cut_b_remainder,b)] = 1;
+		}
 		
 		changeCallbacks.fireWith(this,[invalidatedSlots]);
 	}
@@ -520,6 +527,14 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
         return G;
     }
     
+	var GetGroupList = function(){
+		var m = this._.groupToImmutablesMapping;
+		var gs = []
+		for(var i =0;i< m.length;i++)
+			if(m[i] > 0 || m[i]==0)
+				gs.push(i);
+		return gs;
+	}
 	
 	var GetProps = function(){
 		return {exp_name: this._.exp_name, 
@@ -569,7 +584,8 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
                 immutablesSlots: Array(255), //this is where we store the indicies for each group
                 nextImmutableSlot: 0, //this makes it quicker to find a vacant slot in the above array when you need one
                 groupToImmutablesMapping: [], //the indicies for group g are stored in immutablesSlots[groupToImmutablesMapping[g]]
-				N: 0 //number of spikes
+				N: 0, //number of spikes
+				extraStuff: {} // this is used for storing semi-peristent stuff related to the cut such as the cluster painting src and dest
 			};
 
 		DoConstruction.call(this,data_type,data,description);
@@ -592,7 +608,8 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
 	cut.prototype.GetImmutableSlot = GetImmutableSlot;
 	cut.prototype.GetNImmutables = GetNImmutables;
 	cut.prototype.TransplantFromAsToB = TransplantFromAsToB;
-	
+	cut.prototype.GetExtraStuff = function(){return this._.extraStuff;}
+	cut.prototype.GetGroupList = GetGroupList;
 	// append these CUT static methods to the ORG module
 	ORG.AddCutChangeCallback = changeCallbacks.add,
 	ORG.RemoveCutChangeCallback = changeCallbacks.remove,
