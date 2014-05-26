@@ -57,11 +57,16 @@ T.Tool.Button_PainterSrc = function(event){
 	}
 }
 
-
+T.Active_TileMouseMove = function(e){
+	var g = $(this).data('group_num');
+	T.SetGroupOver(g);
+}
 // These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
 // temporarily registerd on $tile's, $tilewall, and $document.
 T.$tilewall.on("mousedown",".tile",T.TileMouseDown); 
 T.$tilewall.on("dblclick",".tile",T.TileDoubleClick); 
+T.$tilewall.on("mousemove",".tile",T.Active_TileMouseMove);
+T.$tilewall.on("mouseout",".tile",function(){T.SetGroupOver(-1)});
 
 T.Tool.StopProgagation = function(e){e.stopPropagation();}
 
@@ -69,6 +74,7 @@ T.$tilewall.on("click",".tile-button-swap",T.Tool.Button_Swap);
 T.$tilewall.on("click",".tile-button-dest",T.Tool.Button_PainterDest); 
 T.$tilewall.on("click",".tile-button-src",T.Tool.Button_PainterSrc); 
 T.$tilewall.on("mousedown",'.tile-buttons',T.Tool.StopProgagation);
+
 
 /* =================== MERGER =================== */
 
@@ -381,7 +387,8 @@ T.Tool.GrabIt = function(){
 												webkitTransform: '',
 												width: $(this).width() + 'px',
 												height: $(this).height() + 'px',
-												display: 'block'});
+												display: 'block',
+												boxShadow: 'initial'});
 	var p = $(this).offset();
 	var $pane = $("<div class='floatinginfo grabbed_info'><div class='floating_title'>" + T.ORG.GetExpName() + " (Grabbed)</div> </div>")
 			.append($("<div class='floating_body'/>").append($clone))
@@ -504,7 +511,8 @@ T.Tool.SetPainterDestGroup = function(g){
 	}
 	T.$painter_dest.text(g)
 				   .css({backgroundColor: T.PALETTE_FLAG_CSS[g],
-											color: T.PALETTE_FLAG_CSS_TEXT[g]});
+											color: T.PALETTE_FLAG_CSS_TEXT[g]})
+				   .attr('data-group',g); //use proper data attr to match stickers in src and other categories.
 	T.Tool.painterDestGroup = g;
 	var c = T.ORG.GetCut();
 	if(c){
@@ -516,7 +524,7 @@ T.Tool.SetPainterDestGroup = function(g){
 T.Tool.SetPainterSrcGroups = function(gs){
 	var str = [];
 	for(var i=0;i<gs.length;i++)
-		str.push("<div class='cluster-sticker' style='background: " 
+		str.push("<div class='cluster-sticker'  data-group='" + gs[i] + "' style='background: " 
 					+ T.PALETTE_FLAG_CSS[gs[i]] + "; color:" + T.PALETTE_FLAG_CSS_TEXT[gs[i]] 
 					+ "'>" + gs[i] + "</div>");
 	T.$painter_src.html(str.join(""));
@@ -532,7 +540,7 @@ T.Tool.ClusterOthersUpdate = function(c){
 	var gs = c.GetGroupList();
 	var str = [];
 	for(var i=0;i<gs.length;i++)if(!(T.Tool.painterDestGroup == gs[i] || T.Tool.painterSrcGroups.indexOf(gs[i])>-1))
-		str.push("<div class='cluster-sticker' style='background: " 
+		str.push("<div class='cluster-sticker' data-group='" + gs[i] + "' style='background: " 
 					+ T.PALETTE_FLAG_CSS[gs[i]] + "; color:" + T.PALETTE_FLAG_CSS_TEXT[gs[i]] 
 					+ "'>" + gs[i] + "</div>");
 	T.$cluster_others.html(str.join(""));

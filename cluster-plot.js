@@ -173,8 +173,6 @@ T.CP = function($canvasParent,ORG){
 		console.timeEnd('si cluster');
 	}
 
-	var hoverG = null;
-	
 	var ClusterPlot_MouseMove = function(e){
 		if(meanTMode)
 			return;
@@ -220,19 +218,8 @@ T.CP = function($canvasParent,ORG){
 		for(var g=0;g<PALETTE_FLAG.length;g++)
 			if(c == PALETTE_FLAG[g]) break;
 			
-		//deactive the previously active group if it's not the newly acitve one
-		if(g==PALETTE_FLAG.length || g != hoverG){
-			if(hoverG != null && T.tiles[hoverG])
-				T.tiles[hoverG].$.removeAttr('active');
-			hoverG = null;
-		}
-		
-		//activate the newly active group
-		if(T.tiles[g]){
-			T.tiles[g].$.attr('active',true);
-			hoverG = g;
-		}
-		
+		T.SetGroupOver(g);
+
 	}
 	
 	var BringGroupToFront = function(group_num){
@@ -384,7 +371,9 @@ T.CP = function($canvasParent,ORG){
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	T.$cluster_panel.on("mousemove","canvas",ClusterPlot_MouseMove);
-	T.$cluster_panel.on("mouseout","canvas",function(){	if(hoverG != null) T.tiles[hoverG].$.removeAttr('active'); hoverG = null;});
+	T.$cluster_panel.on("mouseout","canvas",function(){	T.SetGroupOver(-1)});
+	T.$cluster_info.on('mouseover','.cluster-sticker',function(){T.SetGroupOver($(this).attr('data-group'));});
+	T.$cluster_info.on("mouseout",".cluster-sticker",function(){T.SetGroupOver(-1)});
 	
 	return {BringGroupToFront: BringGroupToFront,
 			SetRenderMode: SetRenderMode,

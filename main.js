@@ -724,6 +724,30 @@ T.BarDrag_DocumentMouseUp = function(e){
 }
 
 
+T.groupOver = {g: null,$tile:null,$clusterSticker:null};
+T.SetGroupOver = function(g){
+	if(g == T.groupOver.g)
+		return;
+
+	if(T.groupOver.$tile)
+		T.groupOver.$tile.removeAttr('active');
+	if(T.groupOver.$clusterSticker)
+		T.groupOver.$clusterSticker.removeAttr('active');
+		
+	T.groupOver.g = g;
+	if(!(g==0 || g>0))
+		return;
+		
+	T.groupOver.$clusterSticker = T.$cluster_info.find('.cluster-sticker[data-group=' + g + ']');
+	T.groupOver.$tile = T.tiles[g] ? T.tiles[g].$ : null;
+	
+	if(T.groupOver.$clusterSticker)
+		T.groupOver.$clusterSticker.attr('active',true);
+	if(T.groupOver.$tile)
+		T.groupOver.$tile.attr('active',true);
+		
+}
+
 
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
@@ -737,6 +761,7 @@ T.$info_panel = $('#info_panel');
 T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
 T.$side_panel = $('.side_panel');
+T.$cluster_info = $('.cluster_info');
 T.$painter_dest = $('#painter-dest');
 T.$painter_src = $('#painter-src');
 T.$cluster_others = $('.cluster_others');
