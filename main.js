@@ -30,11 +30,11 @@ T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<div class='tile-sticker'></div>" + 
 			"<div class='tile-over'>" +
-				"<div class='tile-caption'></div>" + 
 				"<div class='tile-buttons'>" +
 					"<button class='tile-button-swap'></button>" +
 					"<button class='tile-button-dest'></button>" +
 					"<button class='tile-button-src'></button>" +
+					"<div class='tile-caption'></div>" + 
 				"</div>" + 
 			"</div>" +
 			"<div class='blind'></div>" + 
@@ -372,8 +372,10 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		T.tiles[new_tile_ind].$.show()
 							   .toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
 							  .data("group_num",new_tile_ind)
-		T.tiles[new_tile_ind].$caption.text("group " + new_tile_ind + " | " + slot_k.inds.length + " waves ");
-		T.tiles[new_tile_ind].$sticker.css({backgroundColor: T.PALETTE_FLAG_CSS[new_tile_ind]})
+		T.tiles[new_tile_ind].$caption.text(slot_k.inds.length);
+		T.tiles[new_tile_ind].$sticker.css({backgroundColor: T.PALETTE_FLAG_CSS[new_tile_ind],
+											color: T.PALETTE_FLAG_CSS_TEXT[new_tile_ind]})
+									  .text(new_tile_ind);
 		T.cutSlotToTileMapping[k] = new_tile_ind;
 	}
 
@@ -844,5 +846,15 @@ T.PALETTE_FLAG_CSS = function(){
 	
 	for(var i=0;i<T.PALETTE_FLAG.length;i+=4)
 		ret.push('rgb(' + T.PALETTE_FLAG[i] +"," +T.PALETTE_FLAG[i+1] +","+ T.PALETTE_FLAG[i+2]+")") //maybe a bit inefficient but it's only 256 values so whatever
+	return ret;
+}();
+
+T.PALETTE_FLAG_CSS_TEXT = function(){
+	var black_list = [0,2,3,4,5,6,7,10,12,13,14,15,17,18,19,20,21,22,23,25,26,27,28,30]; //these group numbers are black, all others are white
+	
+	var ret = [];
+	for(var i=0;i<T.PALETTE_FLAG.length/4;i++)
+		ret.push( black_list.indexOf(i) == -1 ? '#FFF' : '#000');
+		
 	return ret;
 }();

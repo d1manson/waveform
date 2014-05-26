@@ -382,8 +382,8 @@ T.Tool.GrabIt = function(){
 												height: $(this).height() + 'px',
 												display: 'block'});
 	var p = $(this).offset();
-	var $pane = $("<div class='floatinginfo grabbed_info'><b>" + T.ORG.GetExpName() + " (Grabbed)</b> </div>")
-			.append($clone)
+	var $pane = $("<div class='floatinginfo grabbed_info'><div class='floating_title'>" + T.ORG.GetExpName() + " (Grabbed)</div> </div>")
+			.append($("<div class='floating_body'/>").append($clone))
 			.translate(p.left +30,p.top +30)
 			.show();
 	

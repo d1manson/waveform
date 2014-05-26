@@ -167,19 +167,12 @@ right: 0px;
 bottom: 0px;
 }
 .tile-caption{
-position: absolute;
-bottom: 5px;
-left: 5px;
-right: 47px;
+border-top: 1px solid #000;
 text-align: center;
-background-color:rgba(255,255,255,0.85);
-/*border: 1px solid #FFAD33;*/
-padding-top: 3px;
-padding-bottom: 3px;
 }
 .tile:hover:not([moving]):not([splitting]),
 .tile[active]{
-background: #ccc;
+background: #eee;
 border-color: #FFAD33;
 }
 .tile[proximate]{
@@ -270,6 +263,9 @@ height: 14px;
 background: #500;
 border: 2px solid #fff;
 margin-top:0;
+}
+.file_info{
+    width: 400px;
 }
 .file_info_title{
 margin-top: 5px;
@@ -491,6 +487,7 @@ padding: 3px 0px 3px 0px;
 }
 #header_search{
 float: right;
+font-size: 0.8em;
 }
 
 .tile[disabled]{
@@ -537,13 +534,23 @@ transform: translate(400px,20px);
 -webkit-transform: translate(400px, 20px);
 min-width: 200px;
 max-width: 400px;
-min-height: 80px;
 background-color: rgba(255,255,255,0.8);
-border: solid 2px #000;
-padding: 5px;
 display:none;
 z-index:100;
 cursor: move;
+box-shadow: 3px 3px 7px #999;
+}
+.floating_title{
+background:#333;
+color: #fff;
+font-weight:bold;
+display: block;
+padding:5px;
+}
+.floating_body{
+border: 1px solid #000;
+min-height: 60px;
+padding: 8px;
 }
 .grabbed_info{
 min-width: initial;
@@ -663,23 +670,23 @@ position: absolute;
 right: 2px;
 top: 2px;
 width: 20px;
-height: 20px;
+height: 17px;
 border: 1px solid #000;
+text-align: center;
+font-size: 0.8em;
+padding-top: 3px;
 }
 .tile-buttons{
 position: absolute;
-right: 5px;
-top: 5px;
-bottom: 5px;
-text-align: right;
+right: 0px;
+top: 0px;
+bottom: 0px;
 background-color:rgba(255,255,255,0.85);
+box-shadow: -3px 0px 6px #ddc;
 }
 
 .grabbed_info .tile-buttons{
 display: none;
-}
-.grabbed_info .tile-caption{
-right: 5px;
 }
 
 .tile-button-swap,
