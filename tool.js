@@ -30,10 +30,13 @@ T.TileDoubleClick = function(event){
 
 T.Tool.Button_Swap = function(event){
     var g = $(this).parent().parent().parent().data('group_num');
+    T.Tool.Swap(g);
+}
+
+T.Tool.Swap = function(g){
     var ng = parseInt(prompt("Swap group " + g + " with:",g+""));
     if(ng >=0 && ng <= 256)
         T.ORG.GetCut().SwapBandA(g,ng);
-        
 }
 
 T.Tool.Button_PainterDest = function(event){
@@ -44,6 +47,10 @@ T.Tool.Button_PainterDest = function(event){
 T.Tool.Button_PainterSrc = function(event){
 	var g = $(this).parent().parent().parent().data('group_num');
 	
+	T.Tool.PainterSrc_Toggle(g);
+}
+
+T.Tool.PainterSrc_Toggle = function(g){
 	if(key.shift){
 		var ind = T.Tool.painterSrcGroups.indexOf(g);
 		var newGs = T.Tool.painterSrcGroups.slice(0);

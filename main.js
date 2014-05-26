@@ -822,7 +822,9 @@ key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of callin
 key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
 key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
 key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
-
+key('e',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.SetPainterDestGroup(T.groupOver.g);});
+key('f, shift+f',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.PainterSrc_Toggle(T.groupOver.g);});
+key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 
