@@ -506,7 +506,7 @@ var TransplantFromAsToB = function(a_arr,splitMask_arr,b){
 		if (cap) G = G > cap? cap : G; 
 
 		//convert immutablesSlots inds into a single vector giving a gorup number for each spike
-		for(var g=0;g<G;g++){
+		for(var g=0;g<=G;g++){
 			var cut_g = GetGroup.call(this,g);
 			var Glen = cut_g.length;
 			for(var i=0;i<Glen;i++)

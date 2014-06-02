@@ -663,7 +663,9 @@ T.StoreData = function(){
 	localStorage.paletteMode = T.paletteMode;
     localStorage.painterR = T.Tool.painterR;
     localStorage.clusterPlotSize = T.CP.GetSize();
-	
+	localStorage.button_pannel_state = $('#button_panel').attr("state") || "";
+    localStorage.spatial_pannel_state = $('#spatial_panel').attr("state") || "";
+    
 	localStorage.side_panel_width = 100*T.$side_panel.width()/$(document).width();
 }
 
@@ -679,7 +681,10 @@ T.DocumentReady = function(){
         T.Tool.painterR = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		//TODO: load files into T.cut instances
-
+        if(localStorage.button_pannel_state) //this is open by default, so close if required
+            $('#button_panel').attr("state",localStorage.button_pannel_state)
+        if(localStorage.spatial_pannel_state == "")
+            $('#spatial_panel').removeAttr("state") //this is closed by default, so open if required
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.RM.SetCmPerBin(T.binSizeCm);
 		
@@ -726,6 +731,7 @@ T.BarDrag_DocumentMouseUp = function(e){
 
 T.groupOver = {g: null,$tile:null,$clusterSticker:null};
 T.SetGroupOver = function(g){
+    g = parseInt(g);//when coming via data-group attr it might be a string
 	if(g == T.groupOver.g)
 		return;
 
