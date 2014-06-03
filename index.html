@@ -156,8 +156,10 @@ you can drag further files onto the window at any point<br>
 		<div class="side_panel_row">
 			<div class="row_title"  id="spatial_panel_toggle">pos data</div>
 			<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" state="closed">
-				<br>
-				<canvas id="posplot" width="200" height="200"></canvas> 
+				<div class='pos_plot_holder'>
+					<canvas id="posplot" class='poslayer' width="200" height="200"></canvas> 
+					<canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
+				</div>
 			</div>
 		</div>
 

@@ -33,7 +33,20 @@ height: 100%;
 width: 100%; 
 display: none;
 }
-
+.pos_plot_holder{
+display: inline-block;
+position: relative;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+.poslayer{
+position: absolute;
+top: 0px;
+left: 0px;
+}
+.poslayer:first-of-type{
+position: relative;
+}
 .tilewall[tilemoving]{
 cursor: move;
 }
@@ -286,6 +299,7 @@ overflow-x:hidden;
 user-select: none;
 cursor: default;
 height: 100%;
+position: relative;
 }
 .row_title{
 font-weight: bold;

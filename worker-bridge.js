@@ -1,15 +1,27 @@
-var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNames,mainExportHandles){
+var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNames,mainExportHandles,constantsKV){
 	//workerFunciton is a function, the interior of which will be turned into a string and used as a worker
 	//workerExportNames should be an array of string function names available to main 
 	//mainExportNames should be an array of string function names available to worker
 	//mainExportHandles should be an array of the actual functions corresponding to the functions in main
 	//for both Names arrays, if the function name ends in an asterisk it means that the last argument passed is going to be an array of ArrayBuffers
+	// constantsKV should be an object, the keys of which will become vars and the values of which will be JSONified and assigned to the vars
+	//    this will then be placed at the top of the worker code, so can be used as constants or as modifiable values.
 	// 
 	//The result of all this work is that inside the worker we can call main.SomeMainFunction(thing,otherthing,more,[buffer1,buffer2])
 	//and in main we can call myWorker.SomeWorkerFunction(hello,world,[buffer1,buffer2])
 	//
-	var baseWorkerStr = workerFunction.toString().match(/^\s*function\s*\(\s*\)\s*\{(([\s\S](?!\}$))*[\s\S])/)[1];
-	var extraWorkerStr = [];
+	
+	var extraWorkerTopStr = []; //we will fill this with the constantsKV
+	var baseWorkerStr = workerFunction.toString().match(/^\s*function\s*\(\s*\)\s*\{(([\s\S](?!\}$))*[\s\S])/)[1]; //this is the main body of the function
+	var extraWorkerStr = []; //this is all the extra stuff for ease of briding
+	
+	if(constantsKV){
+		var keys = Object.keys(constantsKV);
+		for (var i=0;i<keys.length;i++)
+			extraWorkerTopStr.push('var ' + keys[i] + " = " + JSON.stringify(constantsKV[keys[i]]) + ";");
+	}
+
+
 	
 	// build a string for the worker end of the worker-calls-funciton-in-main-thread operation
 	extraWorkerStr.push("var main = {};\n");
@@ -36,7 +48,12 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 	extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
 	extraWorkerStr.push("\n};\n");
 	extraWorkerStr.push("var console = {\nlog:\n function(str){self.postMessage({foo:'console_log',args:[str]})}\n}\n");
-	var fullWorkerStr = baseWorkerStr + "\n\n/*==== STUFF ADDED BY BuildBridgeWorker ==== */\n\n" + extraWorkerStr.join("");
+	var fullWorkerStr = "\n\n/*==== VARS ADDED BY BuildBridgeWorker ==== */\n\n" + 
+						extraWorkerTopStr.join("\n") + 
+						"\n\n/*==== START OF CUSTOM WORKER CODE ==== */\n\n" +
+						baseWorkerStr + 
+						"\n\n/*==== ADDITIONAL LOGIC ADDED BY BuildBridgeWorker ==== */\n\n" +
+						extraWorkerStr.join("");
 
 	// create the worker
 	var url = window.URL.createObjectURL(new Blob([fullWorkerStr],{type:'text/javascript'}));

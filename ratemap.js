@@ -1,11 +1,23 @@
 "use strict";
 
-T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallback, TILE_CANVAS_NUM,ORG){
-
+T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
+                CanvasUpdateCallback, TILE_CANVAS_NUM,ORG,
+                POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG){
+				
+	var IM_SPIKES_FOR_PATH = 1;
+	var IM_RATEMAP = 0;
+	
+	//these constants will be passed through to the worker for use as standard global vars in the worker's scope
+	var WORKER_CONSTANTS = {IM_SPIKES_FOR_PATH: IM_SPIKES_FOR_PATH,
+							IM_RATEMAP:IM_RATEMAP,
+							POS_W: POS_W,
+							POS_H: POS_H,
+							BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
+							POS_NAN: POS_NAN};						
 
 	var workerFunction = function(){
         "use strict";
-        
+
         // Some functions copied (and simplified/extended) from Mlib.js and utils.js
 		var Swap32 = function(val) {
 			return   ((val & 0xFF) << 24)
@@ -86,8 +98,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
         
         var posFreq = null;
 		var pixPerM = null;
+        var scale_spikes_plot = null;
 		var posValXY = null; // this is the values in pixels
 		var posBinXY = null; // this is posValXY / pixPerM *100/ cmPerBin
+        var spikePosBinXY_b = null; //this is posValXY * the scale factor for plotting to the spikes/pos plot 
 		var spikeTimes = null; // this is the spike times expressed in milliseconds
 		var spikePosInd = null; // this is the spke times expressed in pos indices
 		var spikePosBinXY = null; // this is posBinXY(spikePosInd,:)
@@ -176,13 +190,19 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 			posBinXY = new Uint8ClampedArray(posValXY.length);
 			for(var i=0;i<posValXY.length;i++)
 				posBinXY[i] = posValXY[i] * factor;
-			
+                
+            factor = scale_spikes_plot;
+            var posBinXY_b = new Uint8ClampedArray(posValXY.length);
+    		for(var i=0;i<posValXY.length;i++)
+                posBinXY_b[i] = posValXY[i] * factor;
+            spikePosBinXY_b = pick(new Uint16Array(posBinXY_b.buffer),spikePosInd); //same form as posBinXY_b, but we store it as 2byte blocks for easy picking
+			    
 			var maxXY = max_2(posBinXY);			
 			nBinsX = maxXY[0] + 1; // +1 is because of zero indexing
 			nBinsY = maxXY[1] + 1;
 			
 			spikePosBinXY = pick(new Uint16Array(posBinXY.buffer),spikePosInd); //same form as posBinXY, but we store it as 2byte blocks for easy picking
-			
+						
 			var dwellCounts = hist_2(posBinXY,nBinsX,nBinsY);
 			dwellCounts[0] = 0; // this is where bad points were put, this is a quick fix. TODO: do something better than this
 
@@ -224,7 +244,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
     
         }
         
-        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,BYTES_PER_POS_SAMPLE,POS_NAN){
+        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,scale_spikes_plot_val){
 			//reads pos pixel coordinates
 
             ClearQueue(); 
@@ -234,13 +254,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 				spikePosInd = null;
 				posValXY = null;
 				posBinXY = null;
+                spikePosBinXY_b = null;
 				spikePosBinXY = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
+                scale_spikes_plot = null;
                 return;
             }
             posFreq = posFreq_val;
             pixPerM = pixPerM_val;
+            scale_spikes_plot = scale_spikes_plot_val;
 			
             posValXY = new Uint16Array(2*N); // x_1, y_1, x_2 , y_2, ... in units of pixels    
     		var posData = new Uint16Array(buffer);
@@ -254,12 +277,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
     			}
     		}
 			
-			//TODO: filtering and interpolation
+			//TODO: filtering and interpolation..actually these should be done in the pos loading code elsewhere
 			
             if(spikeTimes){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
 			}
+    
         }
 
 		var GetGroupRatemap = function(slot){
@@ -278,7 +302,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 
 			var im = ToImageData(ratemap);
 			slot.cmPerBin = desiredCmPerBin;
-			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,[im]);
+			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
 		
@@ -299,6 +323,35 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1+Math.floor(map[i]*factor)];
 			}
 			return im.buffer; //this is how it's going to be sent back to the main thread
+		}
+
+		var PlotPoint = function(im,W,H,x,y,s,color){
+			//TODO: indexing at edges is currently invalid. Also need to do - s/2
+			var a_start = y<s/2 ? 0 : y-s/2;
+			var a_end = y +s/2 > H ? H : y+s/2;
+			var b_start = x<s/2 ? 0 : x-s/2;
+			var b_end = x +s/2 > W ? W : x+s/2;
+			
+			for(var a=a_start;a<a_end;a++)for(var b=b_start;b<b_end;b++)
+					im[a*W + b] = color; 
+		}
+		
+		var RenderSpikesForPath = function(color,slot_num,slot_generation){
+			// TODO: actually implement this. and also implement a queue so we can cancel all but most recent
+            
+			var im = new Uint32Array(POS_W*POS_H);
+			var s = slots[slot_num]
+			if(!s || s.generation != slot_generation)
+				return; // TODO: should push this render back on to the local queue for when we do have the slot inds
+				
+			var groupPosIndsXY = pick(spikePosBinXY_b,s.inds); //spikePosBinXY_b was stored as 2byte blocks, which is what we want here
+			groupPosIndsXY = new Uint8Array(groupPosIndsXY.buffer) // now use it as (x,y), 1 btye each
+			
+			for (var i=0;i<groupPosIndsXY.length;i++)
+				PlotPoint(im,POS_W,POS_H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
+
+			main.ShowIm(im.buffer,slot_num,[POS_W,POS_H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
+            
 		}
 	};
 	// ==== END OF WORKER ==========================
@@ -322,7 +375,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 
 	}
 
-	var LoadPosData = function(N_val, buffer,timebase,pixPerM){
+	var LoadPosData = function(N_val, buffer,timebase,pixPerM,scale_spikes_plot){
 		if(!N_val){
 			theWorker.SetPosData(null) //this clears the ratemap queue, clears the cut, and clears the stuff cached for doing ratemaps in future
 			//TODO: decide whether we need to send null canvases
@@ -330,11 +383,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		}
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
 		
-		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,BYTES_PER_POS_SAMPLE,POS_NAN,[buffer]);
+		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,[buffer]);
 
 	}
 	
-	var ShowIm = function(imBuffer,slotInd,sizeXY,generation){
+	var ShowIm = function(imBuffer,slotInd,sizeXY,generation,imType){
         var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
         var ctx = $canvas.get(0).getContext('2d');
 
@@ -342,7 +395,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		imData.data.set(new Uint8ClampedArray(imBuffer));
 		ctx.putImageData(imData, 0, 0);
 
-		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
+		switch(imType){
+			case IM_RATEMAP:
+				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
+				break;
+			case IM_SPIKES_FOR_PATH:
+				$canvas.toggleClass("poslayer",true);
+				SpikeForPathCallback($canvas);  //send the plot back to main
+				break;
+		}
+			
     }
 
     var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ // this = cut object
@@ -406,7 +468,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 		theWorker.SetBinSizeCm(v); //the worker will send back one hist for each slot that it has previously been sent
 	}
 
-
+	var RenderSpikesForPath = function(g){
+	    var color = PALETTE_FLAG[g];
+		var slot = cCut.GetGroup(g,true);
+		theWorker.RenderSpikesForPath(color,slot.num,slot.generation);
+	}
 	
 	var FileStatusChanged = function(status,filetype){
 		if(filetype == null){
@@ -426,14 +492,24 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 
 		if(filetype == "pos"){
 			var posHeader = ORG.GetPosHeader();
-			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre));
+            
+            // work out scale factor for spike pos plot (in spatial panel)
+            var xs = POS_W/(parseInt(posHeader.window_max_x)-parseInt(posHeader.window_min_x));
+            var ys = POS_H/(parseInt(posHeader.window_max_y)-parseInt(posHeader.window_min_y));
+                
+			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
+                        parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre),
+                        xs<ys? xs: ys /*min of the two*/);
 			if(status.cut == 3 && status.tet == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
 				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
 		}
 			
 	}
 
-	var theWorker = BuildBridgedWorker(workerFunction,["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetImmutable*"],["ShowIm*"],[ShowIm]);
+	var theWorker = BuildBridgedWorker(workerFunction,
+										["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetImmutable*","RenderSpikesForPath"],
+										["ShowIm*"],[ShowIm],
+										WORKER_CONSTANTS);
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 	
 	ORG.AddCutChangeCallback(SlotsInvalidated);
@@ -441,8 +517,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,CanvasUpdateCallbac
 	
 	return {
 		SetShow: SetShow,
-		SetCmPerBin: SetCmPerBin
+		SetCmPerBin: SetCmPerBin,
+		RenderSpikesForPath: RenderSpikesForPath
 	}
 
-}(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG)
+}(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
+  T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG,
+  T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
+  new Uint32Array(T.PALETTE_FLAG.buffer))
 

@@ -134,7 +134,7 @@ T.Tool.DocumentMouseMove_Merger = function(event){
 		return;
 		
 	var left = m.lastClientX + m.off_left - m.extraBorderSize;
-	var top = m.lastClientY + m.off_top + m.$parent.scrollTop() - m.extraBorderSize;
+	var top = m.lastClientY + m.off_top + m.$parent.scrollTop() - m.extraBorderSize; 
 	T.Tool.activeMerger.$h.translate(left, top);
 }
 T.Tool.DocumentMouseUp_Merger = function(event){

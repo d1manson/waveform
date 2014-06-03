@@ -65,6 +65,10 @@ T.PlotPos = function(){
 	ctx.stroke();
 }
 
+T.SpikeForPathCallback = function($canv){
+	T.$pos_overlay.replaceWith($canv);
+	T.$pos_overlay = $canv;
+}
 
 T.FinishedLoadingFile = function(status,filetype){
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
@@ -739,7 +743,9 @@ T.SetGroupOver = function(g){
 		T.groupOver.$tile.removeAttr('active');
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.removeAttr('active');
-		
+	
+    T.$pos_overlay.get(0).getContext('2d').clearRect( 0 , 0 , T.POS_PLOT_WIDTH ,T.POS_PLOT_HEIGHT );
+    
 	T.groupOver.g = g;
 	if(!(g==0 || g>0))
 		return;
@@ -747,6 +753,7 @@ T.SetGroupOver = function(g){
 	T.groupOver.$clusterSticker = T.$cluster_info.find('.cluster-sticker[data-group=' + g + ']');
 	T.groupOver.$tile = T.tiles[g] ? T.tiles[g].$ : null;
 	
+    T.RM.RenderSpikesForPath(g);
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.attr('active',true);
 	if(T.groupOver.$tile)
@@ -759,6 +766,7 @@ $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
+T.$pos_overlay = $('#posoverlay');
 T.$mask = $('.mask');
 T.tiles = [];
 T.$actionList = $('.action_list');
