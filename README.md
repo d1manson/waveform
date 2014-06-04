@@ -9,15 +9,17 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the url from ``dev`` to e.g. ``23`` to access version 23 (the version number is incremented at vaguely sensible points during development).  Alternatively look back through the full git history to find what you need.
 
 ### Screenshots
-Example view of the application, with a few things labeled:    
+Example view of the whole application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
+Some screenshots of individual features:     
 
-|                                   |                                                            |
-|:----------------------------------|:----------------------------------------------------------:|
-|Merger tool                        | ![mergetool](/mergertool.png "merger tool")                |
-|Splitter tool                      | ![splittertool](/splittertool.png "splitter tool")         |
-|Cluster painting tool              | ![density](/countmode.png "rendinering in 'density' mode") |        
-|Cluster rendering in "drift" mode  | ![density](/drift.png "clusters rendered in drift mode")   |  
+|                                   |                                         |
+|:----------------------------------|:---------------------------------------:|
+|Merger tool                        | ![mergetool](/mergertool.png)           |
+|Splitter tool                      | ![splittertool](/splittertool.png)      |
+|Cluster painting tool              | ![paintingtool](/clusterpainting.png)  |        
+|ave rendering in  "density" mode   | ![density](/countmode.png)              |  
+|Cluster rendering in "drift" mode  | ![drift](/drift.png)                    |  
 
 
 ### Quickstart
