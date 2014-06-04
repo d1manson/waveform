@@ -4,7 +4,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 
 To use the application, just download the code and open index.html in your browser.  Alternatively, for the latest fairly stable version, [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/).  You can also see the (very unstable) dev version [here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev).
 
-![screenshot](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/screenshot1.png)
+![screenshot](/screenshot1.png "screenshot with labels")
 
 ## Quickstart
 **Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.
