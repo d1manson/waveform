@@ -2,27 +2,26 @@
 
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
 
-**To use the application do one of the following:**
+#### To use the application do one of the following:**
 + go to [d1manson.github.io/waveform](http://d1manson.github.io/waveform) for the latest fairly stable version
 + go to [googledrive.com/...XNVE/dev/](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
 + if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the url from ``dev`` to e.g. ``23`` to access version 23 (the version number is incremented at vaguely sensible points during development).  Alternatively look back through the full git history to find what you need.
 
-### Screenshots
+#### Screenshots
 Example view of the whole application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
 Some screenshots of individual features:     
-
 |                                   |                                         |
 |:----------------------------------|:---------------------------------------:|
 |Merger tool                        | ![mergetool](/mergertool.png)           |
 |Splitter tool                      | ![splittertool](/splittertool.png)      |
 |Cluster painting tool              | ![paintingtool](/clusterpainting.png)  |        
-|ave rendering in  "density" mode   | ![density](/countmode.png)              |  
+|Wave rendering in  "density" mode   | ![density](/countmode.png)              |  
 |Cluster rendering in "drift" mode  | ![drift](/drift.png)                    |  
 
 
-### Quickstart
+#### Quickstart
 **Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.
 
 **Viewing the data.**
@@ -44,7 +43,7 @@ Using the drift button (shortcut `d`) you can see whether there was any shift in
 **Using the floating panes**
 There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
 
-### Keyboard shortcuts.** 
+#### Keyboard shortcuts
 + `escape` open/close side pannel.
 + `a`  do autocut. 
 + `p` cycle palette. 
@@ -64,7 +63,7 @@ There are several floating info panes that appear when you put your cursor over 
 In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
 
 
-### Change Log
+#### Change Log
 * Added a raw spike rendering feature to the spatial panel.
 * Added cluster painter tool.
 * Added a grabbing feature for easy comparisons across trials/cuts.
@@ -96,7 +95,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 * A heirarchical autoclusering method has been partially implemented. See below. 
 * Can now drag cut file back onto the desktop to save it. 
 
-### Understanding the code
+#### Understanding the code
 
 With the exception of `Mlib.js`, `utils.js`, and `bridged-worker.js`, all JavaScript objects are either kept in the namespace `T` or in one of the following sub-namespaces (each of which has its own appropriately named `.js` file):
 * `T.ORG` - organizes data files for multiple experiments, multiple tetrodes within the same experiment, and multiple cuts for the same tetrode. To do this it has some interaction with the [DOM](http://www.w3schools.com/htmldom/).  Many of the other modules register listeners on this module using `AddFileStatusCallback`, `AddCutChangeCallback`, and `AddCutActionCallback`.
@@ -133,7 +132,7 @@ In most browsers you can press F12 to gain access to the developer tools, which 
 
 Oh, and if you've got this far and are still not sure whether JavaScript has anything to do with Java, let me teach you the number one JavaScript fact: JavaScript and Java having nothing in common (beyond the fact they are both programming languages that begin with the letters j-a-v-a).
 
-### A bit more detail about data structures
+#### A bit more detail about data structures
 A good GUI is highly interactive and responsive, even when it is doing heavy processing or rendering, however achieving this in code can be pretty complicated.  Here we explain a couple of steps that have been taken to ensure the GUI is responsive:
 * Whenever we switch experiment, tetrode or cut, the `T.ORG` module loads only the minimal number of new files.  It uses `T.PAR` to load and parse the files (which is done with a worker on another thread). As the files become available the callbacks registered with `AddFileStatusCallback` are informed. These callbacks recieve a `status` object with one field for each of the filetypes (`pos`,`set`,`tet`, and `cut`) and a `filetype` string to say which file has just been loaded (or `null` if this is a "heads-up" occurring at the start of a load).  The four `status` fields store an integer with the following meanings:
   * 0 - file does not exist
@@ -143,7 +142,7 @@ A good GUI is highly interactive and responsive, even when it is doing heavy pro
 * One of the main features of the GUI is its ability to modify cut groups.  This should be a fluid process with no major delays or unresponsiveness. In order to achieve this, the `CUT` class keeps a list of immutable `cutInds` arrays.  Whenever one of these cutInds arrays needs to be modified, we create a new immutable and remove the old one.  Each immutable has a history of cut groups associated to it.  This makes it easy for the waveform rendering module (and other modules) to avoid doing unnecessary work.  A slight detail in the way the immutables are implemented is that they each occupy a "slot" in an array of slots.  When immutables are deleted and created, slots get reused (this prevents the array of immutables from growing too large).  Thus in order to distinguish between all the immutables that occupy a given slot over time, we have an extra property, which is the `generation` of the immutable in the slot. 
 * Rendering the waves is done on a hidden canvas using WebGL, the resulting images are then copied to small visible canvases on the page.  When the tetrode data is first loaded, it gets copied across to the GPU so that it can be used quickly during rendering.  Every effort is made to ensure that redundant rendering is avoided (making use of the immutable cut slot structure).  When we do need to render, a special vector is created that gives the x and y offset on the offscreen canvas for each wave, plus a colormap index for the wave.  We render a line from `t` to `t+1` for every single wave simultaneously, then increment `t` and render the next line (there are 50 points on the wave so 49 lines to be drawn per channel).  The rendering is done this way as it minimises the amount of data that needs to be written to the gpu for each render, it also makes for a very simple vertex shader.
 
-### Autocut    
+#### Autocut    
 **[Under active development, info may not be up to date]**  
 The implementation is only partially complete: it just uses the data from the currently viewed channel (i.e. you cannot cut on multiple channels); more importantly, it only produces clusters for a random sample of 1024*6 spikes.
 Getting this far took quite a bit of effort, but finishing off the method should be relatively easy (though will likely still take a reasonable amount of time to code).
