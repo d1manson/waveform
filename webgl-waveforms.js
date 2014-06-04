@@ -203,25 +203,68 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		gl.vertexAttribPointer(locs.waveColorTex, 1, gl.UNSIGNED_BYTE, true, 3, 2); 
 	}
 
+	var Int8ToUint8 = function(A){
+		// Takes an int8array, A, adds 128 to each element and views it as a uint8 array.
+		// this is done inplace.
+		// See http://en.wikipedia.org/wiki/Signed_number_representations for info.
+		// We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
+		A = new Uint32Array(A.buffer); 
+		for(var i=0;i<A.length;i++)
+			A[i] ^= 0x80808080;
+		return new Uint8Array(A.buffer);
+	}
+	
+	var BuildVoltageDataBuffers_sub = function(oldData,newData,N){
+		// This is "version 2" of this code, we now read from oldData continguously,
+		// and write out in strides, whereas previously we wrote out contiguously 
+		// and read in strides.  This is roughly 4x faster, but still seems slower 
+		// than it ought to be.  ~80ms for 80k spikes, i.e. only 1k spikes per ms for large N.
+		// Note that what we are doing is similar to a transpose in terms of memory movement.
+		var q = -1;
+		var N2 = 2*N;
+		for(var i=0;i<N;i++){ //for each spike
+			var p = 2*i;
+			for(var c=0;c<4;c++){ //for each channel
+				q += 5;
+				for(var t=0;t<50-1;t++){ //for each time point (except the last one)
+					p += N2;
+					newData[p ] = oldData[q];
+					newData[p | 1] = oldData[++q]; // p is an even number, so p|1 is p+1
+				}
+			}
+		}
+	}
+	
+	var BuildVoltageDataBuffers = function(buffer,N){
+		// see UploadVoltage
+		var oldData = new Int8Array(buffer);
+		var newData = new Int8Array(4*(50-1)*N*2); //times 2 because each line has two ends
+		
+		BuildVoltageDataBuffers_sub(oldData,newData,N);
+		newData = Int8ToUint8(newData);
+			
+		var allBuffers = [];
+		for(var c=0; c<4;c++){ //for each channel
+			for(var t=0;t<50-1;t++){ //for each time point (except the last one)
+				var start = ((50-1)*c + t)*2*N;
+				allBuffers.push(newData.subarray(start,start+2*N));
+			}
+		}
+		
+		return allBuffers;
+	}
+	
 	var UploadVoltage = function(buffer){
         //Fills the array of 196 webgl array buffers with vectors 2n in length, and of the form: v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)
 		//For each of the 4 channels, t goes from 0 to 48, which is why we have 49*4 = 196 buffers.
 
-		var N2 = 2*N;	
-        var oldData = new Int8Array(buffer);
-		var cBuffer = new Uint8Array(N2);
-
+		var preparedData = BuildVoltageDataBuffers(buffer,N);
+		
     	for(var c=0; c<4;c++){ //for each channel
 			for(var t=0;t<50-1;t++){ //for each time point (except the last one)
-				var p = (50+4)*c + 4 + t; //pointer to the t'th voltage sample on channel c for the first spike
-				for(var i=0; i<N; i++){ //for each spike
-					cBuffer[i*2 + 0] = 128 + oldData[p]; 
-					cBuffer[i*2 + 1] = 128 + oldData[p+1];
-					p += (50+4)*4; //step through to the same point in the next spike
-				}
 				//upload the current buffer to the gpu.  
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffs.voltage[(50-1)*c + t]);
-				gl.bufferData(gl.ARRAY_BUFFER,  cBuffer, gl.STATIC_DRAW); //It is more static than the waves buffer, but it does change when we switch tets.
+				gl.bufferData(gl.ARRAY_BUFFER,  preparedData[(50-1)*c+t], gl.STATIC_DRAW); //It is more static than the waves buffer, but it does change when we switch tets.
 			}
     	}
 
