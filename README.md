@@ -12,11 +12,12 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 Example view of the application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
 
-Merger tool: ![mergetool](/mergertool.png "merger tool")   
-Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
-Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool")     
-Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")         
-Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode")     
+|                                   |                                                            |
+|:----------------------------------|:----------------------------------------------------------:|
+|Merger tool                        | ![mergetool](/mergertool.png "merger tool")                |
+|Splitter tool                      | ![splittertool](/splittertool.png "splitter tool")         |
+|Cluster painting tool              | ![density](/countmode.png "rendinering in 'density' mode") |        
+|Cluster rendering in "drift" mode  | ![density](/drift.png "clusters rendered in drift mode")   |  
 
 
 ### Quickstart
