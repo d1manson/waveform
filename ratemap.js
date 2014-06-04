@@ -326,7 +326,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 
 		var PlotPoint = function(im,W,H,x,y,s,color){
-			//TODO: indexing at edges is currently invalid. Also need to do - s/2
 			var a_start = y<s/2 ? 0 : y-s/2;
 			var a_end = y +s/2 > H ? H : y+s/2;
 			var b_start = x<s/2 ? 0 : x-s/2;
@@ -337,7 +336,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 		
 		var RenderSpikesForPath = function(color,slot_num,slot_generation){
-			// TODO: actually implement this. and also implement a queue so we can cancel all but most recent
+			// TODO: implement a queue so we can cancel all but most recent
             
 			var im = new Uint32Array(POS_W*POS_H);
 			var s = slots[slot_num]

@@ -3,8 +3,10 @@
 
 T.CP = function($canvasParent,ORG){
 
-	//TODO: it may be woth moving the plotting into a worker
-
+	//TODO: it may be woth moving the plotting into a worker..could also do the painting and mouse-over-group detection in the worker.
+    // for the painting it might be best to send the finished painted overlay to the worker for processing rather than trying to paint
+    // manually or something in the worker.
+    
 	var cCut = null;
 	var amps = null;
 	var ctxes = [];
@@ -368,12 +370,23 @@ T.CP = function($canvasParent,ORG){
         cssSize = s;
     }
     
+    var ClusterStickerMouseDown = function(e){
+        var g = parseInt($(this).attr('data-group'));
+        if(e.button == 2 || e.altKey)
+            T.Tool.PainterSrc_Toggle(g);
+        else
+            T.Tool.SetPainterDestGroup(g);
+    }
+
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
-	T.$cluster_panel.on("mousemove","canvas",ClusterPlot_MouseMove);
-	T.$cluster_panel.on("mouseout","canvas",function(){	T.SetGroupOver(-1)});
-	T.$cluster_info.on('mouseover','.cluster-sticker',function(){T.SetGroupOver($(this).attr('data-group'));});
-	T.$cluster_info.on("mouseout",".cluster-sticker",function(){T.SetGroupOver(-1)});
+	T.$cluster_panel.on({"mousemove": ClusterPlot_MouseMove,
+						  "mouseout": function(){T.SetGroupOver(-1)}
+						},"canvas");
+	T.$cluster_info.on({'mouseover': function(){T.SetGroupOver($(this).attr('data-group'));},
+					    "mouseout" : function(){T.SetGroupOver(-1)},
+						"mousedown" : ClusterStickerMouseDown
+						},'.cluster-sticker');
 	
 	return {BringGroupToFront: BringGroupToFront,
 			SetRenderMode: SetRenderMode,
