@@ -55,7 +55,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 ## Some screenshots
 Merger tool: ![mergetool](/mergertool.png "merger tool")   
 Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
-Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool") 
+Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool")     
 Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")         
 Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode")     
 
