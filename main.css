@@ -214,7 +214,8 @@ background: #e6e6e6;
 color: #888;
 z-index: 100;
 }
-.file_drop_text{
+.file_drop_text,
+.tilewall_text{
 margin: auto;
 position: absolute;
 height: 100px;
@@ -223,7 +224,9 @@ top: 0px;
 left: 0px;
 right: 0px;
 }
-
+.tilewall_text{
+text-align: center;
+}
 .action{
 color: #900;
 border: 1px solid #900;

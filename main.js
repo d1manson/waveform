@@ -72,10 +72,12 @@ T.SpikeForPathCallback = function($canv){
 
 T.FinishedLoadingFile = function(status,filetype){
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
-
+	if(T.ORG.GetExpName())
+		T.$tilewall_text.hide();
+		
 	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
 
-	if(filetype == null){
+	if(filetype == null){	
 		if(status.tet < 3){
 			T.PlotPos();
 		}
@@ -88,11 +90,9 @@ T.FinishedLoadingFile = function(status,filetype){
 		}
 	}
 
-
 	if(filetype == "pos"){
 		T.PlotPos();
 	}
-
 
 }
 
@@ -770,7 +770,8 @@ T.$pos_overlay = $('#posoverlay');
 T.$mask = $('.mask');
 T.tiles = [];
 T.$actionList = $('.action_list');
-T.$drop_zone = $('.file_drop');				 			 
+T.$drop_zone = $('.file_drop');			
+T.$tilewall_text = $('.tilewall_text');	 			 
 T.$info_panel = $('#info_panel');
 T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
