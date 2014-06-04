@@ -5,6 +5,7 @@
 //I'm not sure what this means for switching around bytes in the shader.
 //I read that most (?) GPUs use BGRA internally and may use the CPU to convert.
 
+var T = T || {};
 
 T.DM = function(){ 
 
