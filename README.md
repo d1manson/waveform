@@ -44,6 +44,8 @@ There are several floating info panes that appear when you put your cursor over 
 + `Enter` increment destination group number for cluster painting.
 + `s` launch group swap dialog for group under cursor.
 + `Space` hold down `space` and click plots to grab them, or click existing floating dialogues to close them.
++ `+` and `-` change size of cluser plots. (Note that `+` is actually the `=` key.)
++ `?` view help info, which basically just list these shortcuts. (Note that `?` is actually the `/` key.)
 + `ctrl+shift+q` reset everything and refresh the page (hopefully never need to do this).
 
 **Right clicking with a touchpad**
