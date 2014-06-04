@@ -3,10 +3,10 @@
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
 
 **To use the application do one of the following:**
-+ [click here](https://rawgit.com/d1manson/waveform/master/index.html) for the latest fairly stable version
++ [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/) for the latest fairly stable version
 + [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
 + download the code and open index.html in your browser.
-+ if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the of url e.g. ``.../dev/?exp=...`` can be changed to ``.../23/?exp=...`` to access version 23.
++ if you want an older "stable" version you can click the link for the stable version above and change the folder at the end of the of url e.g. ``.../26/?exp=...`` can be changed to ``.../23/?exp=...`` to access version 23.
 
 ![screenshot](/screenshot1.png "screenshot with labels")
 
