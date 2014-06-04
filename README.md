@@ -2,7 +2,10 @@
 
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
 
-To use the application, just download the code and open index.html in your browser.  Alternatively, for the latest fairly stable version, [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/).  You can also see the (very unstable) dev version [here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev).
+**To use the application do one of the following:**
++ [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/) for the latest fairly stable version
++ [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
++ download the code and open index.html in your browser.
 
 ![screenshot](/screenshot1.png "screenshot with labels")
 
