@@ -6,6 +6,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/) for the latest fairly stable version
 + [click here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
 + download the code and open index.html in your browser.
++ if you want an older "stable" version you can click the link for the stable version above and change the folder at the end of the of url e.g. ``.../26/?exp=...`` can be changed to ``.../23/?exp=...`` to access version 23.
 
 ![screenshot](/screenshot1.png "screenshot with labels")
 
@@ -36,10 +37,12 @@ There are several floating info panes that appear when you put your cursor over 
 **Right clicking with a touchpad**
 In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
 
-Merger tool: ![mergetool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/mergertool.png)   
-Splitter tool: ![splittertool](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/splittertool.png)      
-Wave rendering in  "density" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/countmode.png)     
-Cluster rendering in "drift" mode: ![density](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/drift.png)      
+Merger tool: ![mergetool](/mergertool.png "merger tool")   
+Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
+Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool") 
+Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")     
+Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode") 
+
 
 ## Change Log
 * Added cluster painter tool.
