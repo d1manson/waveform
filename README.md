@@ -8,6 +8,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
 + if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the url from ``dev`` to e.g. ``23`` to access version 23 (the version number is incremented at vaguely sensible points during development).  Alternatively look back through the full git history to find what you need.
 
+**A labeled screenshot:**
 ![screenshot](/screenshot1.png "screenshot with labels")
 
 ## Quickstart
