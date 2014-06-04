@@ -2,7 +2,7 @@
 
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
 
-#### To use the application do one of the following:**
+#### To use the application do one of the following:
 + go to [d1manson.github.io/waveform](http://d1manson.github.io/waveform) for the latest fairly stable version
 + go to [googledrive.com/...XNVE/dev/](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
