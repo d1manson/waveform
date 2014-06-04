@@ -2,7 +2,7 @@
 
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, TILE_CANVAS_NUM,ORG,
-                POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG){
+                POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
@@ -13,7 +13,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 							POS_W: POS_W,
 							POS_H: POS_H,
 							BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
-							POS_NAN: POS_NAN};						
+							POS_NAN: POS_NAN,
+							PALETTE_B: PALETTE_B};						
 
 	var workerFunction = function(){
         "use strict";
@@ -65,6 +66,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				ret[i] = numerator[i] / denominator[i];
 			return ret;
 		}
+		var rdivideFloatInPlace = function(numerator,denominator){
+			for(var i=0;i<numerator.length;i++)
+				numerator[i] /= denominator[i];
+		}
 		var IsZero = function(vector){
 			var result = new Uint8ClampedArray(vector.length);
 			for(var i=0;i<vector.length;i++)
@@ -112,6 +117,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
+		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
 		
 		var PALETTE = function(){
@@ -224,7 +230,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			
 		}
 
-        var SetTetData = function(tetTimesBuffer,N){
+        var SetTetData = function(tetTimesBuffer,N,expLenInSeconds_val){
             NewCut();
             if(!N){
 				spikeTimes = null;
@@ -232,11 +238,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				spikePosBinXY = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
+				expLenInSeconds = null;
 				return;
 			}
 						
         	spikeTimes = new Uint32Array(tetTimesBuffer);
-   
+			expLenInSeconds = expLenInSeconds_val;
+			
             if(posFreq != null){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
@@ -326,6 +334,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 
 		var PlotPoint = function(im,W,H,x,y,s,color){
+			/* sets a square point of size s x s in image im, with dimensions WxH to the value specified by color */
 			var a_start = y<s/2 ? 0 : y-s/2;
 			var a_end = y +s/2 > H ? H : y+s/2;
 			var b_start = x<s/2 ? 0 : x-s/2;
@@ -335,20 +344,53 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 					im[a*W + b] = color; 
 		}
 		
-		var RenderSpikesForPath = function(color,slot_num,slot_generation){
-			// TODO: implement a queue so we can cancel all but most recent
+		var PlotPoint2 = function(totals,counts,W,H,x,y,s,val){
+			/* This is like PlotPoints, but it takes two input "images", one which will accumulate counts and one
+			which will accumulate values, they can thus be divided at the end to get means. */
+			var a_start = y<s/2 ? 0 : y-s/2;
+			var a_end = y +s/2 > H ? H : y+s/2;
+			var b_start = x<s/2 ? 0 : x-s/2;
+			var b_end = x +s/2 > W ? W : x+s/2;
+			
+			for(var a=a_start;a<a_end;a++)for(var b=b_start;b<b_end;b++){
+					totals[a*W + b] += val; 
+					counts[a*W + b] += 1;
+			}
+		}
+		var RenderSpikesForPath = function(color,slot_num,slot_generation,asMeanT){
+			// TODO: implement a queue so we can cancel all but most recent ...doesn't really seem to be needed actually.
             
-			var im = new Uint32Array(POS_W*POS_H);
 			var s = slots[slot_num]
 			if(!s || s.generation != slot_generation)
 				return; // TODO: should push this render back on to the local queue for when we do have the slot inds
 				
 			var groupPosIndsXY = pick(spikePosBinXY_b,s.inds); //spikePosBinXY_b was stored as 2byte blocks, which is what we want here
+			var nSpks = groupPosIndsXY.length;
 			groupPosIndsXY = new Uint8Array(groupPosIndsXY.buffer) // now use it as (x,y), 1 btye each
 			
-			for (var i=0;i<groupPosIndsXY.length;i++)
-				PlotPoint(im,POS_W,POS_H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
-
+			if(asMeanT){
+				// Here we accumulate 1s for each spike marker in 2d (a 4x4 square), and separately accumulate spike times for the same marker
+				// Then divide the times by the counts to get the mean.  Finally we apply a pallete to the result.
+				
+				var counts = new Uint32Array(POS_W*POS_H);
+				var totalTimes = new Float32Array(POS_W*POS_H);
+				var groupSpikeTimes = pick(spikeTimes,s.inds);
+				for (var i=0;i<nSpks;i++)
+					PlotPoint2(totalTimes, counts, POS_W, POS_H, groupPosIndsXY[i*2+0], groupPosIndsXY[i*2+1], 4, groupSpikeTimes[i]);
+				var meanTimes = totalTimes; //we're going to do the division in place, so adopt a new variable name now...
+				rdivideFloatInPlace(meanTimes,counts);
+				
+				var factor = 256/1000/expLenInSeconds; //calculating colormap lookup factor
+				var im = counts; //we reuse the memory for the counts array, but read from it as we go...
+				for(var i=0;i<im.length;i++)
+					im[i] = counts[i] ? PALETTE_B[Math.floor(meanTimes[i] * factor)] : 0;  //apply colormap, leaving 0-alpha in pixels with no counts
+				
+			}else{
+				// This is the normal group sticker color plotting
+				var im = new Uint32Array(POS_W*POS_H);
+				for (var i=0;i<nSpks;i++)
+					PlotPoint(im,POS_W,POS_H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
+			}
 			main.ShowIm(im.buffer,slot_num,[POS_W,POS_H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
             
 		}
@@ -358,9 +400,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var cCut = null;
 	var show = [0];
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
+	var meanTMode = false;
 
-
-	var LoadTetData = function(N_val, tetTimes,timebase){
+	var LoadTetData = function(N_val, tetTimes,expLenInSeconds){
 		cCut = null;
         workerSlotGeneration = [];
 		if(!N_val){
@@ -370,7 +412,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 		tetTimes = M.clone(tetTimes); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
 		
-		theWorker.SetTetData(tetTimes.buffer,N_val,[tetTimes.buffer]);
+		theWorker.SetTetData(tetTimes.buffer,N_val,expLenInSeconds,[tetTimes.buffer]);
 
 	}
 
@@ -470,7 +512,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var RenderSpikesForPath = function(g){
 	    var color = PALETTE_FLAG[g];
 		var slot = cCut.GetGroup(g,true);
-		theWorker.RenderSpikesForPath(color,slot.num,slot.generation);
+		theWorker.RenderSpikesForPath(color,slot.num,slot.generation,meanTMode);
 	}
 	
 	var FileStatusChanged = function(status,filetype){
@@ -483,7 +525,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 		
 		if(filetype == "tet"){
-			LoadTetData(ORG.GetN(),ORG.GetTetTimes());
+			LoadTetData(ORG.GetN(),ORG.GetTetTimes(),parseInt(ORG.GetTetHeader().duration));
 			
 			if(status.cut == 3 && status.pos == 3) ///if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
 				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
@@ -505,6 +547,17 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			
 	}
 
+	var SetRenderMode = function(v){
+		//currently this only applies to the spikes plot
+		 switch(v){
+            case 2:
+                meanTMode = true;
+                break;
+            default:
+                meanTMode = false;
+        }
+	}
+	
 	var theWorker = BuildBridgedWorker(workerFunction,
 										["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetImmutable*","RenderSpikesForPath"],
 										["ShowIm*"],[ShowIm],
@@ -517,11 +570,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	return {
 		SetShow: SetShow,
 		SetCmPerBin: SetCmPerBin,
-		RenderSpikesForPath: RenderSpikesForPath
+		RenderSpikesForPath: RenderSpikesForPath,
+		SetRenderMode: SetRenderMode
 	}
 
 }(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
   T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
-  new Uint32Array(T.PALETTE_FLAG.buffer))
+  new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer))
 

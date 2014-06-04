@@ -706,6 +706,11 @@ T.DocumentReady = function(){
 T.DriftButtonClick = function(){
     T.clusterMode = T.clusterMode ? 0 : 2;
     T.CP.SetRenderMode(T.clusterMode);
+	T.RM.SetRenderMode(T.clusterMode);
+	
+	// TODO: it's a bit lame to do this here
+	if(T.groupOver.g >0 || T.groupOver.g==0)
+		T.RM.RenderSpikesForPath(T.groupOver.g);
 }
 
 T.BarMouseDown = function(e){
@@ -884,7 +889,7 @@ T.PALETTE_FLAG = function(){
     	data[29*4+0] = 153; data[29*4+1] = 50; data[29*4+2] = 204;
     	data[30*4+0] = 250; data[30*4+1] = 128; data[30*4+2] = 114;
         return data;
-    }();
+    }(); //Note incosistency..this is uint8, but palette_time is uint32..not a big deal though.
 T.PALETTE_FLAG_CSS = function(){
 	var ret = [];
 	
@@ -901,4 +906,14 @@ T.PALETTE_FLAG_CSS_TEXT = function(){
 		ret.push( black_list.indexOf(i) == -1 ? '#FFF' : '#000');
 		
 	return ret;
+}();
+
+T.PALETTE_TIME = function(){
+	var data = new Uint8Array(256*4);
+        for(var i=0;i<256;i++){
+			data[i*4 +0] = 256-i;  //decreasing red
+			data[i*4 +1] = i; //increasing green
+		    data[i*4+3] = 255; //set alpha to opaque
+		}
+		return new Uint32Array(data.buffer);
 }();

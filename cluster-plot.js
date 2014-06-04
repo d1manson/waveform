@@ -1,7 +1,7 @@
 "use strict"; 
 
 
-T.CP = function($canvasParent,ORG){
+T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG){
 
 	//TODO: it may be woth moving the plotting into a worker..could also do the painting and mouse-over-group detection in the worker.
     // for the painting it might be best to send the finished painted overlay to the worker for processing rather than trying to paint
@@ -21,54 +21,6 @@ T.CP = function($canvasParent,ORG){
     var meanTMode = false;
     var meanTModeIsRendered = false;
     
-	var PALETTE_FLAG = function(){ //duplicated in webgl-waveforms  TODO: put it in main
-        var data = new Uint8Array(256*4);
-        for(var i=0;i<256;i++)
-    		data[i*4+3] = 255; //set alpha to opaque
-        data[0*4+0] = 190;    data[0*4+1] = 190;    data[0*4+2] = 190; //was 220 for all three
-        data[1*4+2] = 200;
-    	data[2*4+0] = 80;	data[2*4+1] = 255;
-        data[3*4+0] = 255;
-        data[4*4+0] = 245;	data[4*4+2] = 255;
-    	data[5*4+1] = 75;	data[5*4+1] = 200;	data[5*4+2] = 255;
-        data[6*4+1] = 185;
-    	data[7*4+0] = 255;	data[7*4+1] = 185;	data[7*4+2] = 50;
-        data[8*4+1] = 150;	data[8*4+2] = 175;
-        data[9*4+0] = 150;	data[9*4+2] = 175;
-    	data[10*4+0] = 170;	data[10*4+1] = 170;
-    	data[11*4+0] = 200;
-    	data[12*4+0] = 255;	data[12*4+1] = 255;
-    	data[13*4+0] = 140;	data[13*4+1] = 140;	data[13*4+2] = 140;
-    	data[14*4+1] = 255; data[14*4+2] = 235;
-    	data[15*4+0] = 255; data[15*4+2] = 160;
-    	data[16*4+0] = 175; data[16*4+1] = 75; data[16*4+2] = 75;
-    	data[17*4+0] = 255; data[17*4+1] = 155; data[17*4+2] = 175;
-    	data[18*4+0] = 190; data[18*4+1] = 190; data[18*4+2] = 160;
-    	data[19*4+0] = 255; data[19*4+1] = 255; data[19*4+2] = 75;
-    	data[20*4+0] = 154; data[20*4+1] = 205; data[20*4+2] = 50;
-    	data[21*4+0] = 255; data[21*4+1] = 99; data[21*4+2] = 71;
-    	data[22*4+1] = 255; data[22*4+2] = 127;
-    	data[23*4+0] = 255; data[23*4+1] = 140;
-    	data[24*4+0] = 32; data[24*4+1] = 178; data[24*4+2] = 170;
-    	data[25*4+0] = 255; data[25*4+1] = 69; 
-    	data[26*4+0] = 240; data[26*4+1] = 230; data[26*4+2] = 140;
-    	data[27*4+0] = 100; data[27*4+1] = 149; data[27*4+2] = 237;
-    	data[28*4+0] = 255; data[28*4+1] = 218; data[28*4+2] = 185;
-    	data[29*4+0] = 153; data[29*4+1] = 50; data[29*4+2] = 204;
-    	data[30*4+0] = 250; data[30*4+1] = 128; data[30*4+2] = 114;
-        return new Uint32Array(data.buffer); //we're going to want to use it as 4byte words
-    }();
-
-	var PALETTE_B = function(){
-	    var data = new Uint8Array(256*4);
-        for(var i=0;i<256;i++){
-			data[i*4 +0] = 256-i;  //decreasing red
-			data[i*4 +1] = i; //increasing green
-		    data[i*4+3] = 255; //set alpha to opaque
-		}
-		return new Uint32Array(data.buffer);
-	}();
-
 	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ //this = cut object
 
 		if(!ready){
@@ -394,4 +346,4 @@ T.CP = function($canvasParent,ORG){
             SetSize: SetSize,
             GetSize: function(){return cssSize;}}; 
 
-} (T.$cluster_panel,T.ORG);
+} (T.$cluster_panel,T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer));
