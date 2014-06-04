@@ -32,6 +32,8 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Split a group.** Right click a group (and drag) to use the split tool.  This tool lets you specify a time and voltage threshold on which to split up a group (voltage threshold applied on a single channel).   The split is shown when you release the right mouse button, but you can right click again to adjust it. To finalise the split left click on the tilewall outside the two active tiles (or right click the tilewall to cancel the split).
 
+**Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts f/e to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift.   
+
 **Reorder the groups.** The button panel has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
 
 **Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.  Note that it is very much a work in progress, or rather an abandoned piece of work.
@@ -41,8 +43,8 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 **Checking for drift**
 Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).
 
-**Using the floating panes**
-There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
+**Grabbing plots**
+To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.  To close of a grabbed plot, hold down space again and click the plot.  The other floating info panes in the application (e.g. file header info) can also be closed by holding down space and clicking them.
 
 #### Keyboard shortcuts
 + `escape` open/close side pannel.
