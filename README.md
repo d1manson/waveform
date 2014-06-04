@@ -32,20 +32,37 @@ Using the drift button (shortcut `d`) you can see whether there was any shift in
 **Using the floating panes**
 There are several floating info panes that appear when you put your cursor over a button.  In most cases you can right click the given button to toggle its info pane on/off.
 
-**Keyboard shortcuts.** `escape` open/close side pannel. `a`  do autocut. `p` cycle palette. `ctrl+z` undo. `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr (can use `shift` to show multiple views as with the mouse).  `d` toggle drift mode rendering of the cluster plots. `ctrl+shift+q` reset everything and refresh the page.
+**Keyboard shortcuts.** 
++ `escape` open/close side pannel.
++ `a`  do autocut. 
++ `p` cycle palette. 
++ `ctrl+z` or just `z` undo.
++ `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr. Use `shift` to show multiple views (as when using the mouse in the button panel).
++ `d` toggle drift mode rendering of the cluster plots.
++ `f` select group under cursor as source (i.e. "From group") group for cluster painting. Use `shift` to select multiple.
++ `e` select group under cursor as destination (i.e. "Enter into group") group for cluser painting.
++ `Enter` increment destination group number for cluster painting.
++ `s` launch group swap dialog for group under cursor.
++ `Space` hold down `space` and click plots to grab them, or click existing floating dialogues to close them.
++ `ctrl+shift+q` reset everything and refresh the page (hopefully never need to do this).
 
 **Right clicking with a touchpad**
 In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
 
+
+## Some screenshots
 Merger tool: ![mergetool](/mergertool.png "merger tool")   
 Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
 Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool") 
-Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")     
-Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode") 
+Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")         
+Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode")     
 
 
 ## Change Log
+* Added a raw spike rendering feature to the spatial panel.
 * Added cluster painter tool.
+* Added a grabbing feature for easy comparisons across trials/cuts.
+* Tidied up the look and feel of the interface.
 * Added a new wave rendering mode which shows the densities.
 * Created a drift mode for rendering cluster plots.
 * Re-worked the `T.ORG` module so that you can now switch cuts/tets/exps more easily.
