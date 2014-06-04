@@ -12,6 +12,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 Example view of the whole application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
 Some screenshots of individual features:     
+
 |                                   |                                         |
 |:----------------------------------|:---------------------------------------:|
 |Merger tool                        | ![mergetool](/mergertool.png)           |
