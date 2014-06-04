@@ -8,8 +8,16 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
 + if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the url from ``dev`` to e.g. ``23`` to access version 23 (the version number is incremented at vaguely sensible points during development).  Alternatively look back through the full git history to find what you need.
 
-### A labeled screenshot:**
+### Screenshots
+Example view of the application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
+
+Merger tool: ![mergetool](/mergertool.png "merger tool")   
+Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
+Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool")     
+Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")         
+Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode")     
+
 
 ### Quickstart
 **Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.
@@ -51,14 +59,6 @@ There are several floating info panes that appear when you put your cursor over 
 
 **Right clicking with a touchpad**
 In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
-
-
-### Some more screenshots
-Merger tool: ![mergetool](/mergertool.png "merger tool")   
-Splitter tool: ![splittertool](/splittertool.png "splitter tool")      
-Cluster painting tool: ![density](/clusterpainting.png "cluster painting tool")     
-Wave rendering in  "density" mode: ![density](/countmode.png "rendinering in 'density' mode")         
-Cluster rendering in "drift" mode: ![density](/drift.png "clusters rendered in drift mode")     
 
 
 ### Change Log
