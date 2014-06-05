@@ -59,7 +59,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 		return c;
 	}();	
-
+    
+    var HEIGHT_SCALE = 0.5;
 	var locs = {}; //caches webgl uniform/attribute locations
 	var buffs = {}; //holds all the webgl buffers
 	var gl = {}; //the webgl instance for the offscreen canvas (that's where all rendering is done)
@@ -220,6 +221,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		// and read in strides.  This is roughly 4x faster, but still seems slower 
 		// than it ought to be.  ~80ms for 80k spikes, i.e. only 1k spikes per ms for large N.
 		// Note that what we are doing is similar to a transpose in terms of memory movement.
+        // TODO: can hopefully speed up by having two 16bit views on the oldDara, offset by 1 byte
+        // and view the new data also as 16bit...need two views on oldData for odd and even t.
+        // then one final t-iteration outside t loop. Not sure whether to use two views of newData,
+        // offset by 2N-bytes or whether to just keep the same number of (explicit) adds as we 
+        //currently have. ...seems this may not be possible without slicing the oldData in order to
+        //start an int16array offset byt 1 byte.
 		var q = -1;
 		var N2 = 2*N;
 		for(var i=0;i<N;i++){ //for each spike
@@ -690,7 +697,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		
 		return {ch: ch,
 				t: Math.round((x-xOffs[ch])/offCanv.dT),
-				v: 127- y/offCanv.waveH*255 //TODO: check if this is exactly correct
+				v: 127- y/offCanv.waveH*255/HEIGHT_SCALE //TODO: check if this is exactly correct
 				};
 	}
 	
@@ -852,7 +859,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 						$(offCanv.el).remove();
 					},
 			InitCopyProg: InitCopyProg, //for experimenting only, this is only supposed to be called once in normal operation
-			HEIGHT_SCALE: 0.5 //this factor tells main.js to scale the aspect ratio of canvases, by cutting the height in two.
+			HEIGHT_SCALE: HEIGHT_SCALE //this factor tells main.js to scale the aspect ratio of canvases, by cutting the height in two.
 			};
 
 }(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG, T.PALETTE_FLAG);
