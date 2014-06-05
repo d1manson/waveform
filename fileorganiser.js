@@ -616,6 +616,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 	ORG.RemoveFileStatusCallback = fileStatusCallbacks.remove;
 	ORG.GetTetBufferProjected = GetTetBufferProjected;
 	ORG.noProjection = true;
+	ORG.GetState = function(){return SimpleClone(cState)};
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS

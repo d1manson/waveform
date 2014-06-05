@@ -98,27 +98,32 @@ T.FinishedLoadingFile = function(status,filetype){
 
 
 T.DispHeaders = function(status,filetype){
+	if(T.$file_info_pane.attr("state") != "closed") //closed here confusingly means visible
+		return;
 	//TODO: move to separate module
-
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
+	console.time("DipsHeaders");
 	var headerTypeList = ["tet","cut","pos","set"];
 	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
 	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
-
+	var filterStr = T.$header_search.val().toLowerCase();
+	var filterOff = !filterStr;
 	for(var i=0,hdr=headerlist[0];i<headerlist.length;hdr=headerlist[++i])
-		if(hdr && filetype==headerTypeList[i]){
+		if(hdr && (filetype==headerTypeList[i] || status[headerTypeList[i]]>=2)){
 			var strbuilder = [];
 			var hdr = headerlist[i];
-			for(var k in hdr)if(hdr.hasOwnProperty(k))
-				strbuilder.push("<td class='header_field_name'>" + k + "</td><td class='header_field_value'>" + hdr[k] + '</td>');
-			T.$file_info[i].html(headernames[i] + "<table><tbody><tr>" + strbuilder.join("</tr><tr>") + "</tr></tbody></table>")
+			var keys = Object.keys(hdr);
+			for(var kk=0,k=keys[kk],k_val=hdr[k];kk<keys.length;kk++,k=keys[kk],k_val=hdr[k])
+				if(filterOff || ((""+k).toLowerCase().search(filterStr) != -1 || (""+hdr[k]).toLowerCase().search(filterStr) != -1))
+					strbuilder.push("<td class='header_field_name'>" + k + "</td><td class='header_field_value'>" + hdr[k] + '</td>'); //TODO: WARNING keys and vals are not escaped ARGH!!
+			
+			T.$file_info[i].get(0).innerHTML = "<div>" + headernames[i] + "<table><tbody><tr>" + strbuilder.join("</tr><tr>") + "</tr></tbody></table></div>"; //faster than using jquery
 			T.$file_info[i].show();
 		}else if(status[headerTypeList[i]]<2){
 			T.$file_info[i].hide();
 		}
-
-	T.FilterHeader();
+	console.timeEnd("DipsHeaders");
 }
 
 
@@ -603,13 +608,7 @@ T.ShowFileSystemLoaded = function(file_names){
 }
 
 T.FilterHeader = function(){
-	var str = T.$header_search.val().toLowerCase();
-	T.$info_panel.find('tr').each(function(){
-			if($(this).text().toLowerCase().search(str)==-1)
-				$(this).hide();
-			else
-				$(this).show()
-			})
+	T.DispHeaders(T.ORG.GetState());
 }
 
 T.UndoLastAction = function(){
@@ -766,6 +765,10 @@ T.SetGroupOver = function(g){
 		
 }
 
+T.ToggleHeaderInfo = function(){
+	T.ToggleElementState(T.$file_info_pane,true); 
+	T.DispHeaders(T.ORG.GetState());
+}
 
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
@@ -807,7 +810,8 @@ T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
-$('#file_headers_button').mousedown(T.ToggleElementState($('.file_info')));
+T.$file_info_pane = $('.file_info');
+$('#file_headers_button').mousedown(T.ToggleHeaderInfo);
 T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
@@ -829,7 +833,7 @@ key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],
 key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
 key('d',T.DriftButtonClick);
-key('h, alt+h',T.ToggleElementState($('.file_info')));
+key('h, alt+h',T.ToggleHeaderInfo);
 key('alt+a',T.ToggleElementState(T.$autocut_info));
 key('ctrl+z, z',T.UndoLastAction);
 key('alt+r',T.ToggleElementState($('.rm_info')));
