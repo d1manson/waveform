@@ -27,7 +27,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		var c = { //The following are all in units of actual pixels
 				   W: 512, // full width 
 				   H: 512, // full height
-				   waveH: 128, //height of a wave
+				   waveH: 256, //height of a wave
 				   dT: 2, //distance from t to t+1 on the wave
 				   waveGap: 2 //horizontal gap between waves
 				   }
@@ -851,7 +851,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 					else 
 						$(offCanv.el).remove();
 					},
-			InitCopyProg: InitCopyProg //for experimenting only, this is only supposed to be called once in normal operation
+			InitCopyProg: InitCopyProg, //for experimenting only, this is only supposed to be called once in normal operation
+			HEIGHT_SCALE: 0.5 //this factor tells main.js to scale the aspect ratio of canvases, by cutting the height in two.
 			};
 
 }(T.CutSlotCanvasUpdate,T.CANVAS_NUM_WAVE, T.ORG, T.PALETTE_FLAG);

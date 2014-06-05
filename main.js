@@ -248,7 +248,7 @@ T.ApplyCanvasSizes = function(){
 	var i = T.tiles.length;
 	while(i--)if(T.tiles[i]){
 		var $c = T.tiles[i].$.find('canvas').eq(0);
-		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING  + 'px'});
+		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE  + 'px'});
 	}
 }
 
@@ -288,7 +288,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
         switch (canvasNum){
 			case T.CANVAS_NUM_WAVE:
 				xF = T.xFactor*T.SPECIAL_SCALING;
-				yF = T.yFactor*T.SPECIAL_SCALING;
+				yF = T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE;
 				break;
 			case T.CANVAS_NUM_RM:
 				xF = T.SPECIAL_SCALING_RM;
