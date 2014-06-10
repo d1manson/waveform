@@ -5,6 +5,13 @@
 // each with an array of tetrodes.
 // It is also responsible for content and interactivity of the files pannel div.
 
+// TODO: implement a cache that alows other modules to store stuff with each tet/exp and later
+// retrieve it.  Will probably need to have some sort of mechanism for kicking stuff out the cache
+// or it could get stupidly big when examining loads of tet/exps.
+// The main things that would benefit form the cache are related to the full spike data, i.e.
+// the raw buffer read off disk, the webgl-waveforms voltage buffers, and possibly the amplitudes.
+// Implementing these should roughly cut the switching time in half for going back to a previously
+// looked at exp-tet. 
 var T = T || {};
 
 T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the T.ORG object was created by cut.js, here we add a lot more to it

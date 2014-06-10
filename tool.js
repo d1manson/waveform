@@ -6,14 +6,22 @@ T.TILE_MOVING_BORDER_WIDTH = 10;
 T.WIDGET_CENTRE_RAD = 10;
 T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
 
+T.Tool.STATES_ENUM = {
+NOTHING: "nothing",
+SPLITTER: "splitter",
+MERGER: "merger",
+PAINTER: "painter",
+GRABBER: "grabber"}; //TODO: make sure this is used everywhere it should be
+T.Tool.State = T.Tool.STATES_ENUM.NOTHING;
+
 /* =================== GENERAL =================== */
 T.TileMouseDown = function(event){
 	$(this).toggleClass('shake',false); //clear any existing dragging animation
-	if(T.Tool.GrabIt_active) return; //TODO: this is a bit of a clumsy hack, but it'll work for now.
+	if(T.Tool.State == T.Tool.STATES_ENUM.GRABBER) return; 
 	T.CP.BringGroupToFront($(this).data("group_num"))
-	if(T.Tool.activeSplitter && (event.button == 2 || event.altKey)){
+	if(T.Tool.State == T.Tool.STATES_ENUM.SPLITTER && (event.button == 2 || event.altKey)){
 		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
-	}else{ 
+	}else if(T.Tool.State == T.Tool.STATES_ENUM.NOTHING){ 
 		if(event.button == 2 || event.altKey)
 			T.Tool.TileMouseDown_BeginSplitter.call(this,event);
 		else if (event.button == 0)
@@ -102,6 +110,7 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 							extraBorderSize: -parseInt($h.css("border-left-width")),//we assume its got same borders all round
 							lastClientX: event.clientX,
 							lastClientY: event.clientY};
+	T.Tool.State = T.Tool.STATES_ENUM.MERGER;
 	$p.insertAfter($h);
 	$h.css({position:'absolute'})
 	  .attr("moving",true); //among other things this means it no longer gets mouse events
@@ -137,7 +146,9 @@ T.Tool.DocumentMouseMove_Merger = function(event){
 	var top = m.lastClientY + m.off_top + m.$parent.scrollTop() - m.extraBorderSize; 
 	T.Tool.activeMerger.$h.translate(left, top);
 }
-T.Tool.DocumentMouseUp_Merger = function(event){
+T.Tool.DocumentMouseUp_Merger = function (event) {
+    if (event.button != 0)
+        return;
 	//this happens on an abandonded merge (otherwise the target tile would intercept the event)
 	T.Tool.EndMerger();
 }
@@ -154,6 +165,7 @@ T.Tool.EndMerger = function(){
 					.removeAttr('proximate');
 	T.$tilewall.removeAttr('tilemoving');
 	delete T.Tool.activeMerger;
+	T.Tool.State = T.Tool.STATES_ENUM.NOTHING;
 }
 
 T.Tool.TileMouseLeaveEnter_MergerTarget = function(event){
@@ -180,7 +192,9 @@ T.Tool.TileMouseMove_MergerTarget = function(event){
 	
 }
 T.Tool.TileMouseUp_MergerTarget = function(event){
-	//Successful merger
+    //Successful merger
+    if (event.button != 0)
+        return;
 	var ind_a = T.Tool.activeMerger.$h.data("group_num");
 	var ind_b = $(this).toggleClass('shake',true)
 					   .data("group_num");
@@ -235,8 +249,10 @@ T.Tool.TileMouseDown_BeginSplitter = function(event){
 							 $b: null,
 							 cut: cut,
 							 splitDone: false,
-							 downOn: 'a'};
-
+							 downOn: 'a',
+	                         buttonUsed: event.button};
+	T.Tool.State = T.Tool.STATES_ENUM.SPLITTER;
+	
 	$.each(T.tiles,function(){this.$.attr('disabled','true');})
 	T.tiles[g].$.removeAttr('disabled')
 				.attr('splitting','true')
@@ -248,10 +264,15 @@ T.Tool.TileMouseDown_BeginSplitter = function(event){
 	event.stopPropagation();
 }
 
-T.Tool.TileMouseDown_ContinueSplitter = function(event){
+T.Tool.TileMouseDown_ContinueSplitter = function (event) {
+    event.stopPropagation();
+ 
 	// this can be called for tile a or tile b
 	var $this = $(this);
 	var s = T.Tool.activeSplitter;
+	if (s.downOn != null)
+	    return;
+	s.buttonUsed = event.button;
 	s.downOn = $this.data('group_num') == s.a ? 'a' : 'b'; 
 	
 	// (re)attach the  mousemove and mouseup handlers (which get removed on mouseup)
@@ -259,14 +280,15 @@ T.Tool.TileMouseDown_ContinueSplitter = function(event){
 	$(document).on('mouseup',T.Tool.DocumentMouseUp_Splitter);
 	
 	T.Tool.TileMouseMove_Splitter.call(this,event); //update the location of the widgets
-	event.stopPropagation();
 }
 
-T.Tool.DocumentMouseUp_Splitter = function(event){
-	var s = T.Tool.activeSplitter;
+T.Tool.DocumentMouseUp_Splitter = function (event) {
+    event.stopPropagation();
+    var s = T.Tool.activeSplitter;
+    if (s.downOn == null || s.buttonUsed != event.button)
+        return;
 	T.tiles[s.downOn=='a' ? s.a : s.b].$.off("mousemove",T.Tool.TileMouseMove_Splitter);	
 	$(document).off('mouseup',T.Tool.DocumentMouseUp_Splitter);
-	event.stopPropagation();
 	
 	var $canv = s.downOn=='a' ? s.$a : s.$b;
 	var offset = $canv.offset(); 
@@ -341,8 +363,11 @@ T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
 	
 }
 
-T.Tool.TileWallMouseDown_Splitter = function(event){
-	var s = T.Tool.activeSplitter;
+T.Tool.TileWallMouseDown_Splitter = function (event) {
+    event.stopPropagation();
+    var s = T.Tool.activeSplitter;
+    if (s.downOn != null)
+        return;
 	s.$svg_a.remove();
 	if(s.$svg_b)
 		s.$svg_b.remove(); 
@@ -357,8 +382,8 @@ T.Tool.TileWallMouseDown_Splitter = function(event){
 	if(T.Tool.activeSplitter && (event.button == 2 || event.altKey))
 		s.cut.Undo();
 	
+	T.Tool.State = T.Tool.STATES_ENUM.NOTHING;
 	T.Tool.activeSplitter = null;
-	event.stopPropagation();
 }
 
 T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
@@ -379,8 +404,6 @@ T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
 
 /* ========================= PLOT-GRABBER ================== */
 //TODO: this shouldnt really be in this file. it is really better grouped with main
-T.Tool.GrabIt_active = false;
-
 T.Tool.$GrabIt_Css = $("<style>.grabbable:hover:after, .floatinginfo:hover:after{position: absolute; left:0px; top:0px; display: block; width: 100%; height: 100%; border: 3px solid #F00; box-sizing:border-box;-moz-box-sizing:border-box;background: rgba(255,255,255,0.5); content: ' ';cursor:pointer !important;}.floatinginfo:hover:after{background: rgba(255,200,200,0.5);}</style>");
 
 T.Tool.GrabIt = function(){
@@ -407,9 +430,9 @@ T.Tool.GrabIt = function(){
 }
 
 T.Tool.GrabIt_DocumentKeyDown = function(e){
-	if (e.which != 32 || T.Tool.GrabIt_active)
+	if (e.which != 32 || T.Tool.State == T.Tool.STATES_ENUM.GRABBER)
 		return;
-	T.Tool.GrabIt_active = true
+	T.Tool.State = T.Tool.STATES_ENUM.GRABBER;
 	$('head').append(T.Tool.$GrabIt_Css);
 	$('body').on('mouseup','.grabbable',T.Tool.GrabIt);
 	e.preventDefault();
@@ -421,7 +444,7 @@ T.Tool.GrabIt_DocumentKeyPress = function(e){
 T.Tool.GrabIt_DocumentKeyUp = function(e){
 	if (e.which != 32)
 		return;
-	T.Tool.GrabIt_active = false;
+	T.Tool.State = T.Tool.STATES_ENUM.NOTHING;
 	$('body').off('mouseup','.grabbable',T.Tool.GrabIt);
 	T.Tool.$GrabIt_Css.remove();
 }
@@ -437,7 +460,7 @@ $(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
 
 
 T.Tool.MakeSVGStr_Painter = function(x,y,r){
-	if (r== 0 || T.Tool.GrabIt_active)
+	if (r== 0 || T.Tool.State == T.Tool.STATES_ENUM.GRABBER)
 		return "<svg style='display:none;pointer-events:none;'></svg>";
 	else
 		return "<svg height=" + (y+r+3) + " style='position:absolute;left:0px;top:0px;pointer-events:none;z-index:100;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
@@ -450,16 +473,14 @@ T.Tool.MakeSVGStr_Painter = function(x,y,r){
 T.Tool.PAINTER_COLOR = '#003300';
 
 T.Tool.Painter_ClusterMouseDown = function(e){
-	if(T.Tool.$painterCanv)
-		return; //this can happen if you press one mouse button down and then the other
+	if(T.Tool.State != T.Tool.STATES_ENUM.NOTHING)
+		return; //this can happen if you press one mouse button down and then the other or if the grabber is active
 		
 	var offset = T.$cluster_panel.offset();
 	var x = event.pageX - offset.left; 
 	var y = event.pageY - offset.top + T.$cluster_panel.scrollTop();
 	
 	var $canvs = T.$cluster_panel.find('canvas');
-	if(T.Tool.GrabIt_active)
-        return; //TODO: this is a nasty hack
 	var dists = $.map($canvs,function($canvas){
 		var toLeft = $canvas.offsetLeft - x;
 		var toRight = x-$canvas.offsetLeft - $canvas.offsetWidth;
@@ -475,7 +496,7 @@ T.Tool.Painter_ClusterMouseDown = function(e){
 		return xDist*xDist + yDist*yDist;
 				
 	})
-	
+	T.Tool.State = T.Tool.STATES_ENUM.PAINTER;
 	var canv_i = T.Tool.painterCanvIndex = dists.indexOf(Math.min.apply(Math,dists));
 	
 	var $c = T.Tool.$painterCanv = $canvs.eq(canv_i);
@@ -492,14 +513,15 @@ T.Tool.Painter_ClusterMouseDown = function(e){
 	var pos = T.Tool.Painter_GetXY(e);
 	T.Tool.painterPrevX = pos.x;
 	T.Tool.painterPrevY = pos.y;
-    T.Tool.painterIsNegative = (event.button == 2 || event.altKey);
+	T.Tool.painterIsNegative = (event.button == 2 || event.altKey);
+	T.Tool.painterButtonUsed = event.button;
     if (T.Tool.painterIsNegative){
         ctx.fillStyle=T.Tool.PAINTER_COLOR;
         ctx.fillRect(0,0,$c.get(0).width,$c.get(0).height);
         ctx.globalCompositeOperation = "destination-out";
     }
-	T.Tool.Painter_ClusterMouseMove(event);
-	$(document).on("mouseup",T.Tool.Painter_DocumentMouseUp);
+    T.Tool.Painter_ClusterMouseMove(event);
+	$(document).on("mouseup", T.Tool.Painter_DocumentMouseUp);
 }
 T.Tool.Painter_GetXY = function(e){
     var $c2 = T.Tool.$painterCanv2;
@@ -566,7 +588,9 @@ T.ORG.AddCutChangeCallback(T.Tool.ClusterPlotChangeCallback);
 T.Tool.SetPainterDestGroup(1);
 T.Tool.SetPainterSrcGroups([0]);
 
-T.Tool.Painter_DocumentMouseUp = function(e){
+T.Tool.Painter_DocumentMouseUp = function (e) {
+    if (e.button != T.Tool.painterButtonUsed)
+        return;
     var $c2 = T.Tool.$painterCanv2;    
     var rgbaData = T.Tool.painterCtx.getImageData(0,0,$c2.get(0).width,$c2.get(0).height).data;
     var mask = new Uint8Array(rgbaData.length/4);
@@ -580,7 +604,8 @@ T.Tool.Painter_DocumentMouseUp = function(e){
 	$(document).off("mouseup",T.Tool.Painter_DocumentMouseUp);
     var splitMasks = T.CP.ClusterMaskToSpikeMask(mask,T.Tool.painterCanvIndex,T.Tool.painterSrcGroups);
     var cut = T.ORG.GetCut();
-    cut.TransplantFromAsToB(T.Tool.painterSrcGroups,splitMasks,T.Tool.painterDestGroup); 
+    cut.TransplantFromAsToB(T.Tool.painterSrcGroups, splitMasks, T.Tool.painterDestGroup);
+    T.Tool.State = T.Tool.STATES_ENUM.NOTHING;
 }
 
 T.Tool.Painter_ClusterMouseMove = function(event){

@@ -611,7 +611,9 @@ T.FilterHeader = function(){
 	T.DispHeaders(T.ORG.GetState());
 }
 
-T.UndoLastAction = function(){
+T.UndoLastAction = function () {
+    if (T.Tool.State != T.Tool.STATES_ENUM.NOTHING)
+        return;
 	var c = T.ORG.GetCut();
 	if(c)
 		c.Undo();
@@ -641,7 +643,7 @@ T.FloatingInfo_DocumentMouseUp = function(e){
     T.FloatInfoMoving = null;
     $(document).off('mousemove mouseup');
 	$('html').removeAttr("dragging");
-	if(T.Tool.GrabIt_active){
+	if(T.Tool.State == T.Tool.STATES_ENUM.GRABBER){
 		if($this.hasClass('grabbed_info'))
 			$this.remove();
 		else
