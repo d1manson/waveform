@@ -67,7 +67,8 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
-* Added a raw spike rendering feature to the spatial panel.
+* Optimised parts of the loading process and fixed a few bugs to do with using both mouse buttons.
+* Added a raw spike rendering feature to the spatial panel, which also renders mean time in drift mode.
 * Added cluster painter tool.
 * Added a grabbing feature for easy comparisons across trials/cuts.
 * Tidied up the look and feel of the interface.
@@ -144,6 +145,10 @@ A good GUI is highly interactive and responsive, even when it is doing heavy pro
   * 3 - file has already been announced
 * One of the main features of the GUI is its ability to modify cut groups.  This should be a fluid process with no major delays or unresponsiveness. In order to achieve this, the `CUT` class keeps a list of immutable `cutInds` arrays.  Whenever one of these cutInds arrays needs to be modified, we create a new immutable and remove the old one.  Each immutable has a history of cut groups associated to it.  This makes it easy for the waveform rendering module (and other modules) to avoid doing unnecessary work.  A slight detail in the way the immutables are implemented is that they each occupy a "slot" in an array of slots.  When immutables are deleted and created, slots get reused (this prevents the array of immutables from growing too large).  Thus in order to distinguish between all the immutables that occupy a given slot over time, we have an extra property, which is the `generation` of the immutable in the slot. 
 * Rendering the waves is done on a hidden canvas using WebGL, the resulting images are then copied to small visible canvases on the page.  When the tetrode data is first loaded, it gets copied across to the GPU so that it can be used quickly during rendering.  Every effort is made to ensure that redundant rendering is avoided (making use of the immutable cut slot structure).  When we do need to render, a special vector is created that gives the x and y offset on the offscreen canvas for each wave, plus a colormap index for the wave.  We render a line from `t` to `t+1` for every single wave simultaneously, then increment `t` and render the next line (there are 50 points on the wave so 49 lines to be drawn per channel).  The rendering is done this way as it minimises the amount of data that needs to be written to the gpu for each render, it also makes for a very simple vertex shader.
+
+**Some more info on T.Tool**   
+There is a `T.Tool.STATE` key-value map which holds each of the tools and their corresponding state objects. While a particular tool is active, `T.Tool.cState` is set to to that tool's `STATE` object.  These state objects hold details like active group number and references to relevant dom nodes.
+
 
 #### Autocut    
 **[Under active development, info may not be up to date]**  
