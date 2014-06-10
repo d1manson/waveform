@@ -62,13 +62,15 @@ T.Tool.PainterSrc_Toggle = function(g){
 	if(key.shift){
 		var ind = T.Tool.painterSrcGroups.indexOf(g);
 		var newGs = T.Tool.painterSrcGroups.slice(0);
-		if (ind == -1)
-			newGs.push(g); 
-		else
-			newGs.splice(ind,1); 
+		if (ind == -1) {
+		    newGs.push(g);
+		    T.CP.BringGroupToFront(g);
+		} else
+		    newGs.splice(ind, 1);
 		T.Tool.SetPainterSrcGroups(newGs); 
 	}else{
-		T.Tool.SetPainterSrcGroups([g]); 
+	    T.Tool.SetPainterSrcGroups([g]);
+	    T.CP.BringGroupToFront(g);
 	}
 }
 
