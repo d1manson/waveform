@@ -666,7 +666,7 @@ T.StoreData = function(){
 	localStorage.state = 1;
 	localStorage.headerFilter = T.$header_search.val();
 	localStorage.paletteMode = T.paletteMode;
-    localStorage.painterR = T.Tool.painterR;
+    localStorage.painterR = T.Tool.PainterState.r;
     localStorage.clusterPlotSize = T.CP.GetSize();
 	localStorage.button_pannel_state = $('#button_panel').attr("state") || "";
     localStorage.spatial_pannel_state = $('#spatial_panel').attr("state") || "";
@@ -683,7 +683,7 @@ T.DocumentReady = function(){
 		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$header_search.val(localStorage.headerFilter || '');
 		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
-        T.Tool.painterR = parseInt(localStorage.painterR) || 20;
+        T.Tool.PainterState.r = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		//TODO: load files into T.cut instances
         if(localStorage.button_pannel_state) //this is open by default, so close if required
