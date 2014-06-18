@@ -146,13 +146,24 @@ T.PAR = function(){
         	cutProps.exp = match[1];
         	cutProps.N = parseInt(match[2]);
         	cutProps.dataStart = match.index + match[0].length;
-        	
+        	cutProps.is_clu = false;
         
         	var cutStr = fullStr.slice(cutProps.dataStart);// results in a copy being made (probably)
         	var cut = []; //TODO: use Uin32Array instead
         	while(match = REGEX_CUT_C.exec(cutStr))
         		cut.push(parseInt(match[0]));
 				
+			main.CutFileRead(null,cutProps,cut);
+		}
+		
+		var ParseCluFile = function(file){
+			var reader = new FileReaderSync();
+			var fullStr = reader.readAsBinaryString(file);
+        	var cut = []; //TODO: use Uin32Array instead
+			var match;
+        	while(match = REGEX_CUT_C.exec(fullStr))
+        		cut.push(parseInt(match[0]));
+			var cutProps = {nGroups: cut.shift(),is_clu: true}
 			main.CutFileRead(null,cutProps,cut);
 		}
 		
@@ -164,9 +175,12 @@ T.PAR = function(){
 			for(var offset=0,match=null;!match && offset<file.size; offset+=BLOCK_SIZE){
 				str = str.slice(-MAX_LENGTH_MATCH_CUT_B) + reader.readAsBinaryString(file.slice(offset,offset+BLOCK_SIZE));
 				match = REGEX_CUT_B.exec(str);
-				if(match) 
+				if(match){
 					main.CutFileGotExpName(filename,match[1],tet);
+					return;
+				}
 			}
+			main.CutFileGotExpName(filename,null,tet); //couldn't find the name
 		}
 	}
 	
@@ -234,10 +248,15 @@ T.PAR = function(){
 			throw(errorMessage);
 		callbacks.set.shift()({header:header});
 	}	
-		
+	
+	//LoadCutWithWorker and LoadCluWithWorker both use the same callback queue and CutFileRead function below.
 	var LoadCutWithWorker = function(file,callback){
 		callbacks.cut.push(callback);
 		cutWorker.ParseCutFile(file);
+	}
+	var LoadCluWithWorker = function(file,callback){
+		callbacks.cut.push(callback);
+		cutWorker.ParseCluFile(file);
 	}
 	var CutFileRead = function(errorMessage,header,cut){
 		if(errorMessage)
@@ -252,10 +271,10 @@ T.PAR = function(){
 	var CutFileGotExpName = function(fileName,expName,tet){
 		callbacks.cut.shift()(fileName,expName,"cut",tet);
 	}
-	
+
 	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude*"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
-	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
+	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","ParseCluFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
 
 	
@@ -293,6 +312,7 @@ T.PAR = function(){
 		LoadSet: LoadSetWithWorker,
         LoadCut: LoadCutWithWorker,
         LoadCut2: GetCutExpNameWithWorker,
+		LoadClu: LoadCluWithWorker,
         GetPendingParseCount: GetPendingParseCount,
         GetTetrodeTime: GetTetrodeTime,
 		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker,

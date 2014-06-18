@@ -129,15 +129,15 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 				
 			};
             
-    var EXP_CUT = function(cut,parent_tet){
+    var EXP_CUT = function(cut,parent_tet,isClu){
                 this.parent = parent_tet;
                 if(cut instanceof CUT){
                     this.cut_instance = cut;
-					
                     this.$ = $("<div class='file_brick new_cut_file_brick' draggable='true'>~" + String.fromCharCode("a".charCodeAt(0)+parent_tet.cutInstanceCount) +  "_" + parent_tet.num + ".cut</div>").data('brick-type','cut'); 
 					parent_tet.cutInstanceCount++;
                 }else{
                     this.cut_file = cut;
+					this.isClu = isClu;
                     this.$ = $("<div class='file_brick cut_file_brick'>" + cut.replace(parent_tet.parent.name,"~") + "</div>").data('brick-type','cut'); 
                 }
                 parent_tet.$.prepend(this.$);
@@ -154,7 +154,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
     var NewFiles = function(files){
 		//this function iterates through a list of file handles, calling GotFileDetails for each file, either synchronously or asynchrously
 		//it also stores the files for later use (unless we are currently getting files from storage)
-
+		
     	pendingNewFiles = files.length;
 		var cutFiles = []; //cut files are a special case due to their less regular naming
         for(var i =0; i <files.length;i++){
@@ -170,8 +170,13 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 				if(ext=="cut") 					type = 1;
 				else if(ext == "pos") 			type = 2;
 				else if(ext == "set") 			type = 3;
-				else if(!isNaN(parseInt(ext)) && !base.match(/\.(klg|clu|fet)$/)) 
-                                                type = 4;
+				else if(!isNaN(parseInt(ext)))
+					if(base.slice(-4) == ".clu")
+						if(base.slice(-9) == ".temp.clu") type = 8; //we dont care about these
+						else							  type = 5; //clu file
+					else if(base.slice(-4) == ".fet") type = 6; //we dont care about these
+					else if(base.slice(-4) == ".klg") type = 7; //we dont care about these
+					else 							  type = 4; //tet file
 
 				if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
 						FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 	
@@ -179,7 +184,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			switch(type){
 				case 1:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0])});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false});
+					break;
+				case 5:
+					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true});
 					break;
 				case 2:
 					GotFileDetails(files[i].name,base,"pos");
@@ -191,50 +199,53 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 					GotFileDetails(files[i].name,base,"tet",parseInt(ext));
 					break;
 				default:
-					pendingNewFiles--;//unknown file type
-                    if(pendingNewFiles == 0 && $.isEmptyObject(cExp))
-                        ReadAndApplyURL();
+					GotFileDetails(files[i].name);//unknown file type
 			}
         }    
 		
 		//Now we've dealt with everything else lets deal with those annoying cut files...
+		//TODO: sort by modified date
 		var allExpsRegex = RegExp.fromList(Object.keys(exps));
 		for(var i=0;i<cutFiles.length;i++){
 			if(allExpsRegex){ //there may not be any experiment names to match against...though I guess we could update the regex as we iterate through this loop...but whatever.
 				var match = allExpsRegex.exec(cutFiles[i].base);
 				if(match){
-					GotFileDetails(cutFiles[i].file.name,match[0],"cut",cutFiles[i].tet); //if we can match one of the experiment names to the file name, then thats great
+					GotFileDetails(cutFiles[i].file.name,match[0],"cut",cutFiles[i].tet,cutFiles[i].isClu); //if we can match one of the experiment names to the file name, then thats great
 					continue;
 				}
 			}
-			PAR.LoadCut2(cutFiles[i].file,cutFiles[i].tet,GotFileDetails); //otherwise we need to read the header to find out the experiment name (done asynchrously)
+			if(cutFiles[i].isClu)
+				GotFileDetails(cutFiles[i].file.name); //if we have a clu file, but we cant match against any names then we're stuck, lets abandon the file
+			else
+				PAR.LoadCut2(cutFiles[i].file,cutFiles[i].tet,GotFileDetails); //otherwise we need to read the header to find out the experiment name (done asynchrously)
 		}
   
     }
 
-    var GotFileDetails = function(file_name,exp_name,ext,tet){
+    var GotFileDetails = function(file_name,exp_name,ext,tet,isClu){
 		//this function stores the file's name in the relevant place in our list of experiments
 
-        if(!(exp_name in exps)) // if this is the first file for this experiment, we create a new EXP object and put it in the exps list
-            exps[exp_name] = new EXP(exp_name);
-    		
-    	var exp = exps[exp_name];
-        
-    	if(ext=="set"){
-    		exp.set_file = file_name;
-            exp.$set.show();
-    	}else if(ext=="pos"){
-    		exp.pos_file = file_name;
-            exp.$pos.show();
-    	}else if(ext=="cut"){
-    		var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
-    		tet_ob.cuts.push(new EXP_CUT(file_name,tet_ob));
-    	}else{ //tet file
-        	var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
-    		tet_ob.tet_file = file_name;
-            tet_ob.$tet.show();
-    	}
-
+		if(exp_name){
+			if(!(exp_name in exps)) // if this is the first file for this experiment, we create a new EXP object and put it in the exps list
+				exps[exp_name] = new EXP(exp_name);
+				
+			var exp = exps[exp_name];
+			
+			if(ext=="set"){
+				exp.set_file = file_name;
+				exp.$set.show();
+			}else if(ext=="pos"){
+				exp.pos_file = file_name;
+				exp.$pos.show();
+			}else if(ext=="cut"){
+				var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
+				tet_ob.cuts.push(new EXP_CUT(file_name,tet_ob,isClu));
+			}else{ //tet file
+				var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
+				tet_ob.tet_file = file_name;
+				tet_ob.$tet.show();
+			}
+		}
 		
 		pendingNewFiles--;
 		if(pendingNewFiles == 0)
@@ -246,7 +257,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
     }
 
 
-	var InternalPARcallback = function(filetype){
+	var InternalPARcallback = function(filetype,isClu){
 		//this function is used by SwitchToExpTet and SwitchToTet to generate a closure for dealing with newly parsed files
 
 		cState[filetype] = 1; //remember that we are loading this filetype
@@ -261,7 +272,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			if (filetype == "cut"){
 				if(!hLivingTet.alive || !hLivingCut.alive) return;
-				cCut = new CUT(cExp.name,cTet.num,1,data.cut,"loaded from file");
+				cCut = new CUT(cExp.name,cTet.num,isClu ? 1.1 : 1,data.cut,"loaded from " + (isClu? "clu" : "cut") + " file");
 				cCutHeader = data.header;
 			}else if(filetype == "tet"){
 				if(!hLivingTet.alive) return;
@@ -441,7 +452,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 					cCut.ReTriggerAll(); //relive the whole life of the cut again
 				}else{//data.cut_file
 					cCutIsFileOrAllZero = true;
-					T.FS.ReadFile(data.cut_file,PAR.LoadCut,InternalPARcallback("cut"));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
+					T.FS.ReadFile(data.cut_file,data.isClu? PAR.LoadClu : PAR.LoadCut,InternalPARcallback("cut",data.isClu));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
 				}
 				
 				MarkCut(data);

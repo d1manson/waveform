@@ -130,7 +130,12 @@ T.CUT = function(ORG){//class factory
 	var DoConstruction = function(data_type,data,description){
 		switch (data_type){
 
-		case 1: //data is an array specifying the group of each spike
+		case 1.1: //data is an array specifying the group of each spike, clu-style
+			for(var i=0;i<data.length;i++)
+				data[i]--;
+			//once we've subtracted one from group numbers can continue on to tint-style cut loading...
+				
+		case 1: //data is an array specifying the group of each spike, tint-style
 			this._.N = data.length;
 			var cutInds = [[]];
 			for(var i=0;i<data.length;i++)
