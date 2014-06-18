@@ -156,6 +156,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 		//it also stores the files for later use (unless we are currently getting files from storage)
 
     	pendingNewFiles = files.length;
+		var cutFiles = []; //cut files are a special case due to their less regular naming
         for(var i =0; i <files.length;i++){
 
             var ext = REGEX_FILE_EXT.exec(files[i].name);
@@ -178,7 +179,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			switch(type){
 				case 1:
-					PAR.LoadCut2(files[i],parseInt(base.match(/\d*$/)[0]),GotFileDetails); //reads the header to find out the experiment name (done asynchrously)
+					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0])});
 					break;
 				case 2:
 					GotFileDetails(files[i].name,base,"pos");
@@ -194,8 +195,21 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
                     if(pendingNewFiles == 0 && $.isEmptyObject(cExp))
                         ReadAndApplyURL();
 			}
-
-        }      
+        }    
+		
+		//Now we've dealt with everything else lets deal with those annoying cut files...
+		var allExpsRegex = RegExp.fromList(Object.keys(exps));
+		for(var i=0;i<cutFiles.length;i++){
+			if(allExpsRegex){ //there may not be any experiment names to match against...though I guess we could update the regex as we iterate through this loop...but whatever.
+				var match = allExpsRegex.exec(cutFiles[i].base);
+				if(match){
+					GotFileDetails(cutFiles[i].file.name,match[0],"cut",cutFiles[i].tet); //if we can match one of the experiment names to the file name, then thats great
+					continue;
+				}
+			}
+			PAR.LoadCut2(cutFiles[i].file,cutFiles[i].tet,GotFileDetails); //otherwise we need to read the header to find out the experiment name (done asynchrously)
+		}
+  
     }
 
     var GotFileDetails = function(file_name,exp_name,ext,tet){

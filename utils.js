@@ -44,3 +44,16 @@ $.fn.translate = function(x,y){
    return this;
     
 }
+
+//Escape a user specified string for use in regex search.
+// Taken from http://stackoverflow.com/a/3561711
+RegExp.escape= function(s) {
+    return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
+
+//Takes an Array of strings and returns a regex which can be used for finding items in the set given in the list
+//with the longest possible match returned. e.g.
+// RegExp.fromList(["hello","world","hello world"]).exec("this hello world life") will match on "hello world".
+RegExp.fromList = function(a){
+	return a.length ? RegExp(a.sort(function(a,b){return b.length-a.length;}).map(RegExp.escape).join("|")) : null;
+}
