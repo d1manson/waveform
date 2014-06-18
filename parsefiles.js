@@ -159,7 +159,7 @@ T.PAR = function(){
 		// This function doesn't bother doing everything it just reads the experiment name
 		var GetCutFileExpName = function(file,tet,filename){
 			var reader = new FileReaderSync();
-			var BLOCK_SIZE = 1024; //1KBs at a time.
+			var BLOCK_SIZE = 10*1024; //10KBs at a time.
 			var str = "";
 			for(var offset=0,match=null;!match && offset<file.size; offset+=BLOCK_SIZE){
 				str = str.slice(-MAX_LENGTH_MATCH_CUT_B) + reader.readAsBinaryString(file.slice(offset,offset+BLOCK_SIZE));
