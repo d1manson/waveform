@@ -184,10 +184,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			switch(type){
 				case 1:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false,date:FileDate(files[i])});
 					break;
 				case 5:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true,date:FileDate(files[i])});
 					break;
 				case 2:
 					GotFileDetails(files[i].name,base,"pos");
@@ -204,7 +204,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
         }    
 		
 		//Now we've dealt with everything else lets deal with those annoying cut files...
-		//TODO: sort by modified date
+		cutFiles.sort(function(a,b){return a.date-b.date}); //sort from oldest to newest.
 		var allExpsRegex = RegExp.fromList(Object.keys(exps));
 		for(var i=0;i<cutFiles.length;i++){
 			if(allExpsRegex){ //there may not be any experiment names to match against...though I guess we could update the regex as we iterate through this loop...but whatever.
@@ -374,12 +374,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
     		if(cTet.tet_file)
     			T.FS.ReadFile(cTet.tet_file,PAR.LoadTetrode,InternalPARcallback("tet"));		
 
-    		if(cTet.cuts[0]){
-				if(cTet.cuts[0].cut_file)
-					SwitchToCut(1,0) //if the first cut is a file, load that
-				else
-					SwitchToCut(1,0) //if the first cut is a cut instance, load that
-			}else if(cTet.tet_file)
+			var nCuts = cTet.cuts.length
+    		if(cTet.cuts[nCuts-1])
+				SwitchToCut(1,nCuts-1); // load the most recent cut (either a cut/clu file or a cut instance)
+			else if(cTet.tet_file)
 				SwitchToCut(4); //if there aren't any cuts, but we do have tetrode data let's make an all-zero cut
 			else
 				SwitchToCut(0); //failing all of that, just clear the old cut

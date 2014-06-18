@@ -57,3 +57,7 @@ RegExp.escape= function(s) {
 RegExp.fromList = function(a){
 	return a.length ? RegExp(a.sort(function(a,b){return b.length-a.length;}).map(RegExp.escape).join("|")) : null;
 }
+
+var FileDate = function(f){
+	return new Date(f.lastModifiedDate).getTime();
+}
