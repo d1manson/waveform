@@ -129,7 +129,7 @@ T.PAR = function(){
 		var REGEX_CUT_A = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
 		var REGEX_CUT_B = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
 		var REGEX_CUT_C = /[0-9]+/g;
-
+		var MAX_LENGTH_MATCH_CUT_B = 300;//this is needed so that when we read in chunks of the cut file we dont have to apply the regex_b to the whole thing each time
 
 		var ParseCutFile = function(file){
 		
@@ -159,9 +159,14 @@ T.PAR = function(){
 		// This function doesn't bother doing everything it just reads the experiment name
 		var GetCutFileExpName = function(file,tet,filename){
 			var reader = new FileReaderSync();
-			var fullStr = reader.readAsBinaryString(file);
-			var match = REGEX_CUT_B.exec(fullStr);
-    		main.CutFileGotExpName(filename,match[1],tet);
+			var BLOCK_SIZE = 1024; //1KBs at a time.
+			var str = "";
+			for(var offset=0,match=null;!match && offset<file.size; offset+=BLOCK_SIZE){
+				str = str.slice(-MAX_LENGTH_MATCH_CUT_B) + reader.readAsBinaryString(file.slice(offset,offset+BLOCK_SIZE));
+				var match = REGEX_CUT_B.exec(str);
+				if(match) 
+					main.CutFileGotExpName(filename,match[1],tet);
+			}
 		}
 	}
 	
