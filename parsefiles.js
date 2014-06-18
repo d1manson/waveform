@@ -163,7 +163,7 @@ T.PAR = function(){
 			var str = "";
 			for(var offset=0,match=null;!match && offset<file.size; offset+=BLOCK_SIZE){
 				str = str.slice(-MAX_LENGTH_MATCH_CUT_B) + reader.readAsBinaryString(file.slice(offset,offset+BLOCK_SIZE));
-				var match = REGEX_CUT_B.exec(str);
+				match = REGEX_CUT_B.exec(str);
 				if(match) 
 					main.CutFileGotExpName(filename,match[1],tet);
 			}
