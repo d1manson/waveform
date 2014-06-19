@@ -238,28 +238,38 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		if (expCutArray.length <= 1)
 			return;
 		
-		// pull the cutFiles out of the DOM and store in a separate cutFiles array
-		var cutFiles = []
-		for(var i=0;i<expCutArray.length;i++)if('cut_file' in expCutArray[i]){
-			cutFiles.push(expCutArray[i]);
-			expCutArray[i].$.detach();
+		// split the cutFiles into files and insts, and pull them all out of the DOM temporarily
+		var cutFiles = [];
+		var cutInsts = [];
+		while(expCutArray.length){
+			var c = expCutArray.shift();
+			if('cut_file' in c)
+				cutFiles.push(c);
+			else
+				cutInsts.push(c);
+			c.$.detach();
 		}
-		
-		if(cutFiles.length == 0)
-			return;
-			
+					
 		// if there is more than 1 cutFile we need to do the sorting based on the modified date
 		if(cutFiles.length > 1){
 			cutFiles.map(function(expCut){console.log("sorting needed for: " + expCut.cut_file);});
-			
 			cutFiles.map(function(expCut){expCut.date = expCut.date || FS.FileDate(expCut.cut_file);}); //if we haven't yet looked up the date then do so now
 			cutFiles.sort(function(a,b){return a.date-b.date}); //sort from newest to oldest...or maybe its the other way..?
 		}
 		
-		// reinsert into dom
+		// reinsert into dom and reconstitute expCutArray
 		var $parent_tet = cutFiles[0].parent.$;
-		while(cutFiles.length)
-			$parent_tet.prepend(cutFiles.shift().$);
+			
+		while(cutFiles.length){
+			var c = cutFiles.shift();
+			$parent_tet.prepend(c.$);
+			expCutArray.push(c);
+		}
+		while(cutInsts.length){
+			var c = cutInsts.pop();
+			$parent_tet.prepend(c.$);
+			expCutArray.push(c);
+		}
 	}
 	
     var GotFileDetails = function(file_name,exp_name,ext,tet,info){
