@@ -14,7 +14,7 @@
 // looked at exp-tet. 
 var T = T || {};
 
-T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the T.ORG object was created by cut.js, here we add a lot more to it
+T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -184,10 +184,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 
 			switch(type){
 				case 1:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false,date:FileDate(files[i])});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false});
 					break;
 				case 5:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true,date:FileDate(files[i])});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true});
 					break;
 				case 2:
 					GotFileDetails(files[i].name,base,"pos");
@@ -203,9 +203,24 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 			}
         }    
 		
-		//Now we've dealt with everything else lets deal with those annoying cut files...
+		$status_text.text("Sorting and organising cut files...");
+		window.setTimeout(function(){SortAndAssignCuts(cutFiles);},40); // reading the modifiedBy date is slow, so we pause at this point to allow everything so far to take effect
+  
+    }
+
+	var SortAndAssignCuts = function(cutFiles){
+		//TODO: push this into a worker. It can take 2 or 3 seconds if there's loads of data.
+		
+		// get the last modified date for all the files
+		cutFiles.map(function(obj){obj.date = FileDate(obj.file);});
+		
+		//order chronologically
 		cutFiles.sort(function(a,b){return a.date-b.date}); //sort from oldest to newest.
+		
+		//build a regex to match on experiment names, matching on the longest possible name
 		var allExpsRegex = RegExp.fromList(Object.keys(exps));
+		
+		//Loop through all the cut files and try and assign to an experiment based on filename, otherwise (if tint-style) read file header (asynchrously)..
 		for(var i=0;i<cutFiles.length;i++){
 			if(allExpsRegex){ //there may not be any experiment names to match against...though I guess we could update the regex as we iterate through this loop...but whatever.
 				var match = allExpsRegex.exec(cutFiles[i].base);
@@ -219,9 +234,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 			else
 				PAR.LoadCut2(cutFiles[i].file,cutFiles[i].tet,GotFileDetails); //otherwise we need to read the header to find out the experiment name (done asynchrously)
 		}
-  
-    }
-
+		$status_text.text("No data selected. Choose a trial from the available files.");
+	}
+	
     var GotFileDetails = function(file_name,exp_name,ext,tet,isClu){
 		//this function stores the file's name in the relevant place in our list of experiments
 
@@ -649,7 +664,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS){ // the 
 	ORG.GetState = function(){return SimpleClone(cState)};
     return ORG;
 
-}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS
+}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text')
 );
 
 
