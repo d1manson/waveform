@@ -149,6 +149,11 @@ T.AC = function($caption,BYTES_PER_SPIKE,ComputeMatrix,TREE){
 		
     var RandomInds = function(n,k,doSort) {
     //returns an array of k unique integers in the range [0 n-1]
+	//TODO: turns out that this is actually the correct way to do it more or less
+	// 		http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+	// but we could make it more efficient by implementing a stack at one end of the inds, and 
+	// swapping the next element above the stack for the ind about to be put on to the stack
+	// that way you dont need to mess around with potentially expensive javascript array stuff.
       var rem_inds = Array(n);
       for (var i=0; i<n; i++)
     	rem_inds[i] = i;

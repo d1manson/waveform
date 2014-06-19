@@ -208,14 +208,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
   
     }
 
-	var SortAndAssignCuts = function(cutFiles){
-		//TODO: push this into a worker. It can take 2 or 3 seconds if there's loads of data.
-		
-		// get the last modified date for all the files
-		cutFiles.map(function(obj){obj.date = FileDate(obj.file);});
-		
-		//order chronologically
-		cutFiles.sort(function(a,b){return a.date-b.date}); //sort from oldest to newest.
+	var SortAndAssignCuts = function(cutFiles){		
+		// We only get modifiedDate and do the sorting when there are multiple cut files for a single tet-exp. This is done within GotFileDetails > SortExpTetCuts.
 		
 		//build a regex to match on experiment names, matching on the longest possible name
 		var allExpsRegex = RegExp.fromList(Object.keys(exps));
@@ -225,7 +219,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			if(allExpsRegex){ //there may not be any experiment names to match against...though I guess we could update the regex as we iterate through this loop...but whatever.
 				var match = allExpsRegex.exec(cutFiles[i].base);
 				if(match){
-					GotFileDetails(cutFiles[i].file.name,match[0],"cut",cutFiles[i].tet,cutFiles[i].isClu); //if we can match one of the experiment names to the file name, then thats great
+					GotFileDetails(cutFiles[i].file.name,match[0],"cut",cutFiles[i].tet,{isClu: cutFiles[i].isClu}); //if we can match one of the experiment names to the file name, then thats great
 					continue;
 				}
 			}
@@ -237,7 +231,38 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		$status_text.text("No data selected. Choose a trial from the available files.");
 	}
 	
-    var GotFileDetails = function(file_name,exp_name,ext,tet,isClu){
+	var SortExpTetCuts = function(expCutArray){
+		// this sorts the cuts left to right:   cut instances last created --> first created, cut files last modified --> first modified
+		// the cut instances are already sorted internally, but the cut files may be anywhere in the list and in any order.
+		
+		if (expCutArray.length <= 1)
+			return;
+		
+		// pull the cutFiles out of the DOM and store in a separate cutFiles array
+		var cutFiles = []
+		for(var i=0;i<expCutArray.length;i++)if('cut_file' in expCutArray[i]){
+			cutFiles.push(expCutArray[i]);
+			expCutArray[i].$.detach();
+		}
+		
+		if(cutFiles.length == 0)
+			return;
+			
+		// if there is more than 1 cutFile we need to do the sorting based on the modified date
+		if(cutFiles.length > 1){
+			cutFiles.map(function(expCut){console.log("sorting needed for: " + expCut.cut_file);});
+			
+			cutFiles.map(function(expCut){expCut.date = expCut.date || FS.FileDate(expCut.cut_file);}); //if we haven't yet looked up the date then do so now
+			cutFiles.sort(function(a,b){return a.date-b.date}); //sort from newest to oldest...or maybe its the other way..?
+		}
+		
+		// reinsert into dom
+		var $parent_tet = cutFiles[0].parent.$;
+		while(cutFiles.length)
+			$parent_tet.prepend(cutFiles.shift().$);
+	}
+	
+    var GotFileDetails = function(file_name,exp_name,ext,tet,info){
 		//this function stores the file's name in the relevant place in our list of experiments
 
 		if(exp_name){
@@ -254,7 +279,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				exp.$pos.show();
 			}else if(ext=="cut"){
 				var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
-				tet_ob.cuts.push(new EXP_CUT(file_name,tet_ob,isClu));
+				tet_ob.cuts.push(new EXP_CUT(file_name,tet_ob,info && info.isClu)); 
+				SortExpTetCuts(tet_ob.cuts);
 			}else{ //tet file
 				var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
 				tet_ob.tet_file = file_name;
@@ -272,7 +298,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     }
 
 
-	var InternalPARcallback = function(filetype,isClu){
+	var InternalPARcallback = function(filetype,info){
 		//this function is used by SwitchToExpTet and SwitchToTet to generate a closure for dealing with newly parsed files
 
 		cState[filetype] = 1; //remember that we are loading this filetype
@@ -287,7 +313,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			if (filetype == "cut"){
 				if(!hLivingTet.alive || !hLivingCut.alive) return;
-				cCut = new CUT(cExp.name,cTet.num,isClu ? 1.1 : 1,data.cut,"loaded from " + (isClu? "clu" : "cut") + " file");
+				cCut = new CUT(cExp.name,cTet.num,info.isClu ? 1.1 : 1,data.cut,"loaded from " + (info.isClu? "clu" : "cut") + " file");
 				cCutHeader = data.header;
 			}else if(filetype == "tet"){
 				if(!hLivingTet.alive) return;
@@ -465,7 +491,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 					cCut.ReTriggerAll(); //relive the whole life of the cut again
 				}else{//data.cut_file
 					cCutIsFileOrAllZero = true;
-					T.FS.ReadFile(data.cut_file,data.isClu? PAR.LoadClu : PAR.LoadCut,InternalPARcallback("cut",data.isClu));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
+					T.FS.ReadFile(data.cut_file,data.isClu? PAR.LoadClu : PAR.LoadCut,InternalPARcallback("cut",{isClu: data.isClu}));	//before generating the closure InternalPARcallback, cState.cut gets set to 1
 				}
 				
 				MarkCut(data);

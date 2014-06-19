@@ -39,6 +39,17 @@ T.FS = function(requestFileSystem,PERSISTANCE){
         },1); //it has to be async to match other version.
     };
 
+	var FileDate = function(name){
+		if(active)
+			return new Date().getTime(); //TODO: make it work here too..though we don't really care about appdata any more.
+			
+		var file = FilesInMemory[name];	
+		if(file)
+			return new Date(file.lastModifiedDate).getTime();
+		else
+			return new Date().getTime();
+	}
+
     var Toggle = function(newState,callback){
         if(newState == active)
             return;
@@ -272,7 +283,8 @@ T.FS = function(requestFileSystem,PERSISTANCE){
         Toggle: Toggle,
         GetPendingReadCount: GetPendingReadCount,
         ArrayAsFile: ArrayAsFile,
-        IsActive: IsActive
+        IsActive: IsActive,
+		FileDate: FileDate
     };
     
 }(window.requestFileSystem || window.webkitRequestFileSystem,window.PERSISTENT);
