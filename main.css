@@ -33,21 +33,14 @@ height: 100%;
 width: 100%; 
 display: none;
 }
-.pos_plot_holder{
-display: inline-block;
-position: relative;
-margin-top: 5px;
-margin-bottom: 5px;
-*/
-}
 .poslayer{
+margin: 0 auto;
 position: absolute;
-top: 0px;
-left: 0px;
+height: 100%;
+left: 0;
+right: 0;
 }
-.poslayer:first-of-type{
-position: relative;
-}
+
 .tilewall[tilemoving]{
 cursor: move;
 }
@@ -95,15 +88,12 @@ position: relative;
 -moz-user-select: -moz-none;
 -o-user-select: none;
 user-select: none;
-overflow-y: scroll;
+overflow-y: hidden;
 overflow-x: hidden;
 /*
 display:table-row;
 overflow:auto;
 */
-}
-.side_panel_row_capped{
-overflow-y: hidden;
 }
 
 /*
@@ -548,7 +538,6 @@ visibility: visible;
 .last_side_panel_row_body > #cluster_panel{
 cursor: none;
 }
-#spatial_panel, 
 #cluster_panel{
 	text-align: center;
 }
