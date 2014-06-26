@@ -794,10 +794,7 @@ $('#reorder_n_button').click(T.ReorderNCut);
 $('#reorder_A_button').click(T.ReorderACut);
 T.$undo = $('#undo_button').click(T.UndoLastAction)
 						   .mousedown(T.ToggleElementState($('.action_info'),false,true));
-$('.bar').on("mousedown", T.BarMouseDown);
 T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
-$('#spatial_panel_toggle').click(T.ToggleElementState($('#spatial_panel')));
-$('#button_panel_toggle').click(T.ToggleElementState($('#button_panel')));
 T.$files_panel = $('#files_panel');
 $('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
 T.$displayButtons = $(".display_button").each(function(i){$(this).data('domindex',i);})
@@ -827,7 +824,7 @@ $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessar
 key('p',T.TogglePalette);
 key('a',T.RunAutocut);
 
-key('esc',T.ToggleElementState([$('.bar'),$('.side_panel'),T.$tilewall]));
+//key('esc',###); //TODO: reimplement full tilewall view with polymer
 key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
 key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
 key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],shiftKey:key.shift});});

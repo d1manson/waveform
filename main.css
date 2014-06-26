@@ -38,6 +38,7 @@ display: inline-block;
 position: relative;
 margin-top: 5px;
 margin-bottom: 5px;
+*/
 }
 .poslayer{
 position: absolute;
@@ -85,16 +86,26 @@ float: left;*/
 .side_panel[state="closed"]{
 display: none;
 }
+
+
 .side_panel_row{
-display:table-row;
-overflow:auto;
 position: relative;
 -webkit-user-select: none;
 -khtml-user-select: none;
 -moz-user-select: -moz-none;
 -o-user-select: none;
 user-select: none;
+overflow-y: scroll;
+overflow-x: hidden;
+/*
+display:table-row;
+overflow:auto;
+*/
 }
+.side_panel_row_capped{
+overflow-y: hidden;
+}
+/*
 .last_side_panel_row_inner{
 left:0px;
 top:0px;
@@ -112,6 +123,7 @@ display:table-row;
 overflow:auto;
 height: 100%;
 }
+*/
 .button_area{
 min-height: 20px;
 max-height: 100px;
@@ -122,7 +134,7 @@ overflow-y: scroll;
 width: 100%;
 }
 #files_panel{
-max-height: 300px;
+/*max-height: 300px;*/
 overflow-y: scroll;
 width: 100%;
 overflow-x: hidden;
