@@ -714,29 +714,6 @@ T.DriftButtonClick = function(){
 		T.RM.RenderSpikesForPath(T.groupOver.g);
 }
 
-T.BarMouseDown = function(e){
-	if (e.button != 0)
-		return;
-	T.barDrag_xOff = e.screenX - T.$side_panel.width()
-	$(document).on("mousemove",T.BarDrag_DocumentMouseMove)
-			   .on("mouseup",T.BarDrag_DocumentMouseUp);
-	T.$mask.css({cursor: "ew-resize",
-				 display: "block"})
-			
-}
-
-T.BarDrag_DocumentMouseMove = function(e){
-	var wPx = (e.screenX-T.barDrag_xOff);
-	var wPc = 100*wPx/$(document).width();
-	wPc = wPc > 80 ? 80 : wPc < 15 ? 15 : wPc;
-	T.$side_panel.css({width: wPc + '%'});
-}
-T.BarDrag_DocumentMouseUp = function(e){
-	$(document).off("mousemove",T.BarDrag_DocumentMouseMove)
-			   .off("mouseup",T.BarDrag_DocumentMouseUp);
-	T.$mask.css({cursor: "",
-				display: "none"});
-}
 
 
 T.groupOver = {g: null,$tile:null,$clusterSticker:null};
@@ -777,7 +754,6 @@ $('.help_button').click(T.ShowHelp)
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.$pos_overlay = $('#posoverlay');
-T.$mask = $('.mask');
 T.tiles = [];
 T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');			

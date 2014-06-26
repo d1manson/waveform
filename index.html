@@ -154,13 +154,13 @@ other file types will be ignored<br>
 		<core-splitter direction="up"></core-splitter>
 
 		<div class="side_panel_row side_panel_row_capped" vertical layout>
-			<div class="collapsable_panel" id="files_panel" flex></div>
+			<div class="scrollable_area" id="files_panel" flex></div>
 		</div>
 		
 		<core-splitter direction="up"></core-splitter>
 
 		<div class="side_panel_row" vertical layout>
-			<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" flex>
+			<div class="grabbable" id="spatial_panel" flex>
 				<div class='pos_plot_holder'>
 					<canvas id="posplot" class='poslayer' width="200" height="200"></canvas> 
 					<canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
@@ -170,7 +170,7 @@ other file types will be ignored<br>
 
 		<core-splitter direction="up"></core-splitter>
 		
-		<div class="side_panel_row side_panel_row_capped" flex>
+		<div class="side_panel_row side_panel_row_capped" flex vertical layout>
 			<div class="cluster_info">
 					<div class="cluster_painter">
 						<div class='cluster-sticker' id='painter-dest'>?</div> 
@@ -183,9 +183,7 @@ other file types will be ignored<br>
 					<div class="cluster_others">
 					</div>
 				</div>
-			<div class="side_panel_row_body">
-				<div id="cluster_panel" class="scrollable_area grabbable" flex></div>
-			</div>
+			<div id="cluster_panel" class="scrollable_area grabbable" flex></div>
 		</div>
 
 
@@ -198,7 +196,6 @@ other file types will be ignored<br>
 	<div class="tilewall_text">No data selected. Choose a trial from the available files.</div>
 	</div>
 	
-	<div class="mask"></div>
 
 </div>
 

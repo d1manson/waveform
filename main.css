@@ -105,6 +105,7 @@ overflow:auto;
 .side_panel_row_capped{
 overflow-y: hidden;
 }
+
 /*
 .last_side_panel_row_inner{
 left:0px;
@@ -135,8 +136,6 @@ width: 100%;
 }
 #files_panel{
 /*max-height: 300px;*/
-overflow-y: scroll;
-width: 100%;
 overflow-x: hidden;
 }
 #info_panel{
@@ -147,8 +146,8 @@ max-height: 400px;
 height: 100%;
 }
 .scrollable_area{
-/*
 overflow-y: scroll;
+/*
 height: 100%;
 position: relative;
 */
@@ -549,6 +548,7 @@ visibility: visible;
 .last_side_panel_row_body > #cluster_panel{
 cursor: none;
 }
+#spatial_panel, 
 #cluster_panel{
 	text-align: center;
 }
