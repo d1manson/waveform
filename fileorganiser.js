@@ -14,7 +14,7 @@
 // looked at exp-tet. 
 var T = T || {};
 
-T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text){ // the T.ORG object was created by cut.js, here we add a lot more to it
+T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -57,10 +57,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     var pendingNewFiles = 0;
 
 	var exps = {}; //exps[some_exp_name] will be an EXP object
-    var $exp_list = $("<div class='exp_list'/>");
-    var $tet_list = $("<div class='button_group'/>").append($("<div class='tetrode_title'>tetrode:</div>"));
-    $files_panel.before($tet_list)
-                .append($exp_list);
 	var tet_buttons = []; //ith entry will hold $ of button if files for tet (i+1) are available
 			
 	// These three classes (EXP, EXP_TET, and EXP_CUT) store file names/cut instances, they also add dom nodes to the $exp_list and store jQuery handles for the new nodes.
@@ -700,7 +696,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetState = function(){return SimpleClone(cState)};
     return ORG;
 
-}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text')
+}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list')
 );
 
 

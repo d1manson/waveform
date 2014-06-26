@@ -154,7 +154,12 @@ other file types will be ignored<br>
 		<core-splitter direction="up"></core-splitter>
 
 		<div class="side_panel_row side_panel_row" vertical layout>
-			<div class="scrollable_area" id="files_panel" flex></div>
+			<div class='button_group above_scrollable_area' id='tet_list'>
+				<div class='tetrode_title'>tetrode:</div>
+			</div>
+			<div class="scrollable_area" id="files_panel" flex>
+			<div class='exp_list' id='exp_list'></div>
+			</div>
 		</div>
 		
 		<core-splitter direction="up"></core-splitter>
@@ -169,7 +174,7 @@ other file types will be ignored<br>
 		<core-splitter direction="up"></core-splitter>
 		
 		<div class="side_panel_row side_panel_row" flex vertical layout>
-			<div class="cluster_info">
+			<div class="cluster_info above_scrollable_area">
 					<div class="cluster_painter">
 						<div class='cluster-sticker' id='painter-dest'>?</div> 
 						&#8592; { 

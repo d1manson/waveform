@@ -749,6 +749,11 @@ T.ToggleHeaderInfo = function(){
 	T.DispHeaders(T.ORG.GetState());
 }
 
+T.ShowScrollShaddow = function(e){
+	var $this = $(this);
+	$this.prev().toggleClass("above_scrolled_area", $this.scrollTop() > 3 /*small number */);
+}
+
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
@@ -795,7 +800,7 @@ $('#drift_button').click(T.DriftButtonClick)
 				  .mousedown(T.ToggleElementState($('.drift_info'),false,true));
 $(document).on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
-
+$('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 // KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 key('p',T.TogglePalette);
 key('a',T.RunAutocut);
