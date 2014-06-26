@@ -75,11 +75,12 @@ height: 100%;
 width: 100%;
 }
 .side_panel{
+width: 355px;
+/*
 display: table;
 border-spacing: 2px;
-width: 355px;
 height: 100%;
-float: left;
+float: left;*/
 }
 .side_panel[state="closed"]{
 display: none;
@@ -134,9 +135,11 @@ max-height: 400px;
 height: 100%;
 }
 .scrollable_area{
+/*
 overflow-y: scroll;
 height: 100%;
 position: relative;
+*/
 }
 .tile{
 border: 1px solid #CCC;

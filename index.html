@@ -6,6 +6,8 @@
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
+<script src="polymer/platform.js"></script>
+<link rel="import" href="polymer/core-splitter.html">
 </head>
 
 <body>
@@ -27,11 +29,11 @@ other file types will be ignored<br>
 
 
 
-<div class="main_wrapper">
+<div class="main_wrapper" horizontal layout>
 
-	<div class="side_panel">
+	<div class="side_panel" vertical layout>
 
-		<div class="side_panel_row">
+		<div class="side_panel_row" vertical layout>
 			<div class="row_title" id="button_panel_toggle">button panel</div>
 
 			<div id="button_panel" class="collapsable_panel">
@@ -150,12 +152,16 @@ other file types will be ignored<br>
 			</div>
 		</div>
 
-		<div class="side_panel_row">
+		<core-splitter direction="up"></core-splitter>
+
+		<div class="side_panel_row" vertical layout>
 			<div class="row_title" id="files_panel_toggle">available files</div>
 			<div class="collapsable_panel" id="files_panel"></div>
 		</div>
+		
+		<core-splitter direction="up"></core-splitter>
 
-		<div class="side_panel_row">
+		<div class="side_panel_row" vertical layout>
 			<div class="row_title"  id="spatial_panel_toggle">pos data</div>
 			<div style="text-align:center;" class="collapsable_panel grabbable" id="spatial_panel" state="closed">
 				<div class='pos_plot_holder'>
@@ -165,8 +171,9 @@ other file types will be ignored<br>
 			</div>
 		</div>
 
-
-		<div class="side_panel_row">
+		<core-splitter direction="up"></core-splitter>
+		
+		<div class="side_panel_row" flex>
 			<div class="last_side_panel_row_inner">
 				<div class="last_side_panel_row_head row_title">
 					cluster plots
@@ -184,7 +191,7 @@ other file types will be ignored<br>
 						</div>
 					</div>
 				<div class="last_side_panel_row_body">
-					<div id="cluster_panel" class="scrollable_area grabbable"></div>
+					<div id="cluster_panel" class="scrollable_area grabbable" flex></div>
 				</div>
 			</div>
 		</div>
@@ -192,10 +199,10 @@ other file types will be ignored<br>
 
 	</div>
 
-	<div class="bar">
-	</div>
+	<core-splitter direction="left"></core-splitter>
+	
 
-	<div class="tilewall">
+	<div class="tilewall" flex>
 	<div class="tilewall_text">No data selected. Choose a trial from the available files.</div>
 	</div>
 	
