@@ -754,6 +754,11 @@ T.ShowScrollShaddow = function(e){
 	$this.prev().toggleClass("above_scrolled_area", $this.scrollTop() > 3 /*small number */);
 }
 
+
+$('core-toolbar').on('mouseenter','core-tooltip',function(){this.setPosition();}); //POLYMER BUGFIX
+
+T.$main_toolbar = $('.main_toolbar');
+$('.menu_toggle').mouseup(function(e){T.$main_toolbar.toggle(400);})
 $('.help_button').click(T.ShowHelp)
 				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
@@ -805,7 +810,7 @@ $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 key('p',T.TogglePalette);
 key('a',T.RunAutocut);
 
-//key('esc',###); //TODO: reimplement full tilewall view with polymer
+key('esc',function(){T.$main_toolbar.toggle(400);});
 key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
 key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
 key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],shiftKey:key.shift});});

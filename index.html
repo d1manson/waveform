@@ -8,9 +8,13 @@
 <link rel="stylesheet" type="text/css" href="main.css">
 <script src="polymer/platform.js"></script>
 <link rel="import" href="polymer/core-splitter.html">
+<link rel="import" href="polymer/core-tooltip.html">
+<link rel="import" href="polymer/core-icon-button.html">
+<link rel="import" href="polymer/core-toolbar.html">
 </head>
 
 <body>
+<core-iconset id="meta"></core-iconset>
 
 <div class="file_drop">
 <div id="filestem_caption"></div>
@@ -27,131 +31,161 @@ other file types will be ignored<br>
 </div>
 
 
+<div class="main_wrapper" vertical layout>
+	<div class="floatinginfo autocut_info">
+		<div class='floating_title'>Autocut [a]</div>
+		<div class='floating_body'>
+			<div id="autocut_caption"></div><br><br>
+			autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
+		</div>
+	</div>
+		
+	<div class="floatinginfo action_info">
+		<div class='floating_title'>Action List [z]</div>
+		<div class='floating_body'>
+			<div class="action_list"></div>
+		</div>
+	</div>
+	
+	<div class="floatinginfo drift_info">
+		<div class='floating_title'>Drift [d]</div>
+		<div class='floating_body'>
+			Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
+			<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+			So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+		</div>
+	</div>
+	
+	<div class="floatinginfo help_info">
+		<div class='floating_title'>Help [?]</div>
+		<div class='floating_body'>
+			Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
+			You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
+			
+			<br><br>
+			Some shortcuts:
+			<ul>
+			<li><b>d</b> toggle drift rendering on/off</li>
+			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+			<li><b>enter</b> increment cluster painting destination group</li>
+			<li><b>e</b> set the cluster painting destination group to the "active" group, i.e. the one currently under the mouse</li>
+			<li><b>f</b> similar to <i>e</i> above, but this sets the srouce group. Note you can hold down shift to toggle the src groups.</li>
+			<li><b>s</b> launch the swap dialog for the "active" group.</li>
+			</ul>
+		</div>						
+	</div>
+		
+	<div class="floatinginfo rm_info">
+		<div class='floating_title'>Spatial ratemap [r]</div>
+		<div class='floating_body'>
+			Bin size default is 2.5cm.  <br><br>
+			If you need to change this open the command line and type (e.g. 5cm):
+			<pre>T.ApplyRmSize(5)</pre>
+			The smoothing kernel is fixed as a 5x5 "boxcar".
+		</div>
+	</div>
+	
+	<div class="floatinginfo tc_info">
+			<div class='floating_title'>Temporal auto correlation [t]</div>
+			<div class='floating_body'>
+				Time window default is set at 500ms.  <br><br>
+				If you need to change this open the command line and type (e.g. 100ms):
+				<pre>T.TC.SetDeltaT(100)</pre>
+			</div>
+	</div>
 
-
-<div class="main_wrapper" horizontal layout>
-
-	<div class="side_panel" vertical layout>
-
-		<div class="side_panel_row" vertical layout>
-
-			<div id="button_panel" class="collapsable_panel">
-				<div class="button_group">
-					<button class="help_button">help</button>
-					<div class="floatinginfo help_info">
-						<div class='floating_title'>Help [?]</div>
-						<div class='floating_body'>
-							Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
-							You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-							
-							<br><br>
-							Some shortcuts:
-							<ul>
-							<li><b>d</b> toggle drift rendering on/off</li>
-							<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-							<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-							<li><b>enter</b> increment cluster painting destination group</li>
-							<li><b>e</b> set the cluster painting destination group to the "active" group, i.e. the one currently under the mouse</li>
-							<li><b>f</b> similar to <i>e</i> above, but this sets the srouce group. Note you can hold down shift to toggle the src groups.</li>
-							<li><b>s</b> launch the swap dialog for the "active" group.</li>
-							</ul>
-						</div>						
-					</div>
-					
-					<button id='undo_button' disabled>undo</button>
-					<div class="floatinginfo action_info">
-						<div class='floating_title'>Action List [z]</div>
-						<div class='floating_body'>
-							<div class="action_list"></div>
-						</div>
-					</div>
-					
-					<button id='file_headers_button'>headers</button>
-					<div class="floatinginfo file_info">
-						<div class='floating_title'>
-							file headers  [h]
-							<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
-						</div>
-						<div class='floating_body'>
-							<div id="info_panel" class="scrollable_area">
-								<div id='header_info' class='header_info'>
-									<div class="file_info_title" id="tet_info" style="display:none;"></div>
-									<div class="file_info_title" id="cut_info" style="display:none;"></div>
-									<div class="file_info_title" id="pos_info" style="display:none;"></div>
-									<div class="file_info_title" id="set_info" style="display:none;"></div>
-								</div>
-							</div>
-						</div>
-					</div>
-					
-					<button id="drift_button">drift</button>
-					<div class="floatinginfo drift_info">
-						<div class='floating_title'>Drift [d]</div>
-						<div class='floating_body'>
-							Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
-							<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-							So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
-						</div>
-					</div>
+	<div class="floatinginfo palette_info">
+		<div class='floating_title'>Toggle waveform palette [p]</div>
+		<div class='floating_body'>
+			There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
+			<ul>
+			<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
+			<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
+			<li>render each pixel based on how many waves cross that pixel</li>
+			</ul>
+		</div>						
+	</div>
+	
+	<div class="floatinginfo file_info">
+		<div class='floating_title'>
+			file headers  [h]
+			<input type="search" id="header_search" value="" size ="15" placeholder="filter headers"  incremental="incremental" >
+		</div>
+		<div class='floating_body'>
+			<div id="info_panel" class="scrollable_area">
+				<div id='header_info' class='header_info'>
+					<div class="file_info_title" id="tet_info" style="display:none;"></div>
+					<div class="file_info_title" id="cut_info" style="display:none;"></div>
+					<div class="file_info_title" id="pos_info" style="display:none;"></div>
+					<div class="file_info_title" id="set_info" style="display:none;"></div>
 				</div>
-				
-				<div class="button_group">
-					<div class="button display_button">c1</div>
-					<div class="button display_button">c2</div>
-					<div class="button display_button">c3</div>
-					<div class="button display_button">c4</div>
-					<div class="button display_button">rm</div>
-					<div class="floatinginfo rm_info">
-						<div class='floating_title'>Spatial ratemap [r]</div>
-						<div class='floating_body'>
-							Bin size default is 2.5cm.  <br><br>
-							If you need to change this open the command line and type (e.g. 5cm):
-							<pre>T.ApplyRmSize(5)</pre>
-							The smoothing kernel is fixed as a 5x5 "boxcar".
-						</div>
-					</div>
-					<div class="button display_button">tc</div>	
-					<div class="floatinginfo tc_info">
-						<div class='floating_title'>Temporal auto correlation [t]</div>
-						<div class='floating_body'>
-							Time window default is set at 500ms.  <br><br>
-							If you need to change this open the command line and type (e.g. 100ms):
-							<pre>T.TC.SetDeltaT(100)</pre>
-						</div>
-					</div>
-					<button id="toggle_palette">palette</button> 
-					<div class="floatinginfo palette_info">
-					<div class='floating_title'>Toggle waveform palette [p]</div>
-					<div class='floating_body'>
-						There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
-						<ul>
-						<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
-						<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
-						<li>render each pixel based on how many waves cross that pixel</li>
-						</ul>
-					</div>						
-				</div>
-				</div>
-				
-
-				<div class="button_group">
-				<button id="reorder_n_button">n-order</button>
-				<button id="reorder_A_button">a-order</button>
-				
-				<button id="autocut">autocut</button>
-				<div class="floatinginfo autocut_info">
-					<div class='floating_title'>Autocut [a]</div>
-					<div class='floating_body'>
-						<div id="autocut_caption"></div><br><br>
-						autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
-					</div>
-					</div>
-				</div>
-
 			</div>
 		</div>
+	</div>
+	
+	
+<core-toolbar class="main_toolbar">
+	<core-tooltip label="help on GitHub" position="right">					
+	<core-icon-button icon="flip-to-front" class="github_button"></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label="keyboard shortcuts">					
+	<core-icon-button icon="list" class="shortcuts_button"></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label='undo [z]'>
+	<core-icon-button icon="reply" id="undo_button"></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label='file headers [h]'>
+		<core-icon-button icon="info" id='file_headers_button'></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label='toggle drift [d]'>
+	<core-icon-button icon="swap-horiz" id='drift_button'></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label="toggle palette [p]">
+	<core-icon-button icon="invert-colors" id='toggle_palette'></core-icon-button>
+	</core-tooltip>
 
-		<core-splitter direction="up"></core-splitter>
+	<core-tooltip label="sort on group size [n]">
+		<core-icon-button icon="sort" id='reorder_n_button'></core-icon-button>
+	</core-tooltip>
+	<core-tooltip label="sort on channel amplitude">
+		<core-icon-button icon="sort" id='reorder_A_button'></core-icon-button>
+	</core-tooltip>
+	
+	<core-tooltip label="bad autocut [a]">
+		<core-icon-button icon="android" id='autocut'></core-icon-button>
+	</core-tooltip>
+			
+	<core-tooltip label="channel 1 [1]">
+		<div class="button display_button">c1</div>
+	</core-tooltip>
+	<core-tooltip label="channel 2 [2]">
+		<div class="button display_button">c2</div>
+	</core-tooltip>
+	<core-tooltip label="channel 3 [3]">
+		<div class="button display_button">c3</div>
+	</core-tooltip>
+	<core-tooltip label="channel 4 [4]">
+		<div class="button display_button">c4</div>
+	</core-tooltip>
+	<core-tooltip label="spatial ratemap [r]">
+		<div class="button display_button">rm</div>
+	</core-tooltip>
+	<core-tooltip label="temporal autocorrelation [t]">
+		<div class="button display_button">tc</div>
+	</core-tooltip>
+
+
+</core-toolbar>
+
+<div  flex horizontal layout>
+
+	<div class="side_panel" vertical layout>
 
 		<div class="side_panel_row side_panel_row" vertical layout>
 			<div class='button_group above_scrollable_area' id='tet_list'>
@@ -188,8 +222,7 @@ other file types will be ignored<br>
 				</div>
 			<div id="cluster_panel" class="scrollable_area grabbable" flex></div>
 		</div>
-
-
+	
 	</div>
 
 	<core-splitter direction="left"></core-splitter>
@@ -198,10 +231,15 @@ other file types will be ignored<br>
 	<div class="tilewall" flex>
 	<div class="tilewall_text">No data selected. Choose a trial from the available files.</div>
 	</div>
-	
+</div>
 
 </div>
 
+
+
+
+
+<core-icon-button icon="menu" class="menu_toggle"></core-icon-button>
 
 <!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  
