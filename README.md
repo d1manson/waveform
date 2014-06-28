@@ -11,6 +11,8 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 #### Screenshots
 Example view of the whole application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
+Note that this screenshot is a little out of date as the button panel has been converted into a toolbar along the top of the page.
+
 Some screenshots of individual features:     
 
 |                                   |                                         |
@@ -47,7 +49,7 @@ Using the drift button (shortcut `d`) you can see whether there was any shift in
 To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.  To close of a grabbed plot, hold down space again and click the plot.  The other floating info panes in the application (e.g. file header info) can also be closed by holding down space and clicking them.
 
 #### Keyboard shortcuts
-+ `escape` open/close side pannel.
++ `escape` open/close the toolbar.
 + `a`  do autocut. 
 + `p` cycle palette. 
 + `ctrl+z` or just `z` undo.
@@ -67,6 +69,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
+* Switched to using flex layout and polymer web components.
 * Added support for `.clu` files. Also improved the process of assigning cut files to trials. And cut files are now chronologically ordered and the most recent is the default.    
 * Optimised parts of the loading process and fixed a few bugs to do with using both mouse buttons.
 * Added a raw spike rendering feature to the spatial panel, which also renders mean time in drift mode.
@@ -126,6 +129,7 @@ If you are a proficient programmer and know a bit of HTML but no JavaScript, you
 * [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays)
 * [Workers](http://www.w3schools.com/html/html5_webworkers.asp)   
 * WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3))
+* [WebComponents and Polymer](http://www.polymer-project.org/)
 * FileSystem API
 * JavaScript Blobs
 * V8 optimization in Chrome     
