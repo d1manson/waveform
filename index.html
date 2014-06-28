@@ -61,9 +61,12 @@ other file types will be ignored<br>
 		<div class='floating_body'>
 			Help is available on the <img src="github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
 			You can submit bug reports and feature requests on <img src="github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-			
-			<br><br>
-			Some shortcuts:
+		</div>						
+	</div>
+		
+	<div class="floatinginfo shortcut_info">
+		<div class='floating_title'>Shortcuts [k]</div>
+		<div class='floating_body'>
 			<ul>
 			<li><b>d</b> toggle drift rendering on/off</li>
 			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
@@ -75,7 +78,7 @@ other file types will be ignored<br>
 			</ul>
 		</div>						
 	</div>
-		
+	
 	<div class="floatinginfo rm_info">
 		<div class='floating_title'>Spatial ratemap [r]</div>
 		<div class='floating_body'>
@@ -131,12 +134,12 @@ other file types will be ignored<br>
 <div class="main_wrapper" vertical layout>
 	
 <core-toolbar class="main_toolbar compact"><div class="fit">
-	<core-tooltip label="help on GitHub" position="right">					
-	<core-icon-button icon="flip-to-front" class="github_button"></core-icon-button>
+	<core-tooltip label="help on GitHub [?]" position="right">					
+	<core-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></core-icon-button>
 	</core-tooltip>
 	
-	<core-tooltip label="keyboard shortcuts [?]">					
-	<core-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='help_info'></core-icon-button>
+	<core-tooltip label="keyboard shortcuts [k]">					
+	<core-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label='undo [z]'>

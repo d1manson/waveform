@@ -588,8 +588,7 @@ T.StoreData = function(){
 	localStorage.tet = T.ORG.GetTet();
 	localStorage.xFactor = T.xFactor;
 	localStorage.yFactor = T.yFactor;
-
-	//TODO store cuts
+    
 	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.binSizeCm;
 	localStorage.state = 1;
@@ -597,14 +596,11 @@ T.StoreData = function(){
 	localStorage.paletteMode = T.paletteMode;
     localStorage.painterR = T.Tool.PainterState.r;
     localStorage.clusterPlotSize = T.CP.GetSize();
-	localStorage.button_pannel_state = $('#button_panel').attr("state") || "";
-    localStorage.spatial_pannel_state = $('#spatial_panel').attr("state") || "";
-    
-	localStorage.side_panel_width = 100*T.$side_panel.width()/$(document).width();
+    localStorage.splitterPercents = JSON.stringify($.map($('core-splitter').get(),function(el){return el.getSize('%');}));
+	localStorage.showToolbar = T.$main_toolbar.is(":visible");
 }
 
-T.DocumentReady = function(){
-
+T.ApplyStoredSettingsA = function(){
 	if(localStorage.state){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
 		T.xFactor = localStorage.xFactor || 2;
@@ -614,24 +610,34 @@ T.DocumentReady = function(){
 		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
         T.Tool.PainterState.r = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
-		//TODO: load files into T.cut instances
-        if(localStorage.button_pannel_state) //this is open by default, so close if required
-            $('#button_panel').attr("state",localStorage.button_pannel_state)
-        if(localStorage.spatial_pannel_state == "")
-            $('#spatial_panel').removeAttr("state") //this is closed by default, so open if required
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.RM.SetCmPerBin(T.binSizeCm);
-		
-		var wPc = localStorage.side_panel_width || 25;
-		T.$side_panel.css({width: wPc + '%'});
-		
+		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
+				
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
+			
 
 	}else{
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
 	}
+}
+
+T.ApplyStoredSettingsB = function(e) {
+	//this is run when the web components are loaded and ready for action
+	$.map(
+		zip([
+			$('core-splitter').get(),
+			(JSON.parse(localStorage.splitterPercents) || [30,30,25]) 
+		]),function(el_n_val){
+			el_n_val[0].setSize(el_n_val[1],'%')
+	});
 	
+}
+
+
+T.DocumentReady = function(){
+	T.ApplyStoredSettingsA();
 	T.InitFloatingInfo();
 	T.InitKeyboardShorcuts();
 	T.InitButtons();
@@ -758,10 +764,12 @@ T.InitKeyboardShorcuts = function(){
 	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
+	key('k, alt+k',T.Toggle('shortcut_info'));
 	key('alt+a',T.Toggle('autocut_info'));
 	key('ctrl+z, z',T.UndoLastAction);
 	key('alt+r',T.Toggle('rm_info'));
-	key('/, alt+/',T.Toggle('help_info'));
+	key('/',T.ShowGitHub);
+	key('alt+/',T.Toggle('help_info'));
 	key('alt+p',T.Toggle('palette_info'));
 	key('alt+d',T.Toggle('drift_info'));
 	key('alt+t',T.Toggle('tc_info'));
@@ -831,6 +839,7 @@ if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 
 $(document).bind("contextmenu",function(e){return false;})
 		    .ready(T.DocumentReady);
+$(window).on('polymer-ready',T.ApplyStoredSettingsB);
 window.onbeforeunload = T.StoreData;
 
 

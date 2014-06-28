@@ -100,6 +100,27 @@ Example:
       var d = e[this.horizontal ? 'dy' : 'dx'];
       this.target.style[this.dimension] = 
           this.size + (this.isNext ? -d : d) + 'px';
+    },
+    
+    getSize: function(units){
+        this.trackStart();
+        switch(units){
+            case 'pc':
+            case '%':
+                return this.size/parseInt(getComputedStyle(this.target.parentElement)[this.dimension])*100;
+            default:
+                return this.size
+        }
+    },
+    
+    setSize: function(val,units){
+        this.trackStart();
+        switch(units){
+            case 'pc':
+            case '%':
+                val = val/100*parseInt(getComputedStyle(this.target.parentElement)[this.dimension]);
+        }
+        this.target.style[this.dimension] = val + "px";
     }
     
   });

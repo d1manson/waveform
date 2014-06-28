@@ -45,6 +45,16 @@ $.fn.translate = function(x,y){
     
 }
 
+//From http://stackoverflow.com/a/10284006/2399799
+//Pythonic-type zip (ignoring edge cases)
+function zip(arrays) {
+    return arrays[0].map(function(_,i){
+        return arrays.map(function(array){return array[i]})
+    });
+}
+
+
+
 //Escape a user specified string for use in regex search.
 // Taken from http://stackoverflow.com/a/3561711
 RegExp.escape= function(s) {
