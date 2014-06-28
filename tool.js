@@ -427,10 +427,11 @@ T.Tool.$GrabIt_Css = $(
 	"border: 3px solid #F00;"+
 	"box-sizing:border-box;-moz-box-sizing:border-box;" +
 	"background: rgba(255,255,255,0.5);"+
-	"content: ' ';"+
-	"cursor:pointer !important;}"+
+	"content: ' ';}"+
 ".floatinginfo:hover:after{"+
 	"background: rgba(255,200,200,0.5);}"+
+".grabbable, .floatinginfo{" +
+	"cursor:pointer !important;}" +
 "</style>");
 
 T.$floating_layer = $('.floating_layer');
