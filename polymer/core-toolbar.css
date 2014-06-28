@@ -31,7 +31,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 :host(.tall) {
   height: 192px;
 }
-
 .toolbar-tools {
   height: 64px;
   padding: 0 8px;
@@ -42,7 +41,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 :host(.narrow) {
   height: 56px;
 }
-
 :host(.narrow.medium-tall) {
   height: 112px;
 }
@@ -55,6 +53,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   height: 56px;
   padding: 0;
 }
+
+/* compact layout */
+:host(.compact){
+  height: 42px;
+}
+:host(.compact) .toolbar-tools {
+  height: 42px;
+  padding: 0;
+}
+
 
 /* middle bar */
 #middleBar {
