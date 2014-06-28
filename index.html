@@ -22,7 +22,7 @@
 <b><br>set | pos | tet | cut | clu</b><br>
 you can drag further files onto the window at any point<br>
 other file types will be ignored<br>
-<button class="help_button" style="position: relative; top: 20px;">Go to quickstart guide on GitHub</button>
+<button class="github_button" style="position: relative; top: 20px;">Go to quickstart guide on GitHub</button>
 </div>
 <div id="works_with_chrome">Tested with Chrome <img src="chromelogo.png" width="15px"/></div>
 <div id="filesystem_buttons"> <button id="filesystem_button">turn on FileAPIs</button>
@@ -30,8 +30,8 @@ other file types will be ignored<br>
 </div>
 </div>
 
+<div class="floating_layer">
 
-<div class="main_wrapper" vertical layout>
 	<div class="floatinginfo autocut_info">
 		<div class='floating_title'>Autocut [a]</div>
 		<div class='floating_body'>
@@ -124,6 +124,11 @@ other file types will be ignored<br>
 		</div>
 	</div>
 	
+</div>
+
+
+
+<div class="main_wrapper" vertical layout>
 	
 <core-toolbar class="main_toolbar compact"><div class="fit">
 	<core-tooltip label="help on GitHub" position="right">					
@@ -131,34 +136,35 @@ other file types will be ignored<br>
 	</core-tooltip>
 	
 	<core-tooltip label="keyboard shortcuts [?]">					
-	<core-icon-button icon="list" class="shortcuts_button"></core-icon-button>
+	<core-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='help_info'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label='undo [z]'>
-	<core-icon-button icon="reply" id="undo_button"></core-icon-button>
+	<core-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label='file headers [h]'>
-		<core-icon-button icon="info" id='file_headers_button'></core-icon-button>
+		<core-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label='toggle drift [d]'>
-	<core-icon-button icon="swap-horiz" id='drift_button'></core-icon-button>
+	<core-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label="toggle palette [p]">
-	<core-icon-button icon="invert-colors" id='toggle_palette'></core-icon-button>
+	<core-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></core-icon-button>
 	</core-tooltip>
 
 	<core-tooltip label="sort on group size [n]">
 		<core-icon-button icon="sort" id='reorder_n_button'></core-icon-button>
 	</core-tooltip>
+	
 	<core-tooltip label="sort on channel amplitude">
 		<core-icon-button icon="sort" id='reorder_A_button'></core-icon-button>
 	</core-tooltip>
 	
 	<core-tooltip label="bad autocut [a]">
-		<core-icon-button icon="android" id='autocut'></core-icon-button>
+		<core-icon-button icon="android" id='autocut' class="info_linked" data-info-name='autocut_info'></core-icon-button>
 	</core-tooltip>
 			
 	<core-tooltip label="channel 1 [1]">
@@ -174,10 +180,10 @@ other file types will be ignored<br>
 		<div class="button display_button">c4</div>
 	</core-tooltip>
 	<core-tooltip label="spatial ratemap [r]">
-		<div class="button display_button">rm</div>
+		<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
 	</core-tooltip>
 	<core-tooltip label="temporal autocorrelation [t]">
-		<div class="button display_button">tc</div>
+		<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
 	</core-tooltip>
 
 </div></core-toolbar>

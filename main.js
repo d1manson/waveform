@@ -96,10 +96,14 @@ T.FinishedLoadingFile = function(status,filetype){
 
 }
 
+T.DispHeadersForced = function(){
+	T.DispHeaders(T.ORG.GetState(),undefined,true);
+}
 
-T.DispHeaders = function(status,filetype){
-	if(T.$file_info_pane.attr("state") != "closed") //closed here confusingly means visible
+T.DispHeaders = function(status,filetype,forced){
+	if(!forced && !T.$file_info_pane.hasClass("showing"))
 		return;
+		
 	//TODO: move to separate module
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
 	console.time("DipsHeaders");
@@ -154,28 +158,12 @@ T.SetDisplayIsOn = function(v){
 
 }
 
-T.DisplayIsOnMouseDown = function(evt){
-	if(evt.button == 2){
-		var thisVal = $(this).data('domindex');
-		var found = false;
-		if(thisVal == T.DISPLAY_ISON.TC){
-			T.ToggleElementState($('.tc_info'),true);
-			found = true;
-		}
-		if(!found) for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
-			T.ToggleElementState($('.rm_info'),true);
-			found = true;
-			break;
-		}
-		return;
-	}
-}
 
 T.DisplayIsOnClick = function(evt,keyboard){
 	//displayIsOn are the 6 buttons: 4xchannel 1xratemap 1xtemporal-autocorr
 	
 	//Can now be called as a keyboard shortcut in which case this is not set and keyboard has the info not evt.
-	//Note click is only triggered with left mouse button, see DisplayIsOnMouseDown for right click.
+	//Note click is only triggered with left mouse button.
 
 	var oldChans = T.chanIsOn;
 	var oldMaps = T.mapIsOn;
@@ -412,7 +400,7 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 	//todo: I don't know if you can clear the filesystem here because it is async and we want to reload the page.
 }
 
-T.ShowHelp = function(){
+T.ShowGitHub = function(){
 	window.open("https://github.com/d1manson/waveform/tree/master#wiki","_blank");
 }
 
@@ -439,15 +427,7 @@ T.TogglePalette = function(val){
 	T.WV.SetPaletteMode(T.paletteMode);
 }
 
-T.AutocutMouseDown = function(evt){
-	if(evt.button == 2)
-		T.ToggleElementState($('.autocut_info'),true);
-}
 
-T.AutocutMouseDown = function(evt){
-	if(evt.button == 2)
-		T.ToggleElementState($('.autocut_info'),true);
-}
 
 T.RunAutocut = function(){
     T.$autocut_info.attr("state","closed"); //TODO: rename the attribute as closed actually means it's visible
@@ -489,27 +469,6 @@ T.ToggleFS = function(newState){
 		T.FS.Toggle(true,T.ShowFileSystemLoaded);
 	}
 }
-
-//For a jQuery element or an array of jQuery elements it removes an existing "state" attribute or adds "state=closed"
-T.ToggleElementState = function(el,doItNow,onRightClickOnly){
-	var foo =  function(e){
-		if(onRightClickOnly && e.button == 0)
-			return;
-			
-		el = [].concat(el); //force it to be an array
-		for(var i=0;i<el.length;i++)if(el[i])
-			if(el[i].attr("state"))
-				el[i].removeAttr("state"); 
-			else 
-				el[i].attr("state","closed");
-	};
-	
-	if(doItNow)
-		foo();
-	else
-		return foo;
-}
-
 
 
 T.CutActionCallback = function(info){
@@ -619,37 +578,7 @@ T.UndoLastAction = function () {
 		c.Undo();
 }
 
-T.FloatingInfo_MouseDown = function(event){
-    var $this = $(this);
-    var offset = $this.position();
-	event.preventDefault();
-	
-    $this.css({zIndex: ++T.floatingTopZ})
-    T.FloatInfoMoving = {$: $(this),
-                    off_left: offset.left-event.clientX,
-    				off_top: offset.top-event.clientY        
-                    }
-    $(document).mousemove(T.FloatingInfo_DocumentMouseMove)
-               .mouseup(T.FloatingInfo_DocumentMouseUp);	
-	$('html').attr("dragging",true);
-}
-T.FloatingInfo_DocumentMouseMove = function(e){
-    T.FloatInfoMoving.$.translate(event.clientX + T.FloatInfoMoving.off_left, 
-                                  event.clientY + T.FloatInfoMoving.off_top)
-        
-}
-T.FloatingInfo_DocumentMouseUp = function(e){
-	var $this = T.FloatInfoMoving.$;
-    T.FloatInfoMoving = null;
-    $(document).off('mousemove mouseup');
-	$('html').removeAttr("dragging");
-	if(T.Tool.cState == T.Tool.STATES.GRABBER){
-		if($this.hasClass('grabbed_info'))
-			$this.remove();
-		else
-			T.ToggleElementState($this,true);
-	}
-}
+
 
 T.StoreData = function(){
 	localStorage.chanIsOn = JSON.stringify(T.chanIsOn);
@@ -702,6 +631,10 @@ T.DocumentReady = function(){
 	}else{
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
 	}
+	
+	T.InitFloatingInfo();
+	T.InitKeyboardShorcuts();
+	T.InitButtons();
 }
 
 T.DriftButtonClick = function(){
@@ -745,8 +678,8 @@ T.SetGroupOver = function(g){
 }
 
 T.ToggleHeaderInfo = function(){
-	T.ToggleElementState(T.$file_info_pane,true); 
-	T.DispHeaders(T.ORG.GetState());
+	T.$file_info_pane.toggleClass('showing');
+	T.DispHeadersForced();
 }
 
 T.ShowScrollShaddow = function(e){
@@ -754,13 +687,113 @@ T.ShowScrollShaddow = function(e){
 	$this.prev().toggleClass("above_scrolled_area", $this.scrollTop() > 3 /*small number */);
 }
 
+T.FloatingInfo_MouseDown = function(event){
+    var $this = $(this);
+    var offset = $this.position();
+	event.preventDefault();
+	
+    $this.css({zIndex: ++T.floatingTopZ})
+    T.FloatInfoMoving = {$: $(this),
+                    off_left: offset.left-event.clientX,
+    				off_top: offset.top-event.clientY        
+                    }
+    $(document).mousemove(T.FloatingInfo_DocumentMouseMove)
+               .mouseup(T.FloatingInfo_DocumentMouseUp);	
+	$('html').attr("dragging",true);
+}
+T.FloatingInfo_DocumentMouseMove = function(e){
+    T.FloatInfoMoving.$.translate(event.clientX + T.FloatInfoMoving.off_left, 
+                                  event.clientY + T.FloatInfoMoving.off_top)
+        
+}
+T.FloatingInfo_DocumentMouseUp = function(e){
+	var $this = T.FloatInfoMoving.$;
+    T.FloatInfoMoving = null;
+    $(document).off('mousemove mouseup');
+	$('html').removeAttr("dragging");
+	if(T.Tool.cState == T.Tool.STATES.GRABBER){
+		if($this.hasClass('grabbed_info'))
+			$this.remove();
+		else
+			$this.toggleClass('showing');
+	}
+}
+T.Toggle = function(info_name){
+	var $el = $('.floating_layer').find("." + info_name); 
+	return function(){$el.toggleClass('showing');};
+}
 
-$('core-toolbar').on('mouseenter','core-tooltip',function(){this.setPosition();}); //POLYMER BUGFIX
+T.InitFloatingInfo = function(){
+	var $floating_layer = $('.floating_layer');
+	$('.info_linked').each(function(){
+		var info_name = $(this).data('info-name');
+		$(this).data('$info',$floating_layer.find('.' + info_name));
+	})
+	.on('mouseenter',function(){
+		$(this).data('$info').css({display:'block'});
+	})
+	.on('mouseleave',function(){
+		$(this).data('$info').css({display:''});
+	})
+	.on('mousedown',function(e){
+		if(e.button != 0 || e.altKey)
+			$(this).data('$info').toggleClass('showing');
+	});
+}
 
+T.ToggleToolbar = function(){
+	T.$main_toolbar.css({height: ''})
+				.slideToggle({duration: 400, queue:false});
+}
+T.InitKeyboardShorcuts = function(){
+	// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
+	key('p',T.TogglePalette);
+	key('a',T.RunAutocut);
+	key('esc',T.ToggleToolbar);
+	key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
+	key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
+	key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],shiftKey:key.shift});});
+	key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
+	key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
+	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+	key('d',T.DriftButtonClick);
+	key('h, alt+h',T.ToggleHeaderInfo);
+	key('alt+a',T.Toggle('autocut_info'));
+	key('ctrl+z, z',T.UndoLastAction);
+	key('alt+r',T.Toggle('rm_info'));
+	key('/, alt+/',T.Toggle('help_info'));
+	key('alt+p',T.Toggle('palette_info'));
+	key('alt+d',T.Toggle('drift_info'));
+	key('alt+t',T.Toggle('tc_info'));
+	key('alt+z',T.Toggle('action_info'));
+	key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
+	key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
+	key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
+	key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
+	key('e',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.SetPainterDestGroup(T.groupOver.g);});
+	key('f, shift+f',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.PainterSrc_Toggle(T.groupOver.g);});
+	key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
+}
+
+T.InitButtons = function(){
+	$('#reorder_n_button').click(T.ReorderNCut);
+	$('#reorder_A_button').click(T.ReorderACut);
+	$('#undo_button').click(T.UndoLastAction);
+	T.$displayButtons.each(function(i){$(this).data('domindex',i);})
+											.click(T.DisplayIsOnClick);
+	$('#toggle_palette').click(T.TogglePalette);
+	$('#autocut').click(T.RunAutocut);
+	$('#apply_rm_size').click(T.ApplyRmSizeClick);
+	T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
+	$('#file_headers_button').on('mouseenter',T.DispHeadersForced);
+	$('.github_button').on('click',T.ShowGitHub);
+	$('.menu_toggle').mouseup(T.ToggleToolbar);
+	T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
+	$('#drift_button').click(T.DriftButtonClick);
+}
+
+$('core-tooltip').on('mouseenter',function(){this.setPosition();}); //POLYMER BUGFIX
 T.$main_toolbar = $('.main_toolbar');
-$('.menu_toggle').mouseup(function(e){T.$main_toolbar.toggle(400);})
-$('.help_button').click(T.ShowHelp)
-				 .mousedown(T.ToggleElementState($('.help_info'),false,true));
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.$pos_overlay = $('#posoverlay');
@@ -776,64 +809,23 @@ T.$cluster_info = $('.cluster_info');
 T.$painter_dest = $('#painter-dest');
 T.$painter_src = $('#painter-src');
 T.$cluster_others = $('.cluster_others');
-$('#reorder_n_button').click(T.ReorderNCut);
-$('#reorder_A_button').click(T.ReorderACut);
-T.$undo = $('#undo_button').click(T.UndoLastAction)
-						   .mousedown(T.ToggleElementState($('.action_info'),false,true));
-T.$FSbutton = $('#filesystem_button').click(T.ToggleFS);
+T.$undo = $('#undo_button');
+T.$FSbutton = $('#filesystem_button');
 T.$files_panel = $('#files_panel');
-$('#files_panel_toggle').click(T.ToggleElementState(T.$files_panel));
-T.$displayButtons = $(".display_button").each(function(i){$(this).data('domindex',i);})
-										.click(T.DisplayIsOnClick)
-										.mousedown(T.DisplayIsOnMouseDown);
-$('#toggle_palette').click(T.TogglePalette)
-					.mousedown(T.ToggleElementState($('.palette_info'),false,true));
-$('#autocut').click(T.RunAutocut)
-			 .mousedown(T.ToggleElementState(T.$autocut_info,false,true));
-$('#apply_rm_size').click(T.ApplyRmSizeClick);
+T.$displayButtons = $(".display_button");
 T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
-T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 T.$file_info_pane = $('.file_info');
-$('#file_headers_button').mousedown(T.ToggleHeaderInfo);
-T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
+
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
 T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
-$('#drift_button').click(T.DriftButtonClick)
-				  .mousedown(T.ToggleElementState($('.drift_info'),false,true));
-$(document).on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
+
+$('.floating_layer').on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
-// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
-key('p',T.TogglePalette);
-key('a',T.RunAutocut);
 
-key('esc',function(){T.$main_toolbar.toggle(400);});
-key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
-key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
-key('3, shift+3',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[2],shiftKey:key.shift});});
-key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
-key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
-key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
-key('d',T.DriftButtonClick);
-key('h, alt+h',T.ToggleHeaderInfo);
-key('alt+a',T.ToggleElementState(T.$autocut_info));
-key('ctrl+z, z',T.UndoLastAction);
-key('alt+r',T.ToggleElementState($('.rm_info')));
-key('/, alt+/',T.ToggleElementState($('.help_info')));
-key('alt+p',T.ToggleElementState($('.palette_info')));
-key('alt+d',T.ToggleElementState($('.drift_info')));
-key('alt+t',T.ToggleElementState($('.tc_info')));
-key('alt+z',T.ToggleElementState($('.action_info')));
-key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
-key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
-key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
-key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
-key('e',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.SetPainterDestGroup(T.groupOver.g);});
-key('f, shift+f',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.PainterSrc_Toggle(T.groupOver.g);});
-key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
 if(!(window.requestFileSystem || window.webkitRequestFileSystem))
 	$('#filesystem_button').hide();
 

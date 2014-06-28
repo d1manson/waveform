@@ -415,7 +415,25 @@ T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
 
 /* ========================= PLOT-GRABBER ================== */
 //TODO: this shouldnt really be in this file. it is really better grouped with main
-T.Tool.$GrabIt_Css = $("<style>.grabbable:hover:after, .floatinginfo:hover:after{position: absolute; left:0px; top:0px; display: block; width: 100%; height: 100%; border: 3px solid #F00; box-sizing:border-box;-moz-box-sizing:border-box;background: rgba(255,255,255,0.5); content: ' ';cursor:pointer !important;}.floatinginfo:hover:after{background: rgba(255,200,200,0.5);}</style>");
+T.Tool.$GrabIt_Css = $(
+"<style>"+
+".grabbable:hover:after, " +
+".floatinginfo:hover:after{"+
+	"position: absolute; "+
+	"left:0px; top:0px; "+
+	"display: block;"+
+	"width: 100%;"+
+	"height: 100%;"+
+	"border: 3px solid #F00;"+
+	"box-sizing:border-box;-moz-box-sizing:border-box;" +
+	"background: rgba(255,255,255,0.5);"+
+	"content: ' ';"+
+	"cursor:pointer !important;}"+
+".floatinginfo:hover:after{"+
+	"background: rgba(255,200,200,0.5);}"+
+"</style>");
+
+T.$floating_layer = $('.floating_layer');
 
 T.Tool.GrabIt = function(){
 	// clones $this into a floating info pane
@@ -436,7 +454,7 @@ T.Tool.GrabIt = function(){
 			.translate(p.left +30,p.top +30)
 			.show();
 	
-	$('body').append($pane);
+	T.$floating_layer.append($pane);
 	
 }
 

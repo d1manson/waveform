@@ -22,8 +22,11 @@ font-size: 0.8em;
 -o-user-select: none;
 user-select: none;
 }
+.floating_layer{
+position: fixed;
+z-index:100;
+}
 .main_toolbar{
-display:none;
 background: #efefef;
 box-shadow: inset 0 0 2px 1px #ccc;
 }
@@ -41,15 +44,6 @@ vertical-align:bottom;
 }
 .grabbable{
 position: relative;
-}
-.mask{
-position: fixed;
-left: 0px;
-top: 0px;
-z-index: 999;
-height: 100%; 
-width: 100%; 
-display: none;
 }
 .poslayer{
 margin: 0 auto;
@@ -497,11 +491,9 @@ visibility: visible;
 .separator_half{
     display: inline-block;
 }
-.last_side_panel_row_body > #cluster_panel{
-cursor: none;
-}
 #cluster_panel{
 	text-align: center;
+	cursor: none;
 }
 #cluster_panel > canvas{
 margin: 2px;
@@ -520,6 +512,9 @@ display:none;
 z-index:100;
 cursor: move;
 box-shadow: 3px 3px 7px #999;
+}
+.showing{
+display: block;
 }
 .floating_title{
 background:#333;
@@ -542,12 +537,6 @@ pointer-events: none;
 }
 html[dragging]{
 cursor:move;
-}
-button:hover + .floatinginfo,
-label:hover + .floatinginfo,
-div:hover + .floatinginfo,
-.floatinginfo[state="closed"]{
-display: block;
 }
 pre{
 font-size: 1.2em;
