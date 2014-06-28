@@ -30,10 +30,16 @@ T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<div class='tile-sticker'></div>" + 
 			"<div class='tile-over'>" +
-				"<div class='tile-buttons'>" +
-					"<button class='tile-button-swap'></button>" +
-					"<button class='tile-button-dest'></button>" +
-					"<button class='tile-button-src'></button>" +
+				"<div class='tile-buttons' layout vertical>" +
+					"<core-tooltip label='swap with... [s]' position='left'>" +
+						"<button class='tile-button-swap'></button>" +
+					"</core-tooltip>" +
+					"<core-tooltip label='make destination group [e]' position='left'>" +
+						"<button class='tile-button-dest'></button>" +
+					"</core-tooltip>" +
+					"<core-tooltip label='make source group [f]' position='left'>" +
+						"<button class='tile-button-src'></button>" +
+					"</core-tooltip>" +
 					"<div class='tile-caption'></div>" + 
 				"</div>" + 
 			"</div>" +

@@ -42,7 +42,7 @@ T.TileDoubleClick = function(event){
 }
 
 T.Tool.Button_Swap = function(event){
-    var g = $(this).parent().parent().parent().data('group_num');
+    var g = $(this).closest(".tile").data('group_num');
     T.Tool.Swap(g);
 }
 
@@ -53,12 +53,12 @@ T.Tool.Swap = function(g){
 }
 
 T.Tool.Button_PainterDest = function(event){
-	var g = $(this).parent().parent().parent().data('group_num');
+	var g = $(this).closest(".tile").data('group_num');
 	T.Tool.SetPainterDestGroup(g);
 }
 
 T.Tool.Button_PainterSrc = function(event){
-	var g = $(this).parent().parent().parent().data('group_num');
+	var g = $(this).closest(".tile").data('group_num');
 	
 	T.Tool.PainterSrc_Toggle(g);
 }

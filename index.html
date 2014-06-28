@@ -75,6 +75,12 @@ other file types will be ignored<br>
 			<li><b>e</b> set the cluster painting destination group to the "active" group, i.e. the one currently under the mouse</li>
 			<li><b>f</b> similar to <i>e</i> above, but this sets the srouce group. Note you can hold down shift to toggle the src groups.</li>
 			<li><b>s</b> launch the swap dialog for the "active" group.</li>
+			<br>
+			<li><b>esc</b> open/close the toolbar</li>
+			<li><b>p</b> toggle palette</li>
+			<li><b>k</b> show this info</li>
+			<li><b>h</b> show header info</li>
+			<li><b>?</b> open GitHub info in a new tab</li>
 			</ul>
 		</div>						
 	</div>
@@ -218,11 +224,15 @@ other file types will be ignored<br>
 		<div class="side_panel_row side_panel_row" flex vertical layout>
 			<div class="cluster_info above_scrollable_area">
 					<div class="cluster_painter">
-						<div class='cluster-sticker' id='painter-dest'>?</div> 
+						<core-tooltip label="destination group [e]" position="right">
+							<div class='cluster-sticker' id='painter-dest'>?</div> 
+						</core-tooltip>
 						&#8592; { 
-						<div id='painter-src'>
-							<div class='cluster-sticker'>?</div>
-						</div> 
+						<core-tooltip label="source groups [f]">
+							<div id='painter-src'>
+								<div class='cluster-sticker'>?</div>
+							</div> 
+						</core-tooltip>
 						}
 					</div>
 					<div class="cluster_others">
