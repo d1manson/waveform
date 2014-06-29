@@ -76,12 +76,27 @@ T.SpikeForPathCallback = function($canv){
 	T.$pos_overlay = $canv;
 }
 
+T.ShowInfoSummary = function(status,filetype){
+    if(filetype == null && status.set < 3){
+        T.$info_summary.text("");
+    }else if(filetype == "set" && status.set >=2){
+        var hd = T.ORG.GetSetHeader();
+        var startTime = new Date(hd["trial_date"] + " " + hd["trial_time"]);
+        var endTime = new Date(startTime)
+        endTime.setSeconds(startTime.getSeconds() + parseInt(hd["duration"]));
+        var str = startTime.getHours() + ":" + (startTime.getMinutes() <10? "0" : "") +  startTime.getMinutes() + " to "
+                    + endTime.getHours() + ":" + (endTime.getMinutes() <10? "0" : "") + endTime.getMinutes();
+        T.$info_summary.text(str);
+		T.$info_summary.css({opacity: 1});
+    }
+}
 T.FinishedLoadingFile = function(status,filetype){
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 	if(T.ORG.GetExpName())
 		T.$tilewall_text.hide();
 		
 	T.DispHeaders(status,filetype); //if null, then it displays all (which could still be something if T.PAR.Get*Header isn't null)
+    T.ShowInfoSummary(status,filetype);
 
 	if(filetype == null){	
 		if(status.tet < 3){
@@ -675,9 +690,12 @@ T.SetGroupOver = function(g){
     T.$pos_overlay.get(0).getContext('2d').clearRect( 0 , 0 , T.POS_PLOT_WIDTH ,T.POS_PLOT_HEIGHT );
     
 	T.groupOver.g = g;
-	if(!(g==0 || g>0))
+	if(!(g==0 || g>0)){
+		T.$info_summary.css({opacity: 1});
 		return;
-		
+	}
+	
+	T.$info_summary.css({opacity: 0});
 	T.groupOver.$clusterSticker = T.$cluster_info.find('.cluster-sticker[data-group=' + g + ']');
 	T.groupOver.$tile = T.tiles[g] ? T.tiles[g].$ : null;
 	
@@ -863,7 +881,7 @@ T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$file_info_pane = $('.file_info');
-
+T.$info_summary = $('.info_summary');
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
 T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
