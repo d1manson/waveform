@@ -757,6 +757,35 @@ T.ToggleToolbar = function(){
 	T.$main_toolbar.css({height: ''})
 				.slideToggle({duration: 400, queue:false});
 }
+
+T.MakeCopyData = function(){
+	//WARNING: no escaping of text here
+	var str = "[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet();
+	if (T.groupOver.g >0 || T.groupOver.g == 0){
+		str += "c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>"; 
+		str += T.groupOver.$tile.find('canvas').get()
+					.map(function(c){
+						return "<img src='" + c.toDataURL() +"' width='" + c.style.width + "' height='" + c.style.height + "'/>";
+				}).join("");
+	}
+	return str;
+}
+
+T.Copy = function(e){
+    // based on: http://stackoverflow.com/a/11347714/2399799    
+    if (e.ctrlKey && !e.altKey && !e.shiftKey && e.which == 67 /* KEY_C */) {
+        T.$hidden_clipboard.html(T.MakeCopyData());
+        var rng = document.createRange();
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        rng.selectNodeContents(T.$hidden_clipboard.get(0));
+        sel.addRange(rng);
+        return true;
+    }
+}
+
+
+
 T.InitKeyboardShorcuts = function(){
 	// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 	key('p',T.TogglePalette);
@@ -787,6 +816,8 @@ T.InitKeyboardShorcuts = function(){
 	key('e',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.SetPainterDestGroup(T.groupOver.g);});
 	key('f, shift+f',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.PainterSrc_Toggle(T.groupOver.g);});
 	key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
+    
+    $(document).on('keydown',T.Copy);
 }
 
 T.InitButtons = function(){
@@ -808,6 +839,7 @@ T.InitButtons = function(){
 
 $('core-tooltip').on('mouseenter',function(){this.setPosition();}); //POLYMER BUGFIX
 T.$main_toolbar = $('.main_toolbar');
+T.$hidden_clipboard = $('.hidden_clipboard');
 T.$tilewall = $('.tilewall');
 T.$posplot = $('#posplot');
 T.$pos_overlay = $('#posoverlay');

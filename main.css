@@ -22,6 +22,17 @@ font-size: 0.8em;
 -o-user-select: none;
 user-select: none;
 }
+.hidden_clipboard{
+opacity: 0;
+position: absolute;
+top: -10000px;
+right: 0;
+-webkit-user-select: initial;
+-khtml-user-select: inital;
+-moz-user-select: -moz-initial;
+-o-user-select: initial;
+user-select: initial;
+}
 .floating_layer{
 position: fixed;
 z-index:100;
