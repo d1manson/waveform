@@ -172,14 +172,15 @@ T.Tool.EndMerger = function(){
         "mousemove": T.Tool.TileMouseMove_MergerTarget
     }, ".tile");
 	T.$tilewall.off("scroll");
-	T.Tool.cState.$placeholder.remove();
-	(T.Tool.cState.$pos_overlay || $([])).remove();
-	T.Tool.cState.$pos_overlay = null;
-	T.Tool.cState.$h.translate(null)
-                    .css({position:'relative'})
-					.removeAttr('moving')
-					.toggleClass('shake',true)
-					.removeAttr('proximate');
+	var s = T.Tool.STATES.MERGER;
+	s.$placeholder.remove();
+	s.$pos_overlay.remove();
+	s.$pos_overlay = null;
+	s.$h.translate(null)
+		.css({position:'relative'})
+		.removeAttr('moving')
+		.toggleClass('shake',true)
+		.removeAttr('proximate');
 	T.$tilewall.removeAttr('tilemoving');
 	T.Tool.cState = T.Tool.STATES.NOTHING;
 }
@@ -464,7 +465,7 @@ T.Tool.GrabIt = function(){
 }
 
 T.Tool.GrabIt_DocumentKeyDown = function(e){
-	if (e.which != 32 || T.Tool.cState == T.Tool.STATES.GRABBER)
+	if (e.which != 32 || T.Tool.cState != T.Tool.STATES.NOTHING) 
 		return;
 	T.Tool.cState = T.Tool.STATES.GRABBER;
 	$('head').append(T.Tool.$GrabIt_Css);
@@ -476,7 +477,7 @@ T.Tool.GrabIt_DocumentKeyPress = function(e){
 		e.preventDefault(); // this is needed to prevent scrolling with space
 }
 T.Tool.GrabIt_DocumentKeyUp = function(e){
-	if (e.which != 32)
+	if (e.which != 32 || T.Tool.cState != T.Tool.STATES.GRABBER)
 		return;
 	T.Tool.cState = T.Tool.STATES.NOTHING;
 	$('body').off('mouseup','.grabbable',T.Tool.GrabIt);
