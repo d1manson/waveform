@@ -120,6 +120,8 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	s.extraBorderSize= -parseInt($h.css("border-left-width"));//we assume its got same borders all round
 	s.lastClientX= event.clientX;
 	s.lastClientY= event.clientY;
+	s.$pos_overlay = $(CanvToImgStr(T.$pos_overlay.get(0),true));
+	s.$pos_overlay.insertBefore(T.$pos_overlay);
 	
 	$p.insertAfter($h);
 	$h.css({position:'absolute'})
@@ -171,6 +173,8 @@ T.Tool.EndMerger = function(){
     }, ".tile");
 	T.$tilewall.off("scroll");
 	T.Tool.cState.$placeholder.remove();
+	T.Tool.cState.$pos_overlay.remove();
+	T.Tool.cState.$pos_overlay = null;
 	T.Tool.cState.$h.translate(null)
                     .css({position:'relative'})
 					.removeAttr('moving')

@@ -31,6 +31,7 @@ var endian = (function(){
 
 
 //Custom jQUery plugin
+// translate
 $.fn.translate = function(x,y){
    
    var str = x==null ? "" : "translate(" + x + "px," + y + "px)";
@@ -43,6 +44,12 @@ $.fn.translate = function(x,y){
    
    return this;
     
+}
+
+
+var CanvToImgStr = function(c,copyClasses){
+	return "<img src='" + c.toDataURL() +"' width='" + c.style.width + "' height='" + c.style.height + 
+				"' class='" + (copyClasses === true? c.className : '') + "'/>";
 }
 
 //From http://stackoverflow.com/a/10284006/2399799

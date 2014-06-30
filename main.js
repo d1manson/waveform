@@ -781,10 +781,7 @@ T.MakeCopyData = function(){
 	var str = "[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet();
 	if (T.groupOver.g >0 || T.groupOver.g == 0){
 		str += "c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>"; 
-		str += T.groupOver.$tile.find('canvas').get()
-					.map(function(c){
-						return "<img src='" + c.toDataURL() +"' width='" + c.style.width + "' height='" + c.style.height + "'/>";
-				}).join("");
+		str += T.groupOver.$tile.find('canvas').get().map(CanvToImgStr).join("");
 	}
 	return str;
 }
