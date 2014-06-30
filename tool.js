@@ -173,7 +173,7 @@ T.Tool.EndMerger = function(){
     }, ".tile");
 	T.$tilewall.off("scroll");
 	T.Tool.cState.$placeholder.remove();
-	T.Tool.cState.$pos_overlay.remove();
+	(T.Tool.cState.$pos_overlay || $([])).remove();
 	T.Tool.cState.$pos_overlay = null;
 	T.Tool.cState.$h.translate(null)
                     .css({position:'relative'})
