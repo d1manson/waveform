@@ -11,7 +11,6 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 #### Screenshots
 Example view of the whole application, with a few things labeled:    
 ![screenshot](/screenshot1.png "screenshot with labels")
-Note that this screenshot is a little out of date as the button panel has been converted into a toolbar along the top of the page.
 
 Some screenshots of individual features:     
 
@@ -25,10 +24,10 @@ Some screenshots of individual features:
 
 
 #### Quickstart
-**Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.
+**Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.  By default the most recently modified cut file will be used.
 
 **Viewing the data.**
-You can select to view a single channel, ratemap, or temporal autocorrelogram by clicking the relevant button in the button panel.  Hold down shift to select multiple views.
+You can select to view a single channel, ratemap, or temporal autocorrelogram by clicking the relevant button in the main toolbar.  Hold down shift to select multiple views.
 
 **Merge groups.** You can drag a tile onto another tile in order to merge two groups together.  
 
@@ -36,21 +35,24 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts f/e to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift.   
 
-**Reorder the groups.** The button panel has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
+**Reorder the groups.** The main toolbar has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
 
-**Autocut.** There is a button in the button panel for doing an autocut.  See the autocut section below for details as to what it does.  Note that it is very much a work in progress, or rather an abandoned piece of work.
+**Autocut.** There is a button in the toolbar for doing an autocut.  Currently this is not very helpful.  If you want a proper autocut, consider using [KlustaKwik](https://github.com/klusta-team/klustakwik), though you will need a set of scripts for reading in your data and preparing for KlustaKwik. At the bottom of this document is some explanation as to what this particular "bad" autocut does.
 
 **Save the cut.** Drag the cut file from the file panel to your operating system's file explorer.  It will be given the standard name for a cut file.
 
 **Checking for drift**
-Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).
+Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).  You can also see whether a particular cell's spatial pattern changed during the trial.
 
-**Grabbing plots**
-To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.  To close of a grabbed plot, hold down space again and click the plot.  The other floating info panes in the application (e.g. file header info) can also be closed by holding down space and clicking them.
+**Info panes and plot grabbing**
+There are several floating info panes (header info, action list, shorcut list etc.) that appear when you move your cursor over the relevant button in the main toolbar.  If you right click the given button it will pin/unpin the info pane, so it will remain even when you move the cursor off the button. These info panes can be dragged around freely.    
+To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.   
+To close of a grabbed plot or info pane, hold down space again and click the floating pane.
+
 
 #### Keyboard shortcuts
-+ `escape` open/close the toolbar.
-+ `a`  do autocut. 
++ `k` show list of keyboard shortcuts
++ `escape` open/close the main toolbar.
 + `p` cycle palette. 
 + `ctrl+z` or just `z` undo.
 + `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr. Use `shift` to show multiple views (as when using the mouse in the button panel).
@@ -61,7 +63,9 @@ To grab a plot, hold down space and then click the plot. This works for tiles in
 + `s` launch group swap dialog for group under cursor.
 + `Space` hold down `space` and click plots to grab them, or click existing floating dialogues to close them.
 + `+` and `-` change size of cluser plots. (Note that `+` is actually the `=` key.)
-+ `?` view help info, which basically just list these shortcuts. (Note that `?` is actually the `/` key.)
++ `?` go to the GitHub page.
++ `a`  do autocut. 
++ `ctrl-c` copy to the system clipboard the info and plots for the group under the cursor.
 + `ctrl+shift+q` reset everything and refresh the page (hopefully never need to do this).
 
 **Right clicking with a touchpad**
@@ -69,6 +73,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
+* Added copy function.
 * Switched to using flex layout and polymer web components.
 * Added support for `.clu` files. Also improved the process of assigning cut files to trials. And cut files are now chronologically ordered and the most recent is the default.    
 * Optimised parts of the loading process and fixed a few bugs to do with using both mouse buttons.
