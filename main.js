@@ -838,7 +838,7 @@ T.InitKeyboardShorcuts = function(){
 	key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
     
     $(document).on('keydown',T.Copy);
-	$('paper-slider').on("keydown",function(e){e.stopPropagation();});
+
 }
 
 T.InitButtons = function(){
