@@ -11,6 +11,7 @@
 <link rel="import" href="polymer/core-tooltip.html">
 <link rel="import" href="polymer/core-icon-button.html">
 <link rel="import" href="polymer/core-toolbar.html">
+<link rel="import" href="polymer/paper-slider.html">
 </head>
 
 <body>
@@ -69,15 +70,19 @@ other file types will be ignored<br>
 	<div class="floatinginfo shortcut_info">
 		<div class='floating_title'>Shortcuts [k]</div>
 		<div class='floating_body'>
+			Shorcuts applied to the "active" group, which is the one under the cursor:
+			<ul>
+			<li><b>e</b> set the cluster painting destination group to the active group.</li>
+			<li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+			<li><b>s</b> launch the swap dialog for the "active" group.</li>
+			<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+			</ul>
+			Other shortcuts:
 			<ul>
 			<li><b>d</b> toggle drift rendering on/off</li>
 			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
 			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
 			<li><b>enter</b> increment cluster painting destination group</li>
-			<li><b>e</b> set the cluster painting destination group to the "active" group, i.e. the one currently under the mouse</li>
-			<li><b>f</b> similar to <i>e</i> above, but this sets the srouce group. Note you can hold down shift to toggle the src groups.</li>
-			<li><b>s</b> launch the swap dialog for the "active" group.</li>
-			<br>
 			<li><b>esc</b> open/close the toolbar</li>
 			<li><b>p</b> toggle palette</li>
 			<li><b>k</b> show this info</li>
@@ -90,10 +95,11 @@ other file types will be ignored<br>
 	<div class="floatinginfo rm_info">
 		<div class='floating_title'>Spatial ratemap [r]</div>
 		<div class='floating_body'>
-			Bin size default is 2.5cm.  <br><br>
-			If you need to change this open the command line and type (e.g. 5cm):
-			<pre>T.ApplyRmSize(5)</pre>
-			The smoothing kernel is fixed as a 5x5 "boxcar".
+			Bin size <span id='rm_binsize_val' class="slider_val">? cm</span><br>
+			<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
+			<br><br>
+			Smoothing kernel boxcar <span id='rm_smoothing_val' class="slider_val">(2x?+1) by (2x?+1) bins</span><br>
+			<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider><br>
 		</div>
 	</div>
 	

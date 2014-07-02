@@ -46,6 +46,11 @@ $.fn.translate = function(x,y){
     
 }
 
+$.fn.anyHasClass = function(cls){
+	return $.map(this,function(el){
+		return $(el).hasClass(cls);
+	}).some(function(val){return val;});
+}
 
 var CanvToImgStr = function(c,copyClasses){
 	return "<img src='" + c.toDataURL() +"' width='" + c.style.width + "' height='" + c.style.height + 

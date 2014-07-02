@@ -6,7 +6,6 @@ T.chanIsOn = [1,1,1,1];
 T.mapIsOn = [0];
 T.tAutocorrIsOn = 0;
 T.paletteMode = -1;
-T.binSizeCm = 2.5;
 
 T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
@@ -20,7 +19,8 @@ T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
 T.xFactor = 2;
 T.yFactor = 2;
 T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented to the user a bit nicer
-T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
+//T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
+T.TILE_RM_HEIGHT = 120;
 T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here manually
 T.floatingTopZ = 100;
 
@@ -246,14 +246,6 @@ T.ApplyWSize = function(val){
 	T.ApplyCanvasSizes();
 }
 
-T.ApplyRmSize = function(v){
-	var new_scale = Math.floor(v*10)/10; //round to 1 d.p.
-	new_scale = isNaN(new_scale)? 2.5 : new_scale;
-	new_scale = new_scale < 0.5? 0.5 : new_scale;
-	new_scale = new_scale > 20? 20 : new_scale;
-	T.binSizeCm = new_scale;
-	T.RM.SetCmPerBin(new_scale);
-}
 
 
 
@@ -299,20 +291,22 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	if($canvas)	{
 		var xF = 1;
 		var yF = 1;
+		
         switch (canvasNum){
 			case T.CANVAS_NUM_WAVE:
 				xF = T.xFactor*T.SPECIAL_SCALING;
 				yF = T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE;
+				$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
 				break;
 			case T.CANVAS_NUM_RM:
 				xF = T.SPECIAL_SCALING_RM;
 				yF = T.SPECIAL_SCALING_RM;
+				$canvas.css({height:  T.TILE_RM_HEIGHT + 'px'}); //apply css scaling
 				break;
 			case T.CANVAS_NUM_TC:
 				// for temporal autocorr leave it at 1
 				break;
 		}
-		$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
     }else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 
@@ -611,7 +605,9 @@ T.StoreData = function(){
 	localStorage.yFactor = T.yFactor;
     
 	localStorage.FSactive = T.FS.IsActive();
-	localStorage.BIN_SIZE_CM = T.binSizeCm;
+	localStorage.BIN_SIZE_CM = T.RM.GetCmPerBin();
+    localStorage.rmSmoothingW = T.RM.GetSmoothingW();
+        
 	localStorage.state = 1;
 	localStorage.headerFilter = T.$header_search.val();
 	localStorage.paletteMode = T.paletteMode;
@@ -626,13 +622,11 @@ T.ApplyStoredSettingsA = function(){
 		T.ORG.SwitchToTet(localStorage.tet || 1);
 		T.xFactor = localStorage.xFactor || 2;
 		T.yFactor = localStorage.yFactor;
-		T.binSizeCm = localStorage.BIN_SIZE_CM || 2.5;
 		T.$header_search.val(localStorage.headerFilter || '');
 		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
         T.Tool.PainterState.r = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
-		T.RM.SetCmPerBin(T.binSizeCm);
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
 				
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
@@ -653,8 +647,11 @@ T.ApplyStoredSettingsB = function(e) {
 		]),function(el_n_val){
 			el_n_val[0].setSize(el_n_val[1],'%')
 	});
-	
+
+	T.RM.SetCmPerBin(parseFloat(localStorage.BIN_SIZE_CM || "2.5"));
+    T.RM.SetSmoothingW(parseInt(localStorage.rmSmoothingW || "2"));
 }
+
 
 
 T.DocumentReady = function(){
@@ -718,6 +715,12 @@ T.ShowScrollShaddow = function(e){
 }
 
 T.FloatingInfo_MouseDown = function(event){
+	// if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
+	if(event.target != event.currentTarget && 
+			$(event.target).hasClass('nodrag') ||
+			$(event.target).parentsUntil(event.currentTarget).anyHasClass('nodrag'))
+			return;
+
     var $this = $(this);
     var offset = $this.position();
 	event.preventDefault();
@@ -833,6 +836,7 @@ T.InitKeyboardShorcuts = function(){
 	key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
     
     $(document).on('keydown',T.Copy);
+	$('paper-slider').on("keydown",function(e){e.stopPropagation();});
 }
 
 T.InitButtons = function(){

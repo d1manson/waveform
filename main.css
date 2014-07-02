@@ -119,6 +119,9 @@ position: relative;
 .scrollable_area{
 overflow-y: scroll;
 }
+.slider_val{
+font-weight: bold;
+}
 .tile{
 border: 1px solid #CCC;
 display: inline-block;

@@ -2,7 +2,8 @@
 
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, TILE_CANVAS_NUM,ORG,
-                POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B){
+                POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
+				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
@@ -77,9 +78,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			return result;
 		}
 		
-		var GetSmoothed = function(matrix,nX,nY){
+		var GetSmoothed = function(matrix,nX,nY,W){
 			var result = new Uint32Array(matrix.length);
-			var W = 2; //kernle is box-car of size 2W+1
+			//kernle is box-car of size 2W+1
 
 			for(var ky=-W;ky<=W;ky++)for(var kx=-W;kx<=W;kx++){//for each offset within the kernel square
 				var y0 = ky<0? 0 : ky;
@@ -117,6 +118,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
+        var desiredSmoothingW = 2;
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
 		
@@ -162,6 +164,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				QueueSlot(i);
 		}
 
+        var SetSmoothingW = function(v){
+            if(v == desiredSmoothingW)
+                return; //no point doing anything if the value isn't new
+
+            ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
+    	    desiredSmoothingW = v;
+			CachePosBinIndsAndDwellMap(); //when we change the smoothing we have to redo this stuff
+			for(var i=0;i<slots.length;i++)if(slots[i] && slots[i].smoothingW != desiredSmoothingW)
+				QueueSlot(i);
+		    
+        }
+        
 		var QueueTick = function(){
             var s = ratemapSlotQueue.shift(); 
             while(!slots[s] && ratemapSlotQueue.length)
@@ -216,7 +230,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			unvisitedBins = IsZero(dwellCounts);
 
 			//ok now we do the smoothing
-			smoothedDwellCounts = GetSmoothed(dwellCounts,nBinsX,nBinsY);
+			smoothedDwellCounts = GetSmoothed(dwellCounts,nBinsX,nBinsY,desiredSmoothingW);
 
 		}
 		
@@ -304,12 +318,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var spikeCounts = hist_2(new Uint8Array(groupPosIndsXY.buffer),nBinsX,nBinsY); //now we treat it as 1 byte blocks
 			spikeCounts[0] = 0; //it's the bad bin, remember, TODO: something better than this
 
-			var smoothedSpikeCounts = GetSmoothed(spikeCounts,nBinsX,nBinsY);
+			var smoothedSpikeCounts = GetSmoothed(spikeCounts,nBinsX,nBinsY,desiredSmoothingW);
 			var ratemap = rdivideFloat(smoothedSpikeCounts,smoothedDwellCounts)
 			useMask(ratemap,unvisitedBins);
 
 			var im = ToImageData(ratemap);
 			slot.cmPerBin = desiredCmPerBin;
+            slot.smoothingW = desiredSmoothingW;
 			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
@@ -401,7 +416,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var show = [0];
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
 	var meanTMode = false;
-
+	var desiredCmPerBin = 2.5;
+	var desiredSmoothingW = 2;
+    
 	var LoadTetData = function(N_val, tetTimes,expLenInSeconds){
 		cCut = null;
         workerSlotGeneration = [];
@@ -504,11 +521,26 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			theWorker.NewCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
 		}
 	}
-
-	var SetCmPerBin = function(v){
+	
+	var SetCmPerBin = function(v,viaSlider){
+		$binSizeVal.text(v + " cm")
+		desiredCmPerBin = v;
 		theWorker.SetBinSizeCm(v); //the worker will send back one hist for each slot that it has previously been sent
+		if(viaSlider !== true)
+			$binSizeSlider.get(0).value = v;
 	}
-
+    var SetSmoothingW = function(v,viaSlider){
+		if(v == 0)
+			$smoothingVal.text("off");
+		else if(v == 1)
+			$smoothingVal.text("(2+1) by (2+1) bins");
+		else
+			$smoothingVal.text("(2x" + v + "+1) by (2x" + v + "+1) bins");
+        desiredSmoothingW = v;
+        theWorker.SetSmoothingW(v);
+        if(viaSlider !== true)
+    		$smoothingSlider.get(0).value = v;
+    }
 	var RenderSpikesForPath = function(g){
 	    var color = PALETTE_FLAG[g];
 		var slot = cCut.GetGroup(g,true);
@@ -558,18 +590,35 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         }
 	}
 	
+
 	var theWorker = BuildBridgedWorker(workerFunction,
-										["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetImmutable*","RenderSpikesForPath"],
+										["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetSmoothingW",
+                                            "SetImmutable*","RenderSpikesForPath"],
 										["ShowIm*"],[ShowIm],
 										WORKER_CONSTANTS);
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
+
+
+	var BinSizeCmSilder_Change = function(e){
+		SetCmPerBin(this.value,true);
+	}
+	$binSizeSlider.on("change",BinSizeCmSilder_Change);
 	
+    var SmoothingWSilder_Change = function(e){
+    	SetSmoothingW(this.value,true);
+	}
+	$smoothingSlider.on("change",SmoothingWSilder_Change);
+	
+    
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	
 	return {
 		SetShow: SetShow,
 		SetCmPerBin: SetCmPerBin,
+		GetCmPerBin: function(){return desiredCmPerBin;},
+        GetSmoothingW: function(){return desiredSmoothingW;},
+        SetSmoothingW: SetSmoothingW,
 		RenderSpikesForPath: RenderSpikesForPath,
 		SetRenderMode: SetRenderMode
 	}
@@ -577,5 +626,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 }(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
   T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
-  new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer))
+  new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
+	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'))
 
