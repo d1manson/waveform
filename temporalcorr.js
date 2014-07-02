@@ -1,6 +1,6 @@
 "use strict";
 
-T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
+T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaTVal){
 
 	// === WORKER ==================================================
 	var workerFunction = function(){
@@ -149,7 +149,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 	var cCut = null;
 	var show = false;
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
-
+	var desiredMaxDeltaT = 500;
 
 	var LoadTetrodeData = function(N_val, tetTimes){
 		cCut = null;
@@ -251,8 +251,15 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		}
 	}
 
-	var SetDeltaT = function(v){
+	var SetDeltaT = function(v,viaSlider){
+		desiredMaxDeltaT = v;
+		if(v < 1000)
+			$deltaTVal.text(v + " ms");
+		else
+			$deltaTVal.text(v/1000 + " s");
 		theWorker.SetMaxDeltaT(v); //the worker will send back one hist for each slot that it has previously been sent
+		if(viaSlider !== true)
+			$deltaTSlider.get(0).value = v;
 	}
 
 
@@ -268,6 +275,12 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 		}
 	}
 
+	
+	var DeltaTSilder_Change = function(e){
+		SetDeltaT(this.value,true);
+	}
+	$deltaTSlider.on("change",DeltaTSilder_Change );
+	
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	
@@ -276,7 +289,8 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG){
 
     return {
 		SetShow: SetShow,
-		SetDeltaT: SetDeltaT
+		SetDeltaT: SetDeltaT,
+		GetDeltaT: function(){return desiredMaxDeltaT;}
     };
 
-}(T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC, T.ORG);
+}(T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC, T.ORG, $('#tc_deltaT_slider'),$('#tc_deltaT_val'));

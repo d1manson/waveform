@@ -106,9 +106,9 @@ other file types will be ignored<br>
 	<div class="floatinginfo tc_info">
 			<div class='floating_title'>Temporal auto correlation [t]</div>
 			<div class='floating_body'>
-				Time window default is set at 500ms.  <br><br>
-				If you need to change this open the command line and type (e.g. 100ms):
-				<pre>T.TC.SetDeltaT(100)</pre>
+				Time window <span id='tc_deltaT_val' class="slider_val">? ms</span><br>
+				<paper-slider class="nodrag" id="tc_deltaT_slider" pin snaps min="20" max="5000" step="20" value="500" style='width:300px;'></paper-slider><br>
+				The number of bins is fixed at 100.
 			</div>
 	</div>
 

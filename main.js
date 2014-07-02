@@ -607,6 +607,7 @@ T.StoreData = function(){
 	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.RM.GetCmPerBin();
     localStorage.rmSmoothingW = T.RM.GetSmoothingW();
+	localStorage.tcDeltaT = T.TC.GetDeltaT();
         
 	localStorage.state = 1;
 	localStorage.headerFilter = T.$header_search.val();
@@ -650,6 +651,7 @@ T.ApplyStoredSettingsB = function(e) {
 
 	T.RM.SetCmPerBin(parseFloat(localStorage.BIN_SIZE_CM || "2.5"));
     T.RM.SetSmoothingW(parseInt(localStorage.rmSmoothingW || "2"));
+	T.TC.SetDeltaT(parseInt(localStorage.tcDeltaT || "500"));
 }
 
 
