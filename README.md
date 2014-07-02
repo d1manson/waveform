@@ -73,6 +73,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
+* Added sliders for ratemap and temporal autocorr paramaters.
 * Added copy function.
 * Switched to using flex layout and polymer web components.
 * Added support for `.clu` files. Also improved the process of assigning cut files to trials. And cut files are now chronologically ordered and the most recent is the default.    
