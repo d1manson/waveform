@@ -644,7 +644,7 @@ T.ApplyStoredSettingsB = function(e) {
 	$.map(
 		zip([
 			$('core-splitter').get(),
-			(JSON.parse(localStorage.splitterPercents) || [30,30,25]) 
+			JSON.parse(localStorage.splitterPercents || "[30,30,25]") 
 		]),function(el_n_val){
 			el_n_val[0].setSize(el_n_val[1],'%')
 	});
