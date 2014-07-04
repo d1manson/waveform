@@ -29,7 +29,7 @@ T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<div class='tile-sticker'></div>" + 
-			"<div class='tile-over'>" +
+			"<div class='tile-over hidden_grabbed'>" +
 				"<div class='tile-buttons' layout vertical>" +
 					"<core-tooltip label='swap with... [s]' position='left'>" +
 						"<button class='tile-button-swap'></button>" +
@@ -677,6 +677,9 @@ T.DriftButtonClick = function(){
 
 T.groupOver = {g: null,$tile:null,$clusterSticker:null};
 T.SetGroupOver = function(g){
+	if(T.Tool.cState == T.Tool.STATES.GRABBER)
+		return; // dont change group over while grabber is active
+		
     g = parseInt(g);//when coming via data-group attr it might be a string
 	if(g == T.groupOver.g)
 		return;

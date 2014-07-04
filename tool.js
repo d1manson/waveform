@@ -454,8 +454,19 @@ T.Tool.GrabIt = function(){
 												height: $(this).height() + 'px',
 												display: 'block',
 												boxShadow: 'initial'});
+	
+	
 	var p = $(this).offset();
-	var $pane = $("<div class='floatinginfo grabbed_info'><div class='floating_title'>" + T.ORG.GetExpName() + " (Grabbed)</div> </div>")
+	var str =  T.ORG.GetExpName();
+	
+	// This next bit, is a bit hacky...clean up some stuff from clone and set title appropriately..
+	$clone.find('.hidden_grabbed').remove();
+	if($(this).hasClass('tile'))
+		str += " t" + T.ORG.GetTet() + "c" + $(this).data('group_num');
+	else if(this.id == "cluster_panel")
+		str += " tet " + T.ORG.GetTet();
+		
+	var $pane = $("<div class='floatinginfo grabbed_info'><div class='floating_title'>" + str + " (Grabbed)</div> </div>")
 			.append($("<div class='floating_body'/>").append($clone))
 			.translate(p.left +30,p.top +30)
 			.show();
