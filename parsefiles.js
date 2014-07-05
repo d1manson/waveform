@@ -107,6 +107,17 @@ T.PAR = function(){
 		
 		var pow2 = function(a){return a*a;}
 	
+		var clone = function(a){ 
+			if(a.slice){
+				return a.slice(0); //for basic arrays and pure ArrayBuffer
+			}else{
+				var result = new a.constructor(a.length); //
+				result.set(a);
+				return result;
+			}
+		}
+	
+	
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
@@ -141,6 +152,16 @@ T.PAR = function(){
     		}
 
 			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE);
+		}
+		
+		var interpXY_sub = function(XY,x_a,y_a,x_b,y_b,i,nNans){
+			//interpolates from element i-1 back to i-nNans, where element i is x_b,y_b and element i-nNans-1 is x_a,x_b
+			var dX = (x_b-x_a)/(nNans+1);
+			var dY = (y_b-y_a)/(nNans+1);
+			for(var j=0;j<nNans;j++){
+				XY[(i-nNans + j)*2+0] = x_a + (j+1)*dX;
+				XY[(i-nNans + j)*2+1] = y_a + (j+1)*dY; 
+			}
 		}
 		
 		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE){
@@ -196,7 +217,42 @@ T.PAR = function(){
 				}
 			}
 			
-			// TODO: interpolate and box-car smooth
+            //Interpolation...		TODO: verify that this actually does what we want
+            var x_a = XY[start*2+0];
+            var y_a = XY[start*2+1];
+            var nNans = start; //this will cause first non-nan to be copied back through all previous nan values
+            for(var i=start;i<nPos;i++){
+                var x_b = XY[i*2+0];
+                var y_b = XY[i*2+1];
+                if(x_b == NAN16 || y_b == NAN16){
+                    nNans++;
+                }else{
+					if(nNans) 
+						interpXY_sub(XY,x_a,y_a,x_b,y_b,i,nNans)
+                    x_a = x_b;
+                    y_a = y_b;
+                    nNans = 0;
+                }
+            }
+			if(nNans) //fill end-nan values with last non-nan val
+				interpXY_sub(XY,x_a,y_a,x_a,y_a,i,nNans)
+			
+			
+			//Box car smoothing...
+			var SMOOTHING_W_S = 0.2; 
+			//TODO: may want to improve upon this pretty naive smoothing implementation..note we dont smooth the ends at all
+			var XY_rough = clone(XY); //we need to clone as this implentation is simple and overwrites the array as its going allong
+			var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired
+			for(var i=k;i<nPos-k-1;i++){
+				var x = 0;
+				var y = 0;
+				for(var j=i-k;j<=i+k;j++){
+					x += XY_rough[j*2+0];
+					y += XY_rough[j*2+1];
+				}
+				XY[i*2+0] = x/(2*k+1);
+				XY[i*2+1] = y/(2*k+1);
+			}
 			
 			header.n_jumpy = nJumpy; //includes untracked
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,

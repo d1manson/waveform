@@ -65,15 +65,13 @@ T.PlotPos = function(){
         var ctx = canv.getContext('2d');
         var data = new Int16Array(buffer);
     	
-    	var elementsPerPosSample = T.PAR.BYTES_PER_POS_SAMPLE/2;
-    	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
+    	var nPos = data.length/2; 
     	ctx.beginPath();
     	ctx.strokeStyle = "RGB(0,0,0)";
     	var i = 0;
     	ctx.moveTo(data[i]*s,data[i+1]*s);
-    	var NAN16 = T.PAR.NAN16;
-    	for(;i<end;i+=2)if(data[i] != NAN16 && data[i+1] != NAN16 && data[i] && data[i+1])
-    		ctx.lineTo(data[i]*s,data[i+1]*s);
+    	for(;i<nPos;i++)
+    		ctx.lineTo(data[i*2+0]*s,data[i*2+1]*s);
     	ctx.stroke();    
 	}
 
