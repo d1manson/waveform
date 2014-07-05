@@ -33,12 +33,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			return (new Int16Array(b))[0] == 256? 'L' : 'B';
 		}();
         
-		var max_2 = function(x){
-			var ret = new x.constructor([-Infinity,-Infinity]);
-			for(var i=0;i<x.length;i++)
-				(x[i] > ret[i % 2]) &&  (ret[i % 2] = x[i]);
-			return ret;
-		}
 		var max = function(X){
 			var m = X[0];
 			for(var i = 1;i< X.length; i++)
@@ -104,6 +98,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         
         var posFreq = null;
 		var pixPerM = null;
+        var max_vals = null;
         var scale_spikes_plot = null;
 		var posValXY = null; // this is the values in pixels
 		var posBinXY = null; // this is posValXY / pixPerM *100/ cmPerBin
@@ -206,20 +201,21 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			//at this point we have posValXY, spikePosInd and cmPerBin.
 			//Here we do some stuff that will be common to all groups that want to have a ratemap
 			
+			// TODO: use header.max_vals rather than calculating maxes here
 			var factor = 100/pixPerM /desiredCmPerBin;
 			posBinXY = new Uint8ClampedArray(posValXY.length);
 			for(var i=0;i<posValXY.length;i++)
 				posBinXY[i] = posValXY[i] * factor;
                 
+            nBinsX = Math.ceil(max_vals[1]*factor) + 1; // +1 is because of zero indexing
+			nBinsY = Math.ceil(max_vals[0]*factor) + 1;
+            
             factor = scale_spikes_plot;
             var posBinXY_b = new Uint8ClampedArray(posValXY.length);
     		for(var i=0;i<posValXY.length;i++)
                 posBinXY_b[i] = posValXY[i] * factor;
             spikePosBinXY_b = pick(new Uint16Array(posBinXY_b.buffer),spikePosInd); //same form as posBinXY_b, but we store it as 2byte blocks for easy picking
-			    
-			var maxXY = max_2(posBinXY);			
-			nBinsX = maxXY[0] + 1; // +1 is because of zero indexing
-			nBinsY = maxXY[1] + 1;
+			    			
 			
 			spikePosBinXY = pick(new Uint16Array(posBinXY.buffer),spikePosInd); //same form as posBinXY, but we store it as 2byte blocks for easy picking
 						
@@ -266,7 +262,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
     
         }
         
-        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,scale_spikes_plot_val){
+        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,scale_spikes_plot_val,max_vals_val){
 			//reads pos pixel coordinates
 
             ClearQueue(); 
@@ -285,6 +281,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             }
             posFreq = posFreq_val;
             pixPerM = pixPerM_val;
+            max_vals = max_vals_val;
             scale_spikes_plot = scale_spikes_plot_val;
 			
 			posValXY = new Int16Array(buffer);
@@ -371,15 +368,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var nSpks = groupPosIndsXY.length;
 			groupPosIndsXY = new Uint8Array(groupPosIndsXY.buffer) // now use it as (x,y), 1 btye each
 			
+            var W = Math.ceil(scale_spikes_plot*max_vals[1]);
+            var H = Math.ceil(scale_spikes_plot*max_vals[0]);
+            
 			if(asMeanT){
 				// Here we accumulate 1s for each spike marker in 2d (a 4x4 square), and separately accumulate spike times for the same marker
 				// Then divide the times by the counts to get the mean.  Finally we apply a pallete to the result.
 				
-				var counts = new Uint32Array(POS_W*POS_H);
-				var totalTimes = new Float32Array(POS_W*POS_H);
+				var counts = new Uint32Array(W*H);
+				var totalTimes = new Float32Array(W*H);
 				var groupSpikeTimes = pick(spikeTimes,s.inds);
 				for (var i=0;i<nSpks;i++)
-					PlotPoint2(totalTimes, counts, POS_W, POS_H, groupPosIndsXY[i*2+0], groupPosIndsXY[i*2+1], 4, groupSpikeTimes[i]);
+					PlotPoint2(totalTimes, counts, W, H, groupPosIndsXY[i*2+0], groupPosIndsXY[i*2+1], 4, groupSpikeTimes[i]);
 				var meanTimes = totalTimes; //we're going to do the division in place, so adopt a new variable name now...
 				rdivideFloatInPlace(meanTimes,counts);
 				
@@ -390,11 +390,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				
 			}else{
 				// This is the normal group sticker color plotting
-				var im = new Uint32Array(POS_W*POS_H);
+				var im = new Uint32Array(W*H);
 				for (var i=0;i<nSpks;i++)
-					PlotPoint(im,POS_W,POS_H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
+					PlotPoint(im,W,H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
 			}
-			main.ShowIm(im.buffer,slot_num,[POS_W,POS_H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
+			main.ShowIm(im.buffer,slot_num,[W,H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
             
 		}
 	};
@@ -421,7 +421,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 	}
 
-	var LoadPosData = function(N_val, buffer,timebase,pixPerM,scale_spikes_plot){
+	var LoadPosData = function(N_val, buffer,timebase,pixPerM,scale_spikes_plot,max_vals){
 		if(!N_val){
 			theWorker.SetPosData(null) //this clears the ratemap queue, clears the cut, and clears the stuff cached for doing ratemaps in future
 			//TODO: decide whether we need to send null canvases
@@ -429,7 +429,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
 		
-		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,[buffer]);
+		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,max_vals,[buffer]);
 
 	}
 	
@@ -555,12 +555,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var posHeader = ORG.GetPosHeader();
             
             // work out scale factor for spike pos plot (in spatial panel)
-            var xs = POS_W/(parseInt(posHeader.max_vals[0])-0);
-            var ys = POS_H/(parseInt(posHeader.max_vals[1])-0);
+            var xs = POS_W/(parseInt(posHeader.max_vals[1])-0);
+            var ys = POS_H/(parseInt(posHeader.max_vals[0])-0);
                 
 			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
                         parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
-                        xs<ys? xs: ys /*min of the two*/);
+                        xs<ys? xs: ys /*min of the two*/,
+                        posHeader.max_vals);
 			if(status.cut == 3 && status.tet == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
 				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
 		}

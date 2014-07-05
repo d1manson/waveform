@@ -106,21 +106,6 @@ T.PAR = function(){
 		}
 		
 		var pow2 = function(a){return a*a;}
-		
-		var max = function(X,stride){
-			// find the maximum over each "dimension" of X, 
-			// which here means max of elements 0,2,4,6,...
-			// 				and max of elements 1,3,5,7,... 
-			if(stride != 2)
-				throw("stride must be 2");
-			var m0 = X[0+0];
-			var m1 = X[0+1];
-			for(var i = 1;i< X.length/2; i+=2){
-				(m0 < X[i+0]) && (m0 = X[i+0]);
-				(m1 < X[i+1]) && (m1 = X[i+1]);
-			}
-			return [m0,m1]; 
-		}
 	
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
@@ -171,7 +156,7 @@ T.PAR = function(){
 						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
 		
 			var POS_NAN = 1023;
-			var MAX_SPEED = 5000;//milimeters per second
+			var MAX_SPEED = 5;//meters per second
 			var NAN16 = -32768; //custom nan value, equal to minimum int16 value
 			
 			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
@@ -181,7 +166,7 @@ T.PAR = function(){
 			times_IN_PLACE(XY,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
 			
 			var sampFreq = parseInt(header.sample_rate);
-			var pow2MaxSampStep = pow2(MAX_SPEED/sampFreq);
+			var pow2MaxSampStep = pow2(MAX_SPEED*UNITS_PER_M /sampFreq);
 			
 			// Find first (x,y) that is non-nan
 			for(var start=0;start<nPos;start++)
@@ -190,28 +175,32 @@ T.PAR = function(){
 				
 			var x_from = XY[start*2+0];
 			var y_from = XY[start*2+1];
-			var jumpLen = 0;
+			var jumpLen = 1;
 			
 			// Set big jump sections to nan
 			for(var i=start+1,nJumpy=0; i<nPos; i++){
-				if (XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16)
-					continue; //this pos is already nan
 				
-				//calculate (dx^2 + dy^2)/dt^2 and check if it is less than maxSpeed^2
-				if ( (pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
-					//speed is too large, so make this a jump
+				// check if this pos is already nan
+				// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
+				if ( XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16 || 
+					(pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
+					//sample is nan or speed is too large, so make this a jump
 					XY[i*2 + 0] = XY[i*2 + 1] = NAN16; 
 					nJumpy++;
 					jumpLen++;
 				}else{
 					//speed is sufficiently small, so this point is ok
-					jumpLen = 0;
+					jumpLen = 1;
 					x_from = XY[i*2 + 0];
 					y_from = XY[i*2 + 1];
 				}
 			}
 			
-			header.max_vals = max(XY,2);
+			// TODO: interpolate and box-car smooth
+			
+			header.n_jumpy = nJumpy; //includes untracked
+			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
+							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
 			header.units_per_meter = UNITS_PER_M;
 			main.PosFileRead(null,header, XY.buffer,[XY.buffer]);
 		}

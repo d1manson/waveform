@@ -12,8 +12,8 @@ T.BASE_CANVAS_HEIGHT = 256;
 T.CANVAS_NUM_WAVE = 0;
 T.CANVAS_NUM_RM = 1;
 T.CANVAS_NUM_TC = 2;
-T.POS_PLOT_WIDTH = 200;
-T.POS_PLOT_HEIGHT = 200;
+T.POS_PLOT_WIDTH = 255;
+T.POS_PLOT_HEIGHT = 255;
 T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
 
 T.xFactor = 2;
@@ -50,26 +50,33 @@ T.$newTile = $("<div class='tile grabbable'>" +
 T.PlotPos = function(){
 	var buffer = T.ORG.GetPosBuffer();
 
-	var ctx = T.$posplot.get(0).getContext('2d');
-	ctx.clearRect(0 , 0 , T.POS_PLOT_WIDTH, T.POS_PLOT_HEIGHT);
+    var canv= T.$posplot.get(0);
 
-	if(buffer == null) return;
+	if(buffer == null) {
+        var ctx = canv.getContext('2d');
+    	ctx.clearRect(0 , 0 , canv.width, canv.height);
+	}else{
+        var header = T.ORG.GetPosHeader();
+        var xs = T.POS_PLOT_WIDTH/header.max_vals[0];
+    	var ys = T.POS_PLOT_HEIGHT/header.max_vals[1];
+    	var s = xs<ys? xs: ys;//min of the two
+        canv.width = Math.ceil(s*header.max_vals[1]);
+        canv.height = Math.ceil(s*header.max_vals[0]);
+        var ctx = canv.getContext('2d');
+        var data = new Int16Array(buffer);
+    	
+    	var elementsPerPosSample = T.PAR.BYTES_PER_POS_SAMPLE/2;
+    	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
+    	ctx.beginPath();
+    	ctx.strokeStyle = "RGB(0,0,0)";
+    	var i = 0;
+    	ctx.moveTo(data[i]*s,data[i+1]*s);
+    	var NAN16 = T.PAR.NAN16;
+    	for(;i<end;i+=2)if(data[i] != NAN16 && data[i+1] != NAN16 && data[i] && data[i+1])
+    		ctx.lineTo(data[i]*s,data[i+1]*s);
+    	ctx.stroke();    
+	}
 
-	var data = new Int16Array(buffer);
-	var header = T.ORG.GetPosHeader();
-	var elementsPerPosSample = T.PAR.BYTES_PER_POS_SAMPLE/2;
-	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
-	var xs = T.POS_PLOT_WIDTH/(parseInt(header.max_vals[0])-0);
-	var ys = T.POS_PLOT_HEIGHT/(parseInt(header.max_vals[1])-0);
-	var s = xs<ys? xs: ys;//min of the two
-	ctx.beginPath();
-	ctx.strokeStyle = "RGB(0,0,0)";
-	var i = 0;
-	ctx.moveTo(data[i]*s,data[i+1]*s);
-	var NAN16 = T.PAR.NAN16;
-	for(;i<end;i+=2)if(data[i] != NAN16 && data[i+1] != NAN16 && data[i] && data[i+1])
-		ctx.lineTo(data[i]*s,data[i+1]*s);
-	ctx.stroke();
 }
 
 T.SpikeForPathCallback = function($canv){
