@@ -2,6 +2,7 @@ var M = {
 	IN_PLACE: {}, //some of the functions below can take this as a flag and perform the calculation "in place", i.e. using one of the inputs as the output
 	
 	pick: function(from,indices){
+		// Take elements specified by indicies from the 1d array "from".
 		var result =  new from.constructor(indices.length); //make an array of the same type as the from array
 		
 		for(var i=0;i<indices.length;i++)
@@ -10,6 +11,17 @@ var M = {
 		return result;
 	},
 	
+	take: function(data,offset,stride){
+		// takes every stride'th element from data, starting with the offset'th element
+		
+		var n = data.length/stride;
+		var res = new data.constructor(n);
+		
+		for(var i=0,j=offset;i<n;i++,j+=stride)
+			res[i] = data[j];
+		return res;
+	},
+		
 	max: function(X){
         var m = X[0];
         for(var i = 1;i< X.length; i++){
@@ -105,6 +117,18 @@ var M = {
 			var result = new Float32Array(numerator.length);
 			for(var i=0;i<numerator.length;i++)
 				result[i] = numerator[i]/denominator[i];
+			return result;
+		}
+	},
+	
+	times: function(src,factor,flag){
+		if(flag == M.IN_PLACE){
+			for(var i=0;i<src.length;i++)
+				src[i] *= factor;
+		}else{
+			var result = new src.constructor(src.length);
+			for(var i=0;i<src.length;i++)
+				result[i] = src[i]*factor;
 			return result;
 		}
 	},

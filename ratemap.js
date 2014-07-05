@@ -287,19 +287,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             pixPerM = pixPerM_val;
             scale_spikes_plot = scale_spikes_plot_val;
 			
-            posValXY = new Uint16Array(2*N); // x_1, y_1, x_2 , y_2, ... in units of pixels    
-    		var posData = new Uint16Array(buffer);
-    		
-    		var wordsPerPosSample = BYTES_PER_POS_SAMPLE/2;
-    
-    		for(var i=0, s=0; i<N;i++,s+=wordsPerPosSample){
-    			if(posData[s+2]!=0 && posData[s+3]!=0 && posData[s+2]!=POS_NAN && posData[s+3]!=POS_NAN){
-    				posValXY[i*2 + 0] = posData[s+2]; //x value
-    				posValXY[i*2 + 1] = posData[s+3]; //y value
-    			}
-    		}
-			
-			//TODO: filtering and interpolation..actually these should be done in the pos loading code elsewhere
+			posValXY = new Int16Array(buffer);
 			
             if(spikeTimes){
                 GetSpikePosInd();
@@ -567,11 +555,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var posHeader = ORG.GetPosHeader();
             
             // work out scale factor for spike pos plot (in spatial panel)
-            var xs = POS_W/(parseInt(posHeader.window_max_x)-parseInt(posHeader.window_min_x));
-            var ys = POS_H/(parseInt(posHeader.window_max_y)-parseInt(posHeader.window_min_y));
+            var xs = POS_W/(parseInt(posHeader.max_vals[0])-0);
+            var ys = POS_H/(parseInt(posHeader.max_vals[1])-0);
                 
 			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
-                        parseInt(posHeader.timebase),parseInt(posHeader.pixels_per_metre),
+                        parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
                         xs<ys? xs: ys /*min of the two*/);
 			if(status.cut == 3 && status.tet == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
 				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);

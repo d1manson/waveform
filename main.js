@@ -59,14 +59,15 @@ T.PlotPos = function(){
 	var header = T.ORG.GetPosHeader();
 	var elementsPerPosSample = T.PAR.BYTES_PER_POS_SAMPLE/2;
 	var end = parseInt(header.num_pos_samples) * elementsPerPosSample; 
-	var xs = T.POS_PLOT_WIDTH/(parseInt(header.window_max_x)-parseInt(header.window_min_x));
-	var ys = T.POS_PLOT_HEIGHT/(parseInt(header.window_max_y)-parseInt(header.window_min_y));
+	var xs = T.POS_PLOT_WIDTH/(parseInt(header.max_vals[0])-0);
+	var ys = T.POS_PLOT_HEIGHT/(parseInt(header.max_vals[1])-0);
 	var s = xs<ys? xs: ys;//min of the two
 	ctx.beginPath();
 	ctx.strokeStyle = "RGB(0,0,0)";
-	var i = 2;
+	var i = 0;
 	ctx.moveTo(data[i]*s,data[i+1]*s);
-	for(;i<end;i+=elementsPerPosSample)if(data[i] != T.PAR.POS_NAN && data[i+1] != T.PAR.POS_NAN && data[i] && data[i+1])
+	var NAN16 = T.PAR.NAN16;
+	for(;i<end;i+=2)if(data[i] != NAN16 && data[i+1] != NAN16 && data[i] && data[i+1])
 		ctx.lineTo(data[i]*s,data[i+1]*s);
 	ctx.stroke();
 }

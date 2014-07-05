@@ -85,6 +85,43 @@ T.PAR = function(){
 			return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
 		}
 		
+		var take = function(data,offset,stride){
+			// takes every stride'th element from data, starting with the offset'th element
+			
+			var n = data.length/stride;
+			var res = new data.constructor(n);
+			
+			for(var i=0,j=offset;i<n;i++,j+=stride)
+				res[i] = data[j];
+			return res;
+		}
+		
+		var times_IN_PLACE = function(src,factor,skipVal){
+			for(var i=0;i<src.length;i++)if(src[i] != skipVal)
+				src[i] *= factor;
+		}
+		var replaceVal_IN_PLACE = function(src,find,replace){
+			for(var i=0;i<src.length;i++)if(src[i] == find)
+				src[i] = replace;
+		}
+		
+		var pow2 = function(a){return a*a;}
+		
+		var max = function(X,stride){
+			// find the maximum over each "dimension" of X, 
+			// which here means max of elements 0,2,4,6,...
+			// 				and max of elements 1,3,5,7,... 
+			if(stride != 2)
+				throw("stride must be 2");
+			var m0 = X[0+0];
+			var m1 = X[0+1];
+			for(var i = 1;i< X.length/2; i+=2){
+				(m0 < X[i+0]) && (m0 = X[i+0]);
+				(m1 < X[i+1]) && (m1 = X[i+1]);
+			}
+			return [m0,m1]; 
+		}
+	
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
@@ -117,10 +154,69 @@ T.PAR = function(){
     			for (var k=0;k<data.length;k++) //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
     				data[k] = Swap16(data[k]);
     		}
-			
-			main.PosFileRead(null,header, buffer,[buffer]);
-			
+
+			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE);
 		}
+		
+		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE){
+		
+			var data = new Int16Array(buffer);
+			var elementsPerPosSample = BYTES_PER_POS_SAMPLE/2;
+			var nPos = parseInt(header.num_pos_samples); 
+			var end = nPos * elementsPerPosSample; 
+			var XY = new Int16Array(nPos*2);
+		
+			var XY = new Int16Array(
+							take(new Int32Array(buffer),1,BYTES_PER_POS_SAMPLE/4).buffer
+						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
+		
+			var POS_NAN = 1023;
+			var MAX_SPEED = 5000;//milimeters per second
+			var NAN16 = -32768; //custom nan value, equal to minimum int16 value
+			
+			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+			
+			var ppm = parseInt(header.pixels_per_metre);
+			var UNITS_PER_M = 1000;
+			times_IN_PLACE(XY,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+			
+			var sampFreq = parseInt(header.sample_rate);
+			var pow2MaxSampStep = pow2(MAX_SPEED/sampFreq);
+			
+			// Find first (x,y) that is non-nan
+			for(var start=0;start<nPos;start++)
+				if(XY[start*2+0] != NAN16 && XY[start*2+1] !=NAN16)
+					break;
+				
+			var x_from = XY[start*2+0];
+			var y_from = XY[start*2+1];
+			var jumpLen = 0;
+			
+			// Set big jump sections to nan
+			for(var i=start+1,nJumpy=0; i<nPos; i++){
+				if (XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16)
+					continue; //this pos is already nan
+				
+				//calculate (dx^2 + dy^2)/dt^2 and check if it is less than maxSpeed^2
+				if ( (pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
+					//speed is too large, so make this a jump
+					XY[i*2 + 0] = XY[i*2 + 1] = NAN16; 
+					nJumpy++;
+					jumpLen++;
+				}else{
+					//speed is sufficiently small, so this point is ok
+					jumpLen = 0;
+					x_from = XY[i*2 + 0];
+					y_from = XY[i*2 + 1];
+				}
+			}
+			
+			header.max_vals = max(XY,2);
+			header.units_per_meter = UNITS_PER_M;
+			main.PosFileRead(null,header, XY.buffer,[XY.buffer]);
+		}
+		
+		
 	}
 	
 	var cutWorkerCode = function(){
@@ -318,7 +414,8 @@ T.PAR = function(){
 		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker,
 		BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
 		BYTES_PER_SPIKE: BYTES_PER_SPIKE,
-		POS_NAN: POS_NAN
+		POS_NAN: POS_NAN,
+		NAN16: -32768//TODO: share this with pos worker properly
     }
     
 }();
