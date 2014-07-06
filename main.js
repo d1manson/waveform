@@ -622,6 +622,9 @@ T.StoreData = function(){
     localStorage.clusterPlotSize = T.CP.GetSize();
     localStorage.splitterPercents = JSON.stringify($.map($('core-splitter').get(),function(el){return el.getSize('%');}));
 	localStorage.showToolbar = T.$main_toolbar.is(":visible");
+	
+	localStorage.posSmoothing = T.ORG.GetPosSmoothing();
+	localStorage.posMaxSpeed = T.ORG.GetPosMaxSpeed();
 }
 
 T.ApplyStoredSettingsA = function(){
@@ -635,7 +638,9 @@ T.ApplyStoredSettingsA = function(){
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
-				
+		T.ORG.SetPosSmoothing(parseInt(localStorage.posSmoothing || "0.2"));
+		T.ORG.SetPosMaxSpeed(parseInt(localStorage.posMaxSpeed || "5"));
+		
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
 			

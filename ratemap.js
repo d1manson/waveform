@@ -114,6 +114,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
         var desiredSmoothingW = 2;
+		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
 		
@@ -138,16 +139,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}();
 	
 		var SetImmutable = function(inds,slotInd,generation){
-			
 			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,cmPerBin: null};
-            QueueSlot(slotInd);
+			if(spikePosBinXY) //Ok, so we have some cut data, but we cant do anythign unless we have pos and tet data.
+				QueueSlot(slotInd);
 		}
 
-		var NewCut = function(){
+		var ClearCut = function(){
 			slots = [];
 			ClearQueue();
 		}
-
+		
 		var SetBinSizeCm = function(v){
 			if(v == desiredCmPerBin)
                 return; //no point doing anything if the value isn't new
@@ -155,8 +156,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
 			desiredCmPerBin = v;
 			CachePosBinIndsAndDwellMap(); //when we change the bin size we have to redo this stuff
-			for(var i=0;i<slots.length;i++)if(slots[i] && slots[i].cmPerBin != desiredCmPerBin)
-				QueueSlot(i);
+			QueueAllSlotsLazy();
 		}
 
         var SetSmoothingW = function(v){
@@ -166,10 +166,21 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
     	    desiredSmoothingW = v;
 			CachePosBinIndsAndDwellMap(); //when we change the smoothing we have to redo this stuff
-			for(var i=0;i<slots.length;i++)if(slots[i] && slots[i].smoothingW != desiredSmoothingW)
-				QueueSlot(i);
+			QueueAllSlotsLazy();
 		    
         }
+		
+		var QueueAllSlotsLazy = function(){
+			//will enqueue any slots that dont match the desired settings
+			for(var i=0;i<slots.length;i++)if(
+					slots[i] && (
+					slots[i].smoothingW != desiredSmoothingW ||
+					slots[i].cmPerBin != desiredCmPerBin	 ||
+					slots[i].posDataId != desiredPosDataId
+					))
+				QueueSlot(i);
+		    
+		}
         
 		var QueueTick = function(){
             var s = ratemapSlotQueue.shift(); 
@@ -241,7 +252,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 
         var SetTetData = function(tetTimesBuffer,N,expLenInSeconds_val){
-            NewCut();
             if(!N){
 				spikeTimes = null;
 				spikePosInd = null;
@@ -255,9 +265,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         	spikeTimes = new Uint32Array(tetTimesBuffer);
 			expLenInSeconds = expLenInSeconds_val;
 			
-            if(posFreq != null){
+			//Ok, now we have tet data. Do we already have pos data, and what about cut data?
+            if(posFreq != null){ 
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
+				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
         }
@@ -266,9 +278,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			//reads pos pixel coordinates
 
             ClearQueue(); 
+			desiredPosDataId++; 
             if(!N){
                 posFreq = null;
-				spikeTimes = null;
 				spikePosInd = null;
 				posValXY = null;
 				posBinXY = null;
@@ -286,9 +298,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			
 			posValXY = new Int16Array(buffer);
 			
+			//Ok, now we have pos data. Do we already have tet data, and what about cut data?
             if(spikeTimes){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
+				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
         }
@@ -310,6 +324,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var im = ToImageData(ratemap);
 			slot.cmPerBin = desiredCmPerBin;
             slot.smoothingW = desiredSmoothingW;
+			slot.posDataId = desiredPosDataId;
 			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
@@ -408,7 +423,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var desiredSmoothingW = 2;
     
 	var LoadTetData = function(N_val, tetTimes,expLenInSeconds){
-		cCut = null;
         workerSlotGeneration = [];
 		if(!N_val){
 			theWorker.SetTetData(null) //this clears the ratemap queue, clears the cut, and clears the stuff cached for doing ratemaps in future
@@ -466,7 +480,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 		if(isNewCut){
 			workerSlotGeneration = [];
-			theWorker.NewCut();
+			theWorker.ClearCut();
 		}
 
 		for(var s=0;s<newlyInvalidatedSlots.length;s++)if(newlyInvalidatedSlots[s]){
@@ -506,7 +520,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			for(var i=0;i<workerSlotGeneration.length;i++)
 				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
 			workerSlotGeneration = [];
-			theWorker.NewCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
+			theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
 		}
 	}
 	
@@ -536,21 +550,27 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 	
 	var FileStatusChanged = function(status,filetype){
+		/* This function's job is to pass on data as soon as possible to the worker, and/or send a signal to 
+		 clear invaldidated data as soon as possible.  The worker will make sure that whatever order things
+		 arrive in it will always do as much work as possible, only stopping when it is missing a required file. */
+		 
 		if(filetype == null){
 			if(status.tet < 3)
 				LoadTetData(null);
 			
 			if(status.pos < 3)
 				LoadPosData(null);
+			
+			if(status.cut < 3){
+				cCut = null;
+				theWorker.ClearCut();
+			}
 		}
 		
 		if(filetype == "tet"){
 			LoadTetData(ORG.GetN(),ORG.GetTetTimes(),parseInt(ORG.GetTetHeader().duration));
-			
-			if(status.cut == 3 && status.pos == 3) ///if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
-				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
 		}
-
+		
 		if(filetype == "pos"){
 			var posHeader = ORG.GetPosHeader();
             
@@ -562,8 +582,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                         parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
                         xs<ys? xs: ys /*min of the two*/,
                         posHeader.max_vals);
-			if(status.cut == 3 && status.tet == 3) //if we happened to have loaded the cut before the tet and pos, we need to force T.RM to accept it now
-				ORG.GetCut().ForceChangeCallback(SlotsInvalidated);
 		}
 			
 	}
@@ -581,8 +599,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	
 
 	var theWorker = BuildBridgedWorker(workerFunction,
-										["SetPosData*","SetTetData*","NewCut","SetBinSizeCm","SetSmoothingW",
-                                            "SetImmutable*","RenderSpikesForPath"],
+										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW",
+                                            "SetImmutable*","RenderSpikesForPath", "ClearCut"],
 										["ShowIm*"],[ShowIm],
 										WORKER_CONSTANTS);
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);

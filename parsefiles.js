@@ -122,7 +122,7 @@ T.PAR = function(){
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
 
-		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE){
+		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S){
 			// Read the file as a string to get the header and find the data start
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
@@ -151,7 +151,7 @@ T.PAR = function(){
     				data[k] = Swap16(data[k]);
     		}
 
-			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE);
+			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S);
 		}
 		
 		var interpXY_sub = function(XY,x_a,y_a,x_b,y_b,i,nNans){
@@ -164,7 +164,10 @@ T.PAR = function(){
 			}
 		}
 		
-		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE){
+		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE,
+					MAX_SPEED, /*meters per second, e.g. 5 */
+					SMOOTHING_W_S /* box car smoothing width in seconds, e.g. 0.2 */
+					){
 		
 			var data = new Int16Array(buffer);
 			var elementsPerPosSample = BYTES_PER_POS_SAMPLE/2;
@@ -177,7 +180,6 @@ T.PAR = function(){
 						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
 		
 			var POS_NAN = 1023;
-			var MAX_SPEED = 5;//meters per second
 			var NAN16 = -32768; //custom nan value, equal to minimum int16 value
 			
 			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
@@ -239,7 +241,6 @@ T.PAR = function(){
 			
 			
 			//Box car smoothing...
-			var SMOOTHING_W_S = 0.2; 
 			//TODO: may want to improve upon this pretty naive smoothing implementation..note we dont smooth the ends at all
 			var XY_rough = clone(XY); //we need to clone as this implentation is simple and overwrites the array as its going allong
 			var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired
@@ -370,9 +371,9 @@ T.PAR = function(){
         callbacks.tet.shift()(new Uint8Array(ampsBuffer));
 	}
 	
-	var LoadPosWithWorker = function(file,callback){
-		callbacks.pos.push(callback);
-    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE);
+	var LoadPosWithWorker = function(file,state){
+		callbacks.pos.push(state.callback);
+    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S);
     }
 	var PosFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)

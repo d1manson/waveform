@@ -42,6 +42,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cLoadingExp = new living();
 	var cLoadingTet = new living();
 	var cLoadingCut = new living();
+	var posMaxSpeed = 5; // meters per second (see PostProcessPos in parsefiles.js)
+	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
+	
 	var cState = {set:0,pos:0,cut:0,tet:0}; 
 		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
 			//	0 - file does not exist
@@ -395,7 +398,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			cLoadingExp = new living();		
 			// load pos and set if they exist
 			if(cExp && cExp.pos_file)
-				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,InternalPARcallback("pos"));
+				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
 			if(cExp && cExp.set_file)
 				T.FS.ReadFile(cExp.set_file,PAR.LoadSet,InternalPARcallback("set"));
 		}
@@ -536,7 +539,26 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 	}
 
+	var SetPosMaxSpeed = function(val){
+	// TODO: localStorage,  living for pos,
+		posMaxSpeed = val;//
+		if(cExp && cExp.pos_file){
+			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
+                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+			fileStatusCallbacks.fireWith(null,[cState,null]);
+		}
+	}
 
+    var SetPosSmoothing = function(val){
+	// TODO: localStorage,  living for pos,
+		posSmoothingWidth = val;//
+		if(cExp && cExp.pos_file){
+			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
+                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+			fileStatusCallbacks.fireWith(null,[cState,null]);
+		}
+	}
+    
 	var GetCTetT = function(callback){ //get the timestamp for each spike
 		if(!cTetT)
     		cTetT = PAR.GetTetrodeTime(cTetBuffer,cTetHeader,cN);
@@ -694,6 +716,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetTetBufferProjected = GetTetBufferProjected;
 	ORG.noProjection = true;
 	ORG.GetState = function(){return SimpleClone(cState)};
+	ORG.SetPosMaxSpeed = SetPosMaxSpeed;
+	ORG.GetPosMaxSpeed = function(){return posMaxSpeed;};
+    ORG.SetPosSmoothing = SetPosSmoothing;
+    ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list')
