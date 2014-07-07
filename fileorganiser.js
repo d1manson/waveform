@@ -43,6 +43,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cLoadingExp = new living();
 	var cLoadingTet = new living();
 	var cLoadingCut = new living();
+	var cLoadingPos = new living();
 	var posMaxSpeed = 5; // meters per second (see PostProcessPos in parsefiles.js)
 	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
 	
@@ -318,6 +319,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var hLivingExp  = cLoadingExp; 
 		var hLivingTet = cLoadingTet;
 		var hLivingCut = cLoadingCut;
+		var hLivingPos = cLoadingPos;
 		return function(data){
 			if(!hLivingExp.alive) return;
 
@@ -340,6 +342,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			}else if(filetype == "set"){
 				cSetHeader = data.header;
 			}else if(filetype = "pos"){
+				if(!hLivingPos.alive) return;
 				cPosBuffer = data.buffer;
 				cPosHeader = data.header;
 			}
@@ -398,8 +401,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			cLoadingExp = new living();		
 			// load pos and set if they exist
-			if(cExp && cExp.pos_file)
+			if(cExp && cExp.pos_file){
+				cLoadingPos = new living();
 				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+			}
 			if(cExp && cExp.set_file)
 				T.FS.ReadFile(cExp.set_file,PAR.LoadSet,InternalPARcallback("set"));
 		}
@@ -548,6 +553,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			$pos_speed_slider.get(0).value = val;
 
 		if(cExp && cExp.pos_file){
+			cLoadingPos.alive = false;
+			cLoadingPos = new living();
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
                             SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
 			fileStatusCallbacks.fireWith(null,[cState,null]);
@@ -562,6 +569,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			$pos_smoothing_slider.get(0).value = val;
 			
 		if(cExp && cExp.pos_file){
+			cLoadingPos.alive = false;
+			cLoadingPos = new living();
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
                             SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
 			fileStatusCallbacks.fireWith(null,[cState,null]);
