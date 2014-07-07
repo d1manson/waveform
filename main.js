@@ -661,8 +661,8 @@ T.ApplyStoredSettingsB = function(e) {
 	T.RM.SetCmPerBin(parseFloat(localStorage.BIN_SIZE_CM || "2.5"));
     T.RM.SetSmoothingW(parseInt(localStorage.rmSmoothingW || "2"));
 	T.TC.SetDeltaT(parseInt(localStorage.tcDeltaT || "500"));
-	T.ORG.SetPosSmoothing(parseInt(localStorage.posSmoothing || "0.2"));
-	T.ORG.SetPosMaxSpeed(parseInt(localStorage.posMaxSpeed || "5"));
+	T.ORG.SetPosSmoothing(parseFloat(localStorage.posSmoothing || "0.2"));
+	T.ORG.SetPosMaxSpeed(parseFloat(localStorage.posMaxSpeed || "5"));
 }
 
 
