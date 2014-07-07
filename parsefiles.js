@@ -163,6 +163,67 @@ T.PAR = function(){
 				XY[(i-nNans + j)*2+1] = y_a + (j+1)*dY; 
 			}
 		}
+        
+		var smoooth1D_IN_PLACE = function(X,stride,k){
+            //Box car smoothing of length 2*k + 1
+			// (If we pretend the stride=1) The first few values of X will be:
+			//  X[0] = (X[0] + X[1] + ... + X[k])/(k+1)
+			//  X[1] = (X[0] + X[1] + ... + X[k+1])/(k+2)
+			//  ... and then we get to..
+			//  X[b] = (X[b-k] + ... + X[b] + ... X[b+k])/(2*k+1)
+			// and then we ramp down at the end as with the start.
+                     
+            //A couple of checks for unimplemented generalisations...
+            if(stride != 2)
+                throw("stride must be 2");
+            if(2*k+1 > 256)
+                throw("smoothing kernel max length is 256")
+
+            /* Note: (a & 0xff) is (a mod 256) */
+            var n = X.length/2;
+			
+            var circBuff_1 = new X.constructor(256);
+            var circBuff_2 = new X.constructor(256);
+            var tot_1 = 0;
+            var tot_2 = 0;
+            
+			//a is the lowest-index in the sum, b is the central and destination index, c is the highgest index in the sum
+			var a=-2*k,b=-k,c=0; 
+			
+			// ramp up part 1: push the first k values into the buffer and sum
+			for(;c<k;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+			}
+			
+			// ramp up part 2: calculate the first k values
+            for(;a<0;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+                X[b*2+0] = tot_1 / (c+1);
+				X[b*2+1] = tot_2 / (c+1);
+            }
+                
+            // main section
+			var d = 2*k+1;
+			for(;c<n;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+				X[b*2+0] = tot_1/d;
+				X[b*2+1] = tot_2/d;
+				tot_1 -= circBuff_1[a & 0xff]; 
+                tot_2 -= circBuff_2[a & 0xff];
+			}
+			
+			// ramp down: calculate last k values
+            for(;b<n;a++,b++,c++){
+                X[b*2+0] = tot_1 / (n-a);
+				X[b*2+1	] = tot_2 / (n-a);
+				tot_1 -= circBuff_1[a & 0xff]; 
+                tot_2 -= circBuff_2[a & 0xff];
+            }
+            
+	}
 		
 		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE,
 					MAX_SPEED, /*meters per second, e.g. 5 */
@@ -238,23 +299,9 @@ T.PAR = function(){
             }
 			if(nNans) //fill end-nan values with last non-nan val
 				interpXY_sub(XY,x_a,y_a,x_a,y_a,i,nNans)
-			
-			
-			//Box car smoothing...
-			//TODO: may want to improve upon this pretty naive smoothing implementation..note we dont smooth the ends at all
-			var XY_rough = clone(XY); //we need to clone as this implentation is simple and overwrites the array as its going allong
-			var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired
-			for(var i=k;i<nPos-k-1;i++){
-				var x = 0;
-				var y = 0;
-				for(var j=i-k;j<=i+k;j++){
-					x += XY_rough[j*2+0];
-					y += XY_rough[j*2+1];
-				}
-				XY[i*2+0] = x/(2*k+1);
-				XY[i*2+1] = y/(2*k+1);
-			}
-			
+
+    		var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired			
+            smoooth1D_IN_PLACE(XY,2,k)			
 			header.n_jumpy = nJumpy; //includes untracked
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y

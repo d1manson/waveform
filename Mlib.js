@@ -207,6 +207,68 @@ var M = {
 		return result; 
 	},
         
+	smooth1D: function(X,stride,k,flag){
+            //Box car smoothing of length 2*k + 1
+			// (If we pretend the stride=1) The first few values of X will be:
+			//  X[0] = (X[0] + X[1] + ... + X[k])/(k+1)
+			//  X[1] = (X[0] + X[1] + ... + X[k+1])/(k+2)
+			//  ... and then we get to..
+			//  X[b] = (X[b-k] + ... + X[b] + ... X[b+k])/(2*k+1)
+			// and then we ramp down at the end as with the start.
+                     
+            //A couple of checks for unimplemented generalisations...
+            if(stride != 2)
+                throw("stride must be 2");
+            if(2*k+1 > 256)
+                throw("smoothing kernel max length is 256")
+			if(flag != M.IN_PLACE)
+				throw("smoothing must be done in place")
+            
+            /* Note: (a & 0xff) is (a mod 256) */
+            var n = X.length/2;
+			
+            var circBuff_1 = new X.constructor(256);
+            var circBuff_2 = new X.constructor(256);
+            var tot_1 = 0;
+            var tot_2 = 0;
+            
+			//a is the lowest-index in the sum, b is the central and destination index, c is the highgest index in the sum
+			var a=-2*k,b=-k,c=0; 
+			
+			// ramp up part 1: push the first k values into the buffer and sum
+			for(;c<k;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+			}
+			
+			// ramp up part 2: calculate the first k values
+            for(;a<0;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+                X[b*2+0] = tot_1 / (c+1);
+				X[b*2+1] = tot_2 / (c+1);
+            }
+                
+            // main section
+			var d = 2*k+1;
+			for(;c<n;a++,b++,c++){
+				tot_1 += circBuff_1[c & 0xff] = X[c*2 + 0]; 
+                tot_2 += circBuff_2[c & 0xff] = X[c*2 + 1];
+				X[b*2+0] = tot_1/d;
+				X[b*2+1] = tot_2/d;
+				tot_1 -= circBuff_1[a & 0xff]; 
+                tot_2 -= circBuff_2[a & 0xff];
+			}
+			
+			// ramp down: calculate last k values
+            for(;b<n;a++,b++,c++){
+                X[b*2+0] = tot_1 / (n-a);
+				X[b*2+1	] = tot_2 / (n-a);
+				tot_1 -= circBuff_1[a & 0xff]; 
+                tot_2 -= circBuff_2[a & 0xff];
+            }
+            
+	},
 	
 	basic: function(typedArr){
 		return Array.apply([],typedArr);//turns typed array into a basic javascript array
