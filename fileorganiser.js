@@ -14,7 +14,8 @@
 // looked at exp-tet. 
 var T = T || {};
 
-T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list){ // the T.ORG object was created by cut.js, here we add a lot more to it
+T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list,
+			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -539,9 +540,13 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 	}
 
-	var SetPosMaxSpeed = function(val){
-	// TODO: localStorage,  living for pos,
+	var SetPosMaxSpeed = function(val,viaSlider){
+	// TODO:   living for pos,
 		posMaxSpeed = val;//
+		$pos_speed_val.text(val == 0? "off" : val + " m/s")
+		if(viaSlider !== true)
+			$pos_speed_slider.get(0).value = val;
+
 		if(cExp && cExp.pos_file){
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
                             SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
@@ -549,9 +554,13 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		}
 	}
 
-    var SetPosSmoothing = function(val){
-	// TODO: localStorage,  living for pos,
+    var SetPosSmoothing = function(val,viaSlider){
+	// TODO:  living for pos,
 		posSmoothingWidth = val;//
+		$pos_smoothing_val.text(val == 0? "off" : val + " s")
+		if(viaSlider !== true)
+			$pos_smoothing_slider.get(0).value = val;
+			
 		if(cExp && cExp.pos_file){
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
                             SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
@@ -682,6 +691,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		
 		
 	};
+	
+	$pos_smoothing_slider.on("change",function(){SetPosSmoothing(this.value,true)});
+	$pos_speed_slider.on("change",function(){SetPosMaxSpeed(this.value,true)});
 
 	window.URL = window.webkitURL || window.URL;
 	$files_panel.on("dragstart",".file_brick",SaveFileDragStart);
@@ -722,7 +734,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
     return ORG;
 
-}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list')
+}(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),
+	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val')
 );
 
 

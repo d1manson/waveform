@@ -178,6 +178,8 @@ T.PAR = function(){
                 throw("stride must be 2");
             if(2*k+1 > 256)
                 throw("smoothing kernel max length is 256")
+			if(k==0)
+				return; //no smoothing
 
             /* Note: (a & 0xff) is (a mod 256) */
             var n = X.length/2;
@@ -256,31 +258,33 @@ T.PAR = function(){
 			for(var start=0;start<nPos;start++)
 				if(XY[start*2+0] != NAN16 && XY[start*2+1] !=NAN16)
 					break;
+					
+			if(MAX_SPEED){					
+				var x_from = XY[start*2+0];
+				var y_from = XY[start*2+1];
+				var jumpLen = 1;
 				
-			var x_from = XY[start*2+0];
-			var y_from = XY[start*2+1];
-			var jumpLen = 1;
-			
-			// Set big jump sections to nan
-			for(var i=start+1,nJumpy=0; i<nPos; i++){
-				
-				// check if this pos is already nan
-				// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
-				if ( XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16 || 
-					(pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
-					//sample is nan or speed is too large, so make this a jump
-					XY[i*2 + 0] = XY[i*2 + 1] = NAN16; 
-					nJumpy++;
-					jumpLen++;
-				}else{
-					//speed is sufficiently small, so this point is ok
-					jumpLen = 1;
-					x_from = XY[i*2 + 0];
-					y_from = XY[i*2 + 1];
+				// Set big jump sections to nan
+				for(var i=start+1,nJumpy=0; i<nPos; i++){
+					
+					// check if this pos is already nan
+					// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
+					if ( XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16 || 
+						(pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
+						//sample is nan or speed is too large, so make this a jump
+						XY[i*2 + 0] = XY[i*2 + 1] = NAN16; 
+						nJumpy++;
+						jumpLen++;
+					}else{
+						//speed is sufficiently small, so this point is ok
+						jumpLen = 1;
+						x_from = XY[i*2 + 0];
+						y_from = XY[i*2 + 1];
+					}
 				}
 			}
 			
-            //Interpolation...		TODO: verify that this actually does what we want
+            //Interpolation...		TODO: verify that this does exactly what we want
             var x_a = XY[start*2+0];
             var y_a = XY[start*2+1];
             var nNans = start; //this will cause first non-nan to be copied back through all previous nan values
@@ -297,11 +301,12 @@ T.PAR = function(){
                     nNans = 0;
                 }
             }
+			
 			if(nNans) //fill end-nan values with last non-nan val
 				interpXY_sub(XY,x_a,y_a,x_a,y_a,i,nNans)
 
     		var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired			
-            smoooth1D_IN_PLACE(XY,2,k)			
+			smoooth1D_IN_PLACE(XY,2,k)			
 			header.n_jumpy = nJumpy; //includes untracked
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y

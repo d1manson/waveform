@@ -606,15 +606,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 
 
-	var BinSizeCmSilder_Change = function(e){
-		SetCmPerBin(this.value,true);
-	}
-	$binSizeSlider.on("change",BinSizeCmSilder_Change);
-	
-    var SmoothingWSilder_Change = function(e){
-    	SetSmoothingW(this.value,true);
-	}
-	$smoothingSlider.on("change",SmoothingWSilder_Change);
+	$binSizeSlider.on("change",function(e){SetCmPerBin(this.value,true);});
+	$smoothingSlider.on("change",function(e){SetSmoothingW(this.value,true);});
 	
     
 	ORG.AddCutChangeCallback(SlotsInvalidated);

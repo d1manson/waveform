@@ -638,8 +638,6 @@ T.ApplyStoredSettingsA = function(){
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
-		T.ORG.SetPosSmoothing(parseInt(localStorage.posSmoothing || "0.2"));
-		T.ORG.SetPosMaxSpeed(parseInt(localStorage.posMaxSpeed || "5"));
 		
 		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
 			T.ToggleFS();//it starts life in the off state, so this turns it on 
@@ -663,6 +661,8 @@ T.ApplyStoredSettingsB = function(e) {
 	T.RM.SetCmPerBin(parseFloat(localStorage.BIN_SIZE_CM || "2.5"));
     T.RM.SetSmoothingW(parseInt(localStorage.rmSmoothingW || "2"));
 	T.TC.SetDeltaT(parseInt(localStorage.tcDeltaT || "500"));
+	T.ORG.SetPosSmoothing(parseInt(localStorage.posSmoothing || "0.2"));
+	T.ORG.SetPosMaxSpeed(parseInt(localStorage.posMaxSpeed || "5"));
 }
 
 

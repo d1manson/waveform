@@ -141,6 +141,29 @@ other file types will be ignored<br>
 		</div>
 	</div>
 	
+		
+	<div class="floatinginfo pos_info">
+		<div class='floating_title'>
+			position post processing
+		</div>
+		<div class='floating_body'>
+			Note that currently only the first LED's data is used even if two LEDs were tracked.
+			<br><br>
+			Max speed <span id='pos_speed_val' class="slider_val">? m/s</span><br>
+			<paper-slider class="nodrag" id="pos_speed_slider" pin snaps min="0" max="10" step="0.25" value="5" style='width:300px'></paper-slider><br>
+			Where the speed appears to rise above this threshold the data is considered invalid.<br>
+			<br>
+			Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data), new values are created by linearly interpolated across the gaps.
+			<br><br>
+			
+			Smoothing <span id='pos_smoothing_val' class="slider_val">? s</span><br>
+			<paper-slider class="nodrag" id="pos_smoothing_slider" pin snaps min="0" max="4" step="0.1" value="0.2" style='width:300px'></paper-slider><br>
+			Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
+			
+			<br><br>
+		</div>
+	</div>
+	
 </div>
 
 
@@ -184,6 +207,10 @@ other file types will be ignored<br>
 		<core-icon-button icon="android" id='autocut' class="info_linked" data-info-name='autocut_info'></core-icon-button>
 	</core-tooltip>
 			
+	<core-tooltip label="position post processing settings">
+		<core-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></core-icon-button>
+	</core-tooltip>
+	
 	<core-tooltip label="channel 1 [1]">
 		<div class="button display_button">c1</div>
 	</core-tooltip>
