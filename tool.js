@@ -651,6 +651,7 @@ T.Tool.ClusterPlotChangeCallback = function(invalidatedSlots_,isNew){
 
 T.Tool.PainterState = T.Tool.STATES.PAINTER;
 T.Tool.PainterState.r = 20;
+T.ORG.AddCutChangeCallback(T.Tool.ClusterPlotChangeCallback);
 T.Tool.SetPainterDestGroup(1);
 T.Tool.SetPainterSrcGroups([0]);
 
