@@ -73,6 +73,7 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
+* Added a speed histogram to the info ontop of pos.    
 * Implemented some post processing for position data together with an info pane to control some of the paramaters.
 * Added sliders for ratemap and temporal autocorr paramaters.
 * Added copy function.
