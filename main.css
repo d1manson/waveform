@@ -28,7 +28,6 @@ user-select: none;
 	padding: 3px;
 	top: 0px;
 	background: rgba(255,255,255,0.5);
-	border: 1px solid #000;
 	-webkit-transition: opacity 0.5s ease-in-out;
    -moz-transition: opacity 0.5s ease-in-out;
 	-ms-transition: opacity 0.5s ease-in-out;

@@ -79,3 +79,6 @@ RegExp.escape= function(s) {
 RegExp.fromList = function(a){
 	return a.length ? RegExp(a.sort(function(a,b){return b.length-a.length;}).map(RegExp.escape).join("|")) : null;
 }
+
+
+Math.hypot = Math.hypot || function(a,b){return Math.sqrt(a*a+b*b);};

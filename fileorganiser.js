@@ -546,7 +546,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	}
 
 	var SetPosMaxSpeed = function(val,viaSlider){
-	// TODO:   living for pos,
 		posMaxSpeed = val;//
 		$pos_speed_val.text(val == 0? "off" : val + " m/s")
 		if(viaSlider !== true)
@@ -562,7 +561,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	}
 
     var SetPosSmoothing = function(val,viaSlider){
-	// TODO:  living for pos,
 		posSmoothingWidth = val;//
 		$pos_smoothing_val.text(val == 0? "off" : val + " s")
 		if(viaSlider !== true)
@@ -593,6 +591,27 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			setTimeout(function(){callback(cTetA);},1);
 	}
 
+	var GetSpeedHist = function(callback){
+		//TODO: cache result and be more careful about what point this might be called i.e. before/after posBuffer is available etc.
+		//and make this async and possibly in a worker.
+		var BIN_SIZE = 5;//cm per second
+		var MAX_SPEED = 60; //cm per second
+		if(!cPosBuffer)
+			return;
+		
+		var data = new Int16Array(cPosBuffer); 
+		var nBins = Math.ceil(MAX_SPEED/BIN_SIZE);
+		var hist = new Int32Array(nBins);
+		var nPos = data.length/2;
+		
+		var f = 1/BIN_SIZE*parseFloat(cPosHeader.sample_rate)/cPosHeader.units_per_meter*100;
+		for(var i=0;i<nPos-1;i++){
+			var speed = Math.hypot(data[i*2+2]-data[i*2+0],data[i*2+3]-data[i*2+1]);
+			hist[Math.floor(speed*f)]++;
+		}
+		setTimeout(function(){callback(hist);},10);
+	}
+	
 	var GetTetBufferProjected = function(){
 		if(ORG.noProjection)
 			return cTetBuffer;
@@ -741,6 +760,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetPosMaxSpeed = function(){return posMaxSpeed;};
     ORG.SetPosSmoothing = SetPosSmoothing;
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
+	ORG.GetSpeedHist = GetSpeedHist;
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),

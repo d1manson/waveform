@@ -77,6 +77,22 @@ T.PlotPos = function(){
 
 }
 
+T.PlotSpeedHist = function(hist){
+	if (!hist)
+		return;
+	var canv = T.$speedhist.get(0);
+	var ctx = canv.getContext('2d');
+	ctx.clearRect(0,0,canv.width,canv.height);
+	var w = canv.height/hist.length; //width of bar, which ends up as the height becuase bar is sideways
+	var max = M.max(hist);
+	var f = canv.width/max;
+	ctx.fillRect(1,0,1,canv.height);
+
+	for(var i=0;i<hist.length;i++){
+		ctx.fillRect(3,i*w,hist[i]*f,w-0.5);
+	}
+}
+
 T.SpikeForPathCallback = function($canv){
 	T.$pos_overlay.replaceWith($canv);
 	T.$pos_overlay = $canv;
@@ -84,7 +100,7 @@ T.SpikeForPathCallback = function($canv){
 
 T.ShowInfoSummary = function(status,filetype){
     if(filetype == null && status.set < 3){
-        T.$info_summary.text("");
+        T.$info_summary_text.text("");
     }else if(filetype == "set" && status.set >=2){
         var hd = T.ORG.GetSetHeader();
         var startTime = new Date(hd["trial_date"] + " " + hd["trial_time"]);
@@ -92,7 +108,7 @@ T.ShowInfoSummary = function(status,filetype){
         endTime.setSeconds(startTime.getSeconds() + parseInt(hd["duration"]));
         var str = startTime.getHours() + ":" + (startTime.getMinutes() <10? "0" : "") +  startTime.getMinutes() + " to "
                     + endTime.getHours() + ":" + (endTime.getMinutes() <10? "0" : "") + endTime.getMinutes();
-        T.$info_summary.text(str);
+        T.$info_summary_text.text(str);
 		T.$info_summary.css({opacity: 1});
     }
 }
@@ -107,6 +123,7 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == null){	
 		if(status.tet < 3){
 			T.PlotPos();
+			T.PlotSpeedHist(null);
 		}
 		if(status.cut < 3){
 			T.ClearAllTiles();
@@ -114,11 +131,13 @@ T.FinishedLoadingFile = function(status,filetype){
 		}
 		if(status.pos < 3){
 			T.PlotPos();
+			T.PlotSpeedHist(null);
 		}
 	}
 
 	if(filetype == "pos"){
 		T.PlotPos();
+		T.ORG.GetSpeedHist(T.PlotSpeedHist)
 	}
 
 }
@@ -899,6 +918,8 @@ T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$file_info_pane = $('.file_info');
 T.$info_summary = $('.info_summary');
+T.$info_summary_text = $('.info_summary_text');
+T.$speedhist = $('#speedhist');
 T.ORG.AddFileStatusCallback(T.FinishedLoadingFile);
 T.ORG.AddCutActionCallback(T.CutActionCallback);	
 T.ORG.AddCutChangeCallback(T.SetGroupDataTiles);
