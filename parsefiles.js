@@ -14,7 +14,8 @@ T.PAR = function(){
 		
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
-
+		var DATA_END = "\r\ndata_end";
+		
 		var ParseTetrodeFile = function(file, SPIKE_FORMAT, BYTES_PER_SPIKE){
 		
 			// Read the first 1024 bytes as a string to get the header and find the data start
@@ -35,10 +36,16 @@ T.PAR = function(){
     			main.TetrodeFileRead("Code implements '" + SPIKE_FORMAT + "' format, but data is in '" +  header.spike_format + "'.",[]);
     			return;  
     		}
-    
+            
+			//Sometimes DACQ creates a header with num_spikes >0, but there are no spikes (this happens when you choose not to record a given tetrode but a file previously existed)
+			if(topStr.slice(dataStart,dataStart + DATA_END.length) == DATA_END){
+				header.num_spikes_claimed = header.num_spikes;
+				header.num_spikes = 0;
+			}
+	
             var N = header.num_spikes;
     	    var dataLen = parseInt(N)*BYTES_PER_SPIKE;
-        
+		
 			//read the data section of the file as an array buffer
     		var buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
 			
