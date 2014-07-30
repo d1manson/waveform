@@ -505,16 +505,35 @@ $(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
 /* ================== CLUSTER PAINTER ========= */
 
 
-T.Tool.MakeSVGStr_Painter = function(x,y,r){
-	if (r== 0 || T.Tool.cState == T.Tool.STATES.GRABBER)
-		return "<svg style='display:none;pointer-events:none;'></svg>";
-	else
-		return "<svg height=" + (y+r+3) + " style='position:absolute;left:0px;top:0px;pointer-events:none;z-index:100;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
-				+ "</svg>";
+T.Tool.UpdateCursor_Painter = (function(){
+	var $el = $("<svg style='display:none;pointer-events:none;'></svg>")
+					.appendTo(T.$cluster_panel);
+	var cur_r = 0;
+	var isShowing = false;
 	
-}
+	return function(x,y,r){
+		if (r == 0 || T.Tool.cState == T.Tool.STATES.GRABBER){
+			if(isShowing){
+				$el.hide();
+				isShowing = false;
+			}
+		}else{
+			if(r != cur_r){
+				var $old = $el;
+				$el = $("<svg height=" + (2*r+2) + " width=" + (2*r+2) + " style='position:absolute;left:0px;top:0px;pointer-events:none;z-index:100;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+				+ "<circle cx='" + (r+1) + "' cy='" + (r+1) + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
+				+ "<circle cx='" + (r+1) + "' cy='" + (r+1) + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
+				+ "</svg>")	
+				$old.replaceWith($el);
+				cur_r = r;
+			}else if(!isShowing){
+				$el.show();
+			}
+			isShowing = true;
+			$el.translate(x-r-1,y-r-1);			
+		}
+	}
+})();
 
 T.Tool.PAINTER_COLOR = '#003300';
 
@@ -631,9 +650,7 @@ T.Tool.ClusterPlotChangeCallback = function(invalidatedSlots_,isNew){
 
 
 T.Tool.PainterState = T.Tool.STATES.PAINTER;
-T.Tool.PainterState.$svg = $(T.Tool.MakeSVGStr_Painter(0, 0, 0)).appendTo(T.$cluster_panel);
 T.Tool.PainterState.r = 20;
-T.ORG.AddCutChangeCallback(T.Tool.ClusterPlotChangeCallback);
 T.Tool.SetPainterDestGroup(1);
 T.Tool.SetPainterSrcGroups([0]);
 
@@ -664,8 +681,7 @@ T.Tool.Painter_ClusterMouseMove = function (event) {
 	var x = event.pageX - offset.left; 
 	var y = event.pageY - offset.top + T.$cluster_panel.scrollTop();
 	var $oldSvg = s.$svg;
-    s.$svg = $(T.Tool.MakeSVGStr_Painter(x,y,s.r));
-	$oldSvg.replaceWith(s.$svg);
+    T.Tool.UpdateCursor_Painter(x,y,s.r);
 	
 	var $c2 = s.$canv2;
 	if($c2){
@@ -689,10 +705,7 @@ T.Tool.Painter_ClusterMouseMove = function (event) {
 }
 
 T.Tool.Painter_ClusterMouseLeave = function (e) {
-    var s = T.Tool.PainterState;
-	var $oldSvg = s.$svg;
-	s.$svg  = $(T.Tool.MakeSVGStr_Painter(0,0,0));
-	$oldSvg.replaceWith(s.$svg);
+	T.Tool.UpdateCursor_Painter(0,0,0);
 }
 
 T.Tool.Painter_ClusterMouseWheel = function (e) {
@@ -700,6 +713,7 @@ T.Tool.Painter_ClusterMouseWheel = function (e) {
 	s.r += e.deltaY * 3;
 	s.r = s.r < 3 ? 3 :
 			s.r > 39 ? 39 : s.r;
+	
 	T.Tool.Painter_ClusterMouseMove(e);
 	e.preventDefault();
 }
