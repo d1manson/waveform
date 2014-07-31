@@ -612,6 +612,11 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		setTimeout(function(){callback(hist);},10);
 	}
 	
+	var ReloadTet = function(withProjection){
+		ORG.noProjection = !withProjection; //Yeah that was dumb.
+		SwitchToTet(cTet.num);
+	}
+	
 	var GetTetBufferProjected = function(){
 		if(ORG.noProjection)
 			return cTetBuffer;
@@ -633,19 +638,33 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			project(newInt8.subarray(i*(4+50),i*(4+50) + 50),oldInt8.subarray(i*(4+50),i*(4+50) + 50));
 		cTetBufferProjected  = newInt8.buffer
 		*/
+		
 		var oldInt8 = new Int8Array(cTetBuffer);
+		/*
 		var x_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},12,4,0);
-		var dxdt_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,1);
-		var d2xdt2_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,2);
+		
+		//var dxdt_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,1);
+		//var d2xdt2_f32 = M.SGolayGeneralised({X:oldInt8,W:50,N:cN*4,S:50+4,off:4},5,2,2);
 
 				
 		//cast from float to int8 and normalise
-		var projI8 = new Int8Array(dxdt_f32.length);
+		var projI8 = new Int8Array(x_f32.length);
 		for(var i=0;i<projI8.length;i++){
 			var v = x_f32[i];
 			projI8[i] = v<-127? -127 : v>127? 127 : v;
 		}
 		cTetBufferProjected  = projI8.buffer;
+		*/
+		var proj = new Int8Array(oldInt8.length);
+		var filt = new Float32Array([0.171838,0.105944,0.0744375,0.0596887,0.047686,0.0394124,0.0321312,0.0265147,0.0214187,0.0172872,0.0134838,0.0103261,0.0074,0.00494912,0.00267517,0.000775923,-0.000979719,-0.00242352,-0.00374495,-0.00479496,-0.00573629,-0.00643201,-0.00702759,-0.00739298,-0.00766293,-0.0077099,-0.00766293,-0.00739298,-0.00702759,-0.00643201,-0.00573629,-0.00479496,-0.00374495,-0.00242352,-0.000979719,0.000775923,0.00267517,0.00494912,0.0074,0.0103261,0.0134838,0.0172872,0.0214187,0.0265147,0.0321312,0.0394124,0.047686,0.0596887,0.0744375,0.105944]);
+
+		for(var i=0;i<cN;i++){
+			for(var c=0;c<4;c++)
+				proj.set(M.circConv(oldInt8.subarray((4*i+c)*(50+4) +4,(4*i+c)*(50+4) +4+50),filt),
+						 (4*i+c)*(50+4) +4)
+		}
+		cTetBufferProjected = proj.buffer;
+		
 		return cTetBufferProjected ;
 	}
 
@@ -761,6 +780,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     ORG.SetPosSmoothing = SetPosSmoothing;
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
 	ORG.GetSpeedHist = GetSpeedHist;
+	ORG.ReloadTet = ReloadTet;
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),
