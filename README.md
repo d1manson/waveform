@@ -23,7 +23,7 @@ Some screenshots of individual features:
 |Cluster rendering in "drift" mode  | ![drift](/drift.png)                    |  
 
 
-#### Quickstart.. it's short and worth reading
+#### Quickstart   (... it's short and worth reading!)
 **Loading the data.** Open your operating system's file explorer and drag all the files you want into the GUI.  They will automatically be organised in the file panel on the left.  Click on a given experiment (aka "trial") to activate it. You switch tetrodes by selecting one of the numbered buttons to the right of the word "tetrode" at the top of the file panel.  If you have multiple cuts on a given tetrode you can switch cuts by clicking on the cut's name.  By default the most recently modified cut file will be used.
 
 **Viewing the data.**
