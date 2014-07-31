@@ -369,7 +369,7 @@ T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 
 T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
 	
-	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;width:100%;	' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
 				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
 				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
 				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
