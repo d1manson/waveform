@@ -358,18 +358,19 @@ var M = {
 		return Yfull;
 	},
 	
-	circConv: function(source,filter){
-		var L_s = source.length;
-		var L_f = filter.length;
-		var L2_f = Math.floor(L_f/2);
-		var ret = new source.constructor(L_s);
-		for(var i=0;i<L_s;i++){
-			var v = 0;
-			for(var j=0;j<L_f;j++)
-				v+= source[(i+j)%L_s]*filter[j];
+	circConv: function(source,filter,ret){
+		//TODO: this was written for a very specific case, where filter and source are the same length, not tested in other cases.
+		//TODO: optimise for symmetric filter, which is common case...need half as many multiplies, and loop iterations.
+		var L_s = L_f = source.length;
+		for(var i=0,p=L_f;i<L_s;i++,p--){//it's the p-- here which assumes filter and source are the same length
+			for(var j=0,v=0;j<p;j++)
+				v += source[i+j]*filter[j];
+			for(;j<L_f;j++)
+				v += source[(i-L_s)+j]*filter[j];
+			/*for(var j=0;j<L_f;j++)
+				v+= source[(i+j)%L_s]*filter[j];*/
 			ret[i] = Math.min(Math.max(v,-128),127); //TODO: generalise we neeed this for int8, but maybe not for other types
 		}
-		return ret;
 	}
 	
 	
