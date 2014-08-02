@@ -612,8 +612,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		setTimeout(function(){callback(hist);},10);
 	}
 	
-	var ReloadTet = function(withProjection){
+	var ReloadTet = function(withProjection,alignPeaks){
 		ORG.noProjection = !withProjection; //Yeah that was dumb.
+		ORG.alignPeaks = alignPeaks;
 		SwitchToTet(cTet.num);
 	}
 	
@@ -656,10 +657,34 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		cTetBufferProjected  = projI8.buffer;
 		*/
 		var proj = new Int8Array(oldInt8.length);
-		var filt = new Float32Array([0.171838,0.105944,0.0744375,0.0596887,0.047686,0.0394124,0.0321312,0.0265147,0.0214187,0.0172872,0.0134838,0.0103261,0.0074,0.00494912,0.00267517,0.000775923,-0.000979719,-0.00242352,-0.00374495,-0.00479496,-0.00573629,-0.00643201,-0.00702759,-0.00739298,-0.00766293,-0.0077099,-0.00766293,-0.00739298,-0.00702759,-0.00643201,-0.00573629,-0.00479496,-0.00374495,-0.00242352,-0.000979719,0.000775923,0.00267517,0.00494912,0.0074,0.0103261,0.0134838,0.0172872,0.0214187,0.0265147,0.0321312,0.0394124,0.047686,0.0596887,0.0744375,0.105944]);
+		var filt = new Float32Array(
+			[0.304272,0.113444,0.0646105,0.048983,0.0360309,0.028965,0.0223912,0.0181711,0.0140656,0.0112257,0.00839536,0.00636525,0.00430839,0.00281398,0.00127907,0.000171193,-0.000982496,-0.00179157,-0.00264835,-0.00321243,-0.00382472,-0.00417697,-0.00457742,-0.00473711,-0.00494487]
+			);
 
 		for(var i=0,p=4;i<cN*4;i++,p+=54)
 			M.circConv(oldInt8.subarray(p,p+50),filt,proj.subarray(p,p+50));
+			
+		if(ORG.alignPeaks){
+			var PEAK_LOC = 10; //the position where we put the peak
+			var m_c = new Int8Array(4); //these two arrays are only used within the i-loop, but it's more efficient to create once outside the loop.
+			var mi_c = new Int8Array(4); 
+			var tmp = new Int8Array(50);
+			for(var i=0,p=4;i<cN;i++){ //for each spike...
+				for(var c=0;c<4;c++,p+=54){ //get the max and its index for each channel
+					var a = proj.subarray(p,p+50);
+					mi_c[c] = M.argmax(a);
+					m_c[c] = a[mi_c[c]];
+				}
+				var mi = mi_c[M.argmax(m_c)] - PEAK_LOC; //use the index from the largest of the channels...TODO: might want to use the largest amplitude channel rather than just max value
+				
+				p-=54*4;
+				for(c=0;c<4;c++,p+=54){ //circshift each channel
+					var a = proj.subarray(p,p+50);
+					M.circShift(a,mi,tmp);
+					a.set(tmp);
+				}
+			}
+		}
 		cTetBufferProjected = proj.buffer;
 		
 		return cTetBufferProjected ;
@@ -770,7 +795,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.AddFileStatusCallback = fileStatusCallbacks.add;
 	ORG.RemoveFileStatusCallback = fileStatusCallbacks.remove;
 	ORG.GetTetBufferProjected = GetTetBufferProjected;
-	ORG.noProjection = true;
+	ORG.noProjection = true; 
+	ORG.alignPeaks = true;//only used if we do request a projection
 	ORG.GetState = function(){return SimpleClone(cState)};
 	ORG.SetPosMaxSpeed = SetPosMaxSpeed;
 	ORG.GetPosMaxSpeed = function(){return posMaxSpeed;};

@@ -37,6 +37,16 @@ var M = {
         }
         return m; //Math.min works recursively and fails for large enough arrays
     },
+
+	argmax: function(X){
+        var m = X[0];
+		var m_i = 0;
+        for(var i = 1;i< X.length; i++){
+            (m < X[i]) && ((m_i = i) && (m = X[i])) //based on max function above, but not tested this for performance
+        }
+        return m_i; 
+	},
+
 	
 	eq: function(X,v){
 		var result = new Uint8Array(X.length);
@@ -359,20 +369,34 @@ var M = {
 	},
 	
 	circConv: function(source,filter,ret){
-		//TODO: this was written for a very specific case, where filter and source are the same length, not tested in other cases.
-		//TODO: optimise for symmetric filter, which is common case...need half as many multiplies, and loop iterations.
-		var L_s = L_f = source.length;
-		for(var i=0,p=L_f;i<L_s;i++,p--){//it's the p-- here which assumes filter and source are the same length
-			for(var j=0,v=0;j<p;j++)
-				v += source[i+j]*filter[j];
-			for(;j<L_f;j++)
-				v += source[(i-L_s)+j]*filter[j];
-			/*for(var j=0;j<L_f;j++)
-				v+= source[(i+j)%L_s]*filter[j];*/
-			ret[i] = Math.min(Math.max(v,-128),127); //TODO: generalise we neeed this for int8, but maybe not for other types
+		// Assume:
+		// source is even length
+		// filter is same length as source, but is symmetric with only half actually provided.
+		
+		var L_s = source.length;
+		var L2_s = L_s/2;
+		
+		for(var a=L2_s,b=0,p=L2_s;a<L_s;a++,b++,p--){ //compute the convolution at two points, a and b, where a=b+L/2
+			var v_a = 0,v_b=0;
+			for(var j=0;j<p;j++){ //Apply the central section of the filter around the point a and the peripheral section around the point b
+				v_a += (source[a-1-j] + source[a+j])*filter[j];
+				v_b += (source[p-1-j] + source[p+j])*filter[L2_s-1-j];
+			}
+			for(j=0;j<b;j++){ // Apply the peripheral section of the filter around the antipodes of a and b, i.e. around the point a-L/2 and b+L/2
+				v_a += (source[b-1-j] + source[b+j])*filter[L2_s-1-j];
+				v_b += (source[b-1-j] + source[b+j])*filter[j];
+			}
+			ret[a] = Math.min(Math.max(v_a,-128),127); 
+			ret[b] = Math.min(Math.max(v_b,-128),127); 
 		}
-	}
+	},
 	
+	circShift: function(X,s,ret){
+		var L = X.length;
+		s = (s+L)%L;//ensure s is positive
+		ret.set(X.subarray(s),0);
+		ret.set(X.subarray(0,s),L-s);
+	}
 	
 
 }
