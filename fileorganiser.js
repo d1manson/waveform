@@ -586,11 +586,58 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var GetCTetA = function(callback){ // get an array of the length waveWidth (= 50 probably), where each element of the array is a typedarray giving the voltage at time t for every wave
  
 		if(!cTetA)
+			//GetCTetA2(function(amps){cTetA = amps; callback(amps);})
     		cTetA = PAR.GetTetrodeAmplitude(GetTetBufferProjected(),cTetHeader,cN,function(amps){cTetA = amps; callback(amps);});
 		else // we already have it, return it asynchrousously for consistency
 			setTimeout(function(){callback(cTetA);},1);
 	}
 
+    var GetCTetA2 = function(callback){
+        //TODO: incorporate properly into GetCTetA
+        
+        var W = 50;
+        
+        // python:  a=cTetBuffer[:,4:50], i.e. drop timestamps
+        var a = M.take(new Int8Array(cTetBuffer),4,4+W,W); 
+        
+        // python: S_aa = sum(a,axis=2)
+        var S_a = M.sum(a,W); 
+        
+        // python: S_aa = sum(a*a,axis=2)
+        var S_aa = M.sum2(a,W);
+        
+        // python: V = S_aa-(S_a**2)/50
+        var V = M.minus(S_aa,M.rdivide(M.pow(S_a,2),W,M.IN_PLACE)) //note only divide is done in place
+        
+        // python: ind = argmax(V,axis=1)
+        var ind = M.argmax(V,4); 
+        
+        /* pick b, S_b and S_bb from a*/
+        var b = M.sub(a,{offsetArray: ind,block: W, stride:4});
+		var S_b = M.sub(S_a,{offsetArray: ind,stride:4});
+		var S_bb = M.sub(S_aa,{offsetArray: ind,stride:4});
+				
+        // python: einsum('...k,...k',a,b) - 1/W*S_a*S_b
+        var numerator = M.minus(M.sum11(a,b,{len:50,broadcast:4}) , 
+                            M.rdivide(
+                                M.times(S_a,S_b,{broadcast:4}),
+                                W,M.IN_PLACE), M.IN_PLACE); //both divide and minus are in place
+        
+        //python: denominator = S_bb - 1/W*S_b**2
+        var denominator = M.minus(S_bb,M.rdivide(M.pow(S_b,2),W,M.IN_PLACE)) //only divde in place
+        
+        //python: amps = numerator / denominator
+        var amps = M.rdivide(numerator,denominator,{in_place:true,broadcast:4}); //note in place means that numerator is now being used as amps                                
+        		
+        //python: scaleFactor = max(b,axis=2) - min(b,axis=2);
+        var scaleFactor = M.minus(M.max(b,W), M.min(b,W), {asType: Float32Array});
+		    
+        //python: amps *= scaleFactor
+        M.times(amps,scaleFactor,{in_place:true,broadcast:4})
+        
+        callback(M.clone(amps,Uint8ClampedArray));
+    }
+    
 	var GetSpeedHist = function(callback){
 		//TODO: cache result and be more careful about what point this might be called i.e. before/after posBuffer is available etc.
 		//and make this async and possibly in a worker.
@@ -658,8 +705,14 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		*/
 		var proj = new Int8Array(oldInt8.length);
 		var filt = new Float32Array(
-			[0.304272,0.113444,0.0646105,0.048983,0.0360309,0.028965,0.0223912,0.0181711,0.0140656,0.0112257,0.00839536,0.00636525,0.00430839,0.00281398,0.00127907,0.000171193,-0.000982496,-0.00179157,-0.00264835,-0.00321243,-0.00382472,-0.00417697,-0.00457742,-0.00473711,-0.00494487]
+			[0.223221,0.111641,0.0713647,0.0555873,0.0427965,0.0348395,0.0277412,0.0226698,0.017975,0.0144035,0.011035,0.00839221,0.00587335,0.0038731,0.00195546,0.000436757,-0.00102294,-0.00215737,-0.00324703,-0.00405822,-0.00483343,-0.00535977,-0.00585545,-0.00611982,-0.00635638,]
 			);
+			/* Above filter generated in Matlab using the following:
+				a = 0.8;
+				f = [1 (1:25).^-a (24:-1:1).^-a]';
+				ff  = ifft(f);
+				fprintf('[');fprintf('%g,',ff(1:25)); fprintf(']\n');
+			*/
 
 		for(var i=0,p=4;i<cN*4;i++,p+=54)
 			M.circConv(oldInt8.subarray(p,p+50),filt,proj.subarray(p,p+50));
