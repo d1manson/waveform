@@ -72,6 +72,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     			this.pos_file = null;
 				this.set_file = null;
 				this.tets = [];
+				this.eeg_files = [];
 
                 //create a node for the exp, its title, and a hidden pair of nodes for pos and set files
                 this.$ = $("<div class='button file_group'/>")
@@ -171,6 +172,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				if(ext=="cut") 					type = 1;
 				else if(ext == "pos") 			type = 2;
 				else if(ext == "set") 			type = 3;
+				else if(ext == "eeg")			type = 9;
 				else if(!isNaN(parseInt(ext)))
 					if(base.slice(-4) == ".clu")
 						if(base.slice(-9) == ".temp.clu") type = 8; //we dont care about these
@@ -198,6 +200,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 					break;
 				case 4:
 					GotFileDetails(files[i].name,base,"tet",parseInt(ext));
+					break;
+				case 9:
+					GotFileDetails(files[i].name,base,"eeg");
 					break;
 				default:
 					GotFileDetails(files[i].name);//unknown file type
@@ -288,6 +293,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			}else if(ext=="pos"){
 				exp.pos_file = file_name;
 				exp.$pos.show();
+			}else if(ext =="eeg"){
+				exp.eeg_files.push(file_name);
 			}else if(ext=="cut"){
 				var tet_ob = exp.tets[tet-1] ? exp.tets[tet-1] : (exp.tets[tet-1] = new EXP_TET(tet,exp));
 				tet_ob.cuts.push(new EXP_CUT(file_name,tet_ob,info && info.isClu)); 
@@ -353,6 +360,26 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		}
 	}
 
+	var GetEEG = function(callback){
+		//TODO: incoperate into file loading paradigm
+		
+		T.FS.ReadFile(cExp.eeg_files[0],PAR.LoadEEG,callback)
+		
+		/*function(x){
+			// lets do some nonsense audio stuff...
+			var ctx = new window.AudioContext();
+			var eeg = new Int8Array(x.buffer); //perhaps uint8?
+			var buf = ctx.createBuffer(1,eeg.length,250*50); //250 is supposed to be sample rate
+			buf.getChannelData(0).set(eeg);
+			var src = ctx.createBufferSource();
+			src.buffer = buf;
+			src.connect(ctx.destination);
+			x.audio = src;
+			callback(x);
+		});*/
+
+	};
+	
     var UpdateURLHistory= function(exp_name,tet_num){
         if(!exp_name || !tet_num)
             return; //don't update if the thing to update is nonsense
@@ -761,6 +788,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     ORG.SetPosSmoothing = SetPosSmoothing;
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
 	ORG.GetSpeedHist = GetSpeedHist;
+	ORG.GetEEG = GetEEG;
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),

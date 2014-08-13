@@ -401,6 +401,41 @@ T.PAR = function(){
 		}
 	}
 	
+	// ==== WORKER CODE ===============================================================================
+	var eegWorkerCode = function(){
+		"use strict";
+		
+		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
+		var DATA_END = "\r\ndata_end";
+		
+		var ParseEEGFile = function(file){
+		
+			// Read the first 1024 bytes as a string to get the header and find the data start
+			var reader = new FileReaderSync();
+			var topStr = reader.readAsBinaryString(file.slice(0, 1024 + 1));
+			var match = REGEX_HEADER_A.exec(topStr);
+    		if(!match){
+    			main.EEGFileRead('did not find end of header in eeg file.',[]);
+    			return;
+    		}
+    		var dataStart = match.index + match[0].length;
+    		var header = {};
+    		var headerStr = match[0];
+    		while (match = REGEX_HEADER_B.exec(headerStr))
+    			header[match[1]] = match[2];
+    
+            var N = parseInt(header.num_EEG_samples);
+			var b = parseInt(header.bytes_per_sample);
+    	    var dataLen = N*b;
+		
+			//read the data section of the file as an array buffer
+    		var buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
+			
+			main.EEGFileRead(null,header,buffer,[buffer]);
+			
+		}
+	}
 	
 	// ================= End Of Worker Code ========================================================================
 	
@@ -410,7 +445,7 @@ T.PAR = function(){
     var POS_FORMAT = "t,x1,y1,x2,y2,numpix1,numpix2";
 	var POS_NAN = 1023;
 	
-	var callbacks = {pos:[],cut:[],set:[],tet:[]};  //we use callback cues as the workers have to process files in order
+	var callbacks = {pos:[],cut:[],set:[],tet:[],eeg:[]};  //we use callback cues as the workers have to process files in order
 	
     var LoadTetrodeWithWorker = function(file,callback){
 		callbacks.tet.push(callback); 
@@ -473,11 +508,21 @@ T.PAR = function(){
 		callbacks.cut.shift()(fileName,expName,"cut",tet);
 	}
 
+	var LoadEEGWithWorker = function(file,callback){
+		callbacks.eeg.push(callback);
+		eegWorker.ParseEEGFile(file);
+	}
+	var EEGFileRead = function(errorMessage,header,buffer){
+		if(errorMessage)
+			throw(errorMessage);
+		callbacks.eeg.shift()({header: header,buffer:buffer});
+	}
+	
 	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude*"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
 	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","ParseCluFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
-
+	var eegWorker = BuildBridgedWorker(eegWorkerCode,["ParseEEGFile"],["EEGFileRead"],[EEGFileRead]);	
 	
     var GetPendingParseCount = function(){
         return callbacks.cut.length + callbacks.set.length + callbacks.tet.length + callbacks.pos.length;
@@ -514,6 +559,7 @@ T.PAR = function(){
         LoadCut: LoadCutWithWorker,
         LoadCut2: GetCutExpNameWithWorker,
 		LoadClu: LoadCluWithWorker,
+		LoadEEG: LoadEEGWithWorker,
         GetPendingParseCount: GetPendingParseCount,
         GetTetrodeTime: GetTetrodeTime,
 		GetTetrodeAmplitude: GetTetrodeAmplitudeWithWorker,

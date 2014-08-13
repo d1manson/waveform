@@ -1,5 +1,35 @@
+/*
+Unfortunately this is a compelte mess in terms of N-dimensions, strides, in place etc.  But at least it's all collected together here (well, there are some bits used in workers that aren't here, but all the stuff on the main thread is here.).
+*/
+
+
 var M = {
-	IN_PLACE: {}, //some of the functions below can take this as a flag and perform the calculation "in place", i.e. using one of the inputs as the output
+	IN_PLACE: {in_place:true}, //some of the functions below can take this as a flag and perform the calculation "in place", i.e. using one of the inputs as the output
+		
+	sub: function(X,info){
+		//This function is an atempt to encapsulate all the indexing needs in one place and use an info object to explicitly state the indexing request
+		if('inds' in info){
+			// python: x.ravel()[inds]
+			return M.pick(X,info.inds);
+		}else if ('offsetArray' in info){
+			// like take, but now offset is an array giving a different value for each block, where for the nth
+			// block, the offset is relative to n*stride*block.
+			// offset values and stride are specified in multiples of 'block'
+			// see the special amplitude thing for an example.
+			block = info.block || 1; stride = info.stride; offsetArray = info.offsetArray;
+			var stride = stride * block;
+			var n = X.length/stride;
+			var ret = new X.constructor(n*block);
+			for(var i=0,p_dest=0;i<n;i++){
+				for(k=0,p_src=i*stride+offsetArray[i]*block;k<block;k++,p_src++,p_dest++)
+					ret[p_dest] = X[p_src]
+			}
+			return ret;
+		}else if ('stride' in info){
+			// python: x.reshape((stride,=1))[offset:offset+block]   ...possibly that's not quite what I mean
+			return M.take(X,info.offset || 0,info.stride,info.block || 0);
+		}
+	},
 	
 	pick: function(from,indices){
 		// Take elements specified by indicies from the 1d array "from".
@@ -11,32 +41,95 @@ var M = {
 		return result;
 	},
 	
-	take: function(data,offset,stride){
-		// takes every stride'th element from data, starting with the offset'th element
-		
-		var n = data.length/stride;
-		var res = new data.constructor(n);
-		
-		for(var i=0,j=offset;i<n;i++,j+=stride)
-			res[i] = data[j];
-		return res;
+	take: function(data,offset,stride,block){
+        if(!block){
+    		// takes every stride'th element from data, starting with the offset'th element
+    		
+    		var n = data.length/stride;
+    		var res = new data.constructor(n);
+    		
+    		for(var i=0,j=offset;i<n;i++,j+=stride)
+    			res[i] = data[j];
+        }else{
+            //Same as above, but takes a block of length block rather than a single element.
+            var n = data.length/stride;
+        	var res = new data.constructor(n*block);
+    		
+    		for(var i=0,j=offset,i_block=0;i<n;i++,j+=stride){
+                for(k=0;k<block;k++,i_block++)
+    			    res[i_block] = data[j+k]; //If you really wanted to could use larger datatype to movemultiple bytes at a time..or even array.set if the block size is really large...but probably not really that important in the end.
+    		}
+        }
+        
+        return res;
 	},
 		
-	max: function(X){
-        var m = X[0];
-        for(var i = 1;i< X.length; i++){
-            (m < X[i]) && (m = X[i])
-        }
-        return m; //Math.max works recursively and fails for large enough arrays
+	//Note: Math.max works recursively and fails for large enough arrays
+	max: function(X,len){
+		if(!len){
+			var m = X[0];
+			for(var i = 1;i< X.length; i++)
+				(m < X[i]) && (m = X[i])
+			return m; 
+		}else{
+			 //Compute along n contiguous blocks of length len
+			var n = X.length/len;
+			var ret = new X.constructor(n);
+			for(var k=0,j=0;k<n;k++){
+				var m = X[j];
+				for(var i = 1;i< len; i++,j++)
+					(m < X[j]) && (m = X[j])
+				ret[k] = m;
+			}
+			return ret;
+		}
 	},
 	
-	min: function(X){
-        var m = X[0];
-        for(var i = 1;i< X.length; i++){
-            (m > X[i]) && (m = X[i])
-        }
-        return m; //Math.min works recursively and fails for large enough arrays
+	min: function(X,len){
+        if(!len){
+			var m = X[0];
+			for(var i = 1;i< X.length; i++)
+				(m > X[i]) && (m = X[i])
+			return m; 
+		}else{
+			 //Compute along n contiguous blocks of length len
+			var n = X.length/len;
+			var ret = new X.constructor(n);
+			for(var k=0,j=0;k<n;k++){
+				var m = X[j];
+				for(var i = 1;i< len; i++,j++)
+					(m > X[j]) && (m = X[j])
+				ret[k] = m;
+			}
+			return ret;
+		}
     },
+
+	argmax: function(X,len){
+        if(!len){
+            var m = X[0];
+    		var m_i = 0;
+            for(var i = 1;i< X.length; i++){
+                (m < X[i]) && ((m_i = i) && (m = X[i])) //based on max function above, but not tested this for performance
+            }
+            return m_i; 
+        }else{
+            //Compute along n contiguous blocks of length len
+			var n = X.length/len;
+			var ret = new Uint8Array(n);
+			for(var k=0,j=0;k<n;k++){
+				var m = X[j];
+				var m_i = 0;
+				j++;
+				for(var i = 1;i< len; i++,j++){
+					(m < X[j]) && ((m_i = i) && (m = X[j])) 
+				}
+				ret[k] = m_i;
+			}
+			return ret;
+        }
+	},
+
 	
 	eq: function(X,v){
 		var result = new Uint8Array(X.length);
@@ -58,12 +151,86 @@ var M = {
 		}
 	},
 	
-	sum: function(X){
-		var result = 0;
-		for(var i=0;i<X.length;i++)
-			result += X[i];
-		return result;
+	sum: function(X,len){
+        if(!len){
+            //1d stride, resulting in a scalar
+        	var res = 0;
+    		for(var i=0;i<X.length;i++)
+    			res += X[i];
+        }else{
+            //compute sum along n contiguous blocks of length len
+            var n = X.length/len;
+            var res = new Float32Array(n)
+            for(var i=0,off=0;i<n;i++,off+=len){
+                for(var j=0,v=0;j<len;j++)
+                    v+= X[off+j]
+                res[i] =v;
+            }
+        }
+        
+		return res;
 	},
+    
+    sum2: function(X,len){
+        //same as sum, but takes element-wise square first
+        
+        if(!len){
+            //1d stride, resulting in a scalar
+        	var res = 0;
+    		for(var i=0;i<X.length;i++)
+    			res += X[i]*X[i];
+        }else{
+            //compute sum along n contiguous blocks of length len
+            var n = X.length/len;
+            var res = new Float32Array(n)
+            for(var i=0,off=0;i<n;i++,off+=len){
+                for(var j=0,v=0;j<len;j++)
+                    v+= X[off+j]*X[off+j];
+                res[i] =v;
+            }
+        }
+        
+		return res;
+	},
+    
+    sum11: function(X,Y,info){
+        //same as sum, but takes element-wise product of X and Y first..not extensively tested
+		
+        info = info || {};
+        if(info.broadcast){
+			//compute sum along contiguous blocks of length len, reusing each block in Y, b times before moving on to the next block
+			var b = info.broadcast;
+			var len = info.len;
+            var n = X.length/len;
+			var nY = n/b;
+            var res = new Float32Array(n)
+            for(var i=0,p_x=0,p_y=0,p_res=0;i<nY;i++,p_y+=len){ // nY blocks in Y...
+				for(var k=0;k<b;k++,p_y-=len,p_res++){ // repeate each Y block, b times 
+					for(var j=0,v=0;j<len;j++,p_x++,p_y++) // sum over Y block and X block
+						v+= X[p_x]*Y[p_y];
+					res[p_res] =v;
+				}
+            }
+		}else if(info.len){
+			len = info.len;
+            //compute sum along n contiguous blocks of length len
+            var n = X.length/len;
+            var res = new Float32Array(n)
+            for(var i=0,off=0;i<n;i++){
+                for(var j=0,v=0;j<len;j++,off++)
+                    v+= X[off]*Y[off];
+                res[i] =v;
+            }
+        }else{
+            //1d stride, resulting in a scalar
+            var res = 0;
+    		for(var i=0;i<X.length;i++)
+    			res += X[i]*Y[i];
+        }
+        
+		return res;
+	},
+    
 	
 	repvec: function(a,n){
 		//analogous to Matlab's repmat, but this just repeats the value a n-times.
@@ -91,11 +258,13 @@ var M = {
 		return result;
 	},
 	
-	clone: function(a){ 
+	clone: function(a,constructor){ 
 		if(a.slice){
 			return a.slice(0); //for basic arrays and pure ArrayBuffer
 		}else{
-			var result = new a.constructor(a.length); //
+            if(!constructor)
+                constructor = a.constructor;
+			var result = new constructor(a.length); //
 			result.set(a);
 			return result;
 		}
@@ -108,31 +277,90 @@ var M = {
 		return result;
 	},
 	
-	rdivide: function(numerator,denominator,flag){
-		if(flag == M.IN_PLACE){
-			for(var i=0;i<numerator.length;i++)
-				numerator[i] /= denominator[i];
+	rdivide: function(numerator,denominator,info){
+		//should be same as times, except for default outputtype is float32array rather than same as input
+		info == info || {}
+		if(!info.in_place)
+			numerator = M.clone(numerator,info.asType || Float32Array);
+			
+		if(denominator.length){
+			//denominator is vector
+			b = info.broadcast;
+			if(b && b>1){
+				//we resue each denominator b times before moving on to the next element
+				for(var p_numerator=0,p_denominator=0;p_denominator<denominator.length;p_denominator++)
+					for(var k=0;k<b;p_numerator++,k++)
+						numerator[p_numerator] /= denominator[p_denominator];
+			}else{
+				//numerator and denominator are same length
+				for(var i=0;i<numerator.length;i++)
+					numerator[i] /= denominator[i]; 
+			}
+			
 		}else{
-			//note that this returns a float array no matter what class the numerator and denonminator are
-			var result = new Float32Array(numerator.length);
+			//denominator is scalar
 			for(var i=0;i<numerator.length;i++)
-				result[i] = numerator[i]/denominator[i];
-			return result;
+				numerator[i] /= denominator; 
 		}
+		return numerator;
+		
 	},
 	
-	times: function(src,factor,flag){
-		if(flag == M.IN_PLACE){
-			for(var i=0;i<src.length;i++)
-				src[i] *= factor;
+    minus: function(a,b,info){
+		info = info || {};
+    	if(!info.in_place)
+            a = M.clone(a,info.asType);
+            
+        if(b.length){
+			for(var i=0;i<a.length;i++)
+    			a[i] -= b[i];
+        }else{
+            for(var i=0;i<a.length;i++)
+    			a[i] -= b; 
+        }
+        
+        return a;
+	},
+    
+	times: function(src,factor,info){
+		info == info || {}
+		if(!info.in_place)
+			src = M.clone(src, info.asType);
+			
+		if(factor.length){
+			//factor is vector
+			b = info.broadcast;
+			if(b && b>1){
+				//we resue each factor b times before moving on to the next element
+				for(var p_src=0,p_factor=0;p_factor<factor.length;p_factor++)
+					for(var k=0;k<b;p_src++,k++)
+						src[p_src] *= factor[p_factor];
+			}else{
+				//factor and src are same length
+				for(var i=0;i<src.length;i++)
+					src[i] *= factor[i]; 
+			}
+			
 		}else{
-			var result = new src.constructor(src.length);
+			//factor is scalar
 			for(var i=0;i<src.length;i++)
-				result[i] = src[i]*factor;
-			return result;
+				src[i] *= factor; 
 		}
+		return src;
 	},
 	
+    pow: function(src,p,flag){
+        if(p==2){
+            if(flag !== M.IN_PLACE)
+                src = M.clone(src);
+            for(var i=0;i<src.length;i++)
+                src[i] *= src[i];
+            return src;
+        }else{
+            throw "Only implemented for p==2"
+        }
+    },
+    
 	useMask: function(vector,mask,val){
 		//sets vector elemnts to val where mask is true, if val is omitted it defaults to zero
 		
@@ -270,6 +498,21 @@ var M = {
             
 	},
 	
+	dft_power: function(X,maxFreq,totalLen){
+		var N = X.length;
+		var m = maxFreq*totalLen/N+1;
+		var ret = new Float32Array(m);
+		var df_k = - 2*3.14159265/totalLen;
+		for(k=0,df_i=0;k<m;k++,df_i+=df_k){
+			for(var i=0,s_r=0,s_i=0,f=0;i<N;i++,f+=df_i){
+				s_r += X[i] * Math.cos(f);
+				s_i += X[i] * Math.sin(f);
+			}	
+			ret[k] = s_r*s_r + s_i*s_i; 
+		}
+		return ret;
+	},
+
 	basic: function(typedArr){
 		return Array.apply([],typedArr);//turns typed array into a basic javascript array
 	},
@@ -356,6 +599,37 @@ var M = {
 		}
 		
 		return Yfull;
+	},
+	
+	circConv: function(source,filter,ret){
+		// Assume:
+		// source is even length
+		// filter is same length as source, but is symmetric with only half actually provided.
+		
+		var L_s = source.length;
+		var L2_s = L_s/2;
+		
+		for(var a=L2_s,b=0,p=L2_s;a<L_s;a++,b++,p--){ //compute the convolution at two points, a and b, where a=b+L/2
+			var v_a = 0,v_b=0;
+			for(var j=0;j<p;j++){ //Apply the central section of the filter around the point a and the peripheral section around the point b
+				v_a += (source[a-1-j] + source[a+j])*filter[j];
+				v_b += (source[p-1-j] + source[p+j])*filter[L2_s-1-j];
+			}
+			for(j=0;j<b;j++){ // Apply the peripheral section of the filter around the antipodes of a and b, i.e. around the point a-L/2 and b+L/2
+				v_a += (source[b-1-j] + source[b+j])*filter[L2_s-1-j];
+				v_b += (source[b-1-j] + source[b+j])*filter[j];
+			}
+			ret[a] = Math.min(Math.max(v_a,-128),127); 
+			ret[b] = Math.min(Math.max(v_b,-128),127); 
+		}
+	},
+	
+	circShift: function(X,s,ret){
+		var L = X.length;
+		s = (s+L)%L;//ensure s is positive
+		ret.set(X.subarray(s),0);
+		ret.set(X.subarray(0,s),L-s);
 	}
+	
 
 }
