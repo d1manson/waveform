@@ -657,14 +657,19 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				var y = (b*w);
 				var off = y*canvW + GAP; 
 				for(var i=0,x=0;i<hist[b];i++,p++){
-					for(var off_=off;x<f*i;x++)
-						for(var k=0;k<w-1;k++,off_+=canvW)
+					for(var off_=off;x<f*i;x++) 
+						for(var k=0;k<w;k++,off_+=canvW)
 							imdata[off_ + x] = c[p];
 				}	
 			}
-			for(var y=0,off=1;y<canvH;y++,off+=canvW)//note we actually do this at x=1..that's why off starts at 1
+			//paint a black line down the left side, at x=1 (not x=0 for some reason...that's why off starts as =1)
+			for(var y=0,off=1;y<canvH;y++,off+=canvW)
 				imdata[off] = 0xff000000;//opaque black
 				
+			//demarcate the bars by making the last line of pixels in each bar have half opacity (this roughly seems to match the sub-pixel rectangle width specified in the normal plotting mode)
+			for(var b=0,off=canvW*(w-1);b<hist.length;b++,off+=canvW*w)
+				for(x=GAP;x<canvW;x++)
+					imdata[off+x] &= 0x80ffffff; 
 			setTimeout(function(){callback(imdata.buffer)},10);
 		}
 	}
