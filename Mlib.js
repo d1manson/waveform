@@ -151,21 +151,31 @@ var M = {
 		}
 	},
 	
-	sum: function(X,len){
-        if(!len){
+	sum: function(X,len,stride){
+        if(!(len || stride)){
             //1d stride, resulting in a scalar
         	var res = 0;
     		for(var i=0;i<X.length;i++)
     			res += X[i];
         }else{
-            //compute sum along n contiguous blocks of length len
-            var n = X.length/len;
-            var res = new Float32Array(n)
-            for(var i=0,off=0;i<n;i++,off+=len){
-                for(var j=0,v=0;j<len;j++)
-                    v+= X[off+j]
-                res[i] =v;
-            }
+			if(len){
+				//compute sum along n contiguous blocks of length len
+				var n = X.length/len;
+				var res = new Float32Array(n)
+				for(var i=0,off=0;i<n;i++,off+=len){
+					for(var j=0,v=0;j<len;j++)
+						v+= X[off+j]
+					res[i] =v;
+				}
+			}else{
+				//compute sum along stride interleaved blocks of length n
+				var n = X.length/stride;
+				var res = new Float32Array(stride)
+				for(var i=0,p=0;i<n;i++){
+					for(var j=0;j<stride;j++,p++)
+						res[j] += X[p];
+				}
+			}
         }
         
 		return res;

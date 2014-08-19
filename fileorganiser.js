@@ -40,10 +40,13 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cPosBuffer = null; //arraybuffer
 	var cPosHeader = null; //object with key name pairs
 	var cSetHeader = null; //object with key name pairs
+	var cEegBuffer = null; //arraybuffer
+	var cEegHeader = null; //object with key name pairs
 	var cLoadingExp = new living();
 	var cLoadingTet = new living();
 	var cLoadingCut = new living();
 	var cLoadingPos = new living();
+	var cLoadingEeg = new living();
 	var posMaxSpeed = 5; // meters per second (see PostProcessPos in parsefiles.js)
 	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
 	
@@ -327,6 +330,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var hLivingTet = cLoadingTet;
 		var hLivingCut = cLoadingCut;
 		var hLivingPos = cLoadingPos;
+		var hLivingEeg = cLoadingEeg;
 		return function(data){
 			if(!hLivingExp.alive) return;
 
@@ -348,10 +352,14 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				makeNullCutFromN = false;
 			}else if(filetype == "set"){
 				cSetHeader = data.header;
-			}else if(filetype = "pos"){
+			}else if(filetype == "pos"){
 				if(!hLivingPos.alive) return;
 				cPosBuffer = data.buffer;
 				cPosHeader = data.header;
+			}else if(filetype == "eeg"){
+				if(!hLivingEeg.alive) return;
+				cEegBuffer = data.buffer;
+				cEegHeader = data.header;
 			}
 
 			cState[filetype] = 2; // tell the callback that this is the filetype that has just loaded
@@ -359,26 +367,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			cState[filetype] = 3; //next time we shall tell the callback that it has ben told about this filetype
 		}
 	}
-
-	var GetEEG = function(callback){
-		//TODO: incoperate into file loading paradigm
-		
-		T.FS.ReadFile(cExp.eeg_files[0],PAR.LoadEEG,callback)
-		
-		/*function(x){
-			// lets do some nonsense audio stuff...
-			var ctx = new window.AudioContext();
-			var eeg = new Int8Array(x.buffer); //perhaps uint8?
-			var buf = ctx.createBuffer(1,eeg.length,250*50); //250 is supposed to be sample rate
-			buf.getChannelData(0).set(eeg);
-			var src = ctx.createBufferSource();
-			src.buffer = buf;
-			src.connect(ctx.destination);
-			x.audio = src;
-			callback(x);
-		});*/
-
-	};
 	
     var UpdateURLHistory= function(exp_name,tet_num){
         if(!exp_name || !tet_num)
@@ -423,14 +411,18 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			cLoadingExp.alive = false; //if there was anything previously loading, we need to stop it
 			cSetHeader = null;
-			cPosHeader = null; cPosBuffer = null;
-			cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; //we are starting from scratch here
+			cPosHeader = null; cPosBuffer = null; cEegHeader = null; cEegBuffer = null;
+			cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; cState.eeg = 0;//we are starting from scratch here
 
 			cLoadingExp = new living();		
-			// load pos and set if they exist
+			// load pos and/or eeg and/or set if they exist
 			if(cExp && cExp.pos_file){
 				cLoadingPos = new living();
 				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+			}
+			if(cExp && cExp.eeg_files[0]){
+				cLoadingEeg = new living();
+				T.FS.ReadFile(cExp.eeg_files[0],PAR.LoadEEG,InternalPARcallback("eeg"));
 			}
 			if(cExp && cExp.set_file)
 				T.FS.ReadFile(cExp.set_file,PAR.LoadSet,InternalPARcallback("set"));
@@ -788,7 +780,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     ORG.SetPosSmoothing = SetPosSmoothing;
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
 	ORG.GetSpeedHist = GetSpeedHist;
-	ORG.GetEEG = GetEEG;
+	ORG.GetEEGBuffer = function(){return cEegBuffer;};
+	ORG.GetEEGHeader = function(){return cEegHeader;};
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),

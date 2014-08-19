@@ -102,6 +102,7 @@ T.ShowInfoSummary = function(status,filetype){
     if(filetype == null && status.set < 3){
         T.$info_summary_text.text("");
     }else if(filetype == "set" && status.set >=2){
+		//TODO: I think you can actually get this info from any of the headers.
         var hd = T.ORG.GetSetHeader();
         var startTime = new Date(hd["trial_date"] + " " + hd["trial_time"]);
         var endTime = new Date(startTime)
@@ -112,6 +113,7 @@ T.ShowInfoSummary = function(status,filetype){
 		T.$info_summary.css({opacity: 1});
     }
 }
+
 T.FinishedLoadingFile = function(status,filetype){
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 	if(T.ORG.GetExpName())
@@ -123,7 +125,7 @@ T.FinishedLoadingFile = function(status,filetype){
 	if(filetype == null){	
 		if(status.tet < 3){
 			T.PlotPos();
-			T.PlotSpeedHist(null);
+			T.PlotSpeedHist(null); //TODO: check whether this is really needed here
 		}
 		if(status.cut < 3){
 			T.ClearAllTiles();
@@ -153,10 +155,10 @@ T.DispHeaders = function(status,filetype,forced){
 	//TODO: move to separate module
 	//TODO: if filetype is null then display all, otherwise only display the one given by the filetype string ["tet","set", etc.]
 	console.time("DipsHeaders");
-	var headerTypeList = ["tet","cut","pos","set"];
-	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetSetHeader()];
+	var headerTypeList = ["tet","cut","pos","eeg","set"];
+	var headerlist = [T.ORG.GetTetHeader(),T.ORG.GetCutHeader(),T.ORG.GetPosHeader(),T.ORG.GetEEGHeader(),T.ORG.GetSetHeader()];
     var tet = T.ORG.GetTet();
-	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.set file'];
+	var headernames = ['.' + tet +' file (spike data)','_' + tet + '.cut file','.pos file','.eeg file','.set file'];
 	var filterStr = T.$header_search.val().toLowerCase();
 	var filterOff = !filterStr;
 	for(var i=0,hdr=headerlist[0];i<headerlist.length;hdr=headerlist[++i])
@@ -869,7 +871,6 @@ T.InitKeyboardShorcuts = function(){
 	key('e',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.SetPainterDestGroup(T.groupOver.g);});
 	key('f, shift+f',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.PainterSrc_Toggle(T.groupOver.g);});
 	key('s',function(){if(T.groupOver.g>0 || T.groupOver.g==0) T.Tool.Swap(T.groupOver.g);});
-    
     $(document).on('keydown',T.Copy);
 
 }
@@ -913,7 +914,7 @@ T.$undo = $('#undo_button');
 T.$FSbutton = $('#filesystem_button');
 T.$files_panel = $('#files_panel');
 T.$displayButtons = $(".display_button");
-T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#set_info')];
+T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#eeg_info'),$('#set_info')];
 T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$file_info_pane = $('.file_info');
