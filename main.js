@@ -24,6 +24,7 @@ T.TILE_RM_HEIGHT = 120;
 T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here manually
 T.floatingTopZ = 100;
 
+T.modeChangeCallbacks = [];
 T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
@@ -45,6 +46,8 @@ T.$newTile = $("<div class='tile grabbable'>" +
 			"</div>" +
 			"<div class='blind'></div>" + 
 			"</div>");		//this gets cloned and appended to $tilewall
+
+
 
 
 T.PlotPos = function(){
@@ -82,16 +85,39 @@ T.PlotSpeedHist = function(hist){
 		return;
 	var canv = T.$speedhist.get(0);
 	var ctx = canv.getContext('2d');
+	var GAP = 3;
 	ctx.clearRect(0,0,canv.width,canv.height);
 	var w = canv.height/hist.length; //width of bar, which ends up as the height becuase bar is sideways
 	var max = M.max(hist);
-	var f = canv.width/max;
+	var f = (canv.width-GAP)/max;
 	ctx.fillRect(1,0,1,canv.height);
 
 	for(var i=0;i<hist.length;i++){
-		ctx.fillRect(3,i*w,hist[i]*f,w-0.5);
+		ctx.fillRect(GAP,i*w,hist[i]*f,w-0.5);
 	}
 }
+
+T.PlotSpeedHistDrift = function(x){
+	var canv =  T.$speedhist.get(0);
+	var ctx = canv.getContext('2d');
+
+	var imData = ctx.createImageData(canv.width,canv.height);
+	imData.data.set(new Uint8ClampedArray(x));
+	ctx.putImageData(imData, 0, 0);
+
+}
+
+T.GoGetSpeedHist = function(v,g){
+	if(v == 2){
+		var canv = T.$speedhist.get(0);
+		T.ORG.GetSpeedHist(T.PlotSpeedHistDrift,true,canv.width,canv.height)
+	}else{
+		T.ORG.GetSpeedHist(T.PlotSpeedHist,false)
+	}
+}
+T.modeChangeCallbacks.push(T.GoGetSpeedHist);
+
+
 
 T.SpikeForPathCallback = function($canv){
 	T.$pos_overlay.replaceWith($canv);
@@ -113,6 +139,7 @@ T.ShowInfoSummary = function(status,filetype){
 		T.$info_summary.css({opacity: 1});
     }
 }
+
 
 T.FinishedLoadingFile = function(status,filetype){
 	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
@@ -139,7 +166,7 @@ T.FinishedLoadingFile = function(status,filetype){
 
 	if(filetype == "pos"){
 		T.PlotPos();
-		T.ORG.GetSpeedHist(T.PlotSpeedHist)
+		T.GoGetSpeedHist(T.clusterMode,T.groupOver.g);
 	}
 
 }
@@ -697,12 +724,8 @@ T.DocumentReady = function(){
 
 T.DriftButtonClick = function(){
     T.clusterMode = T.clusterMode ? 0 : 2;
-    T.CP.SetRenderMode(T.clusterMode);
-	T.RM.SetRenderMode(T.clusterMode);
-	
-	// TODO: it's a bit lame to do this here
-	if(T.groupOver.g >0 || T.groupOver.g==0)
-		T.RM.RenderSpikesForPath(T.groupOver.g);
+	for(var i =0;i<T.modeChangeCallbacks.length;i++)
+		T.modeChangeCallbacks[i](T.clusterMode,T.groupOver.g);	
 }
 
 
@@ -838,7 +861,6 @@ T.Copy = function(e){
         return true;
     }
 }
-
 
 
 T.InitKeyboardShorcuts = function(){
@@ -996,7 +1018,7 @@ T.PALETTE_FLAG_CSS_TEXT = function(){
 T.PALETTE_TIME = function(){
 	var data = new Uint8Array(256*4);
         for(var i=0;i<256;i++){
-			data[i*4 +0] = 256-i;  //decreasing red
+			data[i*4 +0] = 255-i;  //decreasing red
 			data[i*4 +1] = i; //increasing green
 		    data[i*4+3] = 255; //set alpha to opaque
 		}

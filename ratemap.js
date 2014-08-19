@@ -3,7 +3,7 @@
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, TILE_CANVAS_NUM,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
-				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal){
+				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
@@ -586,7 +586,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			
 	}
 
-	var SetRenderMode = function(v){
+	var SetRenderMode = function(v,g){
 		//currently this only applies to the spikes plot
 		 switch(v){
             case 2:
@@ -595,6 +595,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             default:
                 meanTMode = false;
         }
+		
+		if(g>0 || g==0)
+			RenderSpikesForPath(g);
 	}
 	
 
@@ -612,6 +615,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
     
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
+	modeChangeCallbacks.push(SetRenderMode);
 	
 	return {
 		SetShow: SetShow,
@@ -627,5 +631,5 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
   T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
-	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'))
+	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks)
 

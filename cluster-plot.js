@@ -1,7 +1,7 @@
 "use strict"; 
 
 
-T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG){
+T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 
 	//TODO: it may be woth moving the plotting into a worker..could also do the painting and mouse-over-group detection in the worker.
     // for the painting it might be best to send the finished painted overlay to the worker for processing rather than trying to paint
@@ -239,7 +239,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG){
 
 	}
 
-    var SetRenderMode = function(v){
+    var SetRenderMode = function(v,g){
         switch(v){
             case 2:
                 meanTMode = true;
@@ -332,6 +332,8 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG){
 
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
+	modeChangeCallbacks.push(SetRenderMode);
+	
 	T.$cluster_panel.on({"mousemove": ClusterPlot_MouseMove,
 						  "mouseout": function(){T.SetGroupOver(-1)}
 						},"canvas");
@@ -346,4 +348,4 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG){
             SetSize: SetSize,
             GetSize: function(){return cssSize;}}; 
 
-} (T.$cluster_panel,T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer));
+} (T.$cluster_panel,T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer),T.modeChangeCallbacks);

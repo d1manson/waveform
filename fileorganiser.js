@@ -610,7 +610,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			setTimeout(function(){callback(cTetA);},1);
 	}
 
-	var GetSpeedHist = function(callback){
+	var GetSpeedHist = function(callback,timeMode,canvW,canvH){
 		//TODO: cache result and be more careful about what point this might be called i.e. before/after posBuffer is available etc.
 		//and make this async and possibly in a worker.
 		var BIN_SIZE = 5;//cm per second
@@ -624,11 +624,49 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var nPos = data.length/2;
 		
 		var f = 1/BIN_SIZE*parseFloat(cPosHeader.sample_rate)/cPosHeader.units_per_meter*100;
+		//compute speed bin inds and count number of occurances of each bin
+		var binInd = new Uint8Array(nPos);
 		for(var i=0;i<nPos-1;i++){
 			var speed = Math.hypot(data[i*2+2]-data[i*2+0],data[i*2+3]-data[i*2+1]);
-			hist[Math.floor(speed*f)]++;
+			binInd[i] = Math.floor(speed*f);
+			hist[binInd[i]]++;
 		}
-		setTimeout(function(){callback(hist);},10);
+		
+		if(!timeMode){
+			//if we are in normal mode then we're done...
+			setTimeout(function(){callback(hist);},10);
+		}else{
+			//in "time" a.k.a. "drift" mode we are just getting started...
+			var PALETTE = new Uint32Array(T.PALETTE_TIME.buffer); //TODO: acess this more sensibly
+			var GAP = 3;
+			var c = new Int32Array(nPos);
+			for(var i=0;i<nPos;i++)
+				c[i] = binInd[i]<<16 | i; //this is an easy way of sorting on value and getting the sorting indices out at the end
+			M.sort(c,M.IN_PLACE);
+			for(var i=0;i<nPos;i++)
+				c[i] &= 0xffff; //get values back
+			for(var i=0;i<nPos;i++)
+				c[i] = PALETTE[Math.floor(c[i]/nPos*256)]; // convert to colour for use in painting...
+				
+			var w = canvH/hist.length; //width of bar, which ends up as the height becuase bar is sideways
+			var max = M.max(hist);
+			var f = (canvW-GAP)/max;
+			//Now we have to actually paint in all the sections of the bars.
+			var imdata = new Int32Array(canvH*canvW);
+			for(var b=0,p=0;b<hist.length;b++){
+				var y = (b*w);
+				var off = y*canvW + GAP; 
+				for(var i=0,x=0;i<hist[b];i++,p++){
+					for(var off_=off;x<f*i;x++)
+						for(var k=0;k<w-1;k++,off_+=canvW)
+							imdata[off_ + x] = c[p];
+				}	
+			}
+			for(var y=0,off=1;y<canvH;y++,off+=canvW)//note we actually do this at x=1..that's why off starts at 1
+				imdata[off] = 0xff000000;//opaque black
+				
+			setTimeout(function(){callback(imdata.buffer)},10);
+		}
 	}
 	
 	var GetTetBufferProjected = function(){
