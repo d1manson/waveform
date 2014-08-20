@@ -73,7 +73,8 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 
 #### Change Log
-* Added a speed histogram to the info ontop of pos.    
+* Made drop zone a bit fancier.   
+* Added a speed histogram to the info ontop of pos, and later added a drift mode rendering.    
 * Implemented some post processing for position data together with an info pane to control some of the paramaters.
 * Added sliders for ratemap and temporal autocorr paramaters.
 * Added copy function.
