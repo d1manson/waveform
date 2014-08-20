@@ -641,12 +641,12 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			var GAP = 3;
 			var c = new Int32Array(nPos);
 			for(var i=0;i<nPos;i++)
-				c[i] = binInd[i]<<16 | i; //this is an easy way of sorting on value and getting the sorting indices out at the end
+				c[i] = binInd[i]<<16 | Math.floor(i/nPos*256); //this is an easy way of sorting on value and getting the sorting indices out at the end..the indices are actually not full indices but 8-bit palette values
 			M.sort(c,M.IN_PLACE);
 			for(var i=0;i<nPos;i++)
 				c[i] &= 0xffff; //get values back
 			for(var i=0;i<nPos;i++)
-				c[i] = PALETTE[Math.floor(c[i]/nPos*256)]; // convert to colour for use in painting...
+				c[i] = PALETTE[c[i]]; // convert to colour for use in painting...
 				
 			var w = canvH/hist.length; //width of bar, which ends up as the height becuase bar is sideways
 			var max = M.max(hist);
