@@ -741,6 +741,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     var dragEndTimer = 0;
     var haveDroppedAtLeastOnce = false;
     var DocumentDragOver = function (evt) {
+		if(draggingOut)
+			return;
         evt = evt.originalEvent;
         evt.stopPropagation();
         evt.preventDefault();
@@ -756,6 +758,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
         if(haveDroppedAtLeastOnce)
             HideDropZone();
     }
+	var draggingOut = false;
 	var SaveFileDragStart = function(evt){
 
 		if( $(this).data('brick-type') != 'cut')
@@ -764,9 +767,14 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var cut_brick = $(this).data('EXP_CUT');
 		if(!cut_brick.cut_instance)
 			return;
+		draggingOut = true;
 		SaveCutDragStart(evt,cut_brick.parent.parent,cut_brick.parent.num,cut_brick.cut_instance);
 
 	}
+	var SaveFileDragEnd = function(evt){
+		draggingOut = false;
+	}
+
 	var SaveCutDragStart = function(evt,exp,tet,cut){
 		var b = new Blob([cut.GetFileStr()], {type: 'text/plain'}); 
 		var blobURL = window.URL.createObjectURL(b);
@@ -774,7 +782,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		evt.originalEvent.dataTransfer.setData("DownloadURL",'application/octet-stream:' + filename +':' + blobURL);
 		return true;
 	};
-
 
 	var FileBrickClick = function(evt){
 		evt.stopPropagation();
@@ -799,7 +806,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	$pos_speed_slider.on("change",function(){SetPosMaxSpeed(this.value,true)});
 
 	window.URL = window.webkitURL || window.URL;
-	$files_panel.on("dragstart",".file_brick",SaveFileDragStart);
+	$files_panel.on("dragstart",".file_brick",SaveFileDragStart)
+				.on("dragend",".file_brick",SaveFileDragEnd);
     $document.on("dragover", DocumentDragOver) 
              .on("drop", DocumentDropFile);
     $files_panel.on("click",".file_group",FileGroupClick)
