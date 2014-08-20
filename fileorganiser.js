@@ -15,7 +15,7 @@
 var T = T || {};
 
 T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list,
-			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val){ // the T.ORG object was created by cut.js, here we add a lot more to it
+			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val,$banner,$drop_excess_stuff){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -717,18 +717,19 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
         evt = evt.originalEvent;
         evt.stopPropagation();
         evt.preventDefault();
-        if($drop_zone){
-            $drop_zone.remove();
-            $drop_zone = null;
-        }
+        HideDropZone();
         recoveringFilesFromStorage = false;
         NewFiles(evt.dataTransfer.files); // FileList object.
     }
 	var HideDropZone = function(){
-	    if($drop_zone){
+        $drop_zone.hide();
+        $drop_zone.toggleClass('alreadyUsed',true);
+        $drop_excess_stuff.hide();
+        haveDroppedAtLeastOnce = true;
+        /*if($drop_zone){
             $drop_zone.remove();
             $drop_zone = null;
-        }
+        }*/
 	}
     var TetrodeButtonClick = function(){
     	var newTet = $(this).data('tet_num');
@@ -736,12 +737,24 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     }
     var FileGroupClick = function(evt){
     	SwitchToExpTet($(this).data("EXP").name,cTet.num);
-    }    
+    }   
+    var dragEndTimer = 0;
+    var haveDroppedAtLeastOnce = false;
     var DocumentDragOver = function (evt) {
         evt = evt.originalEvent;
         evt.stopPropagation();
         evt.preventDefault();
         evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+        $banner.toggleClass('wibbly_wobbly',true);
+        $drop_zone.show();
+        if(dragEndTimer)
+            clearTimeout(dragEndTimer)
+        dragEndTimer = setTimeout(DocumentDragEnd,500); //this should work because the drag over even is fired every few ms, even if it isn't we still see a bit of wobble at least
+    }
+    var DocumentDragEnd = function(evt){
+        $banner.toggleClass('wibbly_wobbly',false);
+        if(haveDroppedAtLeastOnce)
+            HideDropZone();
     }
 	var SaveFileDragStart = function(evt){
 
@@ -828,7 +841,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),
-	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val')
+	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val'),$('.drop_banner'),$('.github_button_filedrop,#works_with_chrome')
 );
 
 

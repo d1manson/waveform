@@ -197,23 +197,25 @@ T.EEG = function($eegCanv,ORG){
 	}
 	
 	var GotSpectSection = function(spect,bandInd,peakInd,peakVal){
-	
+		var GAP = 3;
 		var canv = $eegCanv.get(0);
 		var ctx = canv.getContext('2d');
 		ctx.clearRect(0,0,canv.width,canv.height);
 
 		if(!spect)
 			return;
-			
+		
+		ctx.fillRect(1,0,1,canv.height); //draw axis down the side
+		
 		spect = new Float32Array(spect);
     	ctx.beginPath();
     	ctx.strokeStyle = "RGB(40,40,40)";
-		var dw = canv.width/peakVal;
+		var dw = (canv.width-GAP)/peakVal;
 		var dh = canv.height/spect.length;
     	var i = 0;
-    	ctx.moveTo(spect[i]*dw,0);
+    	ctx.moveTo(spect[i]*dw+GAP,0);
     	for(;i<spect.length;i++)
-    		ctx.lineTo(dw*spect[i],i*dh);
+    		ctx.lineTo(dw*spect[i]+GAP,i*dh);
     	ctx.stroke();    
 		ctx.beginPath();
 		ctx.strokeStyle = "RGB(0,0,255)";
