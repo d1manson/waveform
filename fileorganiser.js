@@ -175,7 +175,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				if(ext=="cut") 					type = 1;
 				else if(ext == "pos") 			type = 2;
 				else if(ext == "set") 			type = 3;
-				else if(ext == "eeg")			type = 9;
+				/*else if(ext == "eeg")			type = 9;*/
 				else if(!isNaN(parseInt(ext)))
 					if(base.slice(-4) == ".clu")
 						if(base.slice(-9) == ".temp.clu") type = 8; //we dont care about these
