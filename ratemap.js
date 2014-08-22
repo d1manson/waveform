@@ -1,16 +1,18 @@
 "use strict";
-
+/* TODO: better separate the two kinds of ratemap so that we can more easily reduce the work load if we ahve turned one/both off*/
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
-                CanvasUpdateCallback, TILE_CANVAS_NUM,ORG,
+                CanvasUpdateCallback, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
 				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
+	var IM_RATEMAP_DIR = 2;
 	
 	//these constants will be passed through to the worker for use as standard global vars in the worker's scope
 	var WORKER_CONSTANTS = {IM_SPIKES_FOR_PATH: IM_SPIKES_FOR_PATH,
 							IM_RATEMAP:IM_RATEMAP,
+							IM_RATEMAP_DIR: IM_RATEMAP_DIR,
 							POS_W: POS_W,
 							POS_H: POS_H,
 							BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
@@ -19,7 +21,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 	var workerFunction = function(){
         "use strict";
-
+		var pi = 3.14159265;
+		
         // Some functions copied (and simplified/extended) from Mlib.js and utils.js
 		var Swap32 = function(val) {
 			return   ((val & 0xFF) << 24)
@@ -43,6 +46,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var result =  new from.constructor(indices.length); //make an array of the same type as the from array
 			for(var i=0;i<indices.length;i++)
 				result[i] = from[indices[i]];
+			return result;
+		}
+
+		var hist_1 = function(inds,nBins){
+			var result = new Uint32Array(nBins); 
+			var n = inds.length;
+			
+			for(var i=0;i<n;i++)
+				result[inds[i]]++;
+
 			return result;
 		}
 	
@@ -106,17 +119,25 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var spikeTimes = null; // this is the spike times expressed in milliseconds
 		var spikePosInd = null; // this is the spke times expressed in pos indices
 		var spikePosBinXY = null; // this is posBinXY(spikePosInd,:)
+		var posValDir = null; //this is the values in radians (float32)
+		var posBinDir = null; //this is posVlaDir/pi*180/degPerBin ....as with posBinXY this is Uint8Clamped array, which puts a limit on the number of bins...not absolutely crucial but makes life easier in a few places
+		var spikePosBinDir = null; // this is posBinDir(spikePosInd)
 		var nBinsX = null;
 		var nBinsY = null;
+		var nBinsDir = null;
 		var smoothedDwellCounts = null;
+		var smoothedDirDwellCounts = null;
 		var unvisitedBins = null;
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
         var desiredSmoothingW = 2;
+		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15..maybe larger factors too if you really want
+		var desiredSmoothingDir = 0; //TODO: lookup what knid of smoothing needs to be done for dir plots.
 		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
+		
 		
 		var PALETTE = function(){
 			var P_COLORS = 5;
@@ -158,7 +179,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			CachePosBinIndsAndDwellMap(); //when we change the bin size we have to redo this stuff
 			QueueAllSlotsLazy();
 		}
+		var SetBinSizeDeg = function(v){
+			if(v == desiredDegPerBin)
+                return; //no point doing anything if the value isn't new
 
+            ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
+			desiredDegPerBin = v;
+			CachePosBinIndsAndDwellMap_Dir(); //when we change the bin size we have to redo this stuff
+			QueueAllSlotsLazy();
+		}
         var SetSmoothingW = function(v){
             if(v == desiredSmoothingW)
                 return; //no point doing anything if the value isn't new
@@ -176,7 +205,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 					slots[i] && (
 					slots[i].smoothingW != desiredSmoothingW ||
 					slots[i].cmPerBin != desiredCmPerBin	 ||
-					slots[i].posDataId != desiredPosDataId
+					slots[i].posDataId != desiredPosDataId	 ||
+					slots[i].degPerBin != desiredDegPerBin
 					))
 				QueueSlot(i);
 		    
@@ -186,8 +216,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             var s = ratemapSlotQueue.shift(); 
             while(!slots[s] && ratemapSlotQueue.length)
                 s = ratemapSlotQueue.shift(); 
-			if(slots[s])
+			if(slots[s]){
                 GetGroupRatemap(slots[s]);
+				GetGroupRatemap_Dir(slots[s]);
+			}
 			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
             //TODO: may want to time the call and potentially do more within this tick
 		}
@@ -205,6 +237,26 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			ratemapSlotQueue = [];
 		}
 
+		var CachePosBinIndsAndDwellMap_Dir = function(){
+			if(posValDir == null || spikePosInd == null)
+				return;
+			//at this point we have posValDir, spikePosInd and degPerBin.
+			//Here we do some stuff that will be common to all groups that want to have a dir-ratemap
+			
+			var factor = 180/pi/desiredDegPerBin;
+			posBinDir = new Uint8ClampedArray(posValDir.length);
+			for(var i=0;i<posValDir.length;i++)
+				posBinDir[i] = posValDir[i] * factor;
+            
+			spikePosBinDir = pick(posBinDir,spikePosInd); //this is a bit easier than the XY case because we just pick one value per spike rather than two
+			nBinsDir = 360/desiredDegPerBin;
+			var dwellDirCounts = hist_1(posBinDir,nBinsDir+1); //the +1'th bin will be combined with the zero'th bin...
+			dwellDirCounts[0]+= dwellDirCounts[nBinsDir];
+			dwellDirCounts = dwellDirCounts.subarray(0,nBinsDir);
+						
+			smoothedDirDwellCounts = dwellDirCounts; //TODO: actually smooth
+		}
+		
 		var CachePosBinIndsAndDwellMap = function(){
 			if(posValXY == null || spikePosInd == null)
 				return;
@@ -231,7 +283,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			spikePosBinXY = pick(new Uint16Array(posBinXY.buffer),spikePosInd); //same form as posBinXY, but we store it as 2byte blocks for easy picking
 						
 			var dwellCounts = hist_2(posBinXY,nBinsX,nBinsY);
-			dwellCounts[0] = 0; // this is where bad points were put, this is a quick fix. TODO: do something better than this
+			dwellCounts[0] = 0; // TODO: this was needed before we had interpolating in pos load, we might not need this line now
 
 			//before we do the smoothing we need to remmber which bins were unvisted
 			unvisitedBins = IsZero(dwellCounts);
@@ -256,8 +308,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				spikeTimes = null;
 				spikePosInd = null;
 				spikePosBinXY = null;
+				spikePosBinDir = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
+				smoothedDirDwellCounts = null;
 				expLenInSeconds = null;
 				return;
 			}
@@ -269,12 +323,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             if(posFreq != null){ 
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
+				CachePosBinIndsAndDwellMap_Dir();
 				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
         }
         
-        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,scale_spikes_plot_val,max_vals_val){
+        var SetPosData = function(buffer,N,posFreq_val,pixPerM_val,scale_spikes_plot_val,max_vals_val,dirBuffer){
 			//reads pos pixel coordinates
 
             ClearQueue(); 
@@ -284,10 +339,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				spikePosInd = null;
 				posValXY = null;
 				posBinXY = null;
+				posValDir = null;
+				posBinDir = null;
                 spikePosBinXY_b = null;
 				spikePosBinXY = null;
+				spikePosBinDir = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
+				smoothedDirDwellCounts = null;
                 scale_spikes_plot = null;
                 return;
             }
@@ -297,11 +356,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             scale_spikes_plot = scale_spikes_plot_val;
 			
 			posValXY = new Int16Array(buffer);
+			posValDir = new Float32Array(dirBuffer);
 			
 			//Ok, now we have pos data. Do we already have tet data, and what about cut data?
             if(spikeTimes){
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
+				CachePosBinIndsAndDwellMap_Dir();
 				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
@@ -328,7 +389,30 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
-		
+		var GetGroupRatemap_Dir = function(slot){
+			var cutInds = slot.inds;
+
+			var groupPosIndsDir = pick(spikePosBinDir,cutInds); 
+			var spikeCounts = hist_1(groupPosIndsDir,nBinsDir+1);
+			spikeCounts[0] += spikeCounts[nBinsDir];
+			spikeCounts = spikeCounts.subarray(0,nBinsDir);
+
+			var smoothedSpikeCounts = spikeCounts; //TODO: smoothing
+			var ratemap = rdivideFloat(smoothedSpikeCounts,smoothedDirDwellCounts)
+			//var im = ToImageData(ratemap); //TODO: make a proper plotting function for dir data
+			
+			//scale ratemap to have max 1...(for easy plotting)
+			var f = 1/max(ratemap);
+			for(var i=0;i<ratemap.length;i++)
+				ratemap[i] *=f; 
+			// replace nans with zero..TODO: this isn't right there are problems..!
+			for(var i=0;i<ratemap.length;i++)
+				ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
+				
+			slot.degPerBin = desiredDegPerBin;
+			main.PlotDirData(ratemap.buffer, slot.num, slot.generation,IM_RATEMAP_DIR,[ratemap.buffer]);
+		}
+				
 		var ToImageData = function(map){
 			//we use PALETTE which is a Uint32Array, though really the underlying data is 4 bytes of RGBA
 
@@ -421,7 +505,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var meanTMode = false;
 	var desiredCmPerBin = 2.5;
 	var desiredSmoothingW = 2;
-    
+	var desiredDegPerBin = 6;
+	var sintable = null;
+	var costable = null;
+			
 	var LoadTetData = function(N_val, tetTimes,expLenInSeconds){
         workerSlotGeneration = [];
 		if(!N_val){
@@ -435,16 +522,35 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 	}
 
-	var LoadPosData = function(N_val, buffer,timebase,pixPerM,scale_spikes_plot,max_vals){
+	var LoadPosData = function(N_val, buffer,timebase,pixPerM,scale_spikes_plot,max_vals,dirData){
 		if(!N_val){
 			theWorker.SetPosData(null) //this clears the ratemap queue, clears the cut, and clears the stuff cached for doing ratemaps in future
 			//TODO: decide whether we need to send null canvases
 			return;
 		}
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
-		
-		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,max_vals,[buffer]);
+		dirData = M.clone(dirData.buffer); //this too
+		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,max_vals,dirData,[buffer,dirData]);
 
+	}
+	
+	
+	var PlotDirData = function(dataBuffer,slotInd,generation,imType){
+	    var S = 100; //size in pix
+		var data = new Float32Array(dataBuffer);
+		var $canvas = $("<canvas width='" + S + "' height='" + S + "' />");
+        var ctx = $canvas.get(0).getContext('2d');
+		ctx.beginPath();
+    	ctx.strokeStyle = "RGB(0,0,0)";
+		
+    	var i = 0;
+    	ctx.moveTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+		for(;i<data.length;i++)
+			ctx.lineTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+		i = 0;
+		ctx.lineTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+		ctx.stroke();   
+		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,$canvas); //send the plot back to main
 	}
 	
 	var ShowIm = function(imBuffer,slotInd,sizeXY,generation,imType){
@@ -524,6 +630,24 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 	}
 	
+	var SetBinSizeDeg = function(v,viaSlider){
+		//TODO: have a slider
+		
+		theWorker.SetBinSizeDeg(v);
+		desiredDegPerBin = v;
+		
+		//Update trig tables for plotting
+		var nBins = 360/v;
+		sintable = new Float32Array(nBins);
+		costable = new Float32Array(nBins);
+		var pi = 3.14159265;
+		for(var i=0; i<nBins;i++){
+			sintable[i] = Math.sin((i+0.5)*v/180*pi);
+			costable[i] = Math.cos((i+0.5)*v/180*pi);
+		}
+
+	}
+	
 	var SetCmPerBin = function(v,viaSlider){
 		$binSizeVal.text(v + " cm")
 		desiredCmPerBin = v;
@@ -581,7 +705,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
                         parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
                         xs<ys? xs: ys /*min of the two*/,
-                        posHeader.max_vals);
+                        posHeader.max_vals,
+						ORG.GetDir());
+			
 		}
 			
 	}
@@ -600,22 +726,24 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			RenderSpikesForPath(g);
 	}
 	
-
+	
+	
 	var theWorker = BuildBridgedWorker(workerFunction,
 										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW",
-                                            "SetImmutable*","RenderSpikesForPath", "ClearCut"],
-										["ShowIm*"],[ShowIm],
+                                            "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg"],
+										["ShowIm*","PlotDirData*"],[ShowIm,PlotDirData],
 										WORKER_CONSTANTS);
 	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 
 
 	$binSizeSlider.on("change",function(e){SetCmPerBin(this.value,true);});
 	$smoothingSlider.on("change",function(e){SetSmoothingW(this.value,true);});
-	
+	SetBinSizeDeg(6);
     
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	modeChangeCallbacks.push(SetRenderMode);
+	
 	
 	return {
 		SetShow: SetShow,
@@ -623,12 +751,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		GetCmPerBin: function(){return desiredCmPerBin;},
         GetSmoothingW: function(){return desiredSmoothingW;},
         SetSmoothingW: SetSmoothingW,
+		SetBinSizeDeg: SetBinSizeDeg,
+		GetBinSizeDeg: function(){return desiredDegPerBin;},
 		RenderSpikesForPath: RenderSpikesForPath,
 		SetRenderMode: SetRenderMode
 	}
 
 }(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
-  T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.ORG,
+  T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
 	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks)

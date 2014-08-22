@@ -594,6 +594,22 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		}
 	}
     
+	var GetDir = function(){
+		//TODO: this should be returned by the pos file loader as with posbuffer (or whatever it's called these days)
+		// Also it should use both LEDs.
+		if(!cPosBuffer)
+			return;
+			
+		var xy = new Int16Array(cPosBuffer);
+		var dir = new Float32Array(xy.length/2);
+		var pi = 3.14159265;
+		for(var i=1;i<dir.length;i++){
+			dir[i] = Math.atan2(xy[2*i+1] - xy[2*i-1],xy[2*i+0] - xy[2*i-2]) + pi;
+		}
+		dir[0] = dir[1];
+		return dir;
+	}
+	
 	var GetCTetT = function(callback){ //get the timestamp for each spike
 		if(!cTetT)
     		cTetT = PAR.GetTetrodeTime(cTetBuffer,cTetHeader,cN);
@@ -846,6 +862,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetSpeedHist = GetSpeedHist;
 	ORG.GetEEGBuffer = function(){return cEegBuffer;};
 	ORG.GetEEGHeader = function(){return cEegHeader;};
+	ORG.GetDir = GetDir;
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),

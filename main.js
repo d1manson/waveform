@@ -11,7 +11,8 @@ T.BASE_CANVAS_WIDTH = 4*49;
 T.BASE_CANVAS_HEIGHT = 256;
 T.CANVAS_NUM_WAVE = 0;
 T.CANVAS_NUM_RM = 1;
-T.CANVAS_NUM_TC = 2;
+T.CANVAS_NUM_RM_DIR = 2;
+T.CANVAS_NUM_TC = 3;
 T.POS_PLOT_WIDTH = 255;
 T.POS_PLOT_HEIGHT = 255;
 T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
@@ -27,6 +28,7 @@ T.floatingTopZ = 100;
 T.modeChangeCallbacks = [];
 T.$newTile = $("<div class='tile grabbable'>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
+			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
 			"<div class='tile-sticker'></div>" + 
@@ -353,6 +355,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 				$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
 				break;
 			case T.CANVAS_NUM_RM:
+			case T.CANVAS_NUM_RM_DIR: //TODO: probably want some special scaling for direction ratemaps that isn't the same as XY-maps
 				xF = T.SPECIAL_SCALING_RM;
 				yF = T.SPECIAL_SCALING_RM;
 				$canvas.css({height:  T.TILE_RM_HEIGHT + 'px'}); //apply css scaling
