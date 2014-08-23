@@ -15,7 +15,7 @@ T.CANVAS_NUM_RM_DIR = 2;
 T.CANVAS_NUM_TC = 3;
 T.POS_PLOT_WIDTH = 255;
 T.POS_PLOT_HEIGHT = 255;
-T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
+T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4,5], TC: 6}; //order in DOM
 
 T.xFactor = 2;
 T.yFactor = 2;
@@ -26,29 +26,6 @@ T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here
 T.floatingTopZ = 100;
 
 T.modeChangeCallbacks = [];
-T.$newTile = $("<div class='tile grabbable'>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<div class='tile-sticker'></div>" + 
-			"<div class='tile-over hidden_grabbed'>" +
-				"<div class='tile-buttons' layout vertical>" +
-					"<core-tooltip label='swap with... [s]' position='left'>" +
-						"<button class='tile-button-swap'></button>" +
-					"</core-tooltip>" +
-					"<core-tooltip label='make destination group [e]' position='left'>" +
-						"<button class='tile-button-dest'></button>" +
-					"</core-tooltip>" +
-					"<core-tooltip label='make source group [f]' position='left'>" +
-						"<button class='tile-button-src'></button>" +
-					"</core-tooltip>" +
-					"<div class='tile-caption'></div>" + 
-				"</div>" + 
-			"</div>" +
-			"<div class='blind'></div>" + 
-			"</div>");		//this gets cloned and appended to $tilewall
-
 
 
 
@@ -211,7 +188,7 @@ T.DispHeaders = function(status,filetype,forced){
 
 T.SetDisplayIsOn = function(v){ 
 
-	//there are currently 6 buttons: the first 4 are channels, then 1 for ratemap and 1 for temporal autocorr
+	//there are currently 7 buttons: the first 4 are channels, then 2 for ratemap and 1 for temporal autocorr
 	//this function will 
 	if('chanIsOn' in v){
 		T.chanIsOn = v.chanIsOn; //array of 4
@@ -221,7 +198,7 @@ T.SetDisplayIsOn = function(v){
 	}
 
 	if('mapIsOn' in v){
-		T.mapIsOn = v.mapIsOn; //array of 1
+		T.mapIsOn = v.mapIsOn; //array of 2
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
 			T.mapIsOn[i] ? T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).removeAttr('checked');
 		T.RM.SetShow(T.mapIsOn);
@@ -367,21 +344,16 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
     }else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 
-	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
+	t.updateCanvas($canvas.get(0),canvasNum);
 
 	for(var i=0;i<T.canvasUpdatedListeners.length;i++)
 		T.canvasUpdatedListeners[i](canvasNum,$canvas,g);
 }
 
 T.CreateTile = function(i){
-	var $ = T.$newTile.clone();
-
-	$.data("group_num",i);
-	return {$: $,
-			$caption: $.find('.tile-caption'),
-			$sticker: $.find('.tile-sticker')
-			}
-
+	var el = document.createElement('tile-element');
+	el.group_num=i;
+	return el;
 }
 
 T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
@@ -392,8 +364,8 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
-		T.$tilewall.append(t.$);
-		t.$.hide();
+		T.$tilewall.append(t);
+		$(t).hide();
 		T.tiles.push(t);
 	}
 
@@ -405,7 +377,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 			var old_tile_ind = T.cutSlotToTileMapping[k];
 			if(isNum(old_tile_ind)){
 				//hide the tile if one was associated to the slot
-				T.tiles[old_tile_ind].$.hide(); 
+				$(T.tiles[old_tile_ind]).hide(); 
 				T.cutSlotToTileMapping[k] = null;
 			}
 			invalidatedSlots[k] = 0; //by getting rid of any existing tile for the slot we have just validated this slot
@@ -427,36 +399,37 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 				//source group has not yet been displaced, need to create a placeholder
 				movingTile = T.tiles[old_tile_ind];
 				var oldTilePlaceholder = T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
-				movingTile.$.before(oldTilePlaceholder.$); //add the placeholder 
-				oldTilePlaceholder.$.hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
+				$(movingTile).before($(oldTilePlaceholder)); //add the placeholder 
+				$(oldTilePlaceholder).hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
 			}else{
 				//source group has already been displaced
 				movingTile = displaced_tiles[old_tile_ind];
 			}
-			T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
+			$(T.tiles[new_tile_ind]).replaceWith($(movingTile)); // make the move 
 			T.tiles[new_tile_ind] = movingTile; 
 
 		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
-		T.tiles[new_tile_ind].$.show()
-							   .toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
-							  .data("group_num",new_tile_ind)
-		T.tiles[new_tile_ind].$caption.text(slot_k.inds.length);
-		T.tiles[new_tile_ind].$sticker.css({backgroundColor: T.PALETTE_FLAG_CSS[new_tile_ind],
-											color: T.PALETTE_FLAG_CSS_TEXT[new_tile_ind]})
-									  .text(new_tile_ind);
+		var t_new = T.tiles[new_tile_ind];
+		t_new.group_num = new_tile_ind;
+		$(t_new).show()
+				.toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
+		t_new.group_caption = slot_k.inds.length;
+		t_new.group_color_1 = T.PALETTE_FLAG_CSS[new_tile_ind];
+		t_new.group_color_2 = T.PALETTE_FLAG_CSS_TEXT[new_tile_ind];
+
 		T.cutSlotToTileMapping[k] = new_tile_ind;
 	}
 
 
 	while(T.tiles.length-1 > maxGroupNum) // if there are too many tiles, delete some (-1 becuase of group 0)
-		T.tiles.pop().$.remove();
+		$(T.tiles.pop()).remove();
 
 }
 
 T.ClearAllTiles = function(){
 	while(T.tiles.length)
-		T.tiles.pop().$.remove();
+		$(T.tiles.pop()).remove();
 	T.cutSlotToTileMapping = [];
 }
 
@@ -741,9 +714,9 @@ T.SetGroupOver = function(g){
     g = parseInt(g);//when coming via data-group attr it might be a string
 	if(g == T.groupOver.g)
 		return;
-
+	
 	if(T.groupOver.$tile)
-		T.groupOver.$tile.removeAttr('active');
+		T.groupOver.$tile.active = false;
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.removeAttr('active');
 	
@@ -757,13 +730,13 @@ T.SetGroupOver = function(g){
 	
 	T.$info_summary.css({opacity: 0});
 	T.groupOver.$clusterSticker = T.$cluster_info.find('.cluster-sticker[data-group=' + g + ']');
-	T.groupOver.$tile = T.tiles[g] ? T.tiles[g].$ : null;
+	T.groupOver.$tile = T.tiles[g] ? T.tiles[g] : null;
 	
     T.RM.RenderSpikesForPath(g);
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.attr('active',true);
 	if(T.groupOver.$tile)
-		T.groupOver.$tile.attr('active',true);
+		T.groupOver.$tile.active = true;
 		
 }
 
@@ -877,6 +850,7 @@ T.InitKeyboardShorcuts = function(){
 	key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 	key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+	key('q, shift+q',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[1],shiftKey:key.shift});});
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
 	key('k, alt+k',T.Toggle('shortcut_info'));

@@ -1,0 +1,374 @@
+<!--
+CUSTOM ELEMENT: tile-element 
+BY: DM
+
+The tile element is designed for use within the tilewall. The idea is to encapsulate as much of the gory DOM-ish work as possible here but
+alow the main program to do all the more interesting interactivity...it's a bit of a blurred line unfortunately.
+
+Tiles have the following attibutes:
+	group_num - a number
+	group_color_1, group_color_2 - colors used for the group's sticker
+	group_caption - a string, displayed when the group is active
+	proximate/active/moving - true/false. Changes the state as described below.
+	
+And the following methods:
+	startMoving/endMoving - styles the tile to show it is moving and makes it easy to use css transforms to position it within its parent.  
+							The startMoving function returns a palceholder div which you can insert somewhere to show that the tile is moving.
+	shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
+						in the main index.html...perhaps there is a better way of doing this?
+
+
+A tile can be in one of several states, (normal,active,moving,proximate, and hover). Transitioning between states is done by setting element.something = true or false....
+	from normal state: 
+		active=true  => active  ..usually, but...
+					 => hover  ...if movingTile is currently not null
+	from active state:
+		moving=true => moving 
+		active=false => normal
+	from moving state:
+		proximate=true => proximate
+		moving=false => active  
+		..setting active will be ignored and not cause an error
+	from proxiamte state:
+		proximate=false => moving 
+		moving=false => active 
+	from hover state:
+		active=false => normal
+I'm not quite sure why it's so complciated, it would probably be better to just set the state directly.
+-->
+<link rel="import" href="polymer/polymer.html">
+<link rel="import" href="polymer/core-tooltip.html">
+
+<polymer-element name="tile-element" attributes="group_num group_color_1 group_color_2 group_caption">
+<template>
+	<style>
+	:host {
+	display: inline-block;
+	position: relative;
+	transform: rotateY(0);
+	-webkit-transform: rotateY(0);
+	min-width: 98px;
+	min-height: 128px;
+	left: 0px;
+	top: 0px;
+	overflow: hidden;
+	border: 1px solid #CCC;
+	line-height: 0px;
+    }
+	.tile-over{
+	display: none;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+	}
+	.tile-caption{
+	padding-top: 2px;
+	line-height: 12px;
+	border-top: 1px solid #000;
+	text-align: center;
+	}
+	:host-context(.shake){
+	-webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
+	-webkit-animation-duration: 1s;
+		-moz-animation-duration: 1s;
+		-ms-animation-duration: 1s;
+		-o-animation-duration: 1s;
+		animation-duration: 1s;
+	}
+
+	.tile-sticker{
+	line-height: 12px;
+	width: 20px;
+	height: 17px;
+	border: 1px solid #000;
+	text-align: center;
+	font-size: 0.8em;
+	padding-top: 3px;
+	position: absolute;
+	right: 2px;
+	top: 2px;
+	}
+	.tile-buttons{
+	position: absolute;
+	right: 0px;
+	top: 0px;
+	bottom: 0px;
+	background-color:rgba(255,255,255,0.85);
+	box-shadow: -3px 0px 6px #ddc;
+	}
+	.grabbed_info .tile-buttons{
+	display: none;
+	}
+	button{
+	border: 1px solid #900;
+	color: #900;
+	padding: 5px 15px 5px 15px;
+	margin: 0px 2px 0px 2px;
+	box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 -1px 0 rgba(255, 255, 255, 0.3) inset;
+	border-radius: 4px;
+	cursor: pointer;
+	}
+	button:hover{
+	background: #C77;
+	color: #FFF;
+	}
+	button:active{
+	background: #900;
+	border-color: #000;
+	}
+
+	.tile-button-swap,
+	.tile-button-dest,
+	.tile-button-src{
+	margin: 5px;
+	display: block;
+	height: 28px;
+	width: 28px;
+	background-color: #927474;
+	}
+
+	.tile-button-swap{
+	background-position: 2px 1px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABsAAAAYCAYAAAALQIb7AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsIAAA7CARUoSoAAAAVtSURBVEhLjVZZTFVXFF1vgIcMMlQFBZSplckqFAeoVqO2pTjVtLZGralfhhhjWjX6YSIx+uFPDf2zJrVxitEYTJwqRpQGVKgYRGQQVCgKKIOAzGP32r57FQK2K7nvnXvuOXtYezjH8uuOHUMYBUNDQ+jr7YXNZsOUsDCExcRgckgI/IODYXdxQXdnJ169fInqR49QcP06uru6EBIVhW9SU3X/rcuXkXvxItw8PPSdsDr/h2FwcBC93d2YNn06Nu3Zg++2bkXC4sUIFKVURLi5u6tyq8WiRvX39SEqIUG/EdPj4+EQRZRlwM4fTlitb/QODAxgoL8fyRs2IHbePJ0zUFNZicbaWgyIYFc3N/TLuqxz5zBOhFrke/Ts2egSj+ufPkWoMPFBQABe1tSYsu0U7uHlhc7Xr3VC+MO3W7aoVwStzr92DUU5Oejp6UG/vJNiiwiwyePu6alrIp1elebn41VDgyqLnjMHtU+emGxYKXzxmjVqZa8IW7BqlamIm47u34/cS5dUESmjR6TQ1eGAzSnEIvNR4hVRIsqelpTo+GNhhobQOMJK18NjY+EzcSI+mjULnyxapB9qhYrjBw+ivbVVhTNR6A0FE/znwxB4+fhoAvWJQX5CHdczhjSGshkWwvrpsmU6mCiLFq5erWN6e+HoUY2NQcFYoKCgiAg1xkW8Tdm4ERt27jT3kV6Git6Z2fj5unXwmTBBx1dPn8arFy900aA8DLBBxbvgHA2KW7hQ36tKS1F065Y+lUVFOkfPSL0qq3jwQCeZUQSFF9++jcnTpmH+ypX4evNm2OyStKMo49oAWRcwdaq+Zxw5givHjunz54kTWoue3t4IlpLhWttXSUlpkVITBro6OhAzdy6SUlIQFB6Owuxs/FNRoQqNeBmgtZ7jx+ueKkmKZ7LOIfFycXXVmHW0tWnht7W0oKWxEZbf9u4d+nH3briIqyNBy37Ztk2tG6nIAKmmYH5lzIx1TBzuJ83sIoyhbX50dFqM1IO71JqB+upq3L15EzkXLmgCWCX4Y4HxtIvX9JxUsQ6pZFD2MbuXrl0Lx7hxmt12ZlFhbi5Co6NxXwq3orBQN5EKCtB4/Q/QKJZPiMiJjIvTWBrw9vVFwY0bsKRv3z5El7ukg5AC1gat1Q4hioxW8z4wdqzHn9PTtcZGokea9B8HDrzpIOSTmfeZ1Nn85cuRsGQJImbOVOWMx/tARewSScnJpiL2z872dh0TpHGSZKydi8n5ghUrnJ/egsH/fd8+dIjXpHtUyH72xxDpIHnSQ0vv3kVTXR1+OnTIueANwoRe5YgKKbhHjpXLUiMZhw+rtVTAnseMGhPiPeN1Xvb8df486quqEJuYaCYV6SUiZsx420FIGRWUFxRoB2iX2iCapZMwfmOB+/SIEuFkyNffH19IBhKsrawzZ3Q8KA6ZUriBR833UlepEkxfyaz8zEyUCS3/1R8Jo/Gu2LRJDSCyMzLQUF+vY57ab00WzVzkJWlK6+QFH0oKTwoKMrs26eZjjsVA0s+68pDC/2HXLkwJDdXvf2dlofzePbTIMVVZXIyHcvTYkhMT05jizEDeI85K+vL+wLYTKneKCYGBKBNqKZz1R8Wkm0yQXod0jdlLl2K5eOQhrYuoLi9H5qlTsEutsnSeywnP89KsWHpFS9ulnzVKNjU8f67z3n5+cBF6Wpub8eX69XBIW2Na858MBMvx8i6K8/Jw9eTJYTXK9Uw2UxktZZ3w1OY/jwai4v59vTJwPt55lIyG1qYmXDl+HM8eP9bu824zMMamMtLEbGKfJGjNwzt3kCNXAlcpStLHnsmYki7GqVk6eo1c5arKylAnvY8087pgJMhwAP8CsTOglKFq9pQAAAAASUVORK5CYII=);
+	background-repeat: no-repeat;
+	}
+	.tile-button-swap:hover{
+	background-repeat: no-repeat;
+	background-position: 2px 1px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABsAAAAYCAYAAAALQIb7AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwQAADsEBuJFr7QAAA+lJREFUSEuVVllLVVEUvj+oHhpMLDUNhzRTywkte6hMokyFwF5KoqgkfCmao5GwECMsESszDZPrkJqpmKWFpmWDFUQg5Nf61nHvc66ehB4+7rl777W+Ne8d6N0UBT/0pEcimBqOztTV+FmcDdRcArobgalBYHoYmOgDepqAqtN4tTlaz/4uzXH2iGsn0ZoUFqLTl+yFELUmh+NXiQiPdLgK/HD7jBrUvD4MeFzjrg+1WV1Gr5J5F7rS1qiVeFgdqpTofAQ8uAlUXwDqq4Da62gSEsorGc/Q47Z6/Z7anY6O9AiXjMrf5sUrCUEr0d7gEjBsVyowkBmj+/RYkRKBjg3hNtx/yvKd83evApVlznfdLT1ryVT58zoV4AbuyWFDNBzEm9w4tCStUqIeOUvlFOSvQXBjBNByX2WmClMxsiXBkf88iMaEFVYmgKNFujGan4TZ/XkukSTfKDKH/WAig69DwGQ/cKhACU0hfS/KtKEM4H23LiqReKJE34YxlBtvw7QYmea3vNA1cj4ktww5dVgyfOh1DxwrRrO4z7AyzL0Za30JuaaF8bLZkWNhNNxxMBdW6udZFlGASbQkhISD1o7vSNYeYrEMZsVqvuaT0ZCJghQr254WiZbElQoaqJUp6zMl2RrKgK0igzHxcLDV/X/qoJL7ecZ8fdklZDTq4nEEPWGnchzZI3vnMCMpUjJN7kdJrJfQQCzzVpMftB0kJ4bIrJvea4xbZosswLIO8YRgDs6Wayg1Zx7li4FnScp8k4geaR6l7xidADe1CWWRmyTnYa7/L5HmWYy0BWMgzlBvgO4xFE/il+OpgBVIIrruHWOLgToYblMQCzDZh9c564RMLOpj5UiCcaPSwfnDmD2wzSbaj8CAZ7TXpJCscqZl3NNKAkZNZ+NQdmzIhoW0gZmbfkQEjWVr6DyVqhzfmeKQc6J4dUlzK5ke5iarUsaNJtbcW5crNKx+RAQ9Y08xZ0wB882hYEnM0JDfUDJZ4Iiqj1mq9xEPsQ+ZPz8iAxJqyEWWY47jTglk/Nl5+67LQyYTWg/x9u1/5nzLxcgSVut9SAw0b3O9pPJULiARB7z+lwZ3yUzYRruAT3PfYtnY9iRbJMYD+y2hozzLWj0yg5yQC5aGav7mrrDQMMowHtuaqMrszOxq1BYgSEoh5oZTg7K8VHm5WmMJKRbmkDI8Y4oslEzmIolqo5cAJ0odQfF0ICNa+5DPAH0umGcBnwmGwED2aRD1Uhdh+jU0ZyTko0XctsJyzesNzmHrVTof8jCa3puhHv9rGLhkJk8GbEqZ2B2yr4lns3MMmVL2POV+7Mty5qJ4ZHK6EFH4C0j0TBtELlzyAAAAAElFTkSuQmCC);
+	}
+	.tile-button-dest{
+	background-repeat: no-repeat;
+	background-position: 3px 2px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAA75JREFUSEu1ls1rlFcUxp95Z5LJJFEDJtSSSEM11NDGtILSEAmKFNJKDZroQi1YFy7EjSKuXPQfkEoR3IkL48YYwUprKGlHa0jRFKtBXdSUQikIJiVqPicf0/M7zh2GkIAL82zm3vM+53fve++5953Y2RMnsnOzs6prbNSTe/dUUlqqWBRpcnxcHceO6ealS5qemFCiqEiFmp2ZUdK8rQcPquvcOaXKypSdn9eUees3b9afDx4onkgomp+b0469e/Xl4cNqaWtTJpNxI/F3amr09enTKiou9n4QbWI8w0OfHHJhwIJJPKpet06NW7d64qetrWreuVNjL18qm836LFM2y23t7cpMT7sH0SbGMzx4ySEXBoIJO/r78WP1dHZ6EDWZgRmM5wZBkS2ZdbztsrbHvJl1LznkBsGEHZXY2g329+tmbhAwDU1N2r5nT35ZwkCFCjE8eMkJLlgwYUexWEzFJSW6f+uWfr1+XbGcace+faqoqsr1lhYevIhcGLBgwo6mJyc18eqVd3ouX1b3+fOatapabNZLCS855MKABRN27GFfX/b9hgbNWAWY040VlZX5Neb30d27+uHiRX9lNGUl/MWhQ/pwyxbNW/UgfkeHh5Ww0rQRvMr+GhxU9HNXl49WsXq1gyvXrHET4DAI9bxQIRZ85JALAxZM2LFvjx/PslHbbKM4LGFGQST+8/SpHt65o6Jk0mMzVqYbrQzXrl/vb1woBuOQpru7FcXjin138mTWD4klLYQHMUiABzHIQngQgxSbnxvBB8jFl0WvF3kZtfxLlN/k3buVKi9/O5s8Nqb0tWu+yV5rX506parqajcsJjbpfjqdH4DrvcbgH2za5P3FtLauTp1nzija3tGh0pUrNToy4gdl5NkzvyF5k/A2ABcqxIKPHHJhwIIJO/GTHe0f7SEaf/FCH7e0qO3IET/ub3pd4OX0Uvt/3L6tslWrPM5HKkqmUipdscJhn+3fr/ajR33dPekNhZcccmHAggk7opOZmtInNvOWXbvyV27vlSsaff4811taePAicmHAggk74hv6kd3lfFsR8+Yu/8XuEarAY4u8TYjhwUtOcMGCCTuqra9X64EDuUdSf0+Pvr9wwdcxQHyzCwexdigAPHjJITcIJuzo36Eh2ZXtwd/M0HfjhsqtAnxdbZMmbRbpq1f94ATRJsYzPHjJIRcGggk7/nlz8zdDdm8PW4n93turJF8iOyyU4XsbNvhfEtaz8MrmOWXJsrxbW6snAwN+RuIWh/Wf7cuAseKJhP4HwW4bGbwjLxwAAAAASUVORK5CYII=);
+	}
+
+	.tile-button-dest:hover{
+	background-repeat: no-repeat;
+	background-position: 3px 2px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwQAADsEBuJFr7QAAAjRJREFUSEu9ls9LVFEYhs9fU60Lq5kMISg0yozA3PkHtIiCCNfSKiJa1S4iIiIaqY0YWhQMMkjlECgiBBG0KCpoU7u37/mO53puc51kdFp8eubc933euefnhLdjg2qdrklTk3o1PKDl0braZ4/q9chBaXFWK+PHtDRW87686OMZGrT04YUBCybsgFCzD6Uf69L9m2qeqkXhiQPSx3fS5/dqnxvSmzNHCri3rY9naNDiwQvDWcaEHX5eHI8dqUywYIYXx/dLH5Zi3/PHap48VATQps+fmQYtngK+UbCDv9L0hdIDzT1So75PWm/Fz/NP1BwZ2AywNn3+zDSuNU+JYUzYYdnGyb/R3yHXr0hri7HdLQAN2txrLJiwAwYaPiR3rpWF39bi/24BSZPKGLBgog0kMUkUr/r78oT0dVX6npn/FYDWPHhhJB7s4GP3qR0nlDHnlQnAuN0ACg9eGLBgGjuw5LTajOKt6uVMZ4D1VWpTGRO2B/hGe3YvmvhmedFnk9ga3VymtH1it9IbC6YHYPBNYuPFjqyqHJ6HVGkpX0EbJ4IH9LP+T0Bfh6iY5Mbd3ZtkYxWTzB+t9GGZGtMDKjfalx42Gp6qjcZ4pa39tL5Xvy6d7/mowAujdFRgKA6729PRlGq7AbnHGKXDjgZJHcf1javxlWl3C0CDNvfmxzXLqgNuY9c4vCeOJ5+7BZjGtcxlzjAm7M4r88Gt3q9M8+YsvzJLl74Jdnzpp5B06ff3Z8ug/gBhGZJln7iJyQAAAABJRU5ErkJggg==);
+	}
+
+	.tile-button-src{
+	background-repeat: no-repeat;
+	background-position: 2px 2px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAYCAIAAACA18GRAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAPoSURBVEhLrZVtaFNnFMeTm5c2b5W6tamUtToptbq1TAoGLVRkiKgIYmctmx3dxEJVSolCBUWoCqV+SYdfFDpfQC1BQRgVYaMgMixWN6nO0A23VQdrBLU2SZMmvcl+957b7GawD4P9Cc895zzn7TnPOU+sF06deq+mZmFhwbIIq9Way+V+GhtT7HabzWZIdcwnk2WVlZUrV6qF+rCR8XHrt8PDH7e2GmITpiYnb54/D6EoikhwtGL16l1dXcKaga+Bri5FzWQMgY65eByb9Px8dW3t1vZ2lMgRuaqq/qqq7R0dSNKpVDIez6TTYgKQsNqFyWPs9u3vwmHfkiWkbnc4ilwujoCcw76ang719GSz2YVMhq2OY8cqqqrESmDkT3Ap2aaWlk+DwWwu5/H5it1ucSTAndvnw3tpWVnvuXPiCE3ZBYavrKpe7u8Xes26dVv37iVtUhBJHpy9pLT0yxMnJAY1/X5kRLaAYtVLa7Pbf3/6lGJLlI+amzft3p1TVSmWgEot9fv39PS4PB7YP549Gw6FFElcX5VkIqExFkuxx/Pzo0c3zp4Vdm1z8/v19dgLC8h0x759Xkppsfw5NRUeHIRQ9KbJZbNkqkQePhy9fh0ehoC/RSIXTp+GRTj54AH5QguK3O4rAwNvotHp58+/7uuzORxU0FlUlE6nMcHWOhgMErChqenxvXsOp1O7hEzGU1IyF4vhyFx7QJrcoEaoKn1HW3y4fv1UJBKbmdGUvzp8WOxxJAawWs4KpShwJGCLVaqsKaoqaqKsifjkHQFNarOxGnwhNLPFSTA0F6Ma0v8FRqrmgZDMWQ2+EJxRjqnRoolEV1b4UPsPAgFxB0vt6I/s4iSaQe05FO+HtDGaawIBLgo5ygr3tXbjxs1tbYw026yMSOfJk/VNTfNzc2Z32FOatmCw5cCB+MwMLEktLS9vP3qUziA7pa6xkRlEFTP6trqujqGFRVjb2GjuVVx/duTIO34/k/jF8eM8MHQGU4UjTLBVZCBAKpGoaWj45OBBYX+4c+fXiQlzrzqLi78ZGkq8fQu9bPny1u5uCFJjJV/tjFJI4pPRzs5OaYQf794dDYethZ2B31fR6LVQSMaO13VPd7cx/1J7jdLH6vPeXqGf3L9/69Ilp8uVf1Hz4Dizr18P9fUJW71q1YZt24QGf3edDAdjePXMGZovMTubKqw91UnEYlzOm5cv+/fvj754gdAc75/vamDLFkJxflL4ZWKCAhGDSDh6t6Ki5dAhh8NBQfjZTaMiUBh3g9Th9np5OXHEO3fr4sX8ePMk8DyM6BIuweX1mscOCet/+09LJZPl//afNj7+Fw0fFu4LbezWAAAAAElFTkSuQmCC);
+	}
+
+	.tile-button-src:hover{
+	background-repeat: no-repeat;
+	background-position: 2px 2px;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAYCAIAAACA18GRAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAAmNJREFUSEutVd9LU1Ecv39N0ItRupaaWpHTiV2dPxKLpCQYPcSQCtqTCGKJMN97KER8UmElPigtuwMJrdXu5hhDKHTKwlGCEIIPnj7fnePx7HrvRBx8uPd8z/l8P/d7vud7vlfL9nvZ2As2/PQYIwE8V3R3rK3W9NWpWG5xbz1uteEP+sHX2Ogztrtug9WF7+3XAVVof6DHSuPIpz81XtHY0JOi2S2T5ZIsl6JxdG7lTnW8IIcYc/42Wsqn2e8U0XbSqpedVig4c+0CFgAEwoU4IBdtqsL84s0KPFnCOPYq0vpLcYqFxenI7ctxvUaqqECkZmcD8TmZD4q08umNR16xDIQnEJSaLCGku3/2edi2KWirC+zNKxoILRxEYeF97cWD5/cECfgwETtKFsc3vWazv4Vt/BCEWMRodrG3ozTeLmgdHvlHPJVR79V/gW5B3V0/fNn3tb1aapFn5otYTRiIkWYmx8nMmoanUluCHQrChjAcsDX6OJZDwWWvS40LW0YSSS5hRG5dggkyC7/Dga513cDJaGDT1OsBSqqvDiYGmd5GRKQKcWCbSDzAUwkmHJFBTtYwxf2lA0x85KQQB0KTRwwO1CWZtM4DqMivllsLRnn2iBflfiRgyb2luDh47pNOuUddWGoi+7DJqSYAm5rIpdY66qkmLLW6F7jLTaBUrcaXbGr1THeIGmeJOyTv9q8Hyt2en0L8PCkq6G7fL3G3Zc+Rve3jLPWcE0IcyDdyL5jAnww9HXuhy7EX4vJiHr3wM3ph0qkXKrNOPXrHr5/Wo53/HfBXU4YwT/l3lO2fprv/A/OfWCQ+yz0IAAAAAElFTkSuQmCC);
+	}
+
+
+	/*
+	.tile[disabled]{
+	pointer-events: none;
+	}
+	.tile > .blind{
+	position: absolute;
+	left: 0px;
+	right: 0px;
+	top: 0px;
+	bottom: 0px;
+	z-index: 100;
+	background: rgba(0,0,0,0.5);
+	display: none;
+	}
+	.tile[disabled] > .blind{
+	display: block;
+	}
+	.tile[separating] > .blind{
+	display: none;
+	}
+	.tile[separating] > .tile-over{
+	visibility: visible;
+	}
+	*/
+	
+	</style>
+	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
+	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
+	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
+	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
+	<div id='sticker' class='tile-sticker' style="background-color:{{group_color_1}};color:{{group_color_2}};">{{group_num}}</div>
+	<div id='over' class='tile-over hidden_grabbed'>
+		<div class='tile-buttons' layout vertical>
+			<core-tooltip label='swap with... [s]' position='left'>
+				<button class='tile-button-swap'></button>
+			</core-tooltip>
+			<core-tooltip label='make destination group [e]' position='left'>
+				<button class='tile-button-dest'></button>
+			</core-tooltip>
+			<core-tooltip label='make source group [f]' position='left'>
+				<button class='tile-button-src'></button>
+			</core-tooltip>
+			<div class='tile-caption'>{{group_caption}}</div>
+		</div>
+	</div><div class='blind'>
+</div>
+</template>
+
+
+<script>
+	"use strict";
+	
+	var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
+	var activeTile = null; 
+	var ACTIVE = 'a'; 
+	var HOVER = 'h';
+	var MOVING = 'm';
+	var PROXIMATE = 'p';
+	// falsy state is anything else
+	
+	var ResetStyle = function(el){
+		el.style.borderWidth = '';
+		el.style.borderColor = '';
+		el.style.backgroundColor = '';
+		el.style.opacity = '';
+		el.style.pointerEvents =  '';
+		el.style.zIndex = '';
+		el.style.position = '';
+		el.style.boxShadow = '';
+		//can you just do el.style = '' or seomthing?
+		el.$.over.style.display = 'none';
+		el.$.sticker.style.right = '';
+	}
+	
+	var StyleActive = function(el){
+		ResetStyle(el);
+		el.style.boxShadow = '0px 0px 5px 3px #fc0';
+		el.style.backgroundColor = '#eee';
+		el.$.over.style.display = 'block';			
+	}
+	
+	var StyleHover = function(el){
+		ResetStyle(el);
+		el.$.sticker.style.right = '26px';
+		el.style.opacity = '0.5';
+	}
+	var StyleProxiamte = function(el){
+		StyleMoving(el);
+		//el.style.borderColor = '#8F8';
+		el.style.backgroundColor = '';
+	}
+	
+	var StyleMoving = function(el){
+		ResetStyle(el);
+		el.style.opacity = '0.5';
+		el.style.borderWidth = '10px';
+		el.style.borderColor = '#000';
+		el.style.backgroundColor = '#888';
+		el.style.pointerEvents = 'none';
+		el.style.zIndex = '100';
+		el.style.position = 'absolute';
+	}
+	
+	var LogIt = function(el,attr,val){
+		console.log("setting " + attr + "=" + val + " when state_=" + el.state_);
+	}
+	
+    Polymer('tile-element',{
+		group_num: -1,
+		group_color_1: '#666',
+		group_color_2: '#f00',
+		group_caption: '???',
+		updateCanvas: function(newCanv,canvasNum){
+			var oldCanv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			oldCanv.parentNode.replaceChild(newCanv,oldCanv);  
+		},
+		
+		get state(){return this.state_;},
+		get moving(){return this.state_ === MOVING || this.state_ === PROXIMATE;},
+		
+		get borderWidth(){
+			return this.state_ == MOVING || this.state_ == PROXIMATE ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
+		},
+		set active(val){
+			//LogIt(this,'active',val);
+			if(this.state_ === MOVING || this.state_ === PROXIMATE)
+				return; //throw "tile cannot have have its active state altered while it is moving."
+				
+			if(val){
+				if(movingTile){
+					//if another tile is moving, then this tile is being "hovered" not being "active"
+					this.state_ = HOVER
+					StyleHover(this);
+				}else{
+					this.state_ = ACTIVE;
+					StyleActive(this);
+				}
+			}else{
+				this.state_ = null;
+				ResetStyle(this);
+			}
+			
+		},
+
+		set proximate(val){
+			//LogIt(this,'proximate',val);
+			if(val){
+				if(this.state_ === PROXIMATE)
+					return; //nothing new 
+				if(this.state_ !== MOVING)
+					throw "tile cannot become proximate unless it was first in moving state. (state_=" + this.state_ + ")"
+				this.state_ = PROXIMATE;
+				StyleProxiamte(this);
+			}else if(this.state_ === PROXIMATE){
+				this.state_ = MOVING;
+				StyleMoving(this);
+			}
+		},
+		
+		get placeholder(){
+			if(!this.placeholder_){
+				var p = document.createElement('div');
+				p.style.backgroundColor = '#8F8';
+				var s = getComputedStyle(this);
+				p.style.width = s.width;
+				p.style.height = s.height;
+				p.style.border = s.border;
+				p.style.display = s.display;
+				this.placeholder_ = p; //we store this here on the offchance one day we need to respond to changes in the tile's properties durign the moving.
+			}
+			return this.placeholder_;	
+		},
+		set placeholder(val){
+			if(val)
+				throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
+			this.placeholder_ = null;
+		},
+		set moving(val){
+			//LogIt(this,'moving',val);
+			if(val){
+				//start moving...
+				if(movingTile)
+					throw "Tile with group_num=" + movingTile.group_num + " is already moving, cannot move this tile (with group_num=" + this.group_num + ")"
+				if(this.state_ !== ACTIVE)
+					throw "Tile cannot start moving without first being active."
+				this.state_ = MOVING;
+				movingTile = this;
+				StyleMoving(this,true);			
+			}else{
+				if(!(this.state_ === MOVING || this.state_ === PROXIMATE))
+					throw "tile cannot stop moving unless it was already moving."
+				this.state_ = ACTIVE;
+				movingTile = null; 
+				StyleActive(this);
+			}		
+		},
+
+		shake: function(){
+			this.classList.add('shake');
+		},
+		clearShake: function(){
+			this.classList.remove('shake');
+		}
+	});
+</script>
+  
+  
+</polymer-element>

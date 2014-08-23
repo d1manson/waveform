@@ -21,7 +21,7 @@ T.Tool.cState = T.Tool.STATES.NOTHING;
 
 /* =================== GENERAL =================== */
 T.TileMouseDown = function(event){
-	$(this).toggleClass('shake',false); //clear any existing dragging animation
+	this.clearShake();//clear any existing dragging animation
 	if(T.Tool.cState == T.Tool.STATES.GRABBER) return; 
 	T.CP.BringGroupToFront($(this).data("group_num"))
 	if(T.Tool.cState == T.Tool.STATES.SPLITTER && (event.button == 2 || event.altKey)){
@@ -36,8 +36,7 @@ T.TileMouseDown = function(event){
 }
 
 T.TileDoubleClick = function(event){
-	$(this).toggleClass('shake',false); //clear the failed dragging animation from the second mouse down event
-	
+	this.clearShake();//clear the failed dragging animation from the second mouse down event
 	T.TileDoubleClick_BeginSeparator.call(this,event);
 }
 
@@ -80,8 +79,8 @@ T.Tool.PainterSrc_Toggle = function(g){
 }
 
 T.Active_TileMouseMove = function(e){
-	var g = $(this).data('group_num');
-	T.SetGroupOver(g);
+	//if(T.Tool.cState === T.Tool.STATES.NOTHING)
+	T.SetGroupOver(this.group_num);
 }
 // These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
 // temporarily registerd on $tile's, $tilewall, and $document.
@@ -90,7 +89,7 @@ T.$tilewall.on({
     "dblclick": T.TileDoubleClick,
     "mousemove": T.Active_TileMouseMove,
     "mouseout": function () { T.SetGroupOver(-1) }
-},".tile");
+},"tile-element");
 
 T.Tool.StopProgagation = function(e){e.stopPropagation();}
 
@@ -107,26 +106,23 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	var $h = $(this);
 	var offset = $h.position();
 	var $parent = $h.parent();
-	var $p = $h.clone().attr('placeholder', true);
+
 	var s = T.Tool.cState = T.Tool.STATES.MERGER;
 	s.off_left= offset.left-event.clientX;
 	s.off_top= offset.top-event.clientY;
-	s.$h= $h;
-	s.$parent= $parent;
-	s.$placeholder= $p;
-	s.$target= null;
-	s.targetOffX= null;
-	s.targetOffY= null;
-	s.extraBorderSize= -parseInt($h.css("border-left-width"));//we assume its got same borders all round
+	s.$h = $h;
+	s.$parent = $parent;
+	s.$target = null;
+	s.targetOffX = null;
+	s.targetOffY = null;
 	s.lastClientX= event.clientX;
 	s.lastClientY= event.clientY;
+	s.extraBorderSize= -this.borderWidth;//we assume its got same borders all round
+	$(this.placeholder).insertAfter($h);
+	this.moving = true;
+	s.extraBorderSize += this.borderWidth; //it's now got a different border width because it's moving
 	s.$pos_overlay = $(CanvToImgStr(T.$pos_overlay.get(0),true));
 	s.$pos_overlay.insertBefore(T.$pos_overlay);
-	
-	$p.insertAfter($h);
-	$h.css({position:'absolute'})
-	  .attr("moving",true); //among other things this means it no longer gets mouse events
-	s.extraBorderSize += parseInt($h.css("border-left-width")); //border size should change when we apply the moving attribute
 	T.$tilewall.attr('tilemoving',true)
 				
 	//attach mousemove, mouseup handlers for document 
@@ -138,7 +134,7 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	    "mouseenter mouseleave": T.Tool.TileMouseLeaveEnter_MergerTarget,
 	    "mouseup": T.Tool.TileMouseUp_MergerTarget,
 	    "mousemove":T.Tool.TileMouseMove_MergerTarget
-	}, ".tile")
+	}, "tile-element")
 	T.$tilewall.on("scroll", T.Tool.DocumentMouseMove_Merger);
 
 	T.Tool.DocumentMouseMove_Merger(); //call it now to update position
@@ -161,6 +157,7 @@ T.Tool.DocumentMouseUp_Merger = function (event) {
     if (event.button != 0)
         return;
 	//this happens on an abandonded merge (otherwise the target tile would intercept the event)
+	T.Tool.STATES.MERGER.$h.get(0).active = false; //this is a bit of a hack 
 	T.Tool.EndMerger();
 }
 
@@ -170,17 +167,18 @@ T.Tool.EndMerger = function(){
         "mouseenter mouseleave": T.Tool.TileMouseLeaveEnter_MergerTarget,
         "mouseup": T.Tool.TileMouseUp_MergerTarget,
         "mousemove": T.Tool.TileMouseMove_MergerTarget
-    }, ".tile");
+    }, "tile-element");
 	T.$tilewall.off("scroll");
 	var s = T.Tool.STATES.MERGER;
-	s.$placeholder.remove();
 	s.$pos_overlay.remove();
 	s.$pos_overlay = null;
-	s.$h.translate(null)
-		.css({position:'relative'})
-		.removeAttr('moving')
-		.toggleClass('shake',true)
-		.removeAttr('proximate');
+	s.$h.translate(null);
+	var h = s.$h.get(0);
+	var p = h.placeholder;
+	p.parentNode.removeChild(p);
+	h.placeholder = null;
+	h.moving = false; //also ends proximate if it was on
+	h.shake();
 	T.$tilewall.removeAttr('tilemoving');
 	T.Tool.cState = T.Tool.STATES.NOTHING;
 }
@@ -188,13 +186,13 @@ T.Tool.EndMerger = function(){
 T.Tool.TileMouseLeaveEnter_MergerTarget = function(event){
 	var m = T.Tool.cState;
 	if(event.type == "mouseenter"){
-		m.$h.attr("proximate",true);
+		m.$h.get(0).proximate = true;
 		m.$target = $(this);
 		var pos = m.$target.position();
 		m.targetX = pos.left;
 		m.targetY = pos.top;
 	}else{
-		m.$h.removeAttr("proximate");
+		m.$h.get(0).proximate = false;
 		m.$target = null;
 		m.targetX = null;
 		m.targetY = null;
@@ -212,9 +210,9 @@ T.Tool.TileMouseUp_MergerTarget = function(event){
     //Successful merger
     if (event.button != 0)
         return;
-	var ind_a = T.Tool.cState.$h.data("group_num");
-	var ind_b = $(this).toggleClass('shake',true)
-					   .data("group_num");
+	var ind_a = T.Tool.cState.$h.get(0).group_num;
+	var ind_b = this.group_num;
+	this.shake();
 	if(ind_a > ind_b){
 		var tmp = ind_b;
 		ind_b = ind_a;
