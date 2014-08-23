@@ -9,31 +9,38 @@ Tiles have the following attibutes:
 	group_num - a number
 	group_color_1, group_color_2 - colors used for the group's sticker
 	group_caption - a string, displayed when the group is active
-	proximate/active/moving - true/false. Changes the state as described below.
+	proximate/active/moving/disabled - true/false. Changes the state as described below.
+	placeholder - a div element that should be the same size as the tile (TODO: update the placeholder when tile changes size).  You are free to insert this div into the DOM. 
+								(Set it to a falsy value to garbage collect and reset it.)
 	
 And the following methods:
-	startMoving/endMoving - styles the tile to show it is moving and makes it easy to use css transforms to position it within its parent.  
-							The startMoving function returns a palceholder div which you can insert somewhere to show that the tile is moving.
+	updateCanvas -		the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
+	updateSvg - 		the tile contians one svg node for drawing on top of the canvases. You can swap in a new svg node using this function.
 	shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
 						in the main index.html...perhaps there is a better way of doing this?
+	getCanvInfo - 		provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
+						coordinates within the canvas or null if it's outside the canvas.  TODO: actually only the more pageX/Y implementation has be written.
 
-
-A tile can be in one of several states, (normal,active,moving,proximate, and hover). Transitioning between states is done by setting element.something = true or false....
+A tile can be in one of several states, (normal,active,moving,proximate,hover, and disabled). Transitioning between states is done by setting element.something = true or false....
 	from normal state: 
-		active=true  => active  ..usually, but...
-					 => hover  ...if movingTile is currently not null
+		active=true  	=> active  ..usually, but...
+						=> hover  ...if movingTile is currently not null
+		disabled=true 	=>disabled
 	from active state:
-		moving=true => moving 
-		active=false => normal
+		moving=true  	=> moving 
+		active=false 	=> normal
+		disabled=true 	=>disabled
 	from moving state:
-		proximate=true => proximate
-		moving=false => active  
+		proximate=true 	=> proximate
+		moving=false 	=> active  
 		..setting active will be ignored and not cause an error
 	from proxiamte state:
 		proximate=false => moving 
-		moving=false => active 
+		moving=false 	=> active 
 	from hover state:
-		active=false => normal
+		active=false 	=> normal
+	from disabled state:
+		disabled=false	=> normal
 I'm not quite sure why it's so complciated, it would probably be better to just set the state directly.
 -->
 <link rel="import" href="polymer/polymer.html">
@@ -98,7 +105,14 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	background-color:rgba(255,255,255,0.85);
 	box-shadow: -3px 0px 6px #ddc;
 	}
-	.grabbed_info .tile-buttons{
+	.blind{
+	position: absolute;
+	left: 0px;
+	right: 0px;
+	top: 0px;
+	bottom: 0px;
+	z-index: 100;
+	background: rgba(0,0,0,0.5);
 	display: none;
 	}
 	button{
@@ -163,30 +177,11 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAYCAIAAACA18GRAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAAmNJREFUSEutVd9LU1Ecv39N0ItRupaaWpHTiV2dPxKLpCQYPcSQCtqTCGKJMN97KER8UmElPigtuwMJrdXu5hhDKHTKwlGCEIIPnj7fnePx7HrvRBx8uPd8z/l8P/d7vud7vlfL9nvZ2As2/PQYIwE8V3R3rK3W9NWpWG5xbz1uteEP+sHX2Ogztrtug9WF7+3XAVVof6DHSuPIpz81XtHY0JOi2S2T5ZIsl6JxdG7lTnW8IIcYc/42Wsqn2e8U0XbSqpedVig4c+0CFgAEwoU4IBdtqsL84s0KPFnCOPYq0vpLcYqFxenI7ctxvUaqqECkZmcD8TmZD4q08umNR16xDIQnEJSaLCGku3/2edi2KWirC+zNKxoILRxEYeF97cWD5/cECfgwETtKFsc3vWazv4Vt/BCEWMRodrG3ozTeLmgdHvlHPJVR79V/gW5B3V0/fNn3tb1aapFn5otYTRiIkWYmx8nMmoanUluCHQrChjAcsDX6OJZDwWWvS40LW0YSSS5hRG5dggkyC7/Dga513cDJaGDT1OsBSqqvDiYGmd5GRKQKcWCbSDzAUwkmHJFBTtYwxf2lA0x85KQQB0KTRwwO1CWZtM4DqMivllsLRnn2iBflfiRgyb2luDh47pNOuUddWGoi+7DJqSYAm5rIpdY66qkmLLW6F7jLTaBUrcaXbGr1THeIGmeJOyTv9q8Hyt2en0L8PCkq6G7fL3G3Zc+Rve3jLPWcE0IcyDdyL5jAnww9HXuhy7EX4vJiHr3wM3ph0qkXKrNOPXrHr5/Wo53/HfBXU4YwT/l3lO2fprv/A/OfWCQ+yz0IAAAAAElFTkSuQmCC);
 	}
 
-
 	/*
-	.tile[disabled]{
-	pointer-events: none;
-	}
-	.tile > .blind{
-	position: absolute;
-	left: 0px;
-	right: 0px;
-	top: 0px;
-	bottom: 0px;
-	z-index: 100;
-	background: rgba(0,0,0,0.5);
+	.grabbed_info .tile-buttons{
 	display: none;
 	}
-	.tile[disabled] > .blind{
-	display: block;
-	}
-	.tile[separating] > .blind{
-	display: none;
-	}
-	.tile[separating] > .tile-over{
-	visibility: visible;
-	}
+
 	*/
 	
 	</style>
@@ -194,6 +189,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
+	<svg style="display: none;"></svg>
 	<div id='sticker' class='tile-sticker' style="background-color:{{group_color_1}};color:{{group_color_2}};">{{group_num}}</div>
 	<div id='over' class='tile-over hidden_grabbed'>
 		<div class='tile-buttons' layout vertical>
@@ -208,7 +204,8 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			</core-tooltip>
 			<div class='tile-caption'>{{group_caption}}</div>
 		</div>
-	</div><div class='blind'>
+	</div>
+	<div id='blind' class='blind'>
 </div>
 </template>
 
@@ -222,20 +219,14 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	var HOVER = 'h';
 	var MOVING = 'm';
 	var PROXIMATE = 'p';
+	var DISABLED = 'd';
 	// falsy state is anything else
 	
 	var ResetStyle = function(el){
-		el.style.borderWidth = '';
-		el.style.borderColor = '';
-		el.style.backgroundColor = '';
-		el.style.opacity = '';
-		el.style.pointerEvents =  '';
-		el.style.zIndex = '';
-		el.style.position = '';
-		el.style.boxShadow = '';
-		//can you just do el.style = '' or seomthing?
-		el.$.over.style.display = 'none';
+		el.style.cssText = '';
+		el.$.over.style.cssText = '';
 		el.$.sticker.style.right = '';
+		el.$.blind.style.cssText = '';
 	}
 	
 	var StyleActive = function(el){
@@ -252,7 +243,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	}
 	var StyleProxiamte = function(el){
 		StyleMoving(el);
-		//el.style.borderColor = '#8F8';
 		el.style.backgroundColor = '';
 	}
 	
@@ -267,8 +257,14 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.style.position = 'absolute';
 	}
 	
+	var StyleDisabled = function(el){
+		ResetStyle(el);
+		el.$.blind.style.display = 'block';
+		el.style.pointerEvents = 'none';
+	}
+	
 	var LogIt = function(el,attr,val){
-		console.log("setting " + attr + "=" + val + " when state_=" + el.state_);
+		console.log("[g" + el.group_num + "] setting " + attr + "=" + val + " when state_=" + el.state_);
 	}
 	
     Polymer('tile-element',{
@@ -280,7 +276,37 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			var oldCanv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
 			oldCanv.parentNode.replaceChild(newCanv,oldCanv);  
 		},
-		
+		updateSvg: function(newSvg){
+			var oldSvg = this.shadowRoot.getElementsByTagName('svg')[0];
+			oldSvg.parentNode.replaceChild(newSvg,oldSvg);  
+		},
+		getCanvInfo: function(canvasNum,pageX,pageY){
+			//TODO: if no pageX and pageY then life should be more simple...
+			var canv =  this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			var totalOffsetX = 0;
+			var totalOffsetY = 0;
+			var el = canv;
+			do{
+				totalOffsetX += el.offsetLeft - el.scrollLeft;
+				totalOffsetY += el.offsetTop - el.scrollTop;
+			}while(el = el.offsetParent)
+			
+			var canvX = pageX - totalOffsetX;
+			var canvY = pageY - totalOffsetY;
+			
+			var canvProps = getComputedStyle(canv); //TODO: we don't need to do this because we can track any changes since we (largely) have control over the canvases.
+			var w = parseInt(canvProps.width), h = parseInt(canvProps.height);
+			if(canvX < 0 || canvY < 0 || canvX > w|| canvY > h)
+				return null;
+			else
+				return {x:canvX, y:canvY, 
+						w:w,
+						h:h,
+						top:parseInt(canvProps.top),
+						left:parseInt(canvProps.left),
+						el: canv}
+		},
+
 		get state(){return this.state_;},
 		get moving(){return this.state_ === MOVING || this.state_ === PROXIMATE;},
 		
@@ -288,7 +314,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			return this.state_ == MOVING || this.state_ == PROXIMATE ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
 		},
 		set active(val){
-			//LogIt(this,'active',val);
+			LogIt(this,'active',val);
 			if(this.state_ === MOVING || this.state_ === PROXIMATE)
 				return; //throw "tile cannot have have its active state altered while it is moving."
 				
@@ -360,7 +386,18 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 				StyleActive(this);
 			}		
 		},
-
+		set disabled(val){
+			LogIt(this,'disabled',val);
+			if(this.state_ && !(this.state_ === ACTIVE || this.state_ === DISABLED))
+				throw "you cannot change a tile's disabled stae unless it is in normal, active or disabled state."
+			if(val){
+				this.state_ = DISABLED;
+				StyleDisabled(this);
+			}else{
+				this.state_ = null;
+				ResetStyle(this);
+			}
+		},
 		shake: function(){
 			this.classList.add('shake');
 		},

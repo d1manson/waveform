@@ -106,7 +106,6 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	var $h = $(this);
 	var offset = $h.position();
 	var $parent = $h.parent();
-
 	var s = T.Tool.cState = T.Tool.STATES.MERGER;
 	s.off_left= offset.left-event.clientX;
 	s.off_top= offset.top-event.clientY;
@@ -232,47 +231,43 @@ T.Tool.TileMouseUp_MergerTarget = function(event){
 	
 	
 	
-/* =================== SPLITTER =================== */
-//TODO: what about the user clicking undo during the split?
-	
+/* =================== SPLITTER =================== 
+TODO: what about the user clicking undo during the split? or switching to another cut-tet-exp
+
+state object consists of the following:
+	g_a, g_b - the goup numbers for the initial group a, and the group b=a+1
+	a,b - the tiles for a and b. b starts off as null.
+	downOn - while mouse is down it is 'a' or 'b', indicating which of the two tiles the mouse went down on. 
+				it is null when mouse is not down.
+	buttonUsed - what mouse button was used for current mouse down
+	cut, srcCutInds - the cut object and the cut indices for group a before the split began.
+	splitDone - false until the first mouse up occurs when it becomes true.
+*/
+
 T.Tool.TileMouseDown_BeginSplitter = function(event){
-
-	var $this = $(this);
-	var g = $this.data('group_num');
-	var $waveCanvas = $this.find('canvas').eq(T.CANVAS_NUM_WAVE);
-
-	var offset = $waveCanvas.offset(); 
-	var x = event.pageX - offset.left;
-	var y = event.pageY - offset.top;
-	var w = $waveCanvas.width();
-	if (x > w) //TODO: what about y?
-		return; //didn't actually click the canvas
-		
-	var pos = $waveCanvas.position();
+	var g = this.group_num;
+	var canvInfo = this.getCanvInfo(T.CANVAS_NUM_WAVE,event.pageX,event.pageY);
+	if(!canvInfo)
+		return;
 	var cut = T.ORG.GetCut();
 	var srcCutInds = cut.GetGroup(g);
-	
-	var $svg_a = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
 	var s = T.Tool.cState = T.Tool.STATES.SPLITTER;
 	s.usedCtrl = event.button != 2;
-	s.a= g;
-	s.b= g+1;
+	s.g_a = g;
+	s.g_b = g+1;
+	s.a = this
+	s.b = null;
 	s.srcCutInds= srcCutInds;
-	s.$svg_a= $svg_a;
-	s.$svg_b= null;
-	s.$a= $waveCanvas; //TODO: on all events need to test if $(this) is the parent of $a or $b, or neither (if we've updated the canvas, possibly even due to changing the view or something)
-	s.$b= null;
 	s.cut= cut;
 	s.splitDone= false;
-	s.downOn= 'a';
+	s.downOn = 'a';
 	s.buttonUsed= event.button;
 	
+	T.tiles.forEach(function(el){el.disabled = true;});
+	this.disabled = false;
+	this.updateSvg($(T.Tool.MakeSVGStr_Splitter(canvInfo.x,canvInfo.y,canvInfo.w,canvInfo.left,canvInfo.top)).get(0));
 	
-	$.each(T.tiles,function(){this.$.attr('disabled','true');})
-	T.tiles[g].$.removeAttr('disabled')
-				.attr('splitting','true')
-				.append($svg_a)
-				.on("mousemove",T.Tool.TileMouseMove_Splitter);	
+	$(this).on("mousemove",T.Tool.TileMouseMove_Splitter);	
 	T.$tilewall.on('mousedown',T.Tool.TileWallMouseDown_Splitter);
 	$(document).on('mouseup',T.Tool.DocumentMouseUp_Splitter);
 	T.AddCanvasUpdatedListener(T.Tool.CanvasUpdated_Splitter);
@@ -283,15 +278,14 @@ T.Tool.TileMouseDown_ContinueSplitter = function (event) {
     event.stopPropagation();
  
 	// this can be called for tile a or tile b
-	var $this = $(this);
 	var s = T.Tool.cState;
 	if (s.downOn != null)
 	    return;
 	s.buttonUsed = event.button;
-	s.downOn = $this.data('group_num') == s.a ? 'a' : 'b'; 
+	s.downOn = this.group_num == s.g_a ? 'a' : 'b'; 
 	
 	// (re)attach the  mousemove and mouseup handlers (which get removed on mouseup)
-	$this.on("mousemove",T.Tool.TileMouseMove_Splitter);	
+	$(this).on("mousemove",T.Tool.TileMouseMove_Splitter);	
 	$(document).on('mouseup',T.Tool.DocumentMouseUp_Splitter);
 	
 	T.Tool.TileMouseMove_Splitter.call(this,event); //update the location of the widgets
@@ -302,66 +296,58 @@ T.Tool.DocumentMouseUp_Splitter = function (event) {
     var s = T.Tool.cState;
     if (s.downOn == null || s.buttonUsed != event.button)
         return;
-	T.tiles[s.downOn=='a' ? s.a : s.b].$.off("mousemove",T.Tool.TileMouseMove_Splitter);	
+	var t = s.downOn =='a' ? s.a : s.b;
+	$(t).off("mousemove",T.Tool.TileMouseMove_Splitter);	
 	$(document).off('mouseup',T.Tool.DocumentMouseUp_Splitter);
-	
-	var $canv = s.downOn=='a' ? s.$a : s.$b;
-	var offset = $canv.offset(); 
-	var pos = $canv.position();
-	var x = event.pageX - offset.left;
-	var y = event.pageY - offset.top;
-	var waveMouseMeaning = T.WV.MouseToVandT($canv,x,y);
+
+	var canvInfo = t.getCanvInfo(T.CANVAS_NUM_WAVE,event.pageX,event.pageY);
+	//TODO: what happens when mouse up is out of range of canvas?
+	var waveMouseMeaning = T.WV.MouseToVandT($(canvInfo.el),canvInfo.x,canvInfo.y); //TODO: avoid explicitly passing the canvas - that's messy.
 	var splitMask = T.Tool.VIsOverThreshAtT_Splitter(s.srcCutInds,waveMouseMeaning.ch,waveMouseMeaning.t,waveMouseMeaning.v);
 	if(s.splitDone)
 		s.cut.ModifySplitA(splitMask); 
 	else
-		s.cut.SplitA(s.a,splitMask); 
+		s.cut.SplitA(s.g_a,splitMask); 
 	s.splitDone = true;
 	s.downOn = null;
 }
 
 T.Tool.TileMouseMove_Splitter = function(event){
 	var s = T.Tool.cState;
+	var canvInfo = this.getCanvInfo(T.CANVAS_NUM_WAVE,event.pageX,event.pageY);
+	if(!canvInfo)
+		return;
+		
+	var $newSvg = $(T.Tool.MakeSVGStr_Splitter(canvInfo.x,canvInfo.y,canvInfo.w,canvInfo.left,canvInfo.top)).get(0);
+	s.a.replaceSvg($newSvg);
 	
-	var offset = (s.downOn=='a' ? s.$a : s.$b).offset(); 
-	var x = event.pageX - offset.left;
-	var y = event.pageY - offset.top;
-	
-	var pos = s.$a.position();
-	var w = s.$a.width();
-	var $svg_a = $(T.Tool.MakeSVGStr_Splitter(x,y,w,pos.left,pos.top));
-	s.$svg_a.replaceWith($svg_a);
-	s.$svg_a = $svg_a;
-
-	if(s.$svg_b){
-		var $svg_b = $svg_a.clone();
-		s.$svg_b.replaceWith($svg_b);
-		s.$svg_b = $svg_b; //TODO: in theory canvas sizes could be different and thus require different svg
+	if(s.b){
+		s.b.replaceSvg($newSvg.clone());
+		//TODO: in theory canvas sizes could be different and thus require different svg
 	}
+	
 }
 
 T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 	// We use this callback to deal with changes in the tiles as well as changes in the canvas within a static tile
 	
 	var s = T.Tool.cState;
-	if(canvasNum != T.CANVAS_NUM_WAVE || !(group == s.a || group == s.b))
+	if(canvasNum != T.CANVAS_NUM_WAVE || !(group == s.g_a || group == s.g_b))
 		return;
 	
 	// Note that hopefully by moving around the $svg's means that even if tiles moved around the svgs will always end up on only the correct tiles.
-	if(group == s.a){
+	// TODO: check if the above is still true.
+	if(group == s.g_a){
 		//TODO: ought to recreate svg in case of new size of canvas
-		T.tiles[s.a].$.prepend(s.$svg_a)
-					  .attr('splitting','true');
-		s.$a = $canvas;
+		s.a.updateSvg(s.$svg_a);
+		s.a.disabled = false;
 	}else{ //group == s.b
 		if(!s.$svg_b){
 			s.$svg_b = s.$svg_a.clone(); //TODO: in theory canvas sizes could be different and thus require different svg
-			T.tiles[s.b].$.removeAttr('disabled');
 		}
-		T.tiles[s.b].$.prepend(s.$svg_b)
-					   .attr('splitting','true');
+		s.b.updateSvg(s.$svg_b);
+		s.b.disabled = false;
 		
-		s.$b = $canvas;
 	}
 }
 
@@ -383,14 +369,13 @@ T.Tool.TileWallMouseDown_Splitter = function (event) {
     var s = T.Tool.cState;
     if (s.downOn != null)
         return;
+	/*
 	s.$svg_a.remove();
 	if(s.$svg_b)
 		s.$svg_b.remove(); 
-	
-	T.tiles[s.a].$.removeAttr('splitting');
-	T.tiles[s.b].$.removeAttr('splitting');
-	
-	$.each(T.tiles,function(){this.$.removeAttr('disabled');});
+	*/
+		
+	T.tiles.forEach(function(el){el.disabled = false;});
 	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
 	T.RemoveCanvasUpdatedListener(T.Tool.CanvasUpdated_Splitter);
 	
