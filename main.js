@@ -352,6 +352,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 
 T.CreateTile = function(i){
 	var el = document.createElement('tile-element');
+	el.classList.add('grabbable');
 	el.group_num=i;
 	return el;
 }

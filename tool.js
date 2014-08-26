@@ -35,14 +35,6 @@ T.TileMouseDown = function(event){
     event.preventDefault();
 }
 
-/*
-//I dont think this ever worked..did it?
-T.TileDoubleClick = function(event){
-	this.clearShake();//clear the failed dragging animation from the second mouse down event
-	T.TileDoubleClick_BeginSeparator.call(this,event);
-}
-*/
-
 
 T.Tool.Swap = function(g){
     var ng = parseInt(prompt("Swap group " + g + " with:",g+""));
@@ -312,7 +304,6 @@ T.Tool.TileMouseMove_Splitter = function(event){
 	var canvInfo = this.getCanvInfo(T.CANVAS_NUM_WAVE,event.pageX,event.pageY);
 	if(!canvInfo)
 		return;
-		
 	
 	s.x = canvInfo.x;
 	s.y = canvInfo.y;
@@ -330,8 +321,7 @@ T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 	if(canvasNum != T.CANVAS_NUM_WAVE || !(group == s.g_a || group == s.g_b))
 		return;
 	
-	// Note that hopefully by moving around the $svg's means that even if tiles moved around the svgs will always end up on only the correct tiles.
-	// TODO: check if the above is still true.
+	// TODO: check whether all this makes sense...whether tiles can go astray with crosshair that they shouldnt have or missing crosshair they should have
 	if(group == s.g_a){
 		s.a = T.tiles[s.g_a]; //TODO: decide whether the tile can really have changed
 		s.a.updateCrossHair(T.CANVAS_NUM_WAVE,s.x,s.y);
@@ -405,30 +395,37 @@ T.Tool.$GrabIt_Css = $(
 T.$floating_layer = $('.floating_layer');
 
 T.Tool.GrabIt = function(){
+	// This whole thing is a bit of a messy hack at the moment and could do with some cleaning up.
+	
+	
 	// clones $this into a floating info pane
-	var $clone = $(this).clone()
-	var $srcCanvs = $(this).find('canvas');
-	var $destCanvs = $clone.find('canvas');
-	for (var i=0;i<$srcCanvs.length;i++)
-		$destCanvs[i].getContext('2d').drawImage($srcCanvs[i],0,0);	
-	$clone.toggleClass('grabbable',false).css({position:'',
-												webkitTransform: '',
-												width: $(this).width() + 'px',
-												height: $(this).height() + 'px',
-												display: 'block',
-												boxShadow: 'initial'});
-	
-	
-	var p = $(this).offset();
 	var str =  T.ORG.GetExpName();
 	
-	// This next bit, is a bit hacky...clean up some stuff from clone and set title appropriately..
-	$clone.find('.hidden_grabbed').remove();
-	if($(this).hasClass('tile'))
-		str += " t" + T.ORG.GetTet() + "c" + $(this).data('group_num');
-	else if(this.id == "cluster_panel")
-		str += " tet " + T.ORG.GetTet();
-		
+	var $clone;
+	if(this.tagName.toLowerCase() == "tile-element"){
+		//tile-elements have a proper method for this...
+		$clone = $(this.getCopyOfCanvs());
+		str += " t" + T.ORG.GetTet() + "c" + this.group_num;//this is pretty hacky
+	}else{
+		$clone = $(this).clone()
+		var $srcCanvs = $(this).find('canvas');
+		var $destCanvs = $clone.find('canvas');
+		for (var i=0;i<$srcCanvs.length;i++)
+			$destCanvs[i].getContext('2d').drawImage($srcCanvs[i],0,0);	
+		$clone.find('.hidden_grabbed').remove();
+		if(this.id == "cluster_panel")
+			str += " tet " + T.ORG.GetTet();
+		$clone.toggleClass('grabbable',false)
+			  .css({position:'',
+					webkitTransform: '',
+					width: $(this).width() + 'px',
+					height: $(this).height() + 'px',
+					display: 'block',
+					boxShadow: 'initial'});
+	}
+	
+	var p = $(this).offset();
+	
 	var $pane = $("<div class='floatinginfo grabbed_info'><div class='floating_title'>" + str + " (Grabbed)</div> </div>")
 			.append($("<div class='floating_body'/>").append($clone))
 			.translate(p.left +30,p.top +30)
@@ -467,6 +464,7 @@ $(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
 
 /* ================== CLUSTER PAINTER ========= */
 
+//TODO: use crosshair element (with width bars removed) rather than explicitly dealing with svg here
 
 T.Tool.UpdateCursor_Painter = (function(){
 	var $el = $("<svg style='display:none;pointer-events:none;'></svg>")
@@ -692,101 +690,6 @@ T.$cluster_panel.on({
 /* =========================== */
 
 
-/* ========================= SEPARATOR ================== 
-T.TileDoubleClick_BeginSeparator = function(event){
-	var $h = $(this);
-
-	var c = T.ORG.GetCut();
-	var g = $h.data("group_num");
-	var cut_g = c.GetGroup(g);
-	var n_1 = Math.floor(cut_g.length/2);
-	var n_2 = Math.ceil(cut_g.length/2);
-	c.SplitA(g,T.Tool.SeparatorMakeMask(n_1,n_2));
-
-	$.each(T.tiles,function(){this.$.attr('disabled','true');})
-    var $separator_first = $("<div class='separator_half' />")
-                            .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,true)})
-                            .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,true)});
-    var $separator_second = $("<div class='separator_half' />")
-                            .on("mousedown",function(e){return T.Tool.SeparatorMouseUpDown(e,true,false)})
-                            .on("mouseup",function(e){return T.Tool.SeparatorMouseUpDown(e,false,false)});
-	T.tiles[g].$.attr('separating','true')
-                .wrap($separator_first);
-	T.tiles[g+1].$.attr('separating','true')
-                .wrap($separator_second);
-	T.$rt.mousedown(T.Tool.TileWallMouseDown_Separating);
-    T.Tool.separating = {g:g,n_1:n_1,n_2:n_2,increment:1,isFirst:NaN,timer:null};
-}
-
-T.Tool.SeparatorMakeMask = function(n_1,n_2){
-	var mask = new Uint8Array(n_1+n_2);
-	for(var i=n_1;i<n_1+n_2;i++)
-		mask[i] = 1;
-	return mask;
-}
-T.Tool.SeparatorMouseUpDown = function(event,isDown,isFirst){
-    event.stopPropagation();
-   //isDown is false for up events, isFirst is false when the second separator is the source
-   var s = T.Tool.separating;
-	if(isDown){
-		//mouse down: start timer and run first iteration
-		s.isFirst = isFirst;
-		s.increment = 1;
-		s.timer = setInterval(T.Tool.SeparatorMouseDownTick,T.SEPARATOR_MOUSE_DOWN_TIMER_MS);
-		T.Tool.SeparatorMouseDownTick();
-	}else{
-		//mouse up: apply new n values
-		clearInterval(s.timer);
-		s.isFirst = NaN;
-		s.timer = null;	
-		var c = T.ORG.GetCut();
-		c.Undo();
-		c.SplitA(s.g,T.Tool.SeparatorMakeMask(s.n_1,s.n_2));
-	}
- 
-}
-T.Tool.SeparatorMouseDownTick = function(){
-	var s = T.Tool.separating;
-	if(s.isFirst){
-		s.n_1 += s.increment;
-		s.n_2 -= s.increment;
-		if (s.n_2 < 1){
-			s.n_1 += s.n_2 - 1;
-			s.n_2 = 1;
-		}
-	}else{
-		s.n_1 -= s.increment;
-		s.n_2 += s.increment;
-		if (s.n_1 < 1){
-			s.n_2 += s.n_1 - 1;
-			s.n_1 = 1;
-		}
-	}
-	s.increment += 8;
-	s.increment = s.increment > 800 ? 800 : Math.round(s.increment);
-
-	T.tiles[s.g].caption.text("group " + s.g + " | " + s.n_1 + " waves ");
-	T.tiles[s.g+1].caption.text("group " + (s.g+1) + " | " + s.n_2 + " waves ");
-}
-
-T.Tool.TileWallMouseDown_Separating = function(event){
-		//this is the only way to end the separating tool
-		
-		T.$tilewall.off('mousedown');
-        T.tiles[g].$.removeAttr('separating')
-                                     .unwrap();
-        T.tiles[g+1].$.removeAttr('separating')
-                                     .unwrap();
-        $.each(T.tiles,function(){this.$.removeAttr('disabled');});
-		clearInterval(T.Tool.separating.timer);
-        delete T.Tool.separating;
-        
-        if(event.button == 2 || event.altKey)
-            T.ORG.GetCut().Undo();
-}
-	
-	
-	*/
 
 
 
