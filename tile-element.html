@@ -15,7 +15,7 @@ Tiles have the following attibutes:
 	
 And the following methods:
 	updateCanvas -		the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
-	updateSvg - 		the tile contians one svg node for drawing on top of the canvases. You can swap in a new svg node using this function.
+	updateCrossHair - 	specify canvasnumber and canvas (x,y) coordiantes (in css pixels not canvas pixels) or null to remove the crosshair.
 	shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
 						in the main index.html...perhaps there is a better way of doing this?
 	getCanvInfo - 		provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
@@ -45,7 +45,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 -->
 <link rel="import" href="polymer/polymer.html">
 <link rel="import" href="polymer/core-tooltip.html">
-
+<link rel="import" href="cross-hair.html">
 <polymer-element name="tile-element" attributes="group_num group_color_1 group_color_2 group_caption">
 <template>
 	<style>
@@ -189,7 +189,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
-	<svg style="display: none;"></svg>
 	<div id='sticker' class='tile-sticker' style="background-color:{{group_color_1}};color:{{group_color_2}};">{{group_num}}</div>
 	<div id='over' class='tile-over hidden_grabbed'>
 		<div class='tile-buttons' layout vertical>
@@ -276,9 +275,24 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			var oldCanv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
 			oldCanv.parentNode.replaceChild(newCanv,oldCanv);  
 		},
-		updateSvg: function(newSvg){
-			var oldSvg = this.shadowRoot.getElementsByTagName('svg')[0];
-			oldSvg.parentNode.replaceChild(newSvg,oldSvg);  
+		updateCrossHair: function(canvasNum,x,y){
+			/* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
+				if x is null/undefined, any existing crosshair will be removed. 	*/
+			var canv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			var xh = canv.nextElementSibling
+			xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
+			
+			if (xh && !(x==0 || x>0)){
+				xh.remove();
+			}else{
+				if(!xh){
+					xh = document.createElement('cross-hair');
+					xh.w = parseInt(getComputedStyle(canv).width);
+					xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
+					canv.parentNode.insertBefore(xh,canv.nextElementSibling)//insert after the canvas
+				}
+				xh.setXY(x,y);
+			}
 		},
 		getCanvInfo: function(canvasNum,pageX,pageY){
 			//TODO: if no pageX and pageY then life should be more simple...
@@ -302,8 +316,8 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 				return {x:canvX, y:canvY, 
 						w:w,
 						h:h,
-						top:parseInt(canvProps.top),
-						left:parseInt(canvProps.left),
+						top:canv.offsetTop,
+						left:canv.offsetLeft,
 						el: canv}
 		},
 
@@ -319,7 +333,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 				return; //throw "tile cannot have have its active state altered while it is moving."
 				
 			if(val){
-				if(movingTile){
+				if(movingTile){	
 					//if another tile is moving, then this tile is being "hovered" not being "active"
 					this.state_ = HOVER
 					StyleHover(this);

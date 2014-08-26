@@ -262,10 +262,11 @@ T.Tool.TileMouseDown_BeginSplitter = function(event){
 	s.splitDone= false;
 	s.downOn = 'a';
 	s.buttonUsed= event.button;
-	
+	s.x = canvInfo.x;
+	s.y = canvInfo.y;
 	T.tiles.forEach(function(el){el.disabled = true;});
 	this.disabled = false;
-	this.updateSvg($(T.Tool.MakeSVGStr_Splitter(canvInfo.x,canvInfo.y,canvInfo.w,canvInfo.left,canvInfo.top)).get(0));
+	this.updateCrossHair(T.CANVAS_NUM_WAVE,canvInfo.x,canvInfo.y);
 	
 	$(this).on("mousemove",T.Tool.TileMouseMove_Splitter);	
 	T.$tilewall.on('mousedown',T.Tool.TileWallMouseDown_Splitter);
@@ -318,13 +319,13 @@ T.Tool.TileMouseMove_Splitter = function(event){
 	if(!canvInfo)
 		return;
 		
-	var $newSvg = $(T.Tool.MakeSVGStr_Splitter(canvInfo.x,canvInfo.y,canvInfo.w,canvInfo.left,canvInfo.top)).get(0);
-	s.a.replaceSvg($newSvg);
 	
-	if(s.b){
-		s.b.replaceSvg($newSvg.clone());
-		//TODO: in theory canvas sizes could be different and thus require different svg
-	}
+	s.x = canvInfo.x;
+	s.y = canvInfo.y;
+	s.a.updateCrossHair(T.CANVAS_NUM_WAVE,canvInfo.x,canvInfo.y);
+	
+	if(s.b)
+		s.b.updateCrossHair(T.CANVAS_NUM_WAVE,canvInfo.x,canvInfo.y);
 	
 }
 
@@ -338,31 +339,16 @@ T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 	// Note that hopefully by moving around the $svg's means that even if tiles moved around the svgs will always end up on only the correct tiles.
 	// TODO: check if the above is still true.
 	if(group == s.g_a){
-		//TODO: ought to recreate svg in case of new size of canvas
-		s.a.updateSvg(s.$svg_a);
+		s.a = T.tiles[s.g_a]; //TODO: decide whether the tile can really have changed
+		s.a.updateCrossHair(T.CANVAS_NUM_WAVE,s.x,s.y);
 		s.a.disabled = false;
-	}else{ //group == s.b
-		if(!s.$svg_b){
-			s.$svg_b = s.$svg_a.clone(); //TODO: in theory canvas sizes could be different and thus require different svg
-		}
-		s.b.updateSvg(s.$svg_b);
+	}else{ //group == s.g_b
+		s.b = T.tiles[s.g_b]; //TODO: decide whether the tile can really have changed
+		s.b.updateCrossHair(T.CANVAS_NUM_WAVE,s.x,s.y);
 		s.b.disabled = false;
-		
 	}
 }
 
-T.Tool.MakeSVGStr_Splitter = function(x,y,w,left,top){
-	
-	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;width:100%;	' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
-				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
-				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
-				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
-				+ "</svg>";
-	
-}
 
 T.Tool.TileWallMouseDown_Splitter = function (event) {
     event.stopPropagation();

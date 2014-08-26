@@ -1,0 +1,51 @@
+<!--
+CUSTOM ELEMENT: cross-hair
+BY: DM
+
+Displays a cross-hair graphic rendered in svg. It has the following properties:
+	x,y,w,left,top
+-->
+
+<link rel="import" href="polymer/polymer.html">
+<polymer-element name="cross-hair">
+<template><svg></svg></template>
+<script>
+var MakeSVGStr = function(x,y,w,left,top){
+	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;width:100%;	' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
+				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
+				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+				+ "</svg>";
+}
+
+var UpdateSvg = function(el){
+	el.shadowRoot.innerHTML = MakeSVGStr(el.x_,el.y_,el.w_,el.left_,el.top_);
+}
+
+Polymer('cross-hair',{
+	x_: 0,
+	y_: 0,
+	w_: 0,
+	left_: 0,
+	top_: 0,
+	set x(val){this.x_ = val; UpdateSvg(this);},
+	set y(val){this.y_ = val; UpdateSvg(this);},
+	set w(val){this.w_ = val; UpdateSvg(this);},
+	set left(val){this.left_ = val; UpdateSvg(this);},
+	set top(val){this.top_ = val; UpdateSvg(this);},
+	setXY: function(x,y){ 
+		//better than setting x and y separately.
+		this.x_ = x; this.y_=y;
+		UpdateSvg(this);
+	},
+	setLeftTop: function(left,top){
+		//better than setting left and top separately
+		this.left_ = left;this.top_ = top;
+		UpdateSvg(this);
+	}
+});
+</script>
+</polymer-element>
