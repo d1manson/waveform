@@ -193,13 +193,13 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	<div id='over' class='tile-over hidden_grabbed'>
 		<div class='tile-buttons' layout vertical>
 			<core-tooltip label='swap with... [s]' position='left'>
-				<button class='tile-button-swap'></button>
+				<button class='tile-button-swap' on-mousedown="{{StopProp}}" on-click="{{buttonClick0}}"></button>
 			</core-tooltip>
 			<core-tooltip label='make destination group [e]' position='left'>
-				<button class='tile-button-dest'></button>
+				<button class='tile-button-dest' on-mousedown="{{StopProp}}" on-click="{{buttonClick1}}"></button>
 			</core-tooltip>
 			<core-tooltip label='make source group [f]' position='left'>
-				<button class='tile-button-src'></button>
+				<button class='tile-button-src' on-mousedown="{{StopProp}}" on-click="{{buttonClick2}}"></button>
 			</core-tooltip>
 			<div class='tile-caption'>{{group_caption}}</div>
 		</div>
@@ -328,7 +328,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			return this.state_ == MOVING || this.state_ == PROXIMATE ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
 		},
 		set active(val){
-			LogIt(this,'active',val);
+			//LogIt(this,'active',val);
 			if(this.state_ === MOVING || this.state_ === PROXIMATE)
 				return; //throw "tile cannot have have its active state altered while it is moving."
 				
@@ -401,7 +401,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			}		
 		},
 		set disabled(val){
-			LogIt(this,'disabled',val);
+			//LogIt(this,'disabled',val);
 			if(this.state_ && !(this.state_ === ACTIVE || this.state_ === DISABLED))
 				throw "you cannot change a tile's disabled stae unless it is in normal, active or disabled state."
 			if(val){
@@ -417,7 +417,12 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		},
 		clearShake: function(){
 			this.classList.remove('shake');
-		}
+		},
+		StopProp: function(e){console.log('so, what?');e.stopPropagation();},
+		buttonClick0: function(){this.fire('buttonclick',{id:0})},
+		buttonClick1: function(){this.fire('buttonclick',{id:1})},
+		buttonClick2: function(){this.fire('buttonclick',{id:2})} //TODO: it looks a bit silly explicitly having three funcions here that map to one event...cant we achive this more neatly?
+		
 	});
 </script>
   

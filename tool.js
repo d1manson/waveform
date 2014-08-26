@@ -35,15 +35,14 @@ T.TileMouseDown = function(event){
     event.preventDefault();
 }
 
+/*
+//I dont think this ever worked..did it?
 T.TileDoubleClick = function(event){
 	this.clearShake();//clear the failed dragging animation from the second mouse down event
 	T.TileDoubleClick_BeginSeparator.call(this,event);
 }
+*/
 
-T.Tool.Button_Swap = function(event){
-    var g = $(this).closest(".tile").data('group_num');
-    T.Tool.Swap(g);
-}
 
 T.Tool.Swap = function(g){
     var ng = parseInt(prompt("Swap group " + g + " with:",g+""));
@@ -51,16 +50,6 @@ T.Tool.Swap = function(g){
         T.ORG.GetCut().SwapBandA(g,ng);
 }
 
-T.Tool.Button_PainterDest = function(event){
-	var g = $(this).closest(".tile").data('group_num');
-	T.Tool.SetPainterDestGroup(g);
-}
-
-T.Tool.Button_PainterSrc = function(event){
-	var g = $(this).closest(".tile").data('group_num');
-	
-	T.Tool.PainterSrc_Toggle(g);
-}
 
 T.Tool.PainterSrc_Toggle = function(g){
 	if(key.shift){
@@ -82,21 +71,26 @@ T.Active_TileMouseMove = function(e){
 	//if(T.Tool.cState === T.Tool.STATES.NOTHING)
 	T.SetGroupOver(this.group_num);
 }
+
+
+T.Tool.TileButton_Click = function(e){
+	var id = e.originalEvent.detail.id;
+	if(id == 0) //too much python leads to abandoning pefectly good switch statements!
+		T.Tool.Swap(this.group_num);
+	else if(id == 1)
+		T.Tool.SetPainterDestGroup(this.group_num);
+	else if(id == 2)
+		T.Tool.PainterSrc_Toggle(this.group_num);
+}
+
 // These are the only registered listeners initially, on triggering they "activate" a tool which means other listeners are 
 // temporarily registerd on $tile's, $tilewall, and $document.
 T.$tilewall.on({
     "mousedown": T.TileMouseDown,
-    "dblclick": T.TileDoubleClick,
     "mousemove": T.Active_TileMouseMove,
-    "mouseout": function () { T.SetGroupOver(-1) }
+    "mouseout": function () { T.SetGroupOver(-1) },
+	"buttonclick": T.Tool.TileButton_Click,
 },"tile-element");
-
-T.Tool.StopProgagation = function(e){e.stopPropagation();}
-
-T.$tilewall.on("click",".tile-button-swap",T.Tool.Button_Swap); 
-T.$tilewall.on("click",".tile-button-dest",T.Tool.Button_PainterDest); 
-T.$tilewall.on("click",".tile-button-src",T.Tool.Button_PainterSrc); 
-T.$tilewall.on("mousedown",'.tile-buttons',T.Tool.StopProgagation);
 
 
 /* =================== MERGER =================== */
@@ -351,16 +345,16 @@ T.Tool.CanvasUpdated_Splitter = function(canvasNum,$canvas,group){
 
 
 T.Tool.TileWallMouseDown_Splitter = function (event) {
+	//This is the EndSplitter
     event.stopPropagation();
     var s = T.Tool.cState;
     if (s.downOn != null)
         return;
-	/*
-	s.$svg_a.remove();
-	if(s.$svg_b)
-		s.$svg_b.remove(); 
-	*/
-		
+	
+	s.a.updateCrossHair(T.CANVAS_NUM_WAVE,null);
+	if(s.b)
+		s.b.updateCrossHair(T.CANVAS_NUM_WAVE,null);
+			
 	T.tiles.forEach(function(el){el.disabled = false;});
 	T.$tilewall.off('mousedown',T.Tool.TileWallMouseDown_Splitter);
 	T.RemoveCanvasUpdatedListener(T.Tool.CanvasUpdated_Splitter);
