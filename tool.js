@@ -404,7 +404,7 @@ T.Tool.GrabIt = function(){
 	var $clone;
 	if(this.tagName.toLowerCase() == "tile-element"){
 		//tile-elements have a proper method for this...
-		$clone = $(this.getCopyOfCanvs());
+		$clone = $(this.getCopyOfCanvs(true));
 		str += " t" + T.ORG.GetTet() + "c" + this.group_num;//this is pretty hacky
 	}else{
 		$clone = $(this).clone()

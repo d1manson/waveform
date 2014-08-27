@@ -422,21 +422,23 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		buttonClick0: function(){this.fire('buttonclick',{id:0})},
 		buttonClick1: function(){this.fire('buttonclick',{id:1})},
 		buttonClick2: function(){this.fire('buttonclick',{id:2})}, //TODO: it looks a bit silly explicitly having three funcions here that map to one event...cant we achive this more neatly?
-		getCopyOfCanvs: function(){
+		getCopyOfCanvs: function(withSticker){
 			var div = document.createElement('div');
 			var oldCanvs = this.shadowRoot.getElementsByTagName('canvas');
 			for(var i = 0;i<oldCanvs.length;i++){
-				var newCanv = document.createElement('canvas');
-				newCanv.width = oldCanvs[i].width;
-				newCanv.height = oldCanvs[i].height;
-				newCanv.style.cssText = oldCanvs[i].style.cssText; //should take care of scaling
-				newCanv.getContext('2d').drawImage(oldCanvs[i],0,0);
-				div.appendChild(newCanv);
+				var img = document.createElement('img');
+				var props = getComputedStyle(oldCanvs[i])
+				img.setAttribute('width',props.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
+				img.setAttribute('height',props.height); 
+				img.src = oldCanvs[i].toDataURL();
+				div.appendChild(img);
 			}
-			var sticker = this.$.sticker.cloneNode(true);
-			sticker.style.cssText =  "width: 20px;height: 17px;border: 1px solid;text-align: center;padding-top: 3px;position: absolute;right: 0px;top: 0px;font-size:0.8em;" 
-									+ sticker.style.cssText; //this is a bit lame, but doing it properly would be a big complicated job I think
-			div.appendChild(sticker);
+			if(withSticker){
+				var sticker = this.$.sticker.cloneNode(true);
+				sticker.style.cssText =  "width: 20px;height: 17px;border: 1px solid;text-align: center;padding-top: 3px;position: absolute;right: 0px;top: 0px;font-size:0.8em;" 
+										+ sticker.style.cssText; //this is a bit lame, but doing it properly would be a big complicated job I think
+				div.appendChild(sticker);
+			}
 			div.style.position = 'relative';
 			return div;
 		}

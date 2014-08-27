@@ -816,20 +816,15 @@ T.ToggleToolbar = function(){
 				.slideToggle({duration: 400, queue:false});
 }
 
-T.MakeCopyData = function(){
-	//WARNING: no escaping of text here
-	var str = "[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet();
-	if (T.groupOver.g >0 || T.groupOver.g == 0){
-		str += "c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>"; 
-		str += T.groupOver.$tile.find('canvas').get().map(CanvToImgStr).join("");
-	}
-	return str;
-}
-
 T.Copy = function(e){
     // based on: http://stackoverflow.com/a/11347714/2399799    
     if (e.ctrlKey && !e.altKey && !e.shiftKey && e.which == 67 /* KEY_C */) {
-        T.$hidden_clipboard.html(T.MakeCopyData());
+        T.$hidden_clipboard.html('');
+		T.$hidden_clipboard.append("[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet());
+		if  (T.groupOver.g >0 || T.groupOver.g == 0){
+			T.$hidden_clipboard.append("c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>");
+			T.$hidden_clipboard.append($(T.tiles[T.groupOver.g].getCopyOfCanvs(false)).children());
+		}
         var rng = document.createRange();
         var sel = window.getSelection();
         sel.removeAllRanges();
@@ -851,11 +846,11 @@ T.InitKeyboardShorcuts = function(){
 	key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 	key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
-	key('q, shift+q',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[1],shiftKey:key.shift});});
+	key('c, shift+c',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[1],shiftKey:key.shift});});
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
 	key('k, alt+k',T.Toggle('shortcut_info'));
-	key('alt+a',T.Toggle('autocut_info'));
+	//key('alt+a',T.Toggle('autocut_info'));
 	key('ctrl+z, z',T.UndoLastAction);
 	key('alt+r',T.Toggle('rm_info'));
 	key('/',T.ShowGitHub);
@@ -864,7 +859,7 @@ T.InitKeyboardShorcuts = function(){
 	key('alt+d',T.Toggle('drift_info'));
 	key('alt+t',T.Toggle('tc_info'));
 	key('alt+z',T.Toggle('action_info'));
-	key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
+	key('alt+c',T.Toggle('dir_info'));
 	key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
 	key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
 	key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
