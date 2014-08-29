@@ -20,6 +20,11 @@ And the following methods:
 						in the main index.html...perhaps there is a better way of doing this?
 	getCanvInfo - 		provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
 						coordinates within the canvas or null if it's outside the canvas.  TODO: actually only the more pageX/Y implementation has be written.
+	getCopyOfCanvs - 	provides a div containing images that are the same as the canvases.  Confusingly, when you use this for copying to the clipboard, you will get different results
+						depenedning on where you paste.  In gmail, you will get the ratemaps stretched to the size they appear in the GUI, but in google docs, it ignores the width/height 
+						attributes if only one of the two is provided, though it does honour them when both are provided. This means that the ratemaps end up not being stretched in 
+						google docs - the size of the image is dictated by the number of bins. (The waveforms have both height and width specified so they are the expected size).  That's helpful in a way
+						but rather consfusing to say the least.
 
 A tile can be in one of several states, (normal,active,moving,proximate,hover, and disabled). Transitioning between states is done by setting element.something = true or false....
 	from normal state: 
@@ -222,7 +227,8 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	// falsy state is anything else
 	
 	var ResetStyle = function(el){
-		el.style.cssText = '';
+		var display = el.style.display;
+		el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
 		el.$.over.style.cssText = '';
 		el.$.sticker.style.right = '';
 		el.$.blind.style.cssText = '';
@@ -440,6 +446,9 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			}
 			div.style.position = 'relative';
 			return div;
+		},
+		getCanv: function(canvNum){
+			return this.shadowRoot.getElementsByTagName('canvas')[canvNum];
 		}
 	});
 </script>

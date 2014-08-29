@@ -149,13 +149,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				this.$.data('EXP_CUT',this);
             }
 			
-    var RecoverFilesFromStorage = function(){
-    	//takes the files in storage and calls the code as though they had been dropped afresh on the window
-    	recoveringFilesFromStorage = true;
-        FS.GetFileHandleList(NewFiles);
-		HideDropZone();
-    }
-
     var NewFiles = function(files){
 		//this function iterates through a list of file handles, calling GotFileDetails for each file, either synchronously or asynchrously
 		//it also stores the files for later use (unless we are currently getting files from storage)
@@ -184,8 +177,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 					else if(base.slice(-4) == ".klg") type = 7; //we dont care about these
 					else 							  type = 4; //tet file
 
-				if(!recoveringFilesFromStorage && type != -1)//TODO: this is a potential bug, because any files you drop while also loading from storage will not be stored
-						FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 	
+				if(type != -1)
+					FS.WriteFile(files[i].name,files[i]); //store the file in filesystem 	
 			}
 
 			switch(type){
@@ -837,7 +830,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.SwitchToTet = SwitchToTet;
     ORG.SwitchToExpTet = SwitchToExpTet;
 	ORG.SwitchToCut = SwitchToCut;
-	ORG.RecoverFilesFromStorage = RecoverFilesFromStorage;
     ORG.GetExpName = function(){return cExp.name;};
 	ORG.GetSetHeader = function(){return cSetHeader;};
     ORG.GetTet = function(){return cTet.num;};

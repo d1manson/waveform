@@ -22,14 +22,6 @@
 <div class="hidden_clipboard"></div>
 
 <div class="floating_layer">
-
-	<div class="floatinginfo autocut_info">
-		<div class='floating_title'>Autocut [a]</div>
-		<div class='floating_body'>
-			<div id="autocut_caption"></div><br><br>
-			autocut only uses about 6000 spikes and only runs on one channel.   Tree view is still in early development.
-		</div>
-	</div>
 		
 	<div class="floatinginfo action_info">
 		<div class='floating_title'>Action List [z]</div>
@@ -65,6 +57,13 @@
 			<li><b>s</b> launch the swap dialog for the "active" group.</li>
 			<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
 			</ul>
+			Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+			<ul>
+			<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
+			<li><b>r</b> spatial ratemap</li>
+			<li><b>c</b> directional ratemap</li>
+			<li><b>t</b> temporal autocorrelogram</li>
+			</ul>
 			Other shortcuts:
 			<ul>
 			<li><b>d</b> toggle drift rendering on/off</li>
@@ -72,7 +71,7 @@
 			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
 			<li><b>enter</b> increment cluster painting destination group</li>
 			<li><b>esc</b> open/close the toolbar</li>
-			<li><b>p</b> toggle palette</li>
+			<li><b>p</b> toggle waveform palette</li>
 			<li><b>k</b> show this info</li>
 			<li><b>h</b> show header info</li>
 			<li><b>?</b> open GitHub info in a new tab</li>
@@ -92,7 +91,7 @@
 	</div>
 	
 	<div class="floatinginfo dir_info">
-		<div class='floating_title'>Directional ratemap [Q]</div>
+		<div class='floating_title'>Directional ratemap [c]</div>
 		<div class='floating_body'>
 			Bin size <span id='dir_binsize_val' class="slider_val">6 degrees</span><br>
 			WARNING: directional plots are still in alpha testing (unlike everything else which is just about in beta!).
@@ -205,10 +204,6 @@
 	<core-tooltip label="sort on channel amplitude">
 		<core-icon-button icon="sort" id='reorder_A_button'></core-icon-button>
 	</core-tooltip>
-	
-	<core-tooltip label="bad autocut [a]">
-		<core-icon-button icon="android" id='autocut' class="info_linked" data-info-name='autocut_info'></core-icon-button>
-	</core-tooltip>
 			
 	<core-tooltip label="position post processing settings">
 		<core-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></core-icon-button>
@@ -229,7 +224,7 @@
 	<core-tooltip label="spatial ratemap [r]">
 		<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
 	</core-tooltip>
-	<core-tooltip label="directional ratemap [Q]">
+	<core-tooltip label="directional ratemap [c]">
 		<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
 	</core-tooltip>
 	<core-tooltip label="temporal autocorrelation [t]">
@@ -348,9 +343,6 @@ other file types will be ignored<br>
 <script src="webgl-waveforms.js"></script>
 <script src="eeg.js"></script>
 
-<!-- T.AC does autocutting, uses tree.js to display hierarchy -->
-<script src="tree.js"></script>
-<script src="autocut.js"></script>
 
 </body>
 </html>

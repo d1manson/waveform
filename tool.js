@@ -1,16 +1,21 @@
 "use strict";
+/*
+T.Tool deals with most/all of the cut-modification interactivity...painting, splitting, merging, swapping etc.
+Note that T.CUT defines the actual logic of the backen datastructure for the cut, here we are concerned with
+the interface aspect.
+By bad design, the grabber tool (which doesn't actually effect the cut) is also located in this file...I guess
+because it has some things in common with the other stuff going on here even though it doesn't modify the cut.
+Also by bad design, the undo tool (I guess it is a tool) is located in main rather than in this file.
+
+T.Tool.cState will hold one of the values in T.Tool.STATES. Note that only one of the tools should be active
+at any one time.
+Where the value is an object it may have further properties relating to that particular type of state.
+In some cases, a reference is held to the object and used even when it is not the active state.
+For example, PAINTER exists as T.Tool.PainterState, which is needed so we can adjust r, and src and dest
+even when the PAINTER is not the active state.
+*/
 
 
-T.PROXIMITY = 30;
-T.TILE_MOVING_BORDER_WIDTH = 10;
-T.WIDGET_CENTRE_RAD = 10;
-T.SEPARATOR_MOUSE_DOWN_TIMER_MS = 100;
-
-// T.Tool.cState will hold one of the following values
-// Where the value is an object it may have further properties relating to that particular type of state.
-// In some cases, a reference is held to the object and used even when it is not the active state.
-//  For example, PAINTER exists as T.Tool.PainterState, which is needed so we can adjust r, and src and dest
-// even when the PAINTER is not the active state.
 T.Tool.STATES = { 
     NOTHING: "nothing",
     SPLITTER: { name:"splitter"},
@@ -288,7 +293,10 @@ T.Tool.DocumentMouseUp_Splitter = function (event) {
 	$(document).off('mouseup',T.Tool.DocumentMouseUp_Splitter);
 
 	var canvInfo = t.getCanvInfo(T.CANVAS_NUM_WAVE,event.pageX,event.pageY);
-	//TODO: what happens when mouse up is out of range of canvas?
+	
+    if(!canvInfo) //when mouse up is out of range of canvas use last available x,y values
+        canvInfo = {x: s.x, y:s.y,el: t.getCanv(T.CANVAS_NUM_WAVE)};
+    
 	var waveMouseMeaning = T.WV.MouseToVandT($(canvInfo.el),canvInfo.x,canvInfo.y); //TODO: avoid explicitly passing the canvas - that's messy.
 	var splitMask = T.Tool.VIsOverThreshAtT_Splitter(s.srcCutInds,waveMouseMeaning.ch,waveMouseMeaning.t,waveMouseMeaning.v);
 	if(s.splitDone)

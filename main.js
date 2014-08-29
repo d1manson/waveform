@@ -443,7 +443,6 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 	window.onbeforeunload = "";
 	localStorage.clear();
 	location.reload();
-	//todo: I don't know if you can clear the filesystem here because it is async and we want to reload the page.
 }
 
 T.ShowGitHub = function(){
@@ -475,46 +474,6 @@ T.TogglePalette = function(val){
 
 
 
-T.RunAutocut = function(){
-    T.$autocut_info.attr("state","closed"); //TODO: rename the attribute as closed actually means it's visible
-	var chan = -1;
-	for(var i=0;i<4;i++)
-		if(T.chanIsOn[i])
-			if(chan == -1)
-				chan = i;
-			else{
-				alert("Currently you can only autocut on a single channel. Using channel " + (chan+1) + ".");
-				break;
-			}
-	if(chan == -1){
-		alert("Currently you can only autocut on a single channel. Using channel 1.");
-		chan = 0;
-	}
-	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
-}
-
-T.AutocutFinished = function(cut,chan,tree){
-	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
-
-	tree.OnNode('mouseenter',function(evt,ind){
-		console.log(ind + ": mouseenter");
-	});
-	tree.OnNode('mouseleave',function(evt,ind){
-		console.log(ind + ": mouseleave");
-	});	
-}
-
-T.ToggleFS = function(newState){
-	if(T.FS.IsActive()){
-		//deactivate
-		T.$FSbutton.text("turn on FileAPIs");
-		T.FS.Toggle(false,T.ShowFileSystemLoaded);
-	}else{
-		//activate
-		T.$FSbutton.text("turn off FileAPIs");
-		T.FS.Toggle(true,T.ShowFileSystemLoaded);
-	}
-}
 
 
 T.CutActionCallback = function(info){
@@ -602,15 +561,6 @@ T.ReorderACut = function(amps){
 	T.ORG.GetCut().ReorderAll(inds);
 }
 
-T.ShowFileSystemLoaded = function(file_names){
-	if(!file_names || file_names.length == 0){
-		$('#filestem_caption').html("No files available.");
-		T.$filesystem_load_button.hide();
-	}else{
-		$('#filestem_caption').html("Found " + file_names.length + " existing files.<BR>" + file_names.join("<BR>")); //TODO: using html here with filenames is potentially a bug
-		T.$filesystem_load_button.show();
-	}
-}
 
 T.FilterHeader = function(){
 	T.DispHeaders(T.ORG.GetState());
@@ -635,7 +585,6 @@ T.StoreData = function(){
 	localStorage.xFactor = T.xFactor;
 	localStorage.yFactor = T.yFactor;
     
-	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.RM.GetCmPerBin();
     localStorage.rmSmoothingW = T.RM.GetSmoothingW();
 	localStorage.tcDeltaT = T.TC.GetDeltaT();
@@ -838,7 +787,6 @@ T.Copy = function(e){
 T.InitKeyboardShorcuts = function(){
 	// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 	key('p',T.TogglePalette);
-	key('a',T.RunAutocut);
 	key('esc',T.ToggleToolbar);
 	key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
 	key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
@@ -850,7 +798,6 @@ T.InitKeyboardShorcuts = function(){
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
 	key('k, alt+k',T.Toggle('shortcut_info'));
-	//key('alt+a',T.Toggle('autocut_info'));
 	key('ctrl+z, z',T.UndoLastAction);
 	key('alt+r',T.Toggle('rm_info'));
 	key('/',T.ShowGitHub);
@@ -877,13 +824,11 @@ T.InitButtons = function(){
 	T.$displayButtons.each(function(i){$(this).data('domindex',i);})
 											.click(T.DisplayIsOnClick);
 	$('#toggle_palette').click(T.TogglePalette);
-	$('#autocut').click(T.RunAutocut);
 	$('#apply_rm_size').click(T.ApplyRmSizeClick);
 	T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 	$('#file_headers_button').on('mouseenter',T.DispHeadersForced);
 	$('.github_button').on('click',T.ShowGitHub);
 	$('.menu_toggle').mouseup(T.ToggleToolbar);
-	T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 	$('#drift_button').click(T.DriftButtonClick);
 }
 
@@ -898,7 +843,6 @@ T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');			
 T.$tilewall_text = $('.tilewall_text');	 			 
 T.$info_panel = $('#info_panel');
-T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
 T.$side_panel = $('.side_panel');
 T.$cluster_info = $('.cluster_info');
@@ -906,11 +850,9 @@ T.$painter_dest = $('#painter-dest');
 T.$painter_src = $('#painter-src');
 T.$cluster_others = $('.cluster_others');
 T.$undo = $('#undo_button');
-T.$FSbutton = $('#filesystem_button');
 T.$files_panel = $('#files_panel');
 T.$displayButtons = $(".display_button");
 T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#eeg_info'),$('#set_info')];
-T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$file_info_pane = $('.file_info');
 T.$info_summary = $('.info_summary');
@@ -924,8 +866,6 @@ $('.floating_layer').on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 
-if(!(window.requestFileSystem || window.webkitRequestFileSystem))
-	$('#filesystem_button').hide();
 
 $(document).bind("contextmenu",function(e){return false;})
 		    .ready(T.DocumentReady);
