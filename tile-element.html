@@ -138,6 +138,9 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	border-color: #000;
 	}
 
+	canvas{
+	image-rendering: pixelated;
+	}
 	.tile-button-swap,
 	.tile-button-dest,
 	.tile-button-src{
@@ -334,9 +337,11 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			return this.state_ == MOVING || this.state_ == PROXIMATE ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
 		},
 		set active(val){
-			//LogIt(this,'active',val);
-			if(this.state_ === MOVING || this.state_ === PROXIMATE)
-				return; //throw "tile cannot have have its active state altered while it is moving."
+			LogIt(this,'active',val);
+			if(this.state_ === MOVING || this.state_ === PROXIMATE){
+				console.warn("tile cannot have have its active state altered while it is moving.");
+				return;
+			}
 				
 			if(val){
 				if(movingTile){	
@@ -436,6 +441,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 				img.setAttribute('width',oldCanvs[i].style.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
 				img.setAttribute('height',oldCanvs[i].style.height); 
 				img.src = oldCanvs[i].toDataURL();
+				img.style.imageRendering = 'pixelated';
 				div.appendChild(img);
 			}
 			if(withSticker){

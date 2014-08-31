@@ -28,7 +28,7 @@ T.Tool.cState = T.Tool.STATES.NOTHING;
 T.TileMouseDown = function(event){
 	this.clearShake();//clear any existing dragging animation
 	if(T.Tool.cState == T.Tool.STATES.GRABBER) return; 
-	T.CP.BringGroupToFront($(this).data("group_num"))
+	T.CP.BringGroupToFront(this.group_num);
 	if(T.Tool.cState == T.Tool.STATES.SPLITTER && (event.button == 2 || event.altKey)){
 		T.Tool.TileMouseDown_ContinueSplitter.call(this,event);
 	}else if(T.Tool.cState == T.Tool.STATES.NOTHING){ 

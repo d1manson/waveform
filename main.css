@@ -8,7 +8,7 @@ p,ul,ol{
 margin-top: 6px;
 margin-bottom: 6px;
 }
-ul,ol{
+ul,ol{image-rendering: pixelated;
 padding-left:10px;
 margin-left:10px;
 }
@@ -75,8 +75,11 @@ height: 100%;
 left: 0;
 right: 0;
 min-height: 150px;
+image-rendering: pixelated;
 }
-
+.cluster_canv{
+image-rendering: pixelated;
+}
 .tilewall[tilemoving]{
 cursor: move;
 }
