@@ -7,22 +7,22 @@ Displays a cross-hair graphic rendered in svg. It has the following properties:
 -->
 
 <link rel="import" href="polymer/polymer.html">
-<polymer-element name="cross-hair">
-<template><svg></svg></template>
+<polymer-element name="cross-hair" attributes="showbars r">
+<template>
+<svg></svg>
+</template>
 <script>
-var MakeSVGStr = function(x,y,w,left,top){
-	return "<svg style='position:absolute;left:" + left + "px;top:" + top + "px;width:100%;	' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='black' stroke-width='1' fill='none'/>"
-				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='6' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
-				+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
-				+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+6) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+var MakeSVGStr = function(x,y,w,left,top,r,showBars){
+	return "<svg style='pointer-events:none;position:absolute;left:" + left + "px;top:" + top + "px;width:" + (showBars & 1 ? w : x+r+2 )+ "px;height:" + (y+r+2) + "px' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
+				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
+				+ (showBars & 1 ?
+					  "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-r) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+					+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+r) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
+					+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-r) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+					+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+r) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
+				  : "")
 				+ "</svg>";
-}
-
-var UpdateSvg = function(el){
-	el.shadowRoot.innerHTML = MakeSVGStr(el.x_,el.y_,el.w_,el.left_,el.top_);
 }
 
 Polymer('cross-hair',{
@@ -31,20 +31,29 @@ Polymer('cross-hair',{
 	w_: 0,
 	left_: 0,
 	top_: 0,
-	set x(val){this.x_ = val; UpdateSvg(this);},
-	set y(val){this.y_ = val; UpdateSvg(this);},
-	set w(val){this.w_ = val; UpdateSvg(this);},
-	set left(val){this.left_ = val; UpdateSvg(this);},
-	set top(val){this.top_ = val; UpdateSvg(this);},
+	r: 6,
+	showbars: 1, //1=horizontal, 2=vertical 3=both (only 1 is implemented)
+	set x(val){this.x_ = val; this.UpdateSvg();},
+	set y(val){this.y_ = val; this.UpdateSvg();},
+	set w(val){this.w_ = val; this.UpdateSvg();},
+	set left(val){this.left_ = val; this.UpdateSvg();},
+	set top(val){this.top_ = val; this.UpdateSvg();},
+	observe: {
+		showbars: 'UpdateSvg',
+		r: 'UpdateSvg'
+	},
 	setXY: function(x,y){ 
 		//better than setting x and y separately.
 		this.x_ = x; this.y_=y;
-		UpdateSvg(this);
+		this.UpdateSvg();
 	},
 	setLeftTop: function(left,top){
 		//better than setting left and top separately
 		this.left_ = left;this.top_ = top;
-		UpdateSvg(this);
+		this.UpdateSvg();
+	},
+	UpdateSvg: function(){
+		this.shadowRoot.innerHTML = MakeSVGStr(this.x_,this.y_,this.w_,this.left_,this.top_,this.r,this.showbars);
 	}
 });
 </script>

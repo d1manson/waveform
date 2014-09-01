@@ -474,35 +474,18 @@ $(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
 
 //TODO: use crosshair element (with width bars removed) rather than explicitly dealing with svg here
 
-T.Tool.UpdateCursor_Painter = (function(){
-	var $el = $("<svg style='display:none;pointer-events:none;'></svg>")
-					.appendTo(T.$cluster_panel);
-	var cur_r = 0;
-	var isShowing = false;
-	
-	return function(x,y,r){
-		if (r == 0 || T.Tool.cState == T.Tool.STATES.GRABBER){
-			if(isShowing){
-				$el.hide();
-				isShowing = false;
-			}
-		}else{
-			if(r != cur_r){
-				var $old = $el;
-				$el = $("<svg height=" + (2*r+2) + " width=" + (2*r+2) + " style='position:absolute;left:0px;top:0px;pointer-events:none;z-index:100;' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
-				+ "<circle cx='" + (r+1) + "' cy='" + (r+1) + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
-				+ "<circle cx='" + (r+1) + "' cy='" + (r+1) + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
-				+ "</svg>")	
-				$old.replaceWith($el);
-				cur_r = r;
-			}else if(!isShowing){
-				$el.show();
-			}
-			isShowing = true;
-			$el.translate(x-r-1,y-r-1);			
-		}
+T.Tool.UpdateCursor_Painter = function(x,y,r){
+	var xh = T.Tool.PainterState.crosshair;
+	if (r == 0 || T.Tool.cState == T.Tool.STATES.GRABBER){	
+		xh.style.display = 'none';
+	}else{
+		var xh = T.Tool.PainterState.crosshair;
+		if(xh.r != r)
+			xh.r = r;
+		xh.setXY(x,y);
+		xh.style.display = 'block';
 	}
-})();
+};
 
 T.Tool.PAINTER_COLOR = '#003300';
 
@@ -619,7 +602,9 @@ T.Tool.ClusterPlotChangeCallback = function(invalidatedSlots_,isNew){
 
 
 T.Tool.PainterState = T.Tool.STATES.PAINTER;
-T.Tool.PainterState.r = 20;
+T.Tool.PainterState.r = 20; //TODO: lose this, and just use crosshair's r value
+T.Tool.PainterState.crosshair = document.getElementById('cluster_crosshair');
+T.Tool.PainterState.crosshair.r = 20;
 T.ORG.AddCutChangeCallback(T.Tool.ClusterPlotChangeCallback);
 T.Tool.SetPainterDestGroup(1);
 T.Tool.SetPainterSrcGroups([0]);

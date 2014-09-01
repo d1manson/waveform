@@ -53,10 +53,12 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		}
 
 		// in addition to all the coordinate stuff we also need to actually create the canvas and store a reference to it
-		var canvas = $("<canvas width='" + c.W + "' height='" + c.H + "' />");
-    	//canvas.css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
-        c.el = canvas.get(0);
-
+		c.el = document.createElement('canvas');
+		c.el.width = c.W;
+		c.el.height = c.H;
+		c.el.style.imageRendering = 'pixelated';
+    	//$(c.el).css({position:"absolute",left:"800px",background:"#fff"}); $('body').append(canvas); // DEBUG ONLY
+ 
 		return c;
 	}();	
     
