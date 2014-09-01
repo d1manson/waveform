@@ -218,7 +218,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 s = ratemapSlotQueue.shift(); 
 			if(slots[s]){
                 GetGroupRatemap(slots[s]);
-				GetGroupRatemap_Dir(slots[s]);
+				//GetGroupRatemap_Dir(slots[s]);
 			}
 			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
             //TODO: may want to time the call and potentially do more within this tick

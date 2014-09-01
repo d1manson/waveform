@@ -29,7 +29,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 				   H: 512, // full height
 				   waveH: 256, //height of a wave
 				   dT: 2, //distance from t to t+1 on the wave
-				   waveGap: 2 //horizontal gap between waves
+				   waveGap: 2//horizontal gap between waves
 				   }
 
 		c.waveW = (50-1)*c.dT; //width of a wave
@@ -79,7 +79,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 	// At any one time, different slots may have different channels rendered, and may be using different colormaps (colormap is consitent across channels within a slot).  
 	// The desiredChannels and desiredColormaps record the desired render state that we are working towards for all slots where invalidatedSlots[i] is true.
 	var blankSlotRenderState = { invalidatedSlots: null, 
-							$canvases: [], //array of handles to the canvases corresponding to each slot. The canvases may move around/be deleted from the DOM but only this module will modify their image data.
+							$canvases: [], //NO LONGER jQUERY. array of handles to the canvases corresponding to each slot. The canvases may move around/be deleted from the DOM but only this module will modify their image data.
 							chanXOffset: [], // Array of 4-arrays, specifying the xOffset to each channel within the canvas, or NaN if it's not been rendered
 							slotGeneration: [], //Records which generation of slot immutable was last rendered for each slot
 							slotColMap: [], //records -1 if the hot colormap was last used and 0-n if a flag color was used, and -2 if the count colormap was used
@@ -234,9 +234,9 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			for(var c=0;c<4;c++){ //for each channel
 				q += 5;
 				for(var t=0;t<50-1;t++){ //for each time point (except the last one)
-					p += N2;
 					newData[p ] = oldData[q];
 					newData[p | 1] = oldData[++q]; // p is an even number, so p|1 is p+1
+					p += N2;
 				}
 			}
 		}
@@ -527,8 +527,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 				M.useMask(chanIsToBeRendered,r.desiredChannels,1); //force render of all desired channels
 				slotsToRender.push(s); //we need to render this slot
 				// create a new canvas of the right size and update all associated properties to reflect the fact the canvas is empty...
-				r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
-				canvasContexts[i] = r.$canvases[i] .get(0).getContext('2d'); //we're going to need the 2d context for copying image data from the offscreen canvas
+				var canv = document.createElement('canvas');
+				canv.width = offCanv.waveW*nDesiredChannels;
+				canv.height = offCanv.waveH;
+				r.$canvases[i] = canv;
+				canvasContexts[i] = canv.getContext('2d'); //we're going to need the 2d context for copying image data from the offscreen canvas
 				r.slotGeneration[i] = NaN;
 				r.slotColMap[i] = NaN;
 				r.chanXOffset[i] = [NaN,NaN,NaN,NaN];
@@ -554,8 +557,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			var $old_canvas = r.$canvases[i];
 			var oldOffsets = r.chanXOffset[i].slice(0);
 			
-			r.$canvases[i] = $("<canvas width='" + offCanv.waveW*nDesiredChannels + "' height='" + offCanv.waveH + "' />");
-			var newCtx = r.$canvases[i] .get(0).getContext('2d');
+			var canv = document.createElement('canvas');
+			canv.width = offCanv.waveW*nDesiredChannels;
+			canv.height = offCanv.waveH;
+			r.$canvases[i] = canv;
+			var newCtx = canv.getContext('2d');
 			canvasContexts[i] = newCtx; //we're going to need the 2d context for copying image data from the offscreen canvas
 			r.slotGeneration[i] = NaN;
 			r.slotColMap[i] = NaN;
@@ -563,7 +569,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			
 			//if we already have any of the desired channels rendered, we should copy them across now
 			for(var c = 0;c<chanIsToBeRendered.length;c++)if(r.desiredChannels[c] && isNum(oldOffsets[c])){
-				newCtx.drawImage($old_canvas.get(0),oldOffsets[c],0,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
+				newCtx.drawImage($old_canvas,oldOffsets[c],0,offCanv.waveW,offCanv.waveH,xOff[c],0,offCanv.waveW,offCanv.waveH);
 				r.chanXOffset[i][c] = xOff[c];
 			}
 			
@@ -591,8 +597,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		var newlyPreparedSlots = slotsToRender.concat(slotsCopyPasted);
 		while(newlyPreparedSlots.length){
 			var s = newlyPreparedSlots .pop();
-			r.$canvases[s.num].data('slot_num',s.num);
-			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
+			$(r.$canvases[s.num]).data('slot_num',s.num);
+			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, $(r.$canvases[s.num]));
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
 			r.slotColMap[s.num] = r.desiredColormap < 0? r.desiredColormap : s.group_history.slice(-1)[0];
 			r.slotGeneration[s.num] = s.generation;
