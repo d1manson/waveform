@@ -53,7 +53,7 @@ It is also possible to copy a tile's plots to the system clipboard (e.g. for pas
 **Reset preferences**
 The GUI will in general remember your preferences (i.e. bin size, smoothing, cluster painting brush size etc.).  However there may very occasionally be a problem with this, perhaps caused by an update to the code since your last visit to the page.  If you find the page hasn't loaded properly you should open up the developer tools and go to the "console" tab (press `F12` or find the option in your browser's menu).  You should then type the command `T.ResetAndRefresh()`.  This will clear your preferences and reset the page. If this still doesn't work then submit a bug report asap (see the navigation the icon on the right here on GitHub).
 
-#### Keyboard shortcuts
+**Keyboard shortcuts**
 + `k` show list of keyboard shortcuts
 + `escape` open/close the main toolbar.
 + `p` cycle palette. 
