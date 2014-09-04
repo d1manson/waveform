@@ -51,7 +51,7 @@ To grab a plot, hold down space and then click the plot. This works for tiles in
 It is also possible to copy a tile's plots to the system clipboard (e.g. for pasting into an email or note taking application). To to do this, simply press ``ctrl-c`` when one of the groups in the tile wall is "active".  Note that not all programs will correctly interpret the clipboard data - Gmail and Google Docs have been tested and seem to work.
 
 **Reset preferences**
-The GUI will in general remember your preferences (i.e. bin size, smoothing, cluster painting brush size etc.).  However there may very occasionally be a problem with this, perhaps caused by an update to the code since your last visit to the page.  If you find the page hasn't loaded properly you should open up the developer tools and go to the "console" tab (press ``F12`` or find the option in your browser's menu).  You should then type the command ``T.ResetAndRefresh()``.  This will clear your preferences and reset the page. If this still doesn't work then subit a bug via report asap (see the navigation the icon on the right here on GitHub).
+The GUI will in general remember your preferences (i.e. bin size, smoothing, cluster painting brush size etc.).  However there may very occasionally be a problem with this, perhaps caused by an update to the code since your last visit to the page.  If you find the page hasn't loaded properly you should open up the developer tools and go to the "console" tab (press ``F12`` or find the option in your browser's menu).  You should then type the command ``T.ResetAndRefresh()``.  This will clear your preferences and reset the page. If this still doesn't work then submit a bug report asap (see the navigation the icon on the right here on GitHub).
 
 #### Keyboard shortcuts
 + `k` show list of keyboard shortcuts
@@ -74,6 +74,7 @@ _Right clicking with a touchpad._ In some cases right clicking can be emulated b
 
 
 #### Change Log
+* Encapsulated some parts of the page as polymer components: tile-element and cross-hair.
 * Made drop zone a bit fancier.   
 * Added a speed histogram to the info ontop of pos, and later added a drift mode rendering.    
 * Implemented some post processing for position data together with an info pane to control some of the paramaters.
