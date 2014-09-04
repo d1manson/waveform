@@ -117,6 +117,21 @@ _Right clicking with a touchpad._ In some cases right clicking can be emulated b
 
 #### Understanding the code
 
+If you've never tried to style a `div` with CSS then you would do well to start off by Googling a basic HTML5 and CSS tutorial - if you are reluctant to do this then open the developer tools in your browser using `F12` and look through the "elements" tab to decide whether you can understand the structure of the page and its styling.
+
+If you are a proficient programmer and know a bit of HTML but no JavaScript, you should expect to find the code pretty confusing at first, but hopefully it will make sense soon enough.  Here are some **important** things to grasp before going much further:
+* [jQuery](http://en.wikipedia.org/wiki/JQuery) - this makes interaction with elements on the page easier than with "Vanillia" JavaScript.  However for an application such as this that only aims to support one (or two) modern browsers it could be considered unneccessary overhead - in some places in the code base Vanilla JavaScript is used instead of jQuery.
+* [callbacks and the asynchronous paradigm](http://recurial.com/programming/understanding-callback-functions-in-javascript/) - Everything in JavaScript begins with an event, and only one such event is being processed at any one time.  This means there is a "queue" of events that are (waiting to be) processed in a strict order.  You can add things to this queue by requesting an event after a short delay (e.g. 2ms).  Although only one piece of the JavaScript code is executing at any given time, other things can be happening, such as loading data from a file.  In many cases these "other things" will be designed to occur in the background and then trigger an event when they are completed.  This model of letting things happen in the background is described as being "asynchronous".
+* [Workers](http://www.w3schools.com/html/html5_webworkers.asp) - As decsribed in the previous point, only one thing is happening at any given time in JavaScript.  While this restriction doesn't apply to non-JavaScript things, such as the file loading example mentioned, there are several occasions when it would be nice to be able to run multiple pieces of code at the same time.  This is what Workers do.  They are entirely separate instances of JavaScript running in parallel, which are only able to communicate by sending messages to each other (these messages are delivered as events into the event cues at either end).
+* [closures](http://stackoverflow.com/questions/111102/how-do-javascript-closures-work) - this alows variables to be passed around in a way that will be unfamiliar to programmers only experinced with C/C++ and or Matlab/Fortran (actually Matlab does in support closures but they are not a well known feautre of the lanugage).
+* [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays) - these are roughly speaking like arrays in "traditional" numerical computing languages such as C or Fortran in that they are (almost certainly) implemented as contiguous blocks of memory, and are designed for storing a vector of numbers using a particular precision (e.g. 32-bit floatin point or 8bit integer).  They even permit a certain kind of pointer useage.
+* WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3)) - this enables us to harness the power of the GPU.
+* [WebComponents and Polymer](http://www.polymer-project.org/) - this is a new web technology which alows the devloper to make parts of an application far more modular and reusable than was previously possible.  All the visual and interactive aspects of a particular item on the page can be encapsualted in one place and not find themselves tampered with unexpectedly by other parts of the page.  Polymer wraps around the new web standards to make this concept even neater/easier and provides a "polyfill" for missing features (a "pollyfill" is essentially a hack that is inserted into the page to make it seem to the developer that all browsers support the latest features even if they don't quite...his hack is (usually) possible because the extra features can be written in JavaScript and left in the global "window" namespace as though they were put there by the browser.)
+* JavaScript Blobs - this isn't that important; google if you're interested.
+* V8 optimization in Chrome - the web wasn't born with JavaScript (was it?), rather it was aquired at some later point and then gradually grew in signficance.  Early JavaScript engines were not especially intelligent as there wasn't anything interesting for them to process, but over time they went through several stages of improvement.  Current engines (in particular Chromium's V8 engine) are the result of huge amounts of man hours of work. The result is that the browser will try really hard to run JavaScript as close to native speed as possible, i.e. it will take a function and try and convert it into machine code that would be very similar to the machine code emitted by a C/C++ compiler for an euqivalent function.  Because of the nature of the language it is rarely possible to get below 3-4 times the speed of "native" code, but often that will be sufficient.  There are no hard and fast rules about writing code that will make V8 "happy", but if a particular section of code is running slow there are some rules of thumb and some profiling tools that will be of interest.
+
+
+
 With the exception of `Mlib.js`, `utils.js`, and `bridged-worker.js`, all JavaScript objects are either kept in the namespace `T` or in one of the following sub-namespaces (each of which has its own appropriately named `.js` file):
 * `T.ORG` - organizes data files for multiple experiments, multiple tetrodes within the same experiment, and multiple cuts for the same tetrode. To do this it has some interaction with the [DOM](http://www.w3schools.com/htmldom/).  Many of the other modules register listeners on this module using `AddFileStatusCallback`, `AddCutChangeCallback`, and `AddCutActionCallback`.
 * `T.CUT` - is a JavaScript psuedo-class that keeps track of the starting state and history of operations performed on a cut.  Whenever the cut is changed, it triggers the callbacks registered with `T.ORG.AddCutChangeCallback` and `T.ORG.AddCutActionCallback`.
@@ -133,19 +148,7 @@ There are also a (growing) number of Polymer custom elements which encapsulate D
 * `tile-element` - each group in the tilewall gets one of these elements.  It has various methods for adjusting its visual state (e.g. make it look one way while it is being dragged and another way when it is being split etc.).  It also has a method for showing and updating the position of a cross-hair on a canvas; a method for copying its canvases; and one or two other methods.  The line between what should be contained within the tile-element and what is in ``T.Tool`` is slightly ambiguous but worth maintaing.
 *  `cross-hair` - this displays an SVG black and white dashed circle, optionally with a horizontal line either side.  All its methods relate to positioning the centre and setting the radius of the circle and extent of the horizontal lines.
 
-If you've never tried to style a `div` with CSS then you would do well to google a basic HTML5&CSS tutorial.
 
-If you are a proficient programmer and know a bit of HTML but no JavaScript, you should expect to find the code pretty confusing at first, but hopefully it will make sense soon enough.  Here are some **important** things to grasp before going much further:
-* [jQuery](http://en.wikipedia.org/wiki/JQuery)
-* [callbacks and the asynchronous paradigm] (http://recurial.com/programming/understanding-callback-functions-in-javascript/)
-* [closures](http://stackoverflow.com/questions/111102/how-do-javascript-closures-work)
-* [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays)
-* [Workers](http://www.w3schools.com/html/html5_webworkers.asp)   
-* WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3))
-* [WebComponents and Polymer](http://www.polymer-project.org/)
-* FileSystem API
-* JavaScript Blobs
-* V8 optimization in Chrome     
 
 You will also need to accept that although JavaScript is not as fast as  C/Java/Matlab/Python etc and in many ways is a horrible language, it is pretty easy to write a very interactive and responsive application using it.
 
@@ -183,18 +186,3 @@ Rendering the waves is done on a hidden canvas using WebGL, the resulting images
 **Some more info on T.Tool**   
 There is a `T.Tool.STATE` key-value map which holds each of the tools and their corresponding state objects. While a particular tool is active, `T.Tool.cState` is set to to that tool's `STATE` object.  These state objects hold details like active group number and references to relevant dom nodes.
 
-
-#### Autocut    
-**[Under active development, info may not be up to date]**  
-The implementation is only partially complete: it just uses the data from the currently viewed channel (i.e. you cannot cut on multiple channels); more importantly, it only produces clusters for a random sample of 1024*6 spikes.
-Getting this far took quite a bit of effort, but finishing off the method should be relatively easy (though will likely still take a reasonable amount of time to code).
-There are basically 5 stages, the first 3 of which have been implemented, though they require some generalisations:
-
-1. Compute full distance matrix for about 6000 waveforms, taking the sum of absolute differences along the length of the waves. [This is runs fast here as it uses the GPU, Matlab is relatively quick on the CPU but does take a resonable amount of time.]
-
-1. Build the hierarchy for the 6000 waveforms, for the distance metric use the average distance from waves in one group to waves in the other group.  To get the hierarchy, iteratively combine the two closest groups until there is only one group. [This is slow in javascript, but fast in Matlab's mex routine.]
-
-1. Partition the 6000 waveforms into groups, using the hierarchy.  This is relatively simple, we just cut the hierarchy into sections so that no group has more than a certain number of leaves.  This does mean that some groups will have only a very small number of leaves (i.e. spikes) but it generally is a major problem.
-<li>For the remaining waveforms, compute the distance matrix to the initial 6000 waves. [To do this efficiently need to sort the 6000 waves by group, and zero-pad them into blocks of 32.  Can then do partial sums on the GPU and thus transfer less data back to the CPU - the next step only needs to know the sums (or means) across groups, not the individual values in the distance matrix]
-
-1. For all waveforms, find the mean distance to each of the groups and choose the nearest group as the group for that waveform. [Once the previous step has been completed this should be pretty simple.]</li>
