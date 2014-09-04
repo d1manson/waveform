@@ -150,6 +150,7 @@ There are a few javasript files that we consider utility code rather than integr
 * `jQuery` - if you dont know what this is go back to the section entitled "notes for the uninitated"
 * `jQuery.mousewheel` - a freely available jquery plugin for mousewheel events
 * `keymaster` - a freely available module for handling keyboard events and shorcuts. Note that thre is (at least) one example where keyboard interaction is used without this (from memory the `space` key used in plto grabbing and the `ctrl` key used in copying tiles may use raw JS).
+* `webgl-debug` - this is a freely avaialble script that can be used to wrap webgl calls in order to give better error reporting.  It is not normally needed so ahs been commmented out in `index.html`, however when doing webgl development it is worth using.
 * `utils.js` - this includes a small number of (mostly) custom written utitlity functions, polyfills, and jQuery plugins. Take a look and see.
 * `Mlib.js` - contains a namespace `M` with some basic functions for doing Matlab style manipulation of arrays.  It is very basic, poorly organised and only the functions that have so far been needed have been coded, and not in a particularly generalized form.  Note also that many functions have been copied from here and simplified for use by various workers (e.g. in ratemap production).
 * `bridged-worker.js` makes it easier to use HTML5 workers - I was so pleased with this file that I gave it its own [GitHub gist](https://gist.github.com/d1manson/6714892) which was then turned into a standalone repo by someone else.   
