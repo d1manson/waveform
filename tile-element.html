@@ -392,7 +392,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			this.placeholder_ = null;
 		},
 		set moving(val){
-			//LogIt(this,'moving',val);
+			LogIt(this,'moving',val);
 			if(val){
 				//start moving...
 				if(movingTile)
@@ -437,6 +437,8 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			var oldCanvs = this.shadowRoot.getElementsByTagName('canvas');
 			for(var i = 0;i<oldCanvs.length;i++){
 				var img = document.createElement('img');
+				if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
+					continue;
 				img.setAttribute('width',oldCanvs[i].style.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
 				img.setAttribute('height',oldCanvs[i].style.height); 
 				img.src = oldCanvs[i].toDataURL();
