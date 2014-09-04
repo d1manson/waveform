@@ -33,7 +33,7 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Split a group.** Right click a group (and drag) to use the split tool.  This tool lets you specify a time and voltage threshold on which to split up a group (voltage threshold applied on a single channel).   The split is shown when you release the right mouse button, but you can right click again to adjust it. To finalise the split left click on the tilewall outside the two active tiles (or right click the tilewall to cancel the split).
 
-**Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts f/e to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift. To increment the destination group use the shorcut ``Enter`` (strictly speaking it's not actually a "shorcut" as there's no other way of doing this at the moment!).
+**Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts ``f``/``e`` to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift. To increment the destination group use the shorcut ``Enter`` (strictly speaking it's not actually a "shorcut" as there's no other way of doing this at the moment!).
 
 **Reorder the groups.** The main toolbar has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
 
@@ -46,9 +46,12 @@ Using the drift button (shortcut `d`) you can see whether there was any shift in
 
 **Info panes and plot grabbing**
 There are several floating info panes (header info, action list, shorcut list etc.) that appear when you move your cursor over the relevant button in the main toolbar.  If you right click the given button it will pin/unpin the info pane, so it will remain even when you move the cursor off the button. These info panes can be dragged around freely.    
-To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.   
-To close of a grabbed plot or info pane, hold down space again and click the floating pane.
+To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.   To close of a grabbed plot or info pane, hold down space again and click the floating pane.    
 
+It is also possible to copy a tile's plots to the system clipboard (e.g. for pasting into an email or note taking application). To to do this, simply press ``ctrl-c`` when one of the groups in the tile wall is "active".  Note that not all programs will correctly interpret the clipboard data - Gmail and Google Docs have been tested and seem to work.
+
+**Reset preferences**
+The GUI will in general remember your preferences (i.e. bin size, smoothing, cluster painting brush size etc.).  However there may very occasionally be a problem with this, perhaps caused by an update to the code since your last visit to the page.  If you find the page hasn't loaded properly you should open up the developer tools and go to the "console" tab (press ``F12`` or find the option in your browser's menu).  You should then type the command ``T.ResetAndRefresh()``.  This will clear your preferences and reset the page. If this still doesn't work then subit a bug via report asap (see the navigation the icon on the right here on GitHub).
 
 #### Keyboard shortcuts
 + `k` show list of keyboard shortcuts
@@ -66,10 +69,8 @@ To close of a grabbed plot or info pane, hold down space again and click the flo
 + `?` go to the GitHub page.
 + `a`  do autocut. 
 + `ctrl-c` copy to the system clipboard the info and plots for the group under the cursor.
-+ `ctrl+shift+q` reset everything and refresh the page (hopefully never need to do this).
 
-**Right clicking with a touchpad**
-In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
+_Right clicking with a touchpad._ In some cases right clicking can be emulated by holding the `alt` key and left-clicking.
 
 
 #### Change Log
