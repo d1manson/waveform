@@ -117,7 +117,8 @@ _Right clicking with a touchpad._ In some cases right clicking can be emulated b
 
 #### Understanding the code
 
-**Notes for the uninitated**
+**Notes for the uninitated**    
+
 If you've never tried to style a `div` with CSS then you would do well to start off by Googling a basic HTML5 and CSS tutorial - if you are reluctant to do this then open the developer tools in your browser using `F12` and look through the "elements" tab to decide whether you can understand the structure of the page and its styling.
 
 If you are a proficient programmer and know a bit of HTML but no JavaScript, you should expect to find the code pretty confusing at first, but hopefully it will make sense soon enough.  Here are some **important** things to grasp before going much further:
@@ -136,13 +137,15 @@ A couple of final notes:
 * In most browsers you can press F12 to gain access to the developer tools, which include a feature-rich debugger and interactive console, plus a way of examining the properties of elements on the page.  Note that because you have access to the command line you can easily write a simple script to modify the cut, or better still, you can add a new function to the code-base without bothering to create a proper interactive way of using it, but you will still be able to access it from the command line.
 * Oh, and if you've got this far and are still not sure whether JavaScript has anything to do with Java, let me teach you the number one JavaScript fact: JavaScript and Java having nothing in common (beyond the fact they are both programming languages that begin with the letters j-a-v-a).
 
-**Custom elements**
+**Custom elements**    
+
 There are a (growing) number of Polymer custom elements which encapsulate DOM, CSS and JS in one place. Each element exists in a separate `.html` file:    
 * `tile-element` - each group in the tilewall gets one of these elements.  It has various methods for adjusting its visual state (e.g. make it look one way while it is being dragged and another way when it is being split etc.).  It also has a method for showing and updating the position of a cross-hair on a canvas; a method for copying its canvases; and one or two other methods.  The line between what should be contained within the tile-element and what is in ``T.Tool`` is slightly ambiguous but worth maintaing.
 *  `cross-hair` - this displays an SVG black and white dashed circle, optionally with a horizontal line either side.  All its methods relate to positioning the centre and setting the radius of the circle and extent of the horizontal lines.
 * `core-` - the GUI uses a few publicly available elements such as the splitters and the buttons.  Detailed information on these elements is available at the Polymer-Project's website (but note that we use a particular snapshot of the code so documentation may possibly be out of date). 
 
-**Misc. utility code**
+**Misc. utility code**    
+
 There are a few javasript files that we consider utility code rather than integral to the application:
 * `jQuery` - if you dont know what this is go back to the section entitled "notes for the uninitated"
 * `jQuery.mousewheel` - a freely available jquery plugin for mousewheel events
@@ -151,7 +154,8 @@ There are a few javasript files that we consider utility code rather than integr
 * `Mlib.js` - contains a namespace `M` with some basic functions for doing Matlab style manipulation of arrays.  It is very basic, poorly organised and only the functions that have so far been needed have been coded, and not in a particularly generalized form.  Note also that many functions have been copied from here and simplified for use by various workers (e.g. in ratemap production).
 * `bridged-worker.js` makes it easier to use HTML5 workers - I was so pleased with this file that I gave it its own [GitHub gist](https://gist.github.com/d1manson/6714892) which was then turned into a standalone repo by someone else.   
 
-**The main modules in the application**
+**The main modules in the application**    
+
 The core of the application "lives" within a namespace `T`, each subnamespace has its own appropriately names JS file. Note that there are some slightly awwkard interdependencies meaning that the order the files are loaded in is not that flexible (see the bottom of `index.html` to see what the order is).
 * `T` - the file `main.js`  deals with the stuff in `T` itself. It is where all the miscellaneous interactive stuff is coded and everything comes together nicely...by which I mean it is a bit of a mess and if everything was really well designed there wouldn't be much need for it.
 * `T.PAR` - this module exposes a number of functions, each of which accepts a file handle to a particular type of file that it knows how to parse into a header and binary data buffer.  In addition, it also exposes some functions for getting at the data in the raw buffers, for example there is a function to get the spike times and spike amplitudes.
@@ -164,6 +168,7 @@ The core of the application "lives" within a namespace `T`, each subnamespace ha
 * `T.FS` - this module originally served a more complex purpose (it interacted with the HTML5 FileSystem APIs).  It now is a fairly simple wrapper around a single object which holds references to all the files by name.   
 
 **Subscribing to Events**      
+
 A good GUI is highly interactive and responsive, even when it is doing heavy processing or rendering, however achieving this in code can be pretty complicated.  One of the pardigms we use here is we allow bits of code to "subscribe" to "events", meaning that whenever a particular kind of event occurs a list of functions will be called and passed the data relating to the event.  There is not a great deal of standardisation, but here is a (possibly incomplete) list of the "events" that can be "subscribed" to together with a few nuggets of information about the corresponding section of the application (hopefully this will all be tidied up and nicely standardised):   
 
 ##### `FileStatusCallback`     
@@ -183,7 +188,8 @@ This event fires whenever a new plot is produced for one of the groups.  It's a 
 This event fires when we toggle between normal and "drift" mode.  It hints at being a slightly more general event, but at the moment I think that is all it does.  Several of the plotting modules subscribe to this event so they can produce new plots whenever the mode changes.
 
 
-**Rendering the waves**    
+**Rendering the waves**       
+
 Rendering the waves is done on a hidden canvas using WebGL, the resulting images are then copied to small visible canvases on the page.  When the tetrode data is first loaded, it gets copied across to the GPU so that it can be used quickly during rendering.  Every effort is made to ensure that redundant rendering is avoided (making use of the immutable cut slot structure).  When we do need to render, a special vector is created that gives the x and y offset on the offscreen canvas for each wave, plus a colormap index for the wave.  We render a line from `t` to `t+1` for every single wave simultaneously, then increment `t` and render the next line (there are 50 points on the wave so 49 lines to be drawn per channel).  The rendering is done this way as it minimises the amount of data that needs to be written to the gpu for each render, it also makes for a very simple vertex shader.
 
 
