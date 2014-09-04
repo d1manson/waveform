@@ -269,30 +269,6 @@ T.DisplayIsOnClick = function(evt,keyboard){
 }
 
 
-T.ApplyWSize = function(val){
-	var new_scale = Math.floor(val); 
-	new_scale = isNaN(new_scale)? 2 : new_scale;
-	new_scale = new_scale < 1? 1 : new_scale;
-	new_scale = new_scale > 8? 8 : new_scale;
-	T.xFactor = new_scale;
-	T.yFactor = new_scale;
-	T.ApplyCanvasSizes();
-}
-
-
-
-
-T.ApplyCanvasSizes = function(){
-
-	var i = T.tiles.length;
-	while(i--)if(T.tiles[i]){
-		var $c = T.tiles[i].$.find('canvas').eq(0);
-		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE  + 'px'});
-	}
-}
-
-
-
 //for each cut slot, these two arrays track the updates applied during calls to SetGroupDataTiles
 T.cutSlotToTileMapping = [];
 
