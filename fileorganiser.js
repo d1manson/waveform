@@ -183,7 +183,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			switch(type){
 				case 1:
-					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/\d*$/)[0]),isClu:false});
+					cutFiles.push({file:files[i],base:base,tet:parseInt(base.match(/(\d*)[a-zA-Z _]*$/)[1]),isClu:false});
 					break;
 				case 5:
 					cutFiles.push({file:files[i],base:base,tet:parseInt(ext),isClu:true});
