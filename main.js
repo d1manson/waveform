@@ -588,11 +588,6 @@ T.ApplyStoredSettingsA = function(){
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
-		
-		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
-			T.ToggleFS();//it starts life in the off state, so this turns it on 
-			
-
 	}else{
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
 	}
