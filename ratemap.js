@@ -1,7 +1,7 @@
 "use strict";
 /* TODO: better separate the two kinds of ratemap so that we can more easily reduce the work load if we ahve turned one/both off*/
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
-                CanvasUpdateCallback, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,ORG,
+                CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
 				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks){
 				
@@ -382,11 +382,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var ratemap = rdivideFloat(smoothedSpikeCounts,smoothedDwellCounts)
 			useMask(ratemap,unvisitedBins);
 
-			var im = ToImageData(ratemap);
+			var max_map = max(map);
+			var im = ToImageData(ratemap,max_map);
 			slot.cmPerBin = desiredCmPerBin;
             slot.smoothingW = desiredSmoothingW;
 			slot.posDataId = desiredPosDataId;
-			main.ShowIm(im,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
+			main.ShowIm(im,max_map,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
 		var GetGroupRatemap_Dir = function(slot){
@@ -413,14 +414,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			main.PlotDirData(ratemap.buffer, slot.num, slot.generation,IM_RATEMAP_DIR,[ratemap.buffer]);
 		}
 				
-		var ToImageData = function(map){
+		var ToImageData = function(map,max_map){
 			//we use PALETTE which is a Uint32Array, though really the underlying data is 4 bytes of RGBA
 
 			var im = new Uint32Array(map.length);
 
 			 //for binning, we want values on interval [1 P], so use eps (lazy solution):
 			var eps = 0.0000001;
-			var max_map = max(map);
 			if(max_map == 0){
 				for(var i=0;i<map.length;i++)
 					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1];
@@ -553,14 +553,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,$canvas); //send the plot back to main
 	}
 	
-	var ShowIm = function(imBuffer,slotInd,sizeXY,generation,imType){
+	var ShowIm = function(imBuffer,maxRate,slotInd,sizeXY,generation,imType){
         var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
         var ctx = $canvas.get(0).getContext('2d');
 
 		var imData = ctx.createImageData(sizeXY[0],sizeXY[1]);
 		imData.data.set(new Uint8ClampedArray(imBuffer));
 		ctx.putImageData(imData, 0, 0);
-
+		CutSlotLog(slotInd,"Max spatial rate: " + maxRate + "Hz","rate");
 		switch(imType){
 			case IM_RATEMAP:
 				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
@@ -758,7 +758,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 
 }(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
-  T.CutSlotCanvasUpdate,T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.ORG,
+  T.CutSlotCanvasUpdate, T.CutSlotLog, T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
 	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks)

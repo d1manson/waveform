@@ -331,6 +331,13 @@ T.RemoveCanvasUpdatedListener = function(foo){
 }
 
 
+T.CutSlotLog = function(slotInd,msg,m_type){
+	if(T['log' + m_type]){
+		var g = T.cutSlotToTileMapping[slotInd];
+		console.log("[Group " + g + "] " + msg)
+	}
+}
+
 T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 	//this callback recieves the newly rendered canvases from the waveform rendering and ratemap rendering modules
 	//these rendering modules recieve slot-invalidation events directly from the cut module and can choose to ignore them or
