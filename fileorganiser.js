@@ -254,7 +254,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 					
 		// if there is more than 1 cutFile we need to do the sorting based on the modified date
 		if(cutFiles.length > 1){
-			cutFiles.map(function(expCut){console.log("sorting needed for: " + expCut.cut_file);});
+			//cutFiles.map(function(expCut){console.log("sorting needed for: " + expCut.cut_file);});
 			cutFiles.map(function(expCut){expCut.date = expCut.date || FS.FileDate(expCut.cut_file);}); //if we haven't yet looked up the date then do so now
 			cutFiles.sort(function(a,b){return a.date-b.date}); //sort from newest to oldest...or maybe its the other way..?
 		}

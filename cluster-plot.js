@@ -24,7 +24,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 	var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ //this = cut object
 
 		if(!ready){
-			console.warn('cluster-plot SlotsInvalidated without any voltage data.');
+			//console.warn('cluster-plot SlotsInvalidated without any voltage data.');
 			return;
 		}
 
@@ -84,7 +84,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
         if(meanTMode)
             return;
             
-		console.time('si cluster');
+		//console.time('si cluster');
 		var imData32 = Array(ctxes.length);
 		var imData = Array(ctxes.length);
 		for(var i=0;i<ctxes.length;i++){
@@ -124,7 +124,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 				ctxes[m].fillText((chanList[c2]+1) + "A",canvS-4,canvS- 2);
 		}
         
-		console.timeEnd('si cluster');
+		//console.timeEnd('si cluster');
 	}
 
 	var ClusterPlot_MouseMove = function(e){
@@ -194,7 +194,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 		if(!N_val)	
 			return;
 
-		console.time('tet cluster');
+		//console.time('tet cluster');
 		// get a reduced precision copy of the amplitudes 
 		amps = M.clone(amps_in);
 		var factor = 256/canvS; //256 is the maximum amplitude
@@ -219,7 +219,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 				ctxes.push($newCanvas.get(0).getContext('2d'));
 			}
 		canvasesAreNew = true;
-        console.timeEnd('tet cluster');
+        //console.timeEnd('tet cluster');
         ready = true;
 
 	}
@@ -262,7 +262,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 			imData32[i] = new Uint32Array(imData[i].data.buffer);		
 		}
 
-		console.time('si cluster mean times');
+		//console.time('si cluster mean times');
 
 		for(var c1=0,m=0;c1<chanList.length-1;c1++)for(var c2 =c1+1;c2<chanList.length;c2++,m++){
 			var c1_ = chanList[c1];
@@ -307,7 +307,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 		}
         
         meanTModeIsRendered = true;
-		console.timeEnd('si cluster mean times');
+		//console.timeEnd('si cluster mean times');
 
 	}
 

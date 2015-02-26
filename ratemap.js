@@ -382,12 +382,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var ratemap = rdivideFloat(smoothedSpikeCounts,smoothedDwellCounts)
 			useMask(ratemap,unvisitedBins);
 
-			var max_map = max(map);
+			var max_map = max(ratemap);
 			var im = ToImageData(ratemap,max_map);
 			slot.cmPerBin = desiredCmPerBin;
             slot.smoothingW = desiredSmoothingW;
 			slot.posDataId = desiredPosDataId;
-			main.ShowIm(im,max_map,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
+			main.ShowIm(im,max_map*posFreq, cutInds.length/expLenInSeconds,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
 		var GetGroupRatemap_Dir = function(slot){
@@ -493,7 +493,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				for (var i=0;i<nSpks;i++)
 					PlotPoint(im,W,H,groupPosIndsXY[i*2+0],groupPosIndsXY[i*2+1],4,color)			
 			}
-			main.ShowIm(im.buffer,slot_num,[W,H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
+			main.ShowIm(im.buffer,-1,-1,slot_num,[W,H],slot_generation,IM_SPIKES_FOR_PATH,[im.buffer]);
             
 		}
 	};
@@ -553,16 +553,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,$canvas); //send the plot back to main
 	}
 	
-	var ShowIm = function(imBuffer,maxRate,slotInd,sizeXY,generation,imType){
+	var ShowIm = function(imBuffer,maxRate,meanRate,slotInd,sizeXY,generation,imType){
         var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
         var ctx = $canvas.get(0).getContext('2d');
 
 		var imData = ctx.createImageData(sizeXY[0],sizeXY[1]);
 		imData.data.set(new Uint8ClampedArray(imBuffer));
 		ctx.putImageData(imData, 0, 0);
-		CutSlotLog(slotInd,"Max spatial rate: " + maxRate + "Hz","rate");
+		
 		switch(imType){
 			case IM_RATEMAP:
+				if(maxRate > 0) 
+					CutSlotLog(slotInd,"Max spatial rate: " + Math.round(maxRate*10)/10 + "Hz. Mean rate: " + Math.round(meanRate*10)/10 + "Hz","rate");
 				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
 				break;
 			case IM_SPIKES_FOR_PATH:
@@ -738,7 +740,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                                             "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg"],
 										["ShowIm*","PlotDirData*"],[ShowIm,PlotDirData],
 										WORKER_CONSTANTS);
-	console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
+	//console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 
 
 	$binSizeSlider.on("change",function(e){SetCmPerBin(this.value,true);});

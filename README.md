@@ -74,6 +74,10 @@ The GUI will in general remember your preferences (i.e. bin size, smoothing, clu
 
 _Right clicking with a touchpad._ In some cases right clicking can be emulated by holding the `alt` key and left-clicking.
 
+**Console-only features**    
+Some stuff doesn't yet have a proper user-interface implementation, but can be accessed by pressing `F12` and going to `Console`:   
++ `T.log.rate=true` - when set to true you will see a log of the max spatial rate and mean rate as each ratemap is produced. (Note mean is just numspikes/duration.)
+
 
 #### Change Log
 * Encapsulated some parts of the page as polymer components: tile-element and cross-hair.

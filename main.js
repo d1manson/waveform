@@ -121,7 +121,7 @@ T.ShowInfoSummary = function(status,filetype){
 
 
 T.FinishedLoadingFile = function(status,filetype){
-	console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
+	//console.log("FinishedLoadingFile(" + JSON.stringify(status) + ", " + filetype + ")");
 	if(T.ORG.GetExpName())
 		T.$tilewall_text.hide();
 		
@@ -134,6 +134,7 @@ T.FinishedLoadingFile = function(status,filetype){
 			T.PlotSpeedHist(null); //TODO: check whether this is really needed here
 		}
 		if(status.cut < 3){
+			console.log("---new cut---")
 			T.ClearAllTiles();
 			T.CutActionCallback({num:0,type:"load",description:"no active cut"});
 		}
@@ -283,9 +284,9 @@ T.RemoveCanvasUpdatedListener = function(foo){
 	}
 }
 
-
+T.log = {}
 T.CutSlotLog = function(slotInd,msg,m_type){
-	if(T['log' + m_type]){
+	if(T.log[m_type]){
 		var g = T.cutSlotToTileMapping[slotInd];
 		console.log("[Group " + g + "] " + msg)
 	}
