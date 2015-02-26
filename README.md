@@ -6,7 +6,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + go to [d1manson.github.io/waveform](http://d1manson.github.io/waveform) for the latest fairly stable version
 + go to [googledrive.com/...XNVE/dev/](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/dev) for the latest (very unstable) dev version
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
-+ if you want an older "stable" version you can click the link for the dev version above and change the folder at the end of the url from ``dev`` to e.g. ``23`` to access version 23 (the version number is incremented at vaguely sensible points during development).  Alternatively look back through the full git history to find what you need.
++ if you want an older "stable" version you will need to navigate through the git history of the ``hgpages``  branch and download the version you like.  Note that unfortunately no version numbering scheme has been used so there isn't a simple way of reocgnising previous iterations.
 
 #### Screenshots
 Example view of the whole application, with a few things labeled:    
@@ -33,24 +33,29 @@ You can select to view a single channel, ratemap, or temporal autocorrelogram by
 
 **Split a group.** Right click a group (and drag) to use the split tool.  This tool lets you specify a time and voltage threshold on which to split up a group (voltage threshold applied on a single channel).   The split is shown when you release the right mouse button, but you can right click again to adjust it. To finalise the split left click on the tilewall outside the two active tiles (or right click the tilewall to cancel the split).
 
-**Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts f/e to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift. To increment the destination group use the shorcut `Enter` (strictly speaking it's not actually a "shorcut" as there's no other way of doing this at the moment!).
+**Cluster paint** The top left of the cluster panel shows the current source and destination groups for cluster painting.  There are two ways of painting a region: either use the left mouse button to select the area you do want to transfer, or use the right mouse button to select an area you don't want to transfer, i.e. transfer everything else. In both cases the region to be transfered is always shown as a transparent green overlay.  There are several ways of select the source and destination groups (use whichever is most convenient for you): (1) left click the relevant group's "sticker" at the top of the cluster panel to select it as the destiation, or right click to select it as the source; (2) click the source/destination buttons that appears when you move the cursor over a group's tile in the tilewall; (3) With your cursor over the group use the shortcuts ``f``/``e`` to select source or destination (this works for the cursor over either the group's sticker, its tile, or its coloured pixels in the cluster plots). For all of the above 3 methods you can select multiple source groups by holding down shift. To increment the destination group use the shorcut `Enter` (strictly speaking it's not actually a "shorcut" as there's no other way of doing this at the moment!).
 
 **Reorder the groups.** The main toolbar has two reordering tools: reorder by N sorts the groups by the number of waves in the group; reorder by A sorts the groups by the amplitude of the mean waveform for the group (it uses the first of the currently displayed channels).
 
-**Autocut.** There is a button in the toolbar for doing an autocut.  Currently this is not very helpful.  If you want a proper autocut, consider using [KlustaKwik](https://github.com/klusta-team/klustakwik), though you will need a set of scripts for reading in your data and preparing for KlustaKwik. At the bottom of this document is some explanation as to what this particular "bad" autocut does.
+**Autocut.** Primative autocut support has been removed from this project. It is recommended that you try using [KlustaKwik](https://github.com/klusta-team/klustakwik), to do so you will need to some kind of script to parse `tet` files and output an `n x m` plaintext table with ``n`` rows for the `n` spikes each with  `m` "dimensions".  Typically the "dimensions" will correspond to principle components or amplitude, but you are free to choose any projection of the data that gives good clustering results.  The (very simple) `.clu` files output by KlustaKwik are recognised by this GUI, so there is no need to conver to the (also very simple) `.cut` format.    
+
+If you're on Windows, you should find that you can use [this fancykk bundle](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/fancykk.zip) to take care of the PCA etc.  The zip file contains a readme that explains how to get the batch file setup to run from the windows right-click context menu.  It's not particularly well tested or fault tollerant, but it should work if everything is done correctly and there are no funny issues with the files.
 
 **Save the cut.** Drag the cut file from the file panel to your operating system's file explorer.  It will be given the standard name for a cut file.
 
 **Checking for drift**
-Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).  You can also see whether a particular cell's spatial pattern changed during the trial.
+Using the drift button (shortcut `d`) you can see whether there was any shift in the clusters during the trial.  (see image below for an example).  You can also see whether a particular cell's spatial pattern changed during the trial. 
 
 **Info panes and plot grabbing**
 There are several floating info panes (header info, action list, shorcut list etc.) that appear when you move your cursor over the relevant button in the main toolbar.  If you right click the given button it will pin/unpin the info pane, so it will remain even when you move the cursor off the button. These info panes can be dragged around freely.    
-To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.   
-To close of a grabbed plot or info pane, hold down space again and click the floating pane.
+To grab a plot, hold down space and then click the plot. This works for tiles in the tilewall, the cluster panel, and the spatial panel.   To close of a grabbed plot or info pane, hold down space again and click the floating pane.    
 
+It is also possible to copy a tile's plots to the system clipboard (e.g. for pasting into an email or note taking application). To to do this, simply press `ctrl-c` when one of the groups in the tile wall is "active".  Note that not all programs will correctly interpret the clipboard data - Gmail and Google Docs have been tested and seem to work.
 
-#### Keyboard shortcuts
+**Reset preferences**
+The GUI will in general remember your preferences (i.e. bin size, smoothing, cluster painting brush size etc.).  However there may very occasionally be a problem with this, perhaps caused by an update to the code since your last visit to the page.  If you find the page hasn't loaded properly you should open up the developer tools and go to the "console" tab (press `F12` or find the option in your browser's menu).  You should then type the command `T.ResetAndRefresh()`.  This will clear your preferences and reset the page. If this still doesn't work then submit a bug report asap (see the navigation the icon on the right here on GitHub).
+
+**Keyboard shortcuts**
 + `k` show list of keyboard shortcuts
 + `escape` open/close the main toolbar.
 + `p` cycle palette. 
@@ -66,13 +71,13 @@ To close of a grabbed plot or info pane, hold down space again and click the flo
 + `?` go to the GitHub page.
 + `a`  do autocut. 
 + `ctrl-c` copy to the system clipboard the info and plots for the group under the cursor.
-+ `ctrl+shift+q` reset everything and refresh the page (hopefully never need to do this).
 
-**Right clicking with a touchpad**
-In most cases right clicking should be emulated by holding the `alt` key and left-clicking.
+_Right clicking with a touchpad._ In some cases right clicking can be emulated by holding the `alt` key and left-clicking.
 
 
 #### Change Log
+* Encapsulated some parts of the page as polymer components: tile-element and cross-hair.
+* Removed autocut and filesystem api.
 * Made drop zone a bit fancier.   
 * Added a speed histogram to the info ontop of pos, and later added a drift mode rendering.    
 * Implemented some post processing for position data together with an info pane to control some of the paramaters.
@@ -114,67 +119,82 @@ In most cases right clicking should be emulated by holding the `alt` key and lef
 
 #### Understanding the code
 
-With the exception of `Mlib.js`, `utils.js`, and `bridged-worker.js`, all JavaScript objects are either kept in the namespace `T` or in one of the following sub-namespaces (each of which has its own appropriately named `.js` file):
-* `T.ORG` - organizes data files for multiple experiments, multiple tetrodes within the same experiment, and multiple cuts for the same tetrode. To do this it has some interaction with the [DOM](http://www.w3schools.com/htmldom/).  Many of the other modules register listeners on this module using `AddFileStatusCallback`, `AddCutChangeCallback`, and `AddCutActionCallback`.
-* `T.CUT` - is a JavaScript psuedo-class that keeps track of the starting state and history of operations performed on a cut.  Whenever the cut is changed, it triggers the callbacks registered with `T.ORG.AddCutChangeCallback` and `T.ORG.AddCutActionCallback`.
+**Notes for the uninitated**    
+
+If you've never tried to style a `div` with CSS then you would do well to start off by Googling a basic HTML5 and CSS tutorial - if you are reluctant to do this then open the developer tools in your browser using `F12` and look through the "elements" tab to decide whether you can understand the structure of the page and its styling.
+
+If you are a proficient programmer and know a bit of HTML but no JavaScript, you should expect to find the code pretty confusing at first, but hopefully it will make sense soon enough.  Here are some **important** things to grasp before going much further:
+* [jQuery](http://en.wikipedia.org/wiki/JQuery) - this makes interaction with elements on the page easier than with "Vanillia" JavaScript.  However for an application such as this that only aims to support one (or two) modern browsers it could be considered unneccessary overhead - in some places in the code base Vanilla JavaScript is used instead of jQuery.
+* [callbacks and the asynchronous paradigm](http://recurial.com/programming/understanding-callback-functions-in-javascript/) - Everything in JavaScript begins with an event, and only one such event is being processed at any one time.  This means there is a "queue" of events that are (waiting to be) processed in a strict order.  You can add things to this queue by requesting an event after a short delay (e.g. 2ms).  Although only one piece of the JavaScript code is executing at any given time, other things can be happening, such as loading data from a file.  In many cases these "other things" will be designed to occur in the background and then trigger an event when they are completed.  This model of letting things happen in the background is described as being "asynchronous".
+* [Workers](http://www.w3schools.com/html/html5_webworkers.asp) - As decsribed in the previous point, only one thing is happening at any given time in JavaScript.  While this restriction doesn't apply to non-JavaScript things, such as the file loading example mentioned, there are several occasions when it would be nice to be able to run multiple pieces of code at the same time.  This is what Workers do.  They are entirely separate instances of JavaScript running in parallel, which are only able to communicate by sending messages to each other (these messages are delivered as events into the event cues at either end).
+* [closures](http://stackoverflow.com/questions/111102/how-do-javascript-closures-work) - this alows variables to be passed around in a way that will be unfamiliar to programmers only experinced with C/C++ and or Matlab/Fortran (actually Matlab does in support closures but they are not a well known feautre of the lanugage).
+* [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays) - these are roughly speaking like arrays in "traditional" numerical computing languages such as C or Fortran in that they are (almost certainly) implemented as contiguous blocks of memory, and are designed for storing a vector of numbers using a particular precision (e.g. 32-bit floatin point or 8bit integer).  They even permit a certain kind of pointer useage.
+* WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3)) - this enables us to harness the power of the GPU.
+* [WebComponents and Polymer](http://www.polymer-project.org/) - this is a new web technology which alows the devloper to make parts of an application far more modular and reusable than was previously possible.  All the visual and interactive aspects of a particular item on the page can be encapsualted in one place and not find themselves tampered with unexpectedly by other parts of the page.  Polymer wraps around the new web standards to make this concept even neater/easier and provides a "polyfill" for missing features (a "pollyfill" is essentially a hack that is inserted into the page to make it seem to the developer that all browsers support the latest features even if they don't quite...his hack is (usually) possible because the extra features can be written in JavaScript and left in the global "window" namespace as though they were put there by the browser.)
+* JavaScript Blobs - this isn't that important; google if you're interested.
+* V8 optimization in Chrome - the web wasn't born with JavaScript (was it?), rather it was aquired at some later point and then gradually grew in signficance.  Early JavaScript engines were not especially intelligent as there wasn't anything interesting for them to process, but over time they went through several stages of improvement.  Current engines (in particular Chromium's V8 engine) are the result of huge amounts of man hours of work. The result is that the browser will try really hard to run JavaScript as close to native speed as possible, i.e. it will take a function and try and convert it into machine code that would be very similar to the machine code emitted by a C/C++ compiler for an euqivalent function.  Because of the nature of the language it is rarely possible to get below 3-4 times the speed of "native" code, but often that will be sufficient.  There are no hard and fast rules about writing code that will make V8 "happy", but if a particular section of code is running slow there are some rules of thumb and some profiling tools that will be of interest.
+
+A couple of final notes:
+* You will also need to accept that although JavaScript is not as fast as  C/Java/Matlab/Python etc and in many ways is a horrible language, it is pretty easy to write a very interactive and responsive application using it.
+* In most browsers you can press F12 to gain access to the developer tools, which include a feature-rich debugger and interactive console, plus a way of examining the properties of elements on the page.  Note that because you have access to the command line you can easily write a simple script to modify the cut, or better still, you can add a new function to the code-base without bothering to create a proper interactive way of using it, but you will still be able to access it from the command line.
+* Oh, and if you've got this far and are still not sure whether JavaScript has anything to do with Java, let me teach you the number one JavaScript fact: JavaScript and Java having nothing in common (beyond the fact they are both programming languages that begin with the letters j-a-v-a).
+
+**Custom elements**    
+
+There are a (growing) number of Polymer custom elements which encapsulate DOM, CSS and JS in one place. Each element exists in a separate `.html` file:    
+* `tile-element` - each group in the tilewall gets one of these elements.  It has various methods for adjusting its visual state (e.g. make it look one way while it is being dragged and another way when it is being split etc.).  It also has a method for showing and updating the position of a cross-hair on a canvas; a method for copying its canvases; and one or two other methods.  The line between what should be contained within the tile-element and what is in ``T.Tool`` is slightly ambiguous but worth maintaing.
+*  `cross-hair` - this displays an SVG black and white dashed circle, optionally with a horizontal line either side.  All its methods relate to positioning the centre and setting the radius of the circle and extent of the horizontal lines.
+* `core-` - the GUI uses a few publicly available elements such as the splitters and the buttons.  Detailed information on these elements is available at the Polymer-Project's website (but note that we use a particular snapshot of the code so documentation may possibly be out of date). 
+
+**Misc. utility code**    
+
+There are a few javasript files that we consider utility code rather than integral to the application:
+* `jQuery` - if you dont know what this is go back to the section entitled "notes for the uninitated"
+* `jQuery.mousewheel` - a freely available jquery plugin for mousewheel events
+* `keymaster` - a freely available module for handling keyboard events and shorcuts. Note that thre is (at least) one example where keyboard interaction is used without this (from memory the `space` key used in plto grabbing and the `ctrl` key used in copying tiles may use raw JS).
+* `webgl-debug` - this is a freely avaialble script that can be used to wrap webgl calls in order to give better error reporting.  It is not normally needed so ahs been commmented out in `index.html`, however when doing webgl development it is worth using.
+* `utils.js` - this includes a small number of (mostly) custom written utitlity functions, polyfills, and jQuery plugins. Take a look and see.
+* `Mlib.js` - contains a namespace `M` with some basic functions for doing Matlab style manipulation of arrays.  It is very basic, poorly organised and only the functions that have so far been needed have been coded, and not in a particularly generalized form.  Note also that many functions have been copied from here and simplified for use by various workers (e.g. in ratemap production).
+* `bridged-worker.js` makes it easier to use HTML5 workers - I was so pleased with this file that I gave it its own [GitHub gist](https://gist.github.com/d1manson/6714892) which was then turned into a standalone repo by someone else.   
+
+**The main modules in the application**    
+
+The core of the application "lives" within a namespace `T`, each subnamespace has its own appropriately names JS file. Note that there are some slightly awwkard interdependencies meaning that the order the files are loaded in is not that flexible (see the bottom of `index.html` to see what the order is).
+* `T` - the file `main.js`  deals with the stuff in `T` itself. It is where all the miscellaneous interactive stuff is coded and everything comes together nicely...by which I mean it is a bit of a mess and if everything was really well designed there wouldn't be much need for it.
 * `T.PAR` - this module exposes a number of functions, each of which accepts a file handle to a particular type of file that it knows how to parse into a header and binary data buffer.  In addition, it also exposes some functions for getting at the data in the raw buffers, for example there is a function to get the spike times and spike amplitudes.
-* `T.Tool` - this module has heavy DOM interactions, specifically with tiles in the tilewall.  It essentially exposes an interactive way of calling the modification functions for the current cut instance.
+* `T.CUT` - This exposes a (pseudo)class that represnts a cut.  The class exposes methods for doing various kinds of manipulaiotion such as swapping, splitting and merging groups.  It stores a history of such actions, which can be reverse using the undo method.  Cut instances can be constructed in a variety of different ways (e.g. you can have an all-zero cut of length N, or load from a list of lists of cutindices etc.).
+* `T.Tool` - this module has heavy interactions with `tile-element`s and the cluster plots and some other bits and bobs. It essentially exposes an interactive way of calling the modification functions for the current cut instance. There is a `T.Tool.STATE` key-value map which holds each of the tools and their corresponding state objects. While a particular tool is active, `T.Tool.cState` is set to to that tool's `STATE` object.  These state objects hold details like active group number and references to relevant dom nodes.
 * `T.WV` - this module uses [WebGL](https://developer.mozilla.org/en-US/docs/Web/WebGL) to render waveforms.  It is complicated and messy.
 * `T.RM` - this module produces ratemaps.
 * `T.TC` - this module produces temporal autocorellograms.
+* `T.EEG` - this module is not ready for use yet, but contains some semi-functional code for dealing with EEG data.
 * `T.CP` - this module produces cluster plots.
-* `T.AC` - this module performs an autocut, the first stage of which uses `T.DM`.
-* `T.DM` - this uses WebGL to produce a distance matrix.    
-* `T.FS` - this module simplifies the process of using the HTML5 FileSystem APIs, which are currently only available in Chrome.  If the user chooses not to turn on the FileSystem this module will act identically, but behind the scenes everything will be much simpler. (Note that turning on the FileSystem is really only of interest for developers working on the application as they may be refreshing the page a lot.)
+* `T.FS` - this module originally served a more complex purpose (it interacted with the HTML5 FileSystem APIs).  It now is a fairly simple wrapper around a single object which holds references to all the files by name.   
 
-The file `Mlib.js`, contains a namespace `M` with some basic functions for doing Matlab style manipulation of arrays.  It is very basic, only the functions that have so far been needed have been coded, and not in a particularly generalized form.  The file, `utils.js`, adds a handful of functions to the global namespace.  Perhaps the most important file is `main.js`; roughly speaking, this is where all the miscellaneous interactive stuff is coded and everything comes together nicely. The file `bridged-worker.js` makes it easier to use HTML5 workers - I was so pleased with this file that I gave it its own [GitHub gist](https://gist.github.com/d1manson/6714892).
+**Subscribing to Events**      
 
-If you've never tried to style a `div` with CSS then you would do well to google a basic HTML5&CSS tutorial.
+A good GUI is highly interactive and responsive, even when it is doing heavy processing or rendering, however achieving this in code can be pretty complicated.  One of the pardigms we use here is we allow bits of code to "subscribe" to "events", meaning that whenever a particular kind of event occurs a list of functions will be called and passed the data relating to the event.  There is not a great deal of standardisation, but here is a (possibly incomplete) list of the "events" that can be "subscribed" to together with a few nuggets of information about the corresponding section of the application (hopefully this will all be tidied up and nicely standardised):   
 
-If you are a proficient programmer and know a bit of HTML but no JavaScript, you should expect to find the code pretty confusing at first, but hopefully it will make sense soon enough.  Here are some **important** things to grasp before going much further:
-* [jQuery](http://en.wikipedia.org/wiki/JQuery)
-* [callbacks and the asynchronous paradigm] (http://recurial.com/programming/understanding-callback-functions-in-javascript/)
-* [closures](http://stackoverflow.com/questions/111102/how-do-javascript-closures-work)
-* [TypedArrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays)
-* [Workers](http://www.w3schools.com/html/html5_webworkers.asp)   
-* WebGL. ([Nice diagram](https://www.ssugames.org/pluginfile.php/1401/mod_resource/content/1/08-alpha/index.html#slide-3))
-* [WebComponents and Polymer](http://www.polymer-project.org/)
-* FileSystem API
-* JavaScript Blobs
-* V8 optimization in Chrome     
-
-You will also need to accept that although JavaScript is not as fast as  C/Java/Matlab/Python etc and in many ways is a horrible language, it is pretty easy to write a very interactive and responsive application using it.
-
-In most browsers you can press F12 to gain access to the developer tools, which include a feature-rich debugger and interactive console, plus a way of examining the properties of elements on the page.  Note that because you have access to the command line you can easily write a simple script to modify the cut, or better still, you can add a new function to the code-base without bothering to create a proper interactive way of using it, but you will still be able to access it from the command line.
-
-
-Oh, and if you've got this far and are still not sure whether JavaScript has anything to do with Java, let me teach you the number one JavaScript fact: JavaScript and Java having nothing in common (beyond the fact they are both programming languages that begin with the letters j-a-v-a).
-
-#### A bit more detail about data structures
-A good GUI is highly interactive and responsive, even when it is doing heavy processing or rendering, however achieving this in code can be pretty complicated.  Here we explain a couple of steps that have been taken to ensure the GUI is responsive:
-* Whenever we switch experiment, tetrode or cut, the `T.ORG` module loads only the minimal number of new files.  It uses `T.PAR` to load and parse the files (which is done with a worker on another thread). As the files become available the callbacks registered with `AddFileStatusCallback` are informed. These callbacks recieve a `status` object with one field for each of the filetypes (`pos`,`set`,`tet`, and `cut`) and a `filetype` string to say which file has just been loaded (or `null` if this is a "heads-up" occurring at the start of a load).  The four `status` fields store an integer with the following meanings:
+##### `FileStatusCallback`     
+Whenever we switch experiment, tetrode or cut, the `T.ORG` module loads only the minimal number of new files.  It uses `T.PAR` to load and parse the files (which is done with a worker on another thread). As the files become available the callbacks registered with `AddFileStatusCallback` are informed. These callbacks recieve a `status` object with one field for each of the filetypes (`pos`,`set`,`tet`, and `cut`) and a `filetype` string to say which file has just been loaded (or `null` if this is a "heads-up" occurring at the start of a load).  The four `status` fields store an integer with the following meanings:
   * 0 - file does not exist
   * 1 - file exists but has not been announced yet
   * 2 - this is the file currently being announced
   * 3 - file has already been announced
-* One of the main features of the GUI is its ability to modify cut groups.  This should be a fluid process with no major delays or unresponsiveness. In order to achieve this, the `CUT` class keeps a list of immutable `cutInds` arrays.  Whenever one of these cutInds arrays needs to be modified, we create a new immutable and remove the old one.  Each immutable has a history of cut groups associated to it.  This makes it easy for the waveform rendering module (and other modules) to avoid doing unnecessary work.  A slight detail in the way the immutables are implemented is that they each occupy a "slot" in an array of slots.  When immutables are deleted and created, slots get reused (this prevents the array of immutables from growing too large).  Thus in order to distinguish between all the immutables that occupy a given slot over time, we have an extra property, which is the `generation` of the immutable in the slot. 
-* Rendering the waves is done on a hidden canvas using WebGL, the resulting images are then copied to small visible canvases on the page.  When the tetrode data is first loaded, it gets copied across to the GPU so that it can be used quickly during rendering.  Every effort is made to ensure that redundant rendering is avoided (making use of the immutable cut slot structure).  When we do need to render, a special vector is created that gives the x and y offset on the offscreen canvas for each wave, plus a colormap index for the wave.  We render a line from `t` to `t+1` for every single wave simultaneously, then increment `t` and render the next line (there are 50 points on the wave so 49 lines to be drawn per channel).  The rendering is done this way as it minimises the amount of data that needs to be written to the gpu for each render, it also makes for a very simple vertex shader.
 
-**Some more info on T.Tool**   
-There is a `T.Tool.STATE` key-value map which holds each of the tools and their corresponding state objects. While a particular tool is active, `T.Tool.cState` is set to to that tool's `STATE` object.  These state objects hold details like active group number and references to relevant dom nodes.
+##### `CutChangeCallback` and `CutActionCallback`    
+One of the main features of the GUI is its ability to modify cut groups.  Whenever a change is made both the `CutChangeCallback` and `CutActionCallback` "events" fire, there is supposed to be a slight difference between these two events (for more details see the comments at the top of `cut.js`). Modifying cuts should be a fluid process with no major delays or unresponsiveness. In order to achieve this, the `CUT` class keeps a list of immutable `cutInds` arrays.  Whenever one of these cutInds arrays needs to be modified, we create a new immutable and remove the old one.  Each immutable has a history of cut groups associated to it.  This makes it easy for the waveform rendering module (and other modules) to avoid doing unnecessary work.  A slight detail in the way the immutables are implemented is that they each occupy a "slot" in an array of slots.  When immutables are deleted and created, slots get reused (this prevents the array of immutables from growing too large).  Thus in order to distinguish between all the immutables that occupy a given slot over time, we have an extra property, which is the `generation` of the immutable in the slot. 
+
+##### `canvasUpdatedListeners`    
+This event fires whenever a new plot is produced for one of the groups.  It's a while since I've looked at this, but I think its only purpose is for telling the splitting tool when the new tile has been populated.  A more important thing to note is the way `T.CutSlotCanvasUpdate` operates as the "delivery" point for plots that are produced by the different modules (temporal autocorr, ratemap, waves).  The creation of these plots is triggered by the loading of the relevant files and by changes in the cut, i.e. it's not the case that some central part of the program requests a list of particular plots and then waits to have them produced.
+
+##### `modeChangeCallbacks`    
+This event fires when we toggle between normal and "drift" mode.  It hints at being a slightly more general event, but at the moment I think that is all it does.  Several of the plotting modules subscribe to this event so they can produce new plots whenever the mode changes.
 
 
-#### Autocut    
-**[Under active development, info may not be up to date]**  
-The implementation is only partially complete: it just uses the data from the currently viewed channel (i.e. you cannot cut on multiple channels); more importantly, it only produces clusters for a random sample of 1024*6 spikes.
-Getting this far took quite a bit of effort, but finishing off the method should be relatively easy (though will likely still take a reasonable amount of time to code).
-There are basically 5 stages, the first 3 of which have been implemented, though they require some generalisations:
+**Rendering the waves**       
 
-1. Compute full distance matrix for about 6000 waveforms, taking the sum of absolute differences along the length of the waves. [This is runs fast here as it uses the GPU, Matlab is relatively quick on the CPU but does take a resonable amount of time.]
+Rendering the waves is done on a hidden canvas using WebGL, the resulting images are then copied to small visible canvases on the page.  When the tetrode data is first loaded, it gets copied across to the GPU so that it can be used quickly during rendering.  Every effort is made to ensure that redundant rendering is avoided (making use of the immutable cut slot structure).  When we do need to render, a special vector is created that gives the x and y offset on the offscreen canvas for each wave, plus a colormap index for the wave.  We render a line from `t` to `t+1` for every single wave simultaneously, then increment `t` and render the next line (there are 50 points on the wave so 49 lines to be drawn per channel).  The rendering is done this way as it minimises the amount of data that needs to be written to the gpu for each render, it also makes for a very simple vertex shader.
 
-1. Build the hierarchy for the 6000 waveforms, for the distance metric use the average distance from waves in one group to waves in the other group.  To get the hierarchy, iteratively combine the two closest groups until there is only one group. [This is slow in javascript, but fast in Matlab's mex routine.]
 
-1. Partition the 6000 waveforms into groups, using the hierarchy.  This is relatively simple, we just cut the hierarchy into sections so that no group has more than a certain number of leaves.  This does mean that some groups will have only a very small number of leaves (i.e. spikes) but it generally is a major problem.
-<li>For the remaining waveforms, compute the distance matrix to the initial 6000 waves. [To do this efficiently need to sort the 6000 waves by group, and zero-pad them into blocks of 32.  Can then do partial sums on the GPU and thus transfer less data back to the CPU - the next step only needs to know the sums (or means) across groups, not the individual values in the distance matrix]
 
-1. For all waveforms, find the mean distance to each of the groups and choose the nearest group as the group for that waveform. [Once the previous step has been completed this should be pretty simple.]</li>

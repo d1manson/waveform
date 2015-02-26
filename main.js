@@ -15,7 +15,7 @@ T.CANVAS_NUM_RM_DIR = 2;
 T.CANVAS_NUM_TC = 3;
 T.POS_PLOT_WIDTH = 255;
 T.POS_PLOT_HEIGHT = 255;
-T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4], TC: 5}; //order in DOM
+T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4,5], TC: 6}; //order in DOM
 
 T.xFactor = 2;
 T.yFactor = 2;
@@ -26,29 +26,6 @@ T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here
 T.floatingTopZ = 100;
 
 T.modeChangeCallbacks = [];
-T.$newTile = $("<div class='tile grabbable'>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" + 
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>" +
-			"<div class='tile-sticker'></div>" + 
-			"<div class='tile-over hidden_grabbed'>" +
-				"<div class='tile-buttons' layout vertical>" +
-					"<core-tooltip label='swap with... [s]' position='left'>" +
-						"<button class='tile-button-swap'></button>" +
-					"</core-tooltip>" +
-					"<core-tooltip label='make destination group [e]' position='left'>" +
-						"<button class='tile-button-dest'></button>" +
-					"</core-tooltip>" +
-					"<core-tooltip label='make source group [f]' position='left'>" +
-						"<button class='tile-button-src'></button>" +
-					"</core-tooltip>" +
-					"<div class='tile-caption'></div>" + 
-				"</div>" + 
-			"</div>" +
-			"<div class='blind'></div>" + 
-			"</div>");		//this gets cloned and appended to $tilewall
-
 
 
 
@@ -211,7 +188,7 @@ T.DispHeaders = function(status,filetype,forced){
 
 T.SetDisplayIsOn = function(v){ 
 
-	//there are currently 6 buttons: the first 4 are channels, then 1 for ratemap and 1 for temporal autocorr
+	//there are currently 7 buttons: the first 4 are channels, then 2 for ratemap and 1 for temporal autocorr
 	//this function will 
 	if('chanIsOn' in v){
 		T.chanIsOn = v.chanIsOn; //array of 4
@@ -221,7 +198,7 @@ T.SetDisplayIsOn = function(v){
 	}
 
 	if('mapIsOn' in v){
-		T.mapIsOn = v.mapIsOn; //array of 1
+		T.mapIsOn = v.mapIsOn; //array of 2
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
 			T.mapIsOn[i] ? T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).removeAttr('checked');
 		T.RM.SetShow(T.mapIsOn);
@@ -292,30 +269,6 @@ T.DisplayIsOnClick = function(evt,keyboard){
 }
 
 
-T.ApplyWSize = function(val){
-	var new_scale = Math.floor(val); 
-	new_scale = isNaN(new_scale)? 2 : new_scale;
-	new_scale = new_scale < 1? 1 : new_scale;
-	new_scale = new_scale > 8? 8 : new_scale;
-	T.xFactor = new_scale;
-	T.yFactor = new_scale;
-	T.ApplyCanvasSizes();
-}
-
-
-
-
-T.ApplyCanvasSizes = function(){
-
-	var i = T.tiles.length;
-	while(i--)if(T.tiles[i]){
-		var $c = T.tiles[i].$.find('canvas').eq(0);
-		$c.css({width: $c.get(0).width * T.xFactor*T.SPECIAL_SCALING  + 'px',height: $c.get(0).height * T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE  + 'px'});
-	}
-}
-
-
-
 //for each cut slot, these two arrays track the updates applied during calls to SetGroupDataTiles
 T.cutSlotToTileMapping = [];
 
@@ -374,21 +327,17 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
     }else
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 
-	t.$.find('canvas').eq(canvasNum).replaceWith($canvas); 
+	t.updateCanvas($canvas.get(0),canvasNum);
 
 	for(var i=0;i<T.canvasUpdatedListeners.length;i++)
 		T.canvasUpdatedListeners[i](canvasNum,$canvas,g);
 }
 
 T.CreateTile = function(i){
-	var $ = T.$newTile.clone();
-
-	$.data("group_num",i);
-	return {$: $,
-			$caption: $.find('.tile-caption'),
-			$sticker: $.find('.tile-sticker')
-			}
-
+	var el = document.createElement('tile-element');
+	el.classList.add('grabbable');
+	el.group_num=i;
+	return el;
 }
 
 T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
@@ -399,8 +348,8 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
-		T.$tilewall.append(t.$);
-		t.$.hide();
+		T.$tilewall.append(t);
+		$(t).hide();
 		T.tiles.push(t);
 	}
 
@@ -412,7 +361,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 			var old_tile_ind = T.cutSlotToTileMapping[k];
 			if(isNum(old_tile_ind)){
 				//hide the tile if one was associated to the slot
-				T.tiles[old_tile_ind].$.hide(); 
+				$(T.tiles[old_tile_ind]).hide(); 
 				T.cutSlotToTileMapping[k] = null;
 			}
 			invalidatedSlots[k] = 0; //by getting rid of any existing tile for the slot we have just validated this slot
@@ -434,36 +383,37 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 				//source group has not yet been displaced, need to create a placeholder
 				movingTile = T.tiles[old_tile_ind];
 				var oldTilePlaceholder = T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
-				movingTile.$.before(oldTilePlaceholder.$); //add the placeholder 
-				oldTilePlaceholder.$.hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
+				$(movingTile).before($(oldTilePlaceholder)); //add the placeholder 
+				$(oldTilePlaceholder).hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
 			}else{
 				//source group has already been displaced
 				movingTile = displaced_tiles[old_tile_ind];
 			}
-			T.tiles[new_tile_ind].$.replaceWith(movingTile.$); // make the move 
+			$(T.tiles[new_tile_ind]).replaceWith($(movingTile)); // make the move 
 			T.tiles[new_tile_ind] = movingTile; 
 
 		} //else: an immutable has been put in a slot, where previously there wasn't one (don't need to do anything special)
 
-		T.tiles[new_tile_ind].$.show()
-							   .toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
-							  .data("group_num",new_tile_ind)
-		T.tiles[new_tile_ind].$caption.text(slot_k.inds.length);
-		T.tiles[new_tile_ind].$sticker.css({backgroundColor: T.PALETTE_FLAG_CSS[new_tile_ind],
-											color: T.PALETTE_FLAG_CSS_TEXT[new_tile_ind]})
-									  .text(new_tile_ind);
+		var t_new = T.tiles[new_tile_ind];
+		t_new.group_num = new_tile_ind;
+		$(t_new).show()
+				.toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
+		t_new.group_caption = slot_k.inds.length;
+		t_new.group_color_1 = T.PALETTE_FLAG_CSS[new_tile_ind];
+		t_new.group_color_2 = T.PALETTE_FLAG_CSS_TEXT[new_tile_ind];
+
 		T.cutSlotToTileMapping[k] = new_tile_ind;
 	}
 
 
 	while(T.tiles.length-1 > maxGroupNum) // if there are too many tiles, delete some (-1 becuase of group 0)
-		T.tiles.pop().$.remove();
+		$(T.tiles.pop()).remove();
 
 }
 
 T.ClearAllTiles = function(){
 	while(T.tiles.length)
-		T.tiles.pop().$.remove();
+		$(T.tiles.pop()).remove();
 	T.cutSlotToTileMapping = [];
 }
 
@@ -476,7 +426,6 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 	window.onbeforeunload = "";
 	localStorage.clear();
 	location.reload();
-	//todo: I don't know if you can clear the filesystem here because it is async and we want to reload the page.
 }
 
 T.ShowGitHub = function(){
@@ -508,46 +457,6 @@ T.TogglePalette = function(val){
 
 
 
-T.RunAutocut = function(){
-    T.$autocut_info.attr("state","closed"); //TODO: rename the attribute as closed actually means it's visible
-	var chan = -1;
-	for(var i=0;i<4;i++)
-		if(T.chanIsOn[i])
-			if(chan == -1)
-				chan = i;
-			else{
-				alert("Currently you can only autocut on a single channel. Using channel " + (chan+1) + ".");
-				break;
-			}
-	if(chan == -1){
-		alert("Currently you can only autocut on a single channel. Using channel 1.");
-		chan = 0;
-	}
-	T.AC.DoAutoCut(chan+1,T.ORG.GetN(),T.ORG.GetTetBuffer(),T.AutocutFinished);
-}
-
-T.AutocutFinished = function(cut,chan,tree){
-	T.ORG.SwitchToCut(3,cut);// TODO: send {description: 'autocut subsample on channel-' + chan};
-
-	tree.OnNode('mouseenter',function(evt,ind){
-		console.log(ind + ": mouseenter");
-	});
-	tree.OnNode('mouseleave',function(evt,ind){
-		console.log(ind + ": mouseleave");
-	});	
-}
-
-T.ToggleFS = function(newState){
-	if(T.FS.IsActive()){
-		//deactivate
-		T.$FSbutton.text("turn on FileAPIs");
-		T.FS.Toggle(false,T.ShowFileSystemLoaded);
-	}else{
-		//activate
-		T.$FSbutton.text("turn off FileAPIs");
-		T.FS.Toggle(true,T.ShowFileSystemLoaded);
-	}
-}
 
 
 T.CutActionCallback = function(info){
@@ -635,15 +544,6 @@ T.ReorderACut = function(amps){
 	T.ORG.GetCut().ReorderAll(inds);
 }
 
-T.ShowFileSystemLoaded = function(file_names){
-	if(!file_names || file_names.length == 0){
-		$('#filestem_caption').html("No files available.");
-		T.$filesystem_load_button.hide();
-	}else{
-		$('#filestem_caption').html("Found " + file_names.length + " existing files.<BR>" + file_names.join("<BR>")); //TODO: using html here with filenames is potentially a bug
-		T.$filesystem_load_button.show();
-	}
-}
 
 T.FilterHeader = function(){
 	T.DispHeaders(T.ORG.GetState());
@@ -668,7 +568,6 @@ T.StoreData = function(){
 	localStorage.xFactor = T.xFactor;
 	localStorage.yFactor = T.yFactor;
     
-	localStorage.FSactive = T.FS.IsActive();
 	localStorage.BIN_SIZE_CM = T.RM.GetCmPerBin();
     localStorage.rmSmoothingW = T.RM.GetSmoothingW();
 	localStorage.tcDeltaT = T.TC.GetDeltaT();
@@ -696,11 +595,6 @@ T.ApplyStoredSettingsA = function(){
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
-		
-		if(parseInt(localStorage.FSactive) || localStorage.FSactive=="true") 
-			T.ToggleFS();//it starts life in the off state, so this turns it on 
-			
-
 	}else{
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
 	}
@@ -748,9 +642,9 @@ T.SetGroupOver = function(g){
     g = parseInt(g);//when coming via data-group attr it might be a string
 	if(g == T.groupOver.g)
 		return;
-
+	
 	if(T.groupOver.$tile)
-		T.groupOver.$tile.removeAttr('active');
+		T.groupOver.$tile.active = false;
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.removeAttr('active');
 	
@@ -764,13 +658,13 @@ T.SetGroupOver = function(g){
 	
 	T.$info_summary.css({opacity: 0});
 	T.groupOver.$clusterSticker = T.$cluster_info.find('.cluster-sticker[data-group=' + g + ']');
-	T.groupOver.$tile = T.tiles[g] ? T.tiles[g].$ : null;
+	T.groupOver.$tile = T.tiles[g] ? T.tiles[g] : null;
 	
     T.RM.RenderSpikesForPath(g);
 	if(T.groupOver.$clusterSticker)
 		T.groupOver.$clusterSticker.attr('active',true);
 	if(T.groupOver.$tile)
-		T.groupOver.$tile.attr('active',true);
+		T.groupOver.$tile.active = true;
 		
 }
 
@@ -849,20 +743,15 @@ T.ToggleToolbar = function(){
 				.slideToggle({duration: 400, queue:false});
 }
 
-T.MakeCopyData = function(){
-	//WARNING: no escaping of text here
-	var str = "[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet();
-	if (T.groupOver.g >0 || T.groupOver.g == 0){
-		str += "c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>"; 
-		str += T.groupOver.$tile.find('canvas').get().map(CanvToImgStr).join("");
-	}
-	return str;
-}
-
 T.Copy = function(e){
     // based on: http://stackoverflow.com/a/11347714/2399799    
     if (e.ctrlKey && !e.altKey && !e.shiftKey && e.which == 67 /* KEY_C */) {
-        T.$hidden_clipboard.html(T.MakeCopyData());
+        T.$hidden_clipboard.html('');
+		T.$hidden_clipboard.append("[" + T.ORG.GetExpName() + "] t" + T.ORG.GetTet());
+		if  (T.groupOver.g >0 || T.groupOver.g == 0){
+			T.$hidden_clipboard.append("c" + T.groupOver.g +  "  n=" + T.ORG.GetCut().GetGroup(T.groupOver.g).length + "<br>");
+			T.$hidden_clipboard.append($(T.tiles[T.groupOver.g].getCopyOfCanvs(false)).children());
+		}
         var rng = document.createRange();
         var sel = window.getSelection();
         sel.removeAllRanges();
@@ -876,7 +765,6 @@ T.Copy = function(e){
 T.InitKeyboardShorcuts = function(){
 	// KEYBOARD SHORTCUTS from keymaster  (github.com/madrobby/keymaster)
 	key('p',T.TogglePalette);
-	key('a',T.RunAutocut);
 	key('esc',T.ToggleToolbar);
 	key('1, shift+1',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[0],shiftKey:key.shift});});
 	key('2, shift+2',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[1],shiftKey:key.shift});});
@@ -884,10 +772,10 @@ T.InitKeyboardShorcuts = function(){
 	key('4, shift+4',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.CHAN[3],shiftKey:key.shift});});
 	key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
+	key('c, shift+c',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[1],shiftKey:key.shift});});
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
 	key('k, alt+k',T.Toggle('shortcut_info'));
-	key('alt+a',T.Toggle('autocut_info'));
 	key('ctrl+z, z',T.UndoLastAction);
 	key('alt+r',T.Toggle('rm_info'));
 	key('/',T.ShowGitHub);
@@ -896,7 +784,7 @@ T.InitKeyboardShorcuts = function(){
 	key('alt+d',T.Toggle('drift_info'));
 	key('alt+t',T.Toggle('tc_info'));
 	key('alt+z',T.Toggle('action_info'));
-	key('ctrl+shift+q',T.ResetAndRefresh); //this shortcut is the only way of calling this function
+	key('alt+c',T.Toggle('dir_info'));
 	key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
 	key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
 	key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
@@ -914,13 +802,11 @@ T.InitButtons = function(){
 	T.$displayButtons.each(function(i){$(this).data('domindex',i);})
 											.click(T.DisplayIsOnClick);
 	$('#toggle_palette').click(T.TogglePalette);
-	$('#autocut').click(T.RunAutocut);
 	$('#apply_rm_size').click(T.ApplyRmSizeClick);
 	T.$header_search.on(T.$header_search.get(0).onsearch === undefined ? "input" : "search",T.FilterHeader);
 	$('#file_headers_button').on('mouseenter',T.DispHeadersForced);
 	$('.github_button').on('click',T.ShowGitHub);
 	$('.menu_toggle').mouseup(T.ToggleToolbar);
-	T.$filesystem_load_button.click(T.ORG.RecoverFilesFromStorage);
 	$('#drift_button').click(T.DriftButtonClick);
 }
 
@@ -935,7 +821,6 @@ T.$actionList = $('.action_list');
 T.$drop_zone = $('.file_drop');			
 T.$tilewall_text = $('.tilewall_text');	 			 
 T.$info_panel = $('#info_panel');
-T.$autocut_info = $('.autocut_info');
 T.$cluster_panel = $('#cluster_panel');
 T.$side_panel = $('.side_panel');
 T.$cluster_info = $('.cluster_info');
@@ -943,11 +828,9 @@ T.$painter_dest = $('#painter-dest');
 T.$painter_src = $('#painter-src');
 T.$cluster_others = $('.cluster_others');
 T.$undo = $('#undo_button');
-T.$FSbutton = $('#filesystem_button');
 T.$files_panel = $('#files_panel');
 T.$displayButtons = $(".display_button");
 T.$file_info = [$('#tet_info'),$('#cut_info'),$('#pos_info'),$('#eeg_info'),$('#set_info')];
-T.$filesystem_load_button = $('#filesystem_load_button');
 T.$header_search = $('#header_search');
 T.$file_info_pane = $('.file_info');
 T.$info_summary = $('.info_summary');
@@ -961,8 +844,6 @@ $('.floating_layer').on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 
-if(!(window.requestFileSystem || window.webkitRequestFileSystem))
-	$('#filesystem_button').hide();
 
 $(document).bind("contextmenu",function(e){return false;})
 		    .ready(T.DocumentReady);

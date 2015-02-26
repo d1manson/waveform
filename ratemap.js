@@ -218,7 +218,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 s = ratemapSlotQueue.shift(); 
 			if(slots[s]){
                 GetGroupRatemap(slots[s]);
-				GetGroupRatemap_Dir(slots[s]);
+				//GetGroupRatemap_Dir(slots[s]);
 			}
 			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
             //TODO: may want to time the call and potentially do more within this tick
@@ -500,7 +500,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	// ==== END OF WORKER ==========================
 	
 	var cCut = null;
-	var show = [0];
+	var show = [0,0];
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
 	var meanTMode = false;
 	var desiredCmPerBin = 2.5;
@@ -615,18 +615,23 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 
 	var SetShow = function(v){
-		if(show[0] ==v[0])
+		if(show[0] ==v[0] && show[1] == v[1])
 			return;
 		show = v.slice(0);
         if(!cCut)
             return;
-		if(v[0]){
+		if(v[0] || v[1]){
         	SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
 		}else{
-			for(var i=0;i<workerSlotGeneration.length;i++)
+			if(!v[0]) for(var i=0;i<workerSlotGeneration.length;i++)
 				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
-			workerSlotGeneration = [];
-			theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
+			if(!v[1]) for(var i=0;i<workerSlotGeneration.length;i++)
+				CanvasUpdateCallback(i,TILE_CANVAS_NUM2,null);
+			if(!v[0] && !v[1]){
+				//TODO: tidy up this case or at least check it's correct
+				workerSlotGeneration = [];
+				theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
+			}
 		}
 	}
 	
