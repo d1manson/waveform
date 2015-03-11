@@ -76,8 +76,8 @@ _Right clicking with a touchpad._ In some cases right clicking can be emulated b
 
 **Console-only features**    
 Some stuff doesn't yet have a proper user-interface implementation, but can be accessed by pressing `F12` and going to `Console`:   
-+ `T.log.rate=true` - when set to true you will see a log of the max spatial rate and mean rate as each ratemap is produced. (Note mean is just numspikes/duration.)
-
++ `T.log.rate=true` - when set to true you will see a log of the max spatial rate and mean rate as each ratemap is produced. (Note mean is just numspikes/duration.)     
++ `T.ORG.SetPosHeaderOverride({window_max_x: '300',window_max_y: '400'})` - the stuff inside the `{...}` can be any values in the pos header. The override occurs immediately after reading the header, before even reading the binary part of the data. Thus you can override ppm before speed filter, or just override window min/max for ratemaps etc.  Note ratemaps do not actually use window_min values at the moment though.
 
 #### Change Log
 * Encapsulated some parts of the page as polymer components: tile-element and cross-hair.
