@@ -49,7 +49,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cLoadingEeg = new living();
 	var posMaxSpeed = 5; // meters per second (see PostProcessPos in parsefiles.js)
 	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
-	
+	var pos_header_override = {}; //key-values to override when reading pos header
+
 	var cState = {set:0,pos:0,cut:0,tet:0}; 
 		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
 			//	0 - file does not exist
@@ -411,7 +412,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			// load pos and/or eeg and/or set if they exist
 			if(cExp && cExp.pos_file){
 				cLoadingPos = new living();
-				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
+					SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
 			}
 			if(cExp && cExp.eeg_files[0]){
 				cLoadingEeg = new living();
@@ -567,7 +569,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			cLoadingPos.alive = false;
 			cLoadingPos = new living();
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+                            SMOOTHING_W_S: posSmoothingWidth, MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
 			fileStatusCallbacks.fireWith(null,[cState,null]);
 		}
 	}
@@ -582,11 +584,26 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			cLoadingPos.alive = false;
 			cLoadingPos = new living();
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed});
+                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
 			fileStatusCallbacks.fireWith(null,[cState,null]);
 		}
 	}
     
+    
+	var SetPosHeaderOverride = function(val){
+		pos_header_override = SimpleClone(val);
+
+		if(cExp && cExp.pos_file){
+			cLoadingPos.alive = false;
+			cLoadingPos = new living();
+			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
+                            SMOOTHING_W_S: posSmoothingWidth, MAX_SPEED: posMaxSpeed, HEADER_OVERRIDE: pos_header_override});
+			fileStatusCallbacks.fireWith(null,[cState,null]);
+		}
+		
+	}
+
+
 	var GetDir = function(){
 		//TODO: this should be returned by the pos file loader as with posbuffer (or whatever it's called these days)
 		// Also it should use both LEDs.
@@ -811,6 +828,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		
 	};
 	
+	
+
 	$pos_smoothing_slider.on("change",function(){SetPosSmoothing(this.value,true)});
 	$pos_speed_slider.on("change",function(){SetPosMaxSpeed(this.value,true)});
 
@@ -824,6 +843,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	$tet_list.on('click','.button',TetrodeButtonClick);
 
     ORG.AddCutActionCallback(CutActionCallback); //this function was added to ORG by cut.js
+
 
 
 	//finally, we are ready to add the extra stuff to the ORG namespace
@@ -854,6 +874,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetSpeedHist = GetSpeedHist;
 	ORG.GetEEGBuffer = function(){return cEegBuffer;};
 	ORG.GetEEGHeader = function(){return cEegHeader;};
+	ORG.SetPosHeaderOverride = SetPosHeaderOverride;
 	ORG.GetDir = GetDir;
     return ORG;
 

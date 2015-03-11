@@ -129,7 +129,7 @@ T.PAR = function(){
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
 
-		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S){
+		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,HEADER_OVERRIDE){
 			// Read the file as a string to get the header and find the data start
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
@@ -146,6 +146,13 @@ T.PAR = function(){
     			header[match[1]] = match[2];
         	var dataLen = parseInt(header.num_pos_samples)*BYTES_PER_POS_SAMPLE;
             
+            // Apply overrides
+            for (k in HEADER_OVERRIDE){
+            	if(header[k] !== undefined)
+            		header[k+"_original"] = header[k];
+            	header[k] = HEADER_OVERRIDE[k];
+            }
+
     		if (header.pos_format != POS_FORMAT){
     			main.PosFileRead("Code implements '" + POS_FORMAT + "' format, but pos data is in '" +  header.pos_format + "'.",[]);
     			return;  
@@ -467,7 +474,7 @@ T.PAR = function(){
 	
 	var LoadPosWithWorker = function(file,state){
 		callbacks.pos.push(state.callback);
-    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S);
+    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S,state.HEADER_OVERRIDE);
     }
 	var PosFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
