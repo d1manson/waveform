@@ -81,7 +81,7 @@ T.PAR = function(){
 		
 	var posWorkerCode = function(){
 		"use strict";
-		
+		var NAN16 = -32768; //custom nan value, equal to minimum int16 value	
 		var endian = function(){
 			var b = new ArrayBuffer(2);
 			(new DataView(b)).setInt16(0,256,true);
@@ -122,6 +122,15 @@ T.PAR = function(){
 				result.set(a);
 				return result;
 			}
+		}
+
+		var minus = function(a,b,c){
+			// we subtract b and c from alternate elemetns of a, inplace, NAN16 is skipped
+			for(var i=0;i<a.length;i++){
+    			a[i] -= a[i] == NAN16? 0 : b;
+    			i++;
+    			a[i] -= a[i] == NAN16? 0 : c;
+    		}
 		}
 	
 	
@@ -257,10 +266,13 @@ T.PAR = function(){
 						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
 		
 			var POS_NAN = 1023;
-			var NAN16 = -32768; //custom nan value, equal to minimum int16 value
 			
 			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
-			
+			if(header.need_to_subtract_mins){
+				var min_x = parseInt(header.window_min_x);
+				var min_y = parseInt(header.window_min_y);
+				minus(XY,min_x,min_y)
+			}
 			var ppm = parseInt(header.pixels_per_metre);
 			var UNITS_PER_M = 1000;
 			times_IN_PLACE(XY,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
