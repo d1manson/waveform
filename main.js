@@ -811,6 +811,7 @@ T.InitButtons = function(){
 	$('#drift_button').click(T.DriftButtonClick);
 }
 
+
 $('core-tooltip').on('mouseenter',function(){this.setPosition();}); //POLYMER BUGFIX
 T.$main_toolbar = $('.main_toolbar');
 T.$hidden_clipboard = $('.hidden_clipboard');
@@ -845,6 +846,12 @@ $('.floating_layer').on("mousedown",".floatinginfo",T.FloatingInfo_MouseDown)
 $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessary to allow the user to click inputs within a dragable floatinginfo
 $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 
+$(window).on('blur',function(){
+	$('#all_below_toolbar').toggleClass('no_focus', true);
+})
+$(window).on('focus',function(){
+	$('#all_below_toolbar').toggleClass('no_focus', false);
+})
 
 $(document).bind("contextmenu",function(e){return false;})
 		    .ready(T.DocumentReady);
