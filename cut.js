@@ -110,10 +110,11 @@ T.CUT = function(ORG){//class factory
 		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
 		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
 		if(increment) //if increment is zero we don't need to touch the other immutables
-			for(var i=0;i<s.length;i++)if(s[i] && s[i].group_history.slice(-1)[0] >= a){ 
-				s[i].group_history.push(s[i].group_history.slice(-1)[0] + increment);
-				invalidated[i] = 1;
-				m[s[i].group_history.slice(-1)[0]] = i;
+			for(var g=m.length-1;g>=a;g--)if(m[g]){
+				s[m[g]].group_history.push(g+increment);
+				invalidated[m[g]] = 1;
+				m[g+increment] = m[g];
+				m[g] = null;
 			}
 		
 		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...
