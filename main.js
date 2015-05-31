@@ -23,6 +23,7 @@ T.SPECIAL_SCALING = 0.5; //this scaling factor makes the size values presented t
 //T.SPECIAL_SCALING_RM = 2; //this makes ratemaps bigger
 T.TILE_RM_HEIGHT = 120;
 T.TILE_MIN_HEIGHT = 128; //TODO: look this up from css rather than state it here manually
+T.TILE_DIR_RM_HEIGHT = 78;
 T.floatingTopZ = 100;
 
 T.modeChangeCallbacks = [];
@@ -215,7 +216,7 @@ T.SetDisplayIsOn = function(v){
 
 
 T.DisplayIsOnClick = function(evt,keyboard){
-	//displayIsOn are the 6 buttons: 4xchannel 1xratemap 1xtemporal-autocorr
+	//displayIsOn are the 6 buttons: 4xchannel 2xratemap 1xtemporal-autocorr
 	
 	//Can now be called as a keyboard shortcut in which case this is not set and keyboard has the info not evt.
 	//Note click is only triggered with left mouse button.
@@ -247,7 +248,7 @@ T.DisplayIsOnClick = function(evt,keyboard){
 		found = true;
 	}
 	if(!found) for(var i=0;i<T.DISPLAY_ISON.RM.length; i++) if(thisVal == T.DISPLAY_ISON.RM[i]){
-		//clicked the i'th ratemap button (there is currently only one available)
+		//clicked the i'th ratemap button
 		setMaps[i] = shiftKey ? !setMaps[i] : 1;
 		found = true;
 		break;
@@ -316,17 +317,17 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 				$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
 				break;
 			case T.CANVAS_NUM_RM:
-			case T.CANVAS_NUM_RM_DIR: //TODO: probably want some special scaling for direction ratemaps that isn't the same as XY-maps
-				xF = T.SPECIAL_SCALING_RM;
-				yF = T.SPECIAL_SCALING_RM;
 				$canvas.css({height:  T.TILE_RM_HEIGHT + 'px'}); //apply css scaling
+				break;
+			case T.CANVAS_NUM_RM_DIR: //TODO: probably want some special scaling for direction ratemaps that isn't the same as XY-maps
+				$canvas.css({height:  T.TILE_DIR_RM_HEIGHT + 'px'}); //apply css scaling
 				break;
 			case T.CANVAS_NUM_TC:
 				// for temporal autocorr leave it at 1
 				break;
 		}
     }else
-		$canvas = $("<canvas width='0' height='0' style='width:0px;height:" + T.TILE_MIN_HEIGHT + "px;'></canvas>"); //create a zero-size canvas if we weren't given anything
+		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
 
 	t.updateCanvas($canvas.get(0),canvasNum);
 
@@ -591,13 +592,14 @@ T.ApplyStoredSettingsA = function(){
 		T.xFactor = localStorage.xFactor || 2;
 		T.yFactor = localStorage.yFactor;
 		T.$header_search.val(localStorage.headerFilter || '');
-		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
+		T.TogglePalette(parseInt(localStorage.paletteMode) || -2);
         T.Tool.PainterState.r = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
 	}else{
-		T.SetDisplayIsOn({chanIsOn: [1,1,1,1]});
+		T.SetDisplayIsOn({chanIsOn: [1,1,1,1], mapIsOn: [1,1], tAutocorrIsOn: 1});
+		T.TogglePalette(-2);
 	}
 }
 

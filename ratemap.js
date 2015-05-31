@@ -137,7 +137,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
-		
+		var show = [1,1];
 		
 		var PALETTE = function(){
 			var P_COLORS = 5;
@@ -169,7 +169,19 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			slots = [];
 			ClearQueue();
 		}
-		
+		var SetShow = function(spa, dir){
+			show[0] = spa;
+			show[1] = dir;
+			for(var i=0;i<slots.length;i++)if(slots[i]){
+				if(!show[0])
+					slots[i].cmPerBin = NaN;
+				if(!show[1])
+					slots[i].degPerBin = NaN;
+			}
+			QueueAllSlotsLazy();
+			
+			// Note we don't actually do any updating here, the main thread must somehow force re-draw
+		}
 		var SetBinSizeCm = function(v){
 			if(v == desiredCmPerBin)
                 return; //no point doing anything if the value isn't new
@@ -200,13 +212,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         }
 		
 		var QueueAllSlotsLazy = function(){
+			if(!(show[0] || show[1]))
+				return;
 			//will enqueue any slots that dont match the desired settings
 			for(var i=0;i<slots.length;i++)if(
 					slots[i] && (
-					slots[i].smoothingW != desiredSmoothingW ||
-					slots[i].cmPerBin != desiredCmPerBin	 ||
-					slots[i].posDataId != desiredPosDataId	 ||
-					slots[i].degPerBin != desiredDegPerBin
+					slots[i].posDataId != desiredPosDataId ||				
+					show[0] && ( slots[i].smoothingW != desiredSmoothingW ||
+								 slots[i].cmPerBin != desiredCmPerBin	  ) ||
+					show[1] && slots[i].degPerBin != desiredDegPerBin
 					))
 				QueueSlot(i);
 		    
@@ -217,8 +231,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             while(!slots[s] && ratemapSlotQueue.length)
                 s = ratemapSlotQueue.shift(); 
 			if(slots[s]){
-                GetGroupRatemap(slots[s]);
-				//GetGroupRatemap_Dir(slots[s]);
+				if(show[0])
+	                GetGroupRatemap(slots[s]);
+				if(show[1])
+					GetGroupRatemap_Dir(slots[s]);
 			}
 			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
             //TODO: may want to time the call and potentially do more within this tick
@@ -531,12 +547,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		buffer = M.clone(buffer); //we need to clone it so that when we transfer ownsership we leave a copy in this thread for other modules to use
 		dirData = M.clone(dirData.buffer); //this too
 		theWorker.SetPosData(buffer,N_val,timebase,pixPerM,scale_spikes_plot,max_vals,dirData,[buffer,dirData]);
-
 	}
 	
-	
 	var PlotDirData = function(dataBuffer,slotInd,generation,imType){
-	    var S = 100; //size in pix
+		if(!show[1])
+			return;
+	    var S = 78; //size in pix
 		var data = new Float32Array(dataBuffer);
 		var $canvas = $("<canvas width='" + S + "' height='" + S + "' />");
         var ctx = $canvas.get(0).getContext('2d');
@@ -554,6 +570,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 	
 	var ShowIm = function(imBuffer,maxRate,meanRate,slotInd,sizeXY,generation,imType){
+        if(imType == IM_RATEMAP && !show[0])
+			return;
         var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
         var ctx = $canvas.get(0).getContext('2d');
 
@@ -583,7 +601,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         if(this != null)
             cCut = this;
 
-        if(!show[0])
+        if(!(show[0] || show[1]))
             return; //we only render when we want to see them
 
 		if(isNewCut){
@@ -617,23 +635,23 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 
 	var SetShow = function(v){
-		if(show[0] ==v[0] && show[1] == v[1])
+		if(show[0] == v[0] && show[1] == v[1])
 			return;
 		show = v.slice(0);
+		theWorker.SetShow(show[0], show[1])
         if(!cCut)
             return;
 		if(v[0] || v[1]){
         	SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
-		}else{
-			if(!v[0]) for(var i=0;i<workerSlotGeneration.length;i++)
-				CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
-			if(!v[1]) for(var i=0;i<workerSlotGeneration.length;i++)
-				CanvasUpdateCallback(i,TILE_CANVAS_NUM2,null);
-			if(!v[0] && !v[1]){
-				//TODO: tidy up this case or at least check it's correct
-				workerSlotGeneration = [];
-				theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
-			}
+		}
+		if(!v[0]) for(var i=0;i<workerSlotGeneration.length;i++)
+			CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
+		if(!v[1]) for(var i=0;i<workerSlotGeneration.length;i++)
+			CanvasUpdateCallback(i,TILE_CANVAS_NUM2,null);
+		if(!v[0] && !v[1]){
+			//TODO: tidy up this case or at least check it's correct
+			workerSlotGeneration = [];
+			theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
 		}
 	}
 	
@@ -737,7 +755,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	
 	var theWorker = BuildBridgedWorker(workerFunction,
 										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW",
-                                            "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg"],
+                                            "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg",
+                                            "SetShow"],
 										["ShowIm*","PlotDirData*"],[ShowIm,PlotDirData],
 										WORKER_CONSTANTS);
 	//console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
