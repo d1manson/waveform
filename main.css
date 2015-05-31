@@ -22,8 +22,20 @@ font-size: 0.8em;
 -o-user-select: none;
 user-select: none;
 }
-#all_below_toolbar.no_focus{
-background: -webkit-gradient(linear, left top, right top, color-stop(0%,#83966e), color-stop(10%,#ffffff), color-stop(90%,#ffffff), color-stop(100%,#83966e));
+#all_below_toolbar{
+  position: relative;
+}
+.keyboard_focus_notifier{
+  display: none;
+  position: absolute;
+  top: 0px;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  border: 20px solid rgba(255,0,0,0.2);
+}
+.keyboard_focus_notifier.no_focus{
+  display: block;
 }
 .info_summary{
     position: absolute;

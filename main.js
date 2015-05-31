@@ -849,10 +849,10 @@ $('input').on("mousedown",function(e){e.stopPropagation()}); //this is neccessar
 $('.scrollable_area').on('scroll',T.ShowScrollShaddow);
 
 $(window).on('blur',function(){
-	$('#all_below_toolbar').toggleClass('no_focus', true);
+	$('.keyboard_focus_notifier').toggleClass('no_focus', true);
 })
 $(window).on('focus',function(){
-	$('#all_below_toolbar').toggleClass('no_focus', false);
+	$('.keyboard_focus_notifier').toggleClass('no_focus', false);
 })
 
 $(document).bind("contextmenu",function(e){return false;})
