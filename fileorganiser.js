@@ -833,7 +833,6 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	$pos_smoothing_slider.on("change",function(){SetPosSmoothing(this.value,true)});
 	$pos_speed_slider.on("change",function(){SetPosMaxSpeed(this.value,true)});
 
-	window.URL = window.webkitURL || window.URL;
 	$files_panel.on("dragstart",".file_brick",SaveFileDragStart)
 				.on("dragend",".file_brick",SaveFileDragEnd);
     $document.on("dragover", DocumentDragOver) 

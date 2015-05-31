@@ -95,6 +95,10 @@
 		<div class='floating_title'>Directional ratemap [c]</div>
 		<div class='floating_body'>
 			Bin size <span id='dir_binsize_val' class="slider_val">6 degrees</span><br>
+			Smoothing kernel boxcar <span id='dir_binsize_val' class="slider_val">(2x2+1) bins</span><br>
+			<br><br>
+			WARNING: only first LED data is read from pos file.
+			<br><br>
 			WARNING: directional plots are still in alpha testing (unlike everything else which is just about in beta!).
 			<!--<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
 			<br><br>
@@ -117,11 +121,10 @@
 	<div class="floatinginfo palette_info">
 		<div class='floating_title'>Toggle waveform palette [p]</div>
 		<div class='floating_body'>
-			There are three palette modes. Click this button (or press [p]) to cycle through the modes: 
+			There are two palette modes. Click this button (or press [p]) to toggle between the two modes: 
 			<ul>
 			<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
-			<li>render each wave in the group a different color (the palette goes from dark red to yellow), the color is assigned according to the index of the wave within the group, so that if the index is meaninful (i.e. following an autocut) the color will be helpful.</li>
-			<li>render each pixel based on how many waves cross that pixel</li>
+			<li>render each pixel based on how many waves cross that pixel.</li>
 			</ul>
 		</div>						
 	</div>
@@ -235,7 +238,8 @@
 </div></core-toolbar>
 
 <div id="all_below_toolbar" flex horizontal layout>
-
+	<div class="keyboard_focus_notifier no_focus"></div>
+	
 	<div class="side_panel" vertical layout>
 
 		<div class="side_panel_row side_panel_row" vertical layout>

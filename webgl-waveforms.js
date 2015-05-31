@@ -68,7 +68,6 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 	var gl = {}; //the webgl instance for the offscreen canvas (that's where all rendering is done)
 	var prog = {}; //the webgl program
 	var copyProg = {}; //the webgl program used when in count-mode for rendering
-	var PALETTE_HOT_REGISTER_IND = 1;
 	var PALETTE_FLAG_REGISTER_IND = 2;
 	var FLOAT_TEXTURE_REGISTER_IND = 0; //this may need to be fixed at 0, not sure
 	var canDoComplexRender = undefined; //will be set to true or false during Init()
@@ -84,11 +83,11 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 							$canvases: [], //NO LONGER jQUERY. array of handles to the canvases corresponding to each slot. The canvases may move around/be deleted from the DOM but only this module will modify their image data.
 							chanXOffset: [], // Array of 4-arrays, specifying the xOffset to each channel within the canvas, or NaN if it's not been rendered
 							slotGeneration: [], //Records which generation of slot immutable was last rendered for each slot
-							slotColMap: [], //records -1 if the hot colormap was last used and 0-n if a flag color was used, and -2 if the count colormap was used
+							slotColMap: [], //records -1 if the count colormap was last used and 0-n if a flag color was used, and -2 if the count colormap was used
 							nSlots: 0, 
 							firstInd: 0,	
 							desiredChannels: [0,0,0,0], 
-							desiredColormap: 0 //-1: hot, +1: flag, -2: count
+							desiredColormap: 0 //+1: flag, -1: count
 							}; 
 	var slotRenderState = SimpleClone(blankSlotRenderState);
 
@@ -178,15 +177,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		}
 
 		//set color map data for the desired waves
-        if(slotRenderState.desiredColormap == -1){
-            for(var s=0;s<cutSlots.length;s++){
-                var inds = cutSlots[s].inds;
-				for(i=0;i<inds.length;i++){
-					buffUint8[inds[i]*6 + 2] = i/(inds.length-1)*254; 
-					buffUint8[inds[i]*6 + 5] = i/(inds.length-1)*254; 
-				}
-            }
-        }else{
+        if(slotRenderState.desiredColormap == 1){
             for(var s=0;s<cutSlots.length;s++){
                 var inds = cutSlots[s].inds;
                 var val = cutSlots[s].group_history.slice(-1)[0]; //group number is the colormap index
@@ -328,7 +319,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		locs.palette = gl.getUniformLocation(prog, "palette");
 		locs.countMode = gl.getUniformLocation(prog, "countMode");
 		locs.countModeColor = gl.getUniformLocation(prog, "countModeColor");
-		
+
 		// create all the neccessarry buffers (no space is actually allocated at this stage for data)
 		buffs.wave = gl.createBuffer();
 		buffs.voltage = Array((50-1)*4);
@@ -337,8 +328,9 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		buffs.isTPlusOne = gl.createBuffer();
 
 		// upload both palettes to the gpu
-        UploadPalette(PALETTE_HOT_REGISTER_IND,PALETTE_HOT); 
 		UploadPalette(PALETTE_FLAG_REGISTER_IND,PALETTE_FLAG); 
+
+        gl.uniform1i(locs.palette, PALETTE_FLAG_REGISTER_IND); 
 
 		// turn off depth testing since we want to just render in order (negative z is still invisible)
     	gl.disable(gl.DEPTH_TEST);
@@ -346,7 +338,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		// prepare the special floating point render taret for colormap-count-mode
 		canDoComplexRender = InitCopyProg();
   
-		slotRenderState.desiredColormap = -1; //default
+		slotRenderState.desiredColormap = 0; 
 		SwitchToMainProg(); //we call this now and then mid-rendering if we are using the colormap-count-mode
 		ready.gl = true;
 	}
@@ -583,7 +575,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		// render each of the requested channels, copying all the new images to their individual canvases
 		for(var c=0;c<chanIsToBeRendered.length;c++)if(chanIsToBeRendered[c]){
 			PerformRenderForChannel(c);
-			if(r.desiredColormap == -2)
+			if(r.desiredColormap == -1)
 				CrossRenderCounts();
 					
 			for(var i=0;i<slotsToRender.length;i++){
@@ -667,16 +659,10 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 		slotRenderState.desiredColormap = m;
         if(m == +1){
-            gl.uniform1i(locs.palette, PALETTE_FLAG_REGISTER_IND); 
 			gl.uniform1i(locs.countMode,false);
 			gl.disable(gl.BLEND);
 			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        }else if (m == -1){
-            gl.uniform1i(locs.palette, PALETTE_HOT_REGISTER_IND);
-			gl.uniform1i(locs.countMode,false);
-			gl.disable(gl.BLEND);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-		}else if (m==-2){
+        }else{
 			gl.uniform1i(locs.countMode,true);					
 			gl.enable(gl.BLEND);
 			gl.blendEquation(gl.FUNC_ADD);
@@ -685,9 +671,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 			gl.bindFramebuffer(gl.FRAMEBUFFER, offCanv.offFBO);
 			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + FLOAT_TEXTURE_REGISTER_IND, gl.TEXTURE_2D, offCanv.offTexture, 0);
 			SetCountModeColor();
-		}else
-			throw new Error('palette mode can only be -1, +1, or -2');
-
+		}
 		if(!onSwitchProg && ready.voltage && ready.cut)
 			InvalidateAll();
     }
@@ -767,26 +751,6 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
        gl.compileShader(shader);
        return ValidShader(shader,str);
     }
-
-	 var PALETTE_HOT = function(){
-        var data = new Uint8Array(256*4);
-    	for(var i=0;i<256;i++)
-    		data[i*4+3] = 255; //set alpha to opaque
-
-        for(var i=0;i<100;i++)
-            data[i*4] = i*255/100;
-        for(var i=0;i<100;i++){
-            data[(100+i)*4] = 255;
-            data[(100+i)*4 + 1] = i*255/100;
-        }
-        for(var i=0;i<56;i++){
-            data[(200+i)*4] = 255;
-            data[(200+i)*4 + 1] = 255;
-            data[(200+i)*4 + 2] = i*255/100; // we never add all the blue 
-        }    
-        return data;
-    }();
-
    
     var UploadPalette = function(registerInd,data){
     	gl.activeTexture(gl.TEXTURE0 + registerInd);

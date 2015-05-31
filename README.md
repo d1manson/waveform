@@ -58,9 +58,9 @@ The GUI will in general remember your preferences (i.e. bin size, smoothing, clu
 **Keyboard shortcuts**
 + `k` show list of keyboard shortcuts
 + `escape` open/close the main toolbar.
-+ `p` cycle palette. 
++ `p` toggle palette. 
 + `ctrl+z` or just `z` undo.
-+ `1`, `2`, `3`, `4`, `r`, `t` view channel 1-4, ratemap or temporal-autocorr. Use `shift` to show multiple views (as when using the mouse in the button panel).
++ `1`, `2`, `3`, `4`, `r`, `c`, `t` view channel 1-4, spatial/directional ratemap or temporal-autocorr. Use `shift` to show multiple views (as when using the mouse in the button panel).
 + `d` toggle drift mode rendering of the cluster plots.
 + `f` select group under cursor as source (i.e. "From group") group for cluster painting. Use `shift` to select multiple.
 + `e` select group under cursor as destination (i.e. "Enter into group") group for cluser painting.
@@ -80,6 +80,8 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 + `T.ORG.SetPosHeaderOverride({window_max_x: '300',window_max_y: '400'})` - the stuff inside the `{...}` can be any values in the pos header. The override occurs immediately after reading the header, before even reading the binary part of the data. Thus you can override ppm before speed filter, or just override window min/max for ratemaps etc.  Note that normally the `window_min_x/y` values are not subtracted from the read in data, but if you do want them to be subtracted then provide  `need_to_subtract_mins: 1` in the list of overrides.  
 
 #### Change Log
+* Removed "hot" wave rendering mode and buttons on tiles.
+* Added dir ratemaps.
 * Encapsulated some parts of the page as polymer components: tile-element and cross-hair.
 * Removed autocut and filesystem api.
 * Made drop zone a bit fancier.   
