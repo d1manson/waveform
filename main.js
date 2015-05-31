@@ -436,21 +436,12 @@ T.ShowGitHub = function(){
 
 T.TogglePalette = function(val){
 	if(typeof val === "number"){
-		T.paletteMode = val;
+		T.paletteMode = val < 0 ? -1 : 1;
 	}else{
-		switch (T.paletteMode){
-			case -1:
-				T.paletteMode = 1;
-				break;
-			case -2:
-				T.paletteMode = -1;
-				break;
-			case 1:
-				T.paletteMode = -2;
-				if(T.WV.canDoComplexRender())
-					break; //set it to -1 instead
-			default:
-				T.paletteMode = -1;
+		if (T.paletteMode < 0){
+			T.paletteMode = 1;
+		}else{
+			T.paletteMode = -1;
 		} 
 	}
 		
@@ -592,14 +583,14 @@ T.ApplyStoredSettingsA = function(){
 		T.xFactor = localStorage.xFactor || 2;
 		T.yFactor = localStorage.yFactor;
 		T.$header_search.val(localStorage.headerFilter || '');
-		T.TogglePalette(parseInt(localStorage.paletteMode) || -2);
+		T.TogglePalette(parseInt(localStorage.paletteMode) || -1);
         T.Tool.PainterState.r = parseInt(localStorage.painterR) || 20;
         T.CP.SetSize(parseInt(localStorage.clusterPlotSize) || 128);
 		T.SetDisplayIsOn({chanIsOn: JSON.parse(localStorage.chanIsOn), mapIsOn: JSON.parse(localStorage.mapIsOn), tAutocorrIsOn: JSON.parse(localStorage.tAutocorrIsOn)});
 		T.$main_toolbar.toggle(localStorage.showToolbar === undefined || localStorage.showToolbar == "true")
 	}else{
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1], mapIsOn: [1,1], tAutocorrIsOn: 1});
-		T.TogglePalette(-2);
+		T.TogglePalette(-1);
 	}
 }
 
