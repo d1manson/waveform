@@ -219,7 +219,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		group_color_2: '#f00',
 		group_caption: '???',
 		updateCanvas: function(newCanv,canvasNum){
-			var oldCanv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			var oldCanv = this.shadowRoot.querySelectorAll('canvas')[canvasNum];
 			for(var i=0;i <oldCanv.classList.length; i++)
 				newCanv.classList.add(oldCanv.classList[i]);
 			oldCanv.parentNode.replaceChild(newCanv,oldCanv);  
@@ -227,7 +227,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		updateCrossHair: function(canvasNum,x,y){
 			/* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
 				if x is null/undefined, any existing crosshair will be removed. 	*/
-			var canv = this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			var canv = this.shadowRoot.querySelectorAll('canvas')[canvasNum];
 			var xh = canv.nextElementSibling
 			xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
 			
@@ -245,7 +245,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		},
 		getCanvInfo: function(canvasNum,pageX,pageY){
 			//TODO: if no pageX and pageY then life should be more simple...
-			var canv =  this.shadowRoot.getElementsByTagName('canvas')[canvasNum];
+			var canv =  this.shadowRoot.querySelectorAll('canvas')[canvasNum];
 			var totalOffsetX = 0;
 			var totalOffsetY = 0;
 			var el = canv;
@@ -372,7 +372,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		StopProp: function(e){console.log('so, what?');e.stopPropagation();},
 		getCopyOfCanvs: function(withSticker){
 			var div = document.createElement('div');
-			var oldCanvs = this.shadowRoot.getElementsByTagName('canvas');
+			var oldCanvs = this.shadowRoot.querySelectorAll('canvas');
 			for(var i = 0;i<oldCanvs.length;i++){
 				var img = document.createElement('img');
 				if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
@@ -393,7 +393,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			return div;
 		},
 		getCanv: function(canvNum){
-			return this.shadowRoot.getElementsByTagName('canvas')[canvNum];
+			return this.shadowRoot.querySelectorAll('canvas')[canvNum];
 		}
 	});
 </script>

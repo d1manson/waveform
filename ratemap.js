@@ -85,6 +85,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			return result;
 		}
 		
+		var GetSmoothed1DPeriodic = function(X, W){
+			//kernle is box-car of size 2W+1
+			var N = X.length;
+			var result = new Uint32Array(N);
+			for(var i=0; i<N; i++)
+				for(var k=-W;k<=W; k++)
+					result[i] += X[(i+k) % N];
+			return result;
+		}
 		var GetSmoothed = function(matrix,nX,nY,W){
 			var result = new Uint32Array(matrix.length);
 			//kernle is box-car of size 2W+1
@@ -133,7 +142,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var desiredCmPerBin = 2.5;
         var desiredSmoothingW = 2;
 		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15..maybe larger factors too if you really want
-		var desiredSmoothingDir = 0; //TODO: lookup what knid of smoothing needs to be done for dir plots.
+		var desiredSmoothingDir = 2; //TODO: lookup what knid of smoothing needs to be done for dir plots.
 		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
@@ -270,7 +279,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			dwellDirCounts[0]+= dwellDirCounts[nBinsDir];
 			dwellDirCounts = dwellDirCounts.subarray(0,nBinsDir);
 						
-			smoothedDirDwellCounts = dwellDirCounts; //TODO: actually smooth
+			smoothedDirDwellCounts = GetSmoothed1DPeriodic(dwellDirCounts, desiredSmoothingDir);
 		}
 		
 		var CachePosBinIndsAndDwellMap = function(){
@@ -414,9 +423,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			spikeCounts[0] += spikeCounts[nBinsDir];
 			spikeCounts = spikeCounts.subarray(0,nBinsDir);
 
-			var smoothedSpikeCounts = spikeCounts; //TODO: smoothing
+			var smoothedSpikeCounts = GetSmoothed1DPeriodic(spikeCounts, desiredSmoothingDir); 
 			var ratemap = rdivideFloat(smoothedSpikeCounts,smoothedDirDwellCounts)
-			//var im = ToImageData(ratemap); //TODO: make a proper plotting function for dir data
 			
 			//scale ratemap to have max 1...(for easy plotting)
 			var f = 1/max(ratemap);
@@ -556,15 +564,27 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var data = new Float32Array(dataBuffer);
 		var $canvas = $("<canvas width='" + S + "' height='" + S + "' />");
         var ctx = $canvas.get(0).getContext('2d');
+
+        // draw axes
+        ctx.beginPath();
+        ctx.strokeStyle = "RGBA(50,50,50,0.3)";
+        ctx.beginPath();
+        ctx.moveTo(S/2,S/4);
+        ctx.lineTo(S/2,S*3/4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(S/4,S/2);
+        ctx.lineTo(S*3/4,S/2);
+        ctx.stroke();
+
 		ctx.beginPath();
     	ctx.strokeStyle = "RGB(0,0,0)";
-		
     	var i = 0;
-    	ctx.moveTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+    	ctx.moveTo(S/2-costable[i]*S/2*data[i], S/2-sintable[i]*S/2*data[i]);
 		for(;i<data.length;i++)
-			ctx.lineTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+			ctx.lineTo(S/2-costable[i]*S/2*data[i], S/2-sintable[i]*S/2*data[i]);
 		i = 0;
-		ctx.lineTo(sintable[i]*S/2*data[i]+S/2,costable[i]*S/2*data[i]+S/2);
+		ctx.lineTo(S/2-costable[i]*S/2*data[i], S/2-sintable[i]*S/2*data[i]);
 		ctx.stroke();   
 		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,$canvas); //send the plot back to main
 	}
