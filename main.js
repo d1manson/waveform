@@ -135,7 +135,6 @@ T.FinishedLoadingFile = function(status,filetype){
 			T.PlotSpeedHist(null); //TODO: check whether this is really needed here
 		}
 		if(status.cut < 3){
-			console.log("---new cut---")
 			T.ClearAllTiles();
 			T.CutActionCallback({num:0,type:"load",description:"no active cut"});
 		}
