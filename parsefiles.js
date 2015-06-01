@@ -259,23 +259,68 @@ T.PAR = function(){
 			var elementsPerPosSample = BYTES_PER_POS_SAMPLE/2;
 			var nPos = parseInt(header.num_pos_samples); 
 			var end = nPos * elementsPerPosSample; 
+			var nLED = parseInt(header.colactive_2) ? 2 : 1;
+			var POS_NAN = 1023;
+
 			var XY = new Int16Array(nPos*2);
-		
 			var XY = new Int16Array(
 							take(new Int32Array(buffer),1,BYTES_PER_POS_SAMPLE/4).buffer
 						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-		
-			var POS_NAN = 1023;
-			
 			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+			
+			if(nLED == 2){
+				var XY2 = new Int16Array(nPos*2);
+				var XY2 = new Int16Array(
+							take(new Int32Array(buffer),2,BYTES_PER_POS_SAMPLE/4).buffer
+						 ); // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+				replaceVal_IN_PLACE(XY2,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+			
+			}
+			
 			if(header.need_to_subtract_mins){
 				var min_x = parseInt(header.window_min_x);
 				var min_y = parseInt(header.window_min_y);
-				minus(XY,min_x,min_y)
+				minus(XY,min_x,min_y);
+				if(nLED == 2)
+					minus(XY2,min_x,min_y);
 			}
+
 			var ppm = parseInt(header.pixels_per_metre);
 			var UNITS_PER_M = 1000;
 			times_IN_PLACE(XY,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+			if(nLED == 2)
+				times_IN_PLACE(XY2,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+
+			if(nLED == 2){
+				// chcek for and apply LED swaping
+				for(var i = 1; i<nPos; i++){
+					if(XY[i*2] == NAN16 || XY[i*2+1] == NAN16 || XY2[i*2] == NAN16 || XY2[i*2+1 == NAN16]){
+						i++; // if this is nan, then skip the next iteration too becauwse we are doing diffs
+						continue;
+					}
+					//var dist12 = 
+				}
+				/*
+				MATLAB:
+
+				led_pos_tmp = led_pos(1:size(led_pix,1),:,:);
+				led_pos_tmp(isnan(led_pos_tmp)) = 0;
+
+				dist12 = sqrt(sum(((led_pos_tmp(2:end,1,:)-led_pos_tmp(1:end-1,2,:)).^2),3));
+				dist11 = sqrt(sum(((led_pos_tmp(2:end,1,:)-led_pos_tmp(1:end-1,1,:)).^2),3));
+				dist21 = sqrt(sum(((led_pos_tmp(2:end,2,:)-led_pos_tmp(1:end-1,1,:)).^2),3));
+				dist22 = sqrt(sum(((led_pos_tmp(2:end,2,:)-led_pos_tmp(1:end-1,2,:)).^2),3));
+
+				pos = 2:size(led_pix,1);
+				switched = (dist12 < dist11-thresh) & ( isnan(led_pos(pos, 2, 1)) |(dist21 < dist22-thresh) );
+
+				% Check if size of big light has shrunk to be closer to that of small light (as Z score)
+				z11 = (mean_npix(1) - led_pix(2:end, 1))/std_npix(1);
+				z12 = (led_pix(2:end, 1) - mean_npix(2))/std_npix(2);
+				shrunk = z11 > z12;
+				swap_list = find( switched & shrunk ) + 1;
+				*/
+			}
 			
 			var sampFreq = parseInt(header.sample_rate);
 			var pow2MaxSampStep = pow2(MAX_SPEED*UNITS_PER_M /sampFreq);

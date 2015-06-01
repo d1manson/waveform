@@ -293,7 +293,7 @@ T.CutSlotLog = function(slotInd,msg,m_type){
 	}
 }
 
-T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
+T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas,info_str){
 	//this callback recieves the newly rendered canvases from the waveform rendering and ratemap rendering modules
 	//these rendering modules recieve slot-invalidation events directly from the cut module and can choose to ignore them or
 	//spend any length of time rendering a new canvas.  They must hwoever guarantee to call this function in chronological order for
@@ -318,6 +318,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 				break;
 			case T.CANVAS_NUM_RM:
 				$canvas.css({height:  T.TILE_RM_HEIGHT + 'px'}); //apply css scaling
+				t.group_spa_max = info_str;
 				break;
 			case T.CANVAS_NUM_RM_DIR: //TODO: probably want some special scaling for direction ratemaps that isn't the same as XY-maps
 				$canvas.css({height:  T.TILE_DIR_RM_HEIGHT + 'px'}); //apply css scaling
@@ -326,8 +327,14 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas){
 				// for temporal autocorr leave it at 1
 				break;
 		}
-    }else
+    }else{
 		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
+		switch (canvasNum){
+			case T.CANVAS_NUM_RM:
+				t.group_spa_max = info_str;
+				break;
+		}
+    }
 
 	t.updateCanvas($canvas.get(0),canvasNum);
 
@@ -354,7 +361,6 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		$(t).hide();
 		T.tiles.push(t);
 	}
-
 
 	var slotCache = Array(invalidatedSlots.length); //this means we only have to call cut.GetImmutableSlot(k) once for each invalidated slot (even though we have two for loops below)
 	for(var k=0;k<invalidatedSlots.length;k++)if(invalidatedSlots[k]){ //for every invalidated slot....
@@ -400,7 +406,8 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		t_new.group_num = new_tile_ind;
 		$(t_new).show()
 				.toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
-		t_new.group_caption = slot_k.inds.length;
+		t_new.group_n = slot_k.inds.length;
+		t_new.group_spa_max = 0;
 		t_new.group_color_1 = T.PALETTE_FLAG_CSS[new_tile_ind];
 		t_new.group_color_2 = T.PALETTE_FLAG_CSS_TEXT[new_tile_ind];
 

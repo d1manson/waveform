@@ -8,7 +8,7 @@ alow the main program to do all the more interesting interactivity...it's a bit 
 Tiles have the following attibutes:
 	group_num - a number
 	group_color_1, group_color_2 - colors used for the group's sticker
-	group_caption - a string, displayed when the group is active
+	group_n - number of spikes in group
 	proximate/active/moving/disabled - true/false. Changes the state as described below.
 	placeholder - a div element that should be the same size as the tile (TODO: update the placeholder when tile changes size).  You are free to insert this div into the DOM. 
 								(Set it to a falsy value to garbage collect and reset it.)
@@ -51,7 +51,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 <link rel="import" href="polymer/polymer.html">
 <link rel="import" href="polymer/core-tooltip.html">
 <link rel="import" href="cross-hair.html">
-<polymer-element name="tile-element" attributes="group_num group_color_1 group_color_2 group_caption">
+<polymer-element name="tile-element" attributes="group_num group_color_1 group_color_2 group_n group_spa_max">
 <template>
 	<style>
 	:host {
@@ -130,6 +130,18 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	.tc{
 	height:50px;
 	}
+	.caption-inner{
+		border-top: 1px solid #000;
+		padding-top: 2px;
+	}
+	.caption-inner:nth-of-type(1){
+		border-top: 0px;
+	}
+
+	.caption-inner-label{
+		font-weight: bold;
+		font-size: 0.8em;
+	}
 	/*
 	.grabbed_info .tile-buttons{
 	display: none;
@@ -148,7 +160,16 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	<div id='over' class='tile-over hidden_grabbed'>
 		<div class='tile-side' layout vertical>
 			<div flex></div>
-			<div class='tile-caption'>n={{group_caption}}</div>
+			<div class='tile-caption'>
+				<template if="{{group_spa_max}}">
+					<div class="caption-inner">{{group_spa_max}}Hz
+						<div class="caption-inner-label">spa max</div>
+					</div>
+				</template>
+				<div class="caption-inner">{{group_n}}
+					<div class="caption-inner-label">n spikes</div>
+				</div>
+			</div>
 		</div>
 	</div>
 	<div id='blind' class='blind'>
@@ -217,7 +238,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		group_num: -1,
 		group_color_1: '#666',
 		group_color_2: '#f00',
-		group_caption: '???',
+		group_n: '???',
 		updateCanvas: function(newCanv,canvasNum){
 			var oldCanv = this.shadowRoot.querySelectorAll('canvas')[canvasNum];
 			for(var i=0;i <oldCanv.classList.length; i++)
