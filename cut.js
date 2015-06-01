@@ -97,10 +97,15 @@ T.CUT = function(ORG){//class factory
 		return k;
     }
 
+    var DebugState = function(str){
+    	if(str)
+    		console.log(">>" + str);
+    	console.log("groupToImmutablesMapping: [" + Array.prototype.join.call(this._.groupToImmutablesMapping,', ') + "]");
+    }
+
 	var SpliceImmutables = function(a,n_remove /* , inds_1, inds_2, ... */){	//behaves like javascript array "splice"
 		var s = this._.immutablesSlots;
 		var m = this._.groupToImmutablesMapping;
-		
 		var invalidated = M.repvec(0,s.length);
 		
 		// clear the slots with groups  a,a+1,...,a+n_remove-1
@@ -109,18 +114,26 @@ T.CUT = function(ORG){//class factory
 		
 		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
 		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
-		if(increment) //if increment is zero we don't need to touch the other immutables
-			for(var g=m.length-1;g>=a;g--)if(m[g]){
+		if(increment > 0){
+			for(var g=m.length-1;g>=a;g--)if(m[g]){ // loop in reverse so as not to overwrite as you go
 				s[m[g]].group_history.push(g+increment);
 				invalidated[m[g]] = 1;
 				m[g+increment] = m[g];
 				m[g] = null;
 			}
+		}
+		else if(increment < 0){
+			for(var g=a;g<m.length;g++)if(m[g]){ // loop forward so as not to overwrite as you go
+				s[m[g]].group_history.push(g+increment);
+				invalidated[m[g]] = 1;
+				m[g+increment] = m[g];
+				m[g] = null;
+			}		
+		} //if increment is zero we don't need to touch the other immutables
 		
 		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...
 		for(var i=2;i<arguments.length;i++)
 			invalidated[NewImmutable.call(this,arguments[i],a+i-2)] = 1;
-
 		return invalidated;
 	}
 	
