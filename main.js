@@ -407,7 +407,6 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 		$(t_new).show()
 				.toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
 		t_new.group_n = slot_k.inds.length;
-		t_new.group_spa_max = 0;
 		t_new.group_color_1 = T.PALETTE_FLAG_CSS[new_tile_ind];
 		t_new.group_color_2 = T.PALETTE_FLAG_CSS_TEXT[new_tile_ind];
 
