@@ -131,8 +131,9 @@ T.FinishedLoadingFile = function(status,filetype){
 
 	if(filetype == null){	
 		if(status.tet < 3){
-			T.PlotPos();
-			T.PlotSpeedHist(null); //TODO: check whether this is really needed here
+			//TODO: check whether anything is needed here
+			//T.PlotPos();
+			//T.PlotSpeedHist(null); 
 		}
 		if(status.cut < 3){
 			T.ClearAllTiles();
@@ -419,8 +420,12 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 }
 
 T.ClearAllTiles = function(){
-	while(T.tiles.length)
-		$(T.tiles.pop()).remove();
+	if(!T.tiles.length)
+		return;
+	// old pop and .remove() from T.tiles loop was slow..use this instead..
+	T.tiles.splice(0,T.tiles.length);
+	var tiles = Array.prototype.slice.call(document.getElementsByTagName('tile-element'))
+							   .forEach(function(t){t.remove()});
 	T.cutSlotToTileMapping = [];
 }
 
