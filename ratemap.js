@@ -438,7 +438,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			main.PlotDirData(ratemap.buffer, slot.num, slot.generation,IM_RATEMAP_DIR,[ratemap.buffer]);
 		}
 				
-		var ToImageData = function(map,max_map){
+		var ToImageData = function(map, max_map){
 			//we use PALETTE which is a Uint32Array, though really the underlying data is 4 bytes of RGBA
 
 			var im = new Uint32Array(map.length);
@@ -601,9 +601,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		
 		switch(imType){
 			case IM_RATEMAP:
-				if(maxRate > 0) 
-					CutSlotLog(slotInd,"Max spatial rate: " + Math.round(maxRate*10)/10 + "Hz. Mean rate: " + Math.round(meanRate*10)/10 + "Hz","rate");
-				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
+				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas, Math.round(maxRate*10)/10 ); //send the plot back to main
 				break;
 			case IM_SPIKES_FOR_PATH:
 				$canvas.toggleClass("poslayer",true);
@@ -665,7 +663,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         	SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
 		}
 		if(!v[0]) for(var i=0;i<workerSlotGeneration.length;i++)
-			CanvasUpdateCallback(i,TILE_CANVAS_NUM,null);
+			CanvasUpdateCallback(i,TILE_CANVAS_NUM,null,0);
 		if(!v[1]) for(var i=0;i<workerSlotGeneration.length;i++)
 			CanvasUpdateCallback(i,TILE_CANVAS_NUM2,null);
 		if(!v[0] && !v[1]){
