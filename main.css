@@ -25,17 +25,20 @@ user-select: none;
 #all_below_toolbar{
   position: relative;
 }
+.keyboard_focus_notifier.ease{
+  transition: border-color 0.3s ease-in-out;
+}
 .keyboard_focus_notifier{
-  display: none;
   position: absolute;
   top: 0px;
   bottom: 0px;
   left: 0px;
   right: 0px;
-  border: 20px solid rgba(255,0,0,0.2);
+  border: 20px solid;
+  border-color: rgba(255,0,0,0);
 }
 .keyboard_focus_notifier.no_focus{
-  display: block;
+  border-color: rgba(255,0,0,0.2);
 }
 .info_summary{
     position: absolute;

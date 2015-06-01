@@ -15,7 +15,7 @@
 var T = T || {};
 
 T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list,
-			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val,$banner,$drop_excess_stuff){ // the T.ORG object was created by cut.js, here we add a lot more to it
+			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val,$banner,$drop_excess_stuff, $keyboard_notifier){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -751,7 +751,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
         $drop_zone.hide();
         $drop_zone.toggleClass('alreadyUsed',true);
         $drop_excess_stuff.hide();
-        haveDroppedAtLeastOnce = true;
+        if (!haveDroppedAtLeastOnce){
+	        setTimeout(function(){$keyboard_notifier.toggleClass('ease', true)},100); //this prevents an ugly transition at the start
+	        haveDroppedAtLeastOnce = true;
+        }
         /*if($drop_zone){
             $drop_zone.remove();
             $drop_zone = null;
@@ -878,7 +881,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),
-	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val'),$('.drop_banner'),$('.github_button_filedrop,#works_with_chrome')
+	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val'),$('.drop_banner'),$('.github_button_filedrop,#works_with_chrome'),
+	$('.keyboard_focus_notifier')
 );
 
 
