@@ -106,14 +106,12 @@ T.CUT = function(ORG){//class factory
 	var SpliceImmutables = function(a,n_remove /* , inds_1, inds_2, ... */){	//behaves like javascript array "splice"
 		var s = this._.immutablesSlots;
 		var m = this._.groupToImmutablesMapping;
-		DebugState.call(this, "A. splice a,n: " + a + "," +n_remove)
 		var invalidated = M.repvec(0,s.length);
 		
 		// clear the slots with groups  a,a+1,...,a+n_remove-1
 		for(var i=0;i<n_remove;i++)
 			invalidated[DeleteImmutable.call(this,a+i)] = 1;
 		
-		DebugState.call(this, "B. splice a,n: " + a + "," +n_remove)
 		// for all slots corresponding to groups a,a+1,a+2,...,nGroups, push an incremented group number onto the group_history
 		var increment = arguments.length-2 - n_remove; //e.g. if you remove one and add three the increment will be two
 		if(increment > 0){
@@ -133,11 +131,9 @@ T.CUT = function(ORG){//class factory
 			}		
 		} //if increment is zero we don't need to touch the other immutables
 		
-		DebugState.call(this, "C. splice a,n: " + a + "," +n_remove)
 		// add the new (inds,group_num) pairs into vacant slots, using group numbers a,a+1,a+2,...
 		for(var i=2;i<arguments.length;i++)
 			invalidated[NewImmutable.call(this,arguments[i],a+i-2)] = 1;
-		DebugState.call(this, "D. splice a,n: " + a + "," +n_remove)
 		return invalidated;
 	}
 	
