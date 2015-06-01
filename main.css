@@ -30,6 +30,7 @@ user-select: none;
 }
 .keyboard_focus_notifier{
   position: absolute;
+  pointer-events: none;
   top: 0px;
   bottom: 0px;
   left: 0px;
