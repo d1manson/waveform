@@ -569,12 +569,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         ctx.beginPath();
         ctx.strokeStyle = "RGBA(50,50,50,0.3)";
         ctx.beginPath();
-        ctx.moveTo(S/2,S/4);
-        ctx.lineTo(S/2,S*3/4);
+        ctx.moveTo(S/2,0);
+        ctx.lineTo(S/2,S);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(S/4,S/2);
-        ctx.lineTo(S*3/4,S/2);
+        ctx.moveTo(0,S/2);
+        ctx.lineTo(S,S/2);
         ctx.stroke();
 
 		ctx.beginPath();
