@@ -126,7 +126,7 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 
 #### Understanding the code
 
-**Notes for the serious future development**    
+**Notes for serious future development**    
 There are a bunch of web standards/stuff which are in early stages of development at the time of writing, but which will be useful in future:  [Polymer 1.0](https://www.polymer-project.org/1.0/), [Shared Array Buffers](https://www.chromestatus.com/feature/4570991992766464) (and allied atomic/threading APIs), [Chrome asm.js optimisation](https://code.google.com/p/v8/issues/detail?id=2599), [WebGL 2.0](http://blog.tojicode.com/2013/09/whats-coming-in-webgl-20.html), [SIMD in JS](https://hacks.mozilla.org/2014/10/introducing-simd-js/) (in some form).   
 
 I have grand plans for a serious framework, which if I ever write and finish, would offer great promisses for a future re-write of this project.  But that might be too ambitious.
