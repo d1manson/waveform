@@ -8,7 +8,7 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
 + if you want an older "stable" version you will need to navigate through the git history of the ``hgpages``  branch and download the version you like.  Note that unfortunately no version numbering scheme has been used so there isn't a simple way of reocgnising previous iterations.
 
-**Updates** I will endevaour to create named releases when new features are implemented (but not do that annoyingly ofen).  There is an RSS feed for releases: https://github.com/d1manson/waveform/releases.atom, which you can use with any RSS reader or [RSS email service](https://blogtrottr.com/).
+**Updates** I will endevaour to create named releases when new features are implemented (but not do that annoyingly ofen).  There is an RSS feed for releases ([here](https://github.com/d1manson/waveform/releases.atom)), which you can use with any RSS reader or [RSS email service](https://blogtrottr.com/).
 
 #### Screenshots
 Example view of the whole application, with a few things labeled:    
