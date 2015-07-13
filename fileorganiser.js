@@ -639,7 +639,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var GetSpeedHist = function(callback,timeMode,canvW,canvH){
 		//TODO: cache result and be more careful about what point this might be called i.e. before/after posBuffer is available etc.
 		//and make this async and possibly in a worker.
-		var BIN_SIZE = 2;//cm per second
+		var BIN_SIZE = 4;//cm per second
 		var MAX_SPEED = 45; //cm per second
 		if(!cPosBuffer)
 			return;

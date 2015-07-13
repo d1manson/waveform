@@ -3,7 +3,7 @@
 var T = T || {};
 T.Tool = {};
 T.chanIsOn = [1,1,1,1];
-T.mapIsOn = [0];
+T.mapIsOn = [1,1,1];
 T.tAutocorrIsOn = 0;
 T.paletteMode = -1;
 
@@ -231,7 +231,7 @@ T.DisplayIsOnClick = function(evt,keyboard){
 	}else{
 		//if ctr key is not down then we start with a blank slate
 		setChans = [0,0,0,0];
-		setMaps = [0];
+		setMaps = [0, 0, 0];
 		setTautocorr = 0;
 	}
 

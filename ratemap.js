@@ -160,7 +160,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
-		var desiredCmsPerBin = 2;
+		var desiredCmsPerBin = 4;
         var desiredSmoothingW = 2;
 		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15..maybe larger factors too if you really want
 		var desiredSmoothingDir = 2; //TODO: lookup what knid of smoothing needs to be done for dir plots.
@@ -545,10 +545,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			var f = W/max(vals);
 			for(var i=0, y=0;i<vals.length && y<H;i++,y++){
 				var h = f*vals[i];
-				for(var x=0;x<h;x++)
-					im[y*W+W-1-x] = color_a;
-				im[y*W+W-1] = color_ax;
-				y++;
+				for (var k=0;k<3;k++){
+					for(var x=0;x<h;x++)
+						im[y*W+W-1-x] = color_a;
+					im[y*W+W-1] = color_ax;
+					y++;
+				}
 				for(var x=0;x<h;x++)
 					im[y*W+W-1-x] = color_b;
 				im[y*W+W-1] = color_ax;
@@ -623,7 +625,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	// ==== END OF WORKER ==========================
 	
 	var cCut = null;
-	var show = [0,0];
+	var show = [0,0,0];
 	var workerSlotGeneration = []; //for each slot, keeps track of the last generation of immutable that was sent to the worker
 	var meanTMode = false;
 	var desiredCmPerBin = 2.5;
@@ -721,7 +723,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         if(this != null)
             cCut = this;
 
-        if(!(show[0] || show[1]))
+        if(!(show[0] || show[1] || show[2]))
             return; //we only render when we want to see them
 
 		if(isNewCut){
