@@ -784,6 +784,7 @@ T.InitKeyboardShorcuts = function(){
 	key('alt+t',T.Toggle('tc_info'));
 	key('alt+z',T.Toggle('action_info'));
 	key('alt+c',T.Toggle('dir_info'));
+	key('alt+v',T.Toggle('speed_info'));
 	key('=',function(){T.CP.SetSize(T.CP.GetSize()+20)})
 	key('-',function(){T.CP.SetSize(T.CP.GetSize()-20)})
 	key('enter',function(){T.Tool.SetPainterDestGroup(-1);});
