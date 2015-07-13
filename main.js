@@ -12,10 +12,11 @@ T.BASE_CANVAS_HEIGHT = 256;
 T.CANVAS_NUM_WAVE = 0;
 T.CANVAS_NUM_RM = 1;
 T.CANVAS_NUM_RM_DIR = 2;
-T.CANVAS_NUM_TC = 3;
+T.CANVAS_NUM_RM_SPEED = 3;
+T.CANVAS_NUM_TC = 4;
 T.POS_PLOT_WIDTH = 255;
 T.POS_PLOT_HEIGHT = 255;
-T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4,5], TC: 6}; //order in DOM
+T.DISPLAY_ISON = {CHAN: [0,1,2,3], RM: [4,5,6], TC: 7}; //order in DOM
 
 T.xFactor = 2;
 T.yFactor = 2;
@@ -190,7 +191,7 @@ T.DispHeaders = function(status,filetype,forced){
 
 T.SetDisplayIsOn = function(v){ 
 
-	//there are currently 7 buttons: the first 4 are channels, then 2 for ratemap and 1 for temporal autocorr
+	//there are currently 7 buttons: the first 4 are channels, then 3 for ratemap and 1 for temporal autocorr
 	//this function will 
 	if('chanIsOn' in v){
 		T.chanIsOn = v.chanIsOn; //array of 4
@@ -200,7 +201,7 @@ T.SetDisplayIsOn = function(v){
 	}
 
 	if('mapIsOn' in v){
-		T.mapIsOn = v.mapIsOn; //array of 2
+		T.mapIsOn = v.mapIsOn; //array of 3
 		for(var i=0;i<T.DISPLAY_ISON.RM.length;i++)
 			T.mapIsOn[i] ? T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).attr('checked',true) : T.$displayButtons.eq(T.DISPLAY_ISON.RM[i]).removeAttr('checked');
 		T.RM.SetShow(T.mapIsOn);
@@ -777,6 +778,7 @@ T.InitKeyboardShorcuts = function(){
 	key('r, shift+r',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[0],shiftKey:key.shift});});
 	key('t, shift+t',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.TC,shiftKey:key.shift});});
 	key('c, shift+c',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[1],shiftKey:key.shift});});
+	key('v, shift+v',function(){T.DisplayIsOnClick(null,{val:T.DISPLAY_ISON.RM[2],shiftKey:key.shift});});
 	key('d',T.DriftButtonClick);
 	key('h, alt+h',T.ToggleHeaderInfo);
 	key('k, alt+k',T.Toggle('shortcut_info'));

@@ -62,7 +62,8 @@
 			<ul>
 			<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
 			<li><b>r</b> spatial ratemap</li>
-			<li><b>c</b> directional ratemap</li>
+			<li><b>c</b> directional ratemap ("c" is for circle)</li>
+			<li><b>v</b> directional ratemap ("v" is for velocity)</li>
 			<li><b>t</b> temporal autocorrelogram</li>
 			</ul>
 			Other shortcuts:
@@ -73,7 +74,7 @@
 			<li><b>enter</b> increment cluster painting destination group</li>
 			<li><b>esc</b> open/close the toolbar</li>
 			<li><b>p</b> toggle waveform palette</li>
-			<li><b>k</b> show this info</li>
+			<li><b>k</b> show this info ("k" is for keyboard)</li>
 			<li><b>h</b> show header info</li>
 			<li><b>?</b> open GitHub info in a new tab</li>
 			</ul>
@@ -108,6 +109,19 @@
 		</div>
 	</div>
 	
+	<div class="floatinginfo speed_info">
+		<div class='floating_title'>Speed ratemap [v]</div>
+		<div class='floating_body'>
+			Bin size <span id='dir_binsize_val' class="slider_val">2 cm/s</span><br>
+			WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
+			<!--<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
+			<br><br>
+			Smoothing kernel boxcar <span id='rm_smoothing_val' class="slider_val">(2x?+1) by (2x?+1) bins</span><br>
+			<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider><br>
+			-->
+		</div>
+	</div>
+
 	
 	<div class="floatinginfo tc_info">
 			<div class='floating_title'>Temporal auto correlation [t]</div>
@@ -230,6 +244,9 @@
 	</core-tooltip>
 	<core-tooltip label="directional ratemap [c]">
 		<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
+	</core-tooltip>
+	<core-tooltip label="speed ratemap [v]">
+		<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
 	</core-tooltip>
 	<core-tooltip label="temporal autocorrelation [t]">
 		<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>

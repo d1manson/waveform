@@ -1,7 +1,7 @@
 "use strict";
 /* TODO: better separate the two kinds of ratemap so that we can more easily reduce the work load if we ahve turned one/both off*/
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
-                CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,ORG,
+                CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,TILE_CANVAS_NUM3,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
 				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks){
 				
@@ -140,13 +140,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
+		var desiredCmsPerBin = 2;
         var desiredSmoothingW = 2;
 		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15..maybe larger factors too if you really want
 		var desiredSmoothingDir = 2; //TODO: lookup what knid of smoothing needs to be done for dir plots.
 		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
-		var show = [1,1];
+		var show = [1,1,1];
 		
 		var PALETTE = function(){
 			var P_COLORS = 5;
@@ -178,14 +179,17 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			slots = [];
 			ClearQueue();
 		}
-		var SetShow = function(spa, dir){
+		var SetShow = function(spa, dir, speed){
 			show[0] = spa;
 			show[1] = dir;
+			show[2] = speed;
 			for(var i=0;i<slots.length;i++)if(slots[i]){
 				if(!show[0])
 					slots[i].cmPerBin = NaN;
 				if(!show[1])
 					slots[i].degPerBin = NaN;
+				if(!show[2])
+					slots[i].cmsPerBin = NaN;
 			}
 			QueueAllSlotsLazy();
 			
@@ -219,9 +223,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			QueueAllSlotsLazy();
 		    
         }
-		
+		var SetBinSizeCms = function(v){
+			if(v == desiredCmsPerBin)
+                return; //no point doing anything if the value isn't new
+
+            ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
+			desiredCmsPerBin = v;
+			CachePosBinIndsAndDwellMap_Speed(); //when we change the bin size we have to redo this stuff
+			QueueAllSlotsLazy();
+		}
+
 		var QueueAllSlotsLazy = function(){
-			if(!(show[0] || show[1]))
+			if(!(show[0] || show[1] || show[2]))
 				return;
 			//will enqueue any slots that dont match the desired settings
 			for(var i=0;i<slots.length;i++)if(
@@ -229,7 +242,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 					slots[i].posDataId != desiredPosDataId ||				
 					show[0] && ( slots[i].smoothingW != desiredSmoothingW ||
 								 slots[i].cmPerBin != desiredCmPerBin	  ) ||
-					show[1] && slots[i].degPerBin != desiredDegPerBin
+					show[1] && slots[i].degPerBin != desiredDegPerBin ||
+					show[2] && slots[i].cmsPerBin != desiredCmsPerBin
 					))
 				QueueSlot(i);
 		    
@@ -653,20 +667,23 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 
 	var SetShow = function(v){
-		if(show[0] == v[0] && show[1] == v[1])
+		if(show[0] == v[0] && show[1] == v[1] && show[2] == v[2])
 			return;
 		show = v.slice(0);
-		theWorker.SetShow(show[0], show[1])
+		theWorker.SetShow(show[0], show[1], show[2])
         if(!cCut)
             return;
-		if(v[0] || v[1]){
+		if(v[0] || v[1] || v[2]){
         	SlotsInvalidated.call(null,M.repvec(1,cCut.GetNImmutables())); //invalidate all slots
 		}
 		if(!v[0]) for(var i=0;i<workerSlotGeneration.length;i++)
 			CanvasUpdateCallback(i,TILE_CANVAS_NUM,null,0);
 		if(!v[1]) for(var i=0;i<workerSlotGeneration.length;i++)
 			CanvasUpdateCallback(i,TILE_CANVAS_NUM2,null);
-		if(!v[0] && !v[1]){
+		if(!v[2]) for(var i=0;i<workerSlotGeneration.length;i++)
+			CanvasUpdateCallback(i,TILE_CANVAS_NUM3,null);
+
+		if(!v[0] && !v[1] && !v[2]){
 			//TODO: tidy up this case or at least check it's correct
 			workerSlotGeneration = [];
 			theWorker.ClearCut(); //clears old cut TODO: maybe we can keep the data safely in the worker in case we want to do show again
@@ -802,7 +819,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 
 }(T.PAR.BYTES_PER_SPIKE,T.PAR.BYTES_PER_POS_SAMPLE,T.PAR.POS_NAN,
-  T.CutSlotCanvasUpdate, T.CutSlotLog, T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.ORG,
+  T.CutSlotCanvasUpdate, T.CutSlotLog, T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.CANVAS_NUM_RM_SPEED,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
 	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks)

@@ -127,6 +127,9 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	.dir-rm{
 	height:78px;
 	}
+	.speed-rm{
+	height: 40px;
+	}
 	.tc{
 	height:50px;
 	}
@@ -149,18 +152,14 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 
 	*/
 	
-	@-webkit-keyframes fadeout{
-	0%     { opacity: 1;  }
-	25%   { opacity: 1;   }
-	50%   { opacity: 0;   }
-	75%   { opacity: 0;   }
-	100%   { opacity: 1;   }
-	}
 	</style>
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
 	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	<div style="display:inline-block;" layout vertical>
-	<div><canvas class='dir-rm' width='0' height='0' style='width:0px'></canvas></div>
+	<div>
+		<canvas class='dir-rm' width='0' height='0' style='width:0px'></canvas>
+		<canvas class='speed-rm' width='0' height='0' style='width:0px'></canvas>
+	</div>
 	<div><canvas class='tc' width='0' height='0' style='width:0px;'></canvas></div>
 	</div>
 	<div id='sticker' class='tile-sticker' style="background-color:{{group_color_1}};color:{{group_color_2}};">{{group_num}}</div>
@@ -201,7 +200,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.$.over.style.cssText = '';
 		el.$.sticker.style.right = '';
 		el.$.blind.style.cssText = '';
-		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = '';})
 	}
 	
 	var StyleActive = function(el){
@@ -214,13 +212,11 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	var StyleHover = function(el){
 		ResetStyle(el);
 		el.$.sticker.style.right = '26px';
+		el.style.opacity = '0.5';
 	}
 	var StyleProxiamte = function(el){
 		StyleMoving(el);
 		el.style.backgroundColor = '';
-		//TODO: need to deal with animation prefixing
-		el.style.opacity = '1';
-		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1s linear infinite';})
 	}
 	
 	var StyleMoving = function(el){
@@ -242,10 +238,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	
 	var LogIt = function(el,attr,val){
 		//console.log("[g" + el.group_num + "] setting " + attr + "=" + val + " when state_=" + el.state_);
-	}
-	
-	var forEachInNodeList = function(nodelist,foo){
-	Array.prototype.forEach.call(Array.prototype.slice.call(nodelist), foo); //no wonder I've been using jQuery...why on earth does this have to be so lengthy?
 	}
 	
     Polymer('tile-element',{
