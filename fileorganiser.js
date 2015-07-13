@@ -639,8 +639,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var GetSpeedHist = function(callback,timeMode,canvW,canvH){
 		//TODO: cache result and be more careful about what point this might be called i.e. before/after posBuffer is available etc.
 		//and make this async and possibly in a worker.
-		var BIN_SIZE = 5;//cm per second
-		var MAX_SPEED = 60; //cm per second
+		var BIN_SIZE = 2;//cm per second
+		var MAX_SPEED = 45; //cm per second
 		if(!cPosBuffer)
 			return;
 		
@@ -655,49 +655,11 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		for(var i=0;i<nPos-1;i++){
 			var speed = Math.hypot(data[i*2+2]-data[i*2+0],data[i*2+3]-data[i*2+1]);
 			binInd[i] = Math.floor(speed*f);
-			hist[binInd[i]]++;
+			if (binInd[i] < MAX_SPEED)
+				hist[binInd[i]]++;
 		}
 		
-		if(!timeMode){
-			//if we are in normal mode then we're done...
-			setTimeout(function(){callback(hist);},10);
-		}else{
-			//in "time" a.k.a. "drift" mode we are just getting started...
-			var PALETTE = new Uint32Array(T.PALETTE_TIME.buffer); //TODO: acess this more sensibly
-			var GAP = 3;
-			var c = new Int32Array(nPos);
-			for(var i=0;i<nPos;i++)
-				c[i] = binInd[i]<<16 | Math.floor(i/nPos*256); //this is an easy way of sorting on value and getting the sorting indices out at the end..the indices are actually not full indices but 8-bit palette values
-			M.sort(c,M.IN_PLACE);
-			for(var i=0;i<nPos;i++)
-				c[i] &= 0xffff; //get values back
-			for(var i=0;i<nPos;i++)
-				c[i] = PALETTE[c[i]]; // convert to colour for use in painting...
-				
-			var w = canvH/hist.length; //width of bar, which ends up as the height becuase bar is sideways
-			var max = M.max(hist);
-			var f = (canvW-GAP)/max;
-			//Now we have to actually paint in all the sections of the bars.
-			var imdata = new Int32Array(canvH*canvW);
-			for(var b=0,p=0;b<hist.length;b++){
-				var y = (b*w);
-				var off = y*canvW + GAP; 
-				for(var i=0,x=0;i<hist[b];i++,p++){
-					for(var off_=off;x<f*i;x++) 
-						for(var k=0;k<w;k++,off_+=canvW)
-							imdata[off_ + x] = c[p];
-				}	
-			}
-			//paint a black line down the left side, at x=1 (not x=0 for some reason...that's why off starts as =1)
-			for(var y=0,off=1;y<canvH;y++,off+=canvW)
-				imdata[off] = 0xff000000;//opaque black
-				
-			//demarcate the bars by making the last line of pixels in each bar have half opacity (this roughly seems to match the sub-pixel rectangle width specified in the normal plotting mode)
-			for(var b=0,off=canvW*(w-1);b<hist.length;b++,off+=canvW*w)
-				for(x=GAP;x<canvW;x++)
-					imdata[off+x] &= 0x80ffffff; 
-			setTimeout(function(){callback(imdata.buffer)},10);
-		}
+		setTimeout(function(){callback(hist);},10);
 	}
 	
 	var GetTetBufferProjected = function(){

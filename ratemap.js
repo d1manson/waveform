@@ -8,11 +8,13 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
 	var IM_RATEMAP_DIR = 2;
-	
+	var IM_RATEMAP_SPEED = 3;
+
 	//these constants will be passed through to the worker for use as standard global vars in the worker's scope
 	var WORKER_CONSTANTS = {IM_SPIKES_FOR_PATH: IM_SPIKES_FOR_PATH,
 							IM_RATEMAP:IM_RATEMAP,
 							IM_RATEMAP_DIR: IM_RATEMAP_DIR,
+							IM_RATEMAP_SPEED: IM_RATEMAP_SPEED,
 							POS_W: POS_W,
 							POS_H: POS_H,
 							BYTES_PER_POS_SAMPLE: BYTES_PER_POS_SAMPLE,
@@ -116,6 +118,22 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			for(var i=0;i<mask.length;i++) if(mask[i])
 					vector[i] = val;		
 		}
+		var dropWhereEqual = function(vector,val){ 
+		    // Buffer in-place, but subarray view is returned, so old view is invalid, Matlab equivalent: X = X(X==99)
+		    // TODO: this loop looks pretty inefficeint will the tripple r<L check
+		    var L = vector.length;
+			for(var r=0,w=0; r<L; r++, w++){
+				for(; vector[r] == val && r<L; r++)
+					;
+				if(r<L)
+					vector[w] = vector[r];
+			}
+
+			if(w<L && vector[w-1]==val)
+				return vector.subarray(0,w-1);
+			else
+				return vector.subarray(0,w);
+		}
         // =======================
         
         var posFreq = null;
@@ -131,9 +149,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var posValDir = null; //this is the values in radians (float32)
 		var posBinDir = null; //this is posVlaDir/pi*180/degPerBin ....as with posBinXY this is Uint8Clamped array, which puts a limit on the number of bins...not absolutely crucial but makes life easier in a few places
 		var spikePosBinDir = null; // this is posBinDir(spikePosInd)
+		var spikeSpeedBin = null;
 		var nBinsX = null;
 		var nBinsY = null;
 		var nBinsDir = null;
+		var dwellSpeedCounts = null;
 		var smoothedDwellCounts = null;
 		var smoothedDirDwellCounts = null;
 		var unvisitedBins = null;
@@ -148,7 +168,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
 		var show = [1,1,1];
-		
+		var SpeedPlotSize = [20, 46];
+		var maxSpeedHist = 45; // anything above this is cropped out
+		var NAN_SPEED_BIN = 255;
+
 		var PALETTE = function(){
 			var P_COLORS = 5;
 			var buffer = new ArrayBuffer(4*(P_COLORS+1));
@@ -170,7 +193,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}();
 	
 		var SetImmutable = function(inds,slotInd,generation){
-			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,cmPerBin: null};
+			slots[slotInd] = {inds:new Uint32Array(inds),generation:generation,num:slotInd,cmPerBin: null,cmsPerBin: null};
 			if(spikePosBinXY) //Ok, so we have some cut data, but we cant do anythign unless we have pos and tet data.
 				QueueSlot(slotInd);
 		}
@@ -258,6 +281,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	                GetGroupRatemap(slots[s]);
 				if(show[1])
 					GetGroupRatemap_Dir(slots[s]);
+				if(show[2])
+					GetGroupRatemap_Speed(slots[s]);
 			}
 			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
             //TODO: may want to time the call and potentially do more within this tick
@@ -274,6 +299,31 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			clearTimeout(ratemapTimer);
             ratemapTimer = 0;
 			ratemapSlotQueue = [];
+		}
+
+		var CachePosBinIndsAndDwellMap_Speed = function(){
+			if(posValXY == null || spikePosInd == null)
+				return;
+                
+			var f = 1/desiredCmsPerBin*posFreq/pixPerM*100;
+			var nSpeedBins = maxSpeedHist/desiredCmsPerBin;
+
+			//compute speed bin for each spike, and get histogram of speed dwell
+			var nPos = posValXY.length/2;
+			dwellSpeedCounts = new Uint32Array(nSpeedBins);
+			spikeSpeedBin = new Uint8Array(spikePosInd.length)
+			for(var i=0, s=0;i<nPos-1;i++){
+				var speed = Math.hypot(posValXY[i*2+2]-posValXY[i*2+0],posValXY[i*2+3]-posValXY[i*2+1]);
+				var b = Math.floor(speed*f);
+				if(b < nSpeedBins)
+					dwellSpeedCounts[b]++; //record dwell for this pos samp
+				else
+					b = NAN_SPEED_BIN; // quasi-nan for spikePosInd
+				for(;spikePosInd[s]==i && s<spikePosInd.length;s++) // if there are any spikes for this pos samp, record their speed bin
+					spikeSpeedBin[s] = b;
+
+			}
+			// Note we ignore any spikes in the final pos samp
 		}
 
 		var CachePosBinIndsAndDwellMap_Dir = function(){
@@ -348,7 +398,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				spikePosInd = null;
 				spikePosBinXY = null;
 				spikePosBinDir = null;
+				spikeSpeedBin = null;
 				unvisitedBins = null;
+				dwellSpeedCounts = null;
 				smoothedDwellCounts = null;
 				smoothedDirDwellCounts = null;
 				expLenInSeconds = null;
@@ -363,6 +415,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
 				CachePosBinIndsAndDwellMap_Dir();
+				CachePosBinIndsAndDwellMap_Speed()
 				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
@@ -383,9 +436,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 spikePosBinXY_b = null;
 				spikePosBinXY = null;
 				spikePosBinDir = null;
+				spikeSpeedBin = null;
 				unvisitedBins = null;
 				smoothedDwellCounts = null;
 				smoothedDirDwellCounts = null;
+				dwellSpeedCounts = null;
                 scale_spikes_plot = null;
                 return;
             }
@@ -402,6 +457,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 GetSpikePosInd();
 				CachePosBinIndsAndDwellMap();
 				CachePosBinIndsAndDwellMap_Dir();
+				CachePosBinIndsAndDwellMap_Speed()
 				QueueAllSlotsLazy(); //if we don't have a cut yet this does nothing
 			}
     
@@ -451,7 +507,18 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			slot.degPerBin = desiredDegPerBin;
 			main.PlotDirData(ratemap.buffer, slot.num, slot.generation,IM_RATEMAP_DIR,[ratemap.buffer]);
 		}
-				
+		var GetGroupRatemap_Speed = function(slot){
+			var cutInds = slot.inds;
+
+			var groupSpeedInds = dropWhereEqual(pick(spikeSpeedBin, cutInds), NAN_SPEED_BIN); 
+			var spikeCounts = hist_1(groupSpeedInds, dwellSpeedCounts.length);
+
+			var ratemap = rdivideFloat(spikeCounts, dwellSpeedCounts)
+							
+			ratemap = PlotHistogram(SpeedPlotSize[0],SpeedPlotSize[1],ratemap);
+			slot.cmsPerBin = desiredCmsPerBin;
+			main.ShowIm(ratemap.buffer, undefined, undefined, slot.num, SpeedPlotSize, slot.generation, IM_RATEMAP_SPEED, [ratemap.buffer]);
+		}		
 		var ToImageData = function(map, max_map){
 			//we use PALETTE which is a Uint32Array, though really the underlying data is 4 bytes of RGBA
 
@@ -469,7 +536,25 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			}
 			return im.buffer; //this is how it's going to be sent back to the main thread
 		}
+		var PlotHistogram = function(W,H,vals){
+			var color_a = 0xff000000;
+			var color_b = 0x88000000;
+			var color_ax = 0xff0000ff;
+			var im = new Uint32Array(W*H);
 
+			var f = W/max(vals);
+			for(var i=0, y=0;i<vals.length && y<H;i++,y++){
+				var h = f*vals[i];
+				for(var x=0;x<h;x++)
+					im[y*W+W-1-x] = color_a;
+				im[y*W+W-1] = color_ax;
+				y++;
+				for(var x=0;x<h;x++)
+					im[y*W+W-1-x] = color_b;
+				im[y*W+W-1] = color_ax;
+			}
+			return im;
+		}
 		var PlotPoint = function(im,W,H,x,y,s,color){
 			/* sets a square point of size s x s in image im, with dimensions WxH to the value specified by color */
 			var a_start = y<s/2 ? 0 : y-s/2;
@@ -604,7 +689,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 	
 	var ShowIm = function(imBuffer,maxRate,meanRate,slotInd,sizeXY,generation,imType){
-        if(imType == IM_RATEMAP && !show[0])
+        if((imType == IM_RATEMAP && !show[0]) || (imType == IM_RATEMAP_SPEED && !show[2]))
 			return;
         var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
         var ctx = $canvas.get(0).getContext('2d');
@@ -616,6 +701,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		switch(imType){
 			case IM_RATEMAP:
 				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas, Math.round(maxRate*10)/10 ); //send the plot back to main
+				break;
+			case IM_RATEMAP_SPEED:
+				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM3,$canvas, undefined ); //send the plot back to main
 				break;
 			case IM_SPIKES_FOR_PATH:
 				$canvas.toggleClass("poslayer",true);

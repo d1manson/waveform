@@ -66,32 +66,25 @@ T.PlotSpeedHist = function(hist){
 		return;
 	var canv = T.$speedhist.get(0);
 	var ctx = canv.getContext('2d');
-	var GAP = 3;
 	ctx.clearRect(0,0,canv.width,canv.height);
 	var w = canv.height/hist.length; //width of bar, which ends up as the height becuase bar is sideways
 	var max = M.max(hist);
-	var f = (canv.width-GAP)/max;
-	ctx.fillRect(1,0,1,canv.height);
-
+	var f = canv.width/max;
+	ctx.fillStyle="#000000";
 	for(var i=0;i<hist.length;i++){
-		ctx.fillRect(GAP,i*w,hist[i]*f,w-0.5);
+		ctx.fillRect(0,i*w,hist[i]*f,w-0.5);
 	}
-}
-
-T.PlotSpeedHistDrift = function(x){
-	var canv =  T.$speedhist.get(0);
-	var ctx = canv.getContext('2d');
-
-	var imData = ctx.createImageData(canv.width,canv.height);
-	imData.data.set(new Uint8ClampedArray(x));
-	ctx.putImageData(imData, 0, 0);
+	ctx.fillStyle="#FF0000";
+	ctx.fillRect(0,0,1,hist.length*w);
 
 }
+
 
 T.GoGetSpeedHist = function(v,g){
 	if(v == 2){
 		var canv = T.$speedhist.get(0);
-		T.ORG.GetSpeedHist(T.PlotSpeedHistDrift,true,canv.width,canv.height)
+		//T.ORG.GetSpeedHist(T.PlotSpeedHistDrift,true,canv.width,canv.height)
+		T.ORG.GetSpeedHist(T.PlotSpeedHist,false)
 	}else{
 		T.ORG.GetSpeedHist(T.PlotSpeedHist,false)
 	}
