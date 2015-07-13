@@ -1,13 +1,15 @@
 # <a name="wiki"/> Waveform
 
-Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so. Feel free to contribute.
+Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so.
 
-#### To use the application do one of the following:
+**To use the application** do one of the following:
 + go to [d1manson.github.io/waveform](http://d1manson.github.io/waveform) for the latest fairly stable version
 + [download](https://github.com/d1manson/waveform/archive/master.zip) the code and open index.html in your browser.
 + if you want an older "stable" version you will need to navigate through the git history of the ``hgpages``  branch and download the version you like.  Note that only recent releases have been tagged with human-readable names.
 
-**Updates** I will endevaour to create named releases when new features are implemented (but not do that annoyingly ofen).  There is an RSS feed for releases ([here](https://github.com/d1manson/waveform/releases.atom)), which you can use with any RSS reader or [RSS email service](https://blogtrottr.com/).
+**Updates** will be downloaded simply by refreshing the page. In terms of being informed of changes, I will endevaour to create named releases when new features are implemented so that you can subscribe to the [RSS feed for releases] (https://github.com/d1manson/waveform/releases.atom).  You can use any RSS reader or [RSS email service](https://blogtrottr.com/) to get the RSS.  I will endeavor not to spam the RSS with lots of small update releases.
+
+**Bugs, features, and feedback.** If you are using the application, I'd love to know!  If you find any bugs then definitely report them as soon as possible.  There are many features I'd like to add at some point, but most of them are rather time consuming to implement using the current framework. However, if you let me know what it is you want, I may be more inclined to implement it, especially if it's one of the less tricky things to do.
 
 #### Screenshots
 Example view of the whole application, with a few things labeled:    
