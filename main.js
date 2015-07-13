@@ -639,12 +639,12 @@ T.DriftButtonClick = function(){
 
 
 T.groupOver = {g: null,$tile:null,$clusterSticker:null};
-T.SetGroupOver = function(g){
+T.SetGroupOver = function(g, force){
 	if(T.Tool.cState == T.Tool.STATES.GRABBER)
 		return; // dont change group over while grabber is active
 		
     g = parseInt(g);//when coming via data-group attr it might be a string
-	if(g == T.groupOver.g)
+	if(g == T.groupOver.g && !force)
 		return;
 	
 	if(T.groupOver.$tile)

@@ -361,6 +361,11 @@ T.Tool.TileWallMouseDown_Splitter = function (event) {
 		s.cut.Undo();
 	
 	T.Tool.cState = T.Tool.STATES.NOTHING;
+	if(event.target.nodeName.toLowerCase() == "tile-element"){
+		// below is a bit of a hack, because somehow we end up partly removign the active group status of the tile, 
+		// while still partly keeping a record of it. The "true" is forces the active group to be fully applied.
+		T.SetGroupOver(event.target.group_num, true); 
+	}
 }
 
 T.Tool.VIsOverThreshAtT_Splitter = function(cutInds,ch,t,vThresh){
