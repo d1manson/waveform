@@ -1,7 +1,7 @@
 "use strict"; 
 
 
-T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
+T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 
 	//TODO: it may be woth moving the plotting into a worker..could also do the painting and mouse-over-group detection in the worker.
     // for the painting it might be best to send the finished painted overlay to the worker for processing rather than trying to paint
@@ -185,10 +185,7 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 	}
 
 	var LoadTetrodeData = function(N_val,amps_in){
-		var old_canvs = canvasParent_el.getElementsByTagName('canvas');
-		for(var i=0;i<old_canvs.length;i++)
-			canvasParent_el.removeChild(old_canvs[i]);
-
+		$canvasParent.find('canvas').remove();
 		ctxes = [];
 		chanList = [];
 		N = null;
@@ -220,11 +217,9 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 
 		for(var i=0;i<chanList.length-1;i++)
 			for(var j =i+1;j<chanList.length;j++){
-				var canvas_el = document.createElement("canvas");
-				canvas_el.width = canvS;
-				canvas_el.height = canvS;
-				canvasParent_el.appendChild(canvas_el);
-				ctxes.push(canvas_el.getContext('2d'));
+				var $newCanvas = $("<canvas class='cluster_canv' width='" + canvS + "px' height='" + canvS + "px'/>");
+				$canvasParent.append($newCanvas);
+				ctxes.push($newCanvas.get(0).getContext('2d'));
 			}
 		canvasesAreNew = true;
         //console.timeEnd('tet cluster');
@@ -356,4 +351,4 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
             SetSize: SetSize,
             GetSize: function(){return cssSize;}}; 
 
-} (T.$cluster_panel.get(0),T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer),T.modeChangeCallbacks);
+} (T.$cluster_panel,T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer),T.modeChangeCallbacks);

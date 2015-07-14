@@ -605,14 +605,8 @@ T.PAR = function(){
 
     // The next three funcs are helpers for GetTetrodeTime
     var Swap32_vector = function(X){
-    	for(var i=0;i<X.length; i++){
-    		var val = X[i];
-    		// copy-pasted from utils.js:Swap32 
-			X[i] = ((val & 0xFF) << 24)
-				   | ((val & 0xFF00) << 8)
-				   | ((val >> 8) & 0xFF00)
-				   | ((val >> 24) & 0xFF);
-    	}
+    	for(var i=0;i<X.length; i++)
+			X[i] = Swap32(X[i]);
     }
     var Take_Strided = function(ret, X, stride){
     	// Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
