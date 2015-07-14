@@ -15,9 +15,13 @@ T.PAR = function(){
 		var REGEX_HEADER_A = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 		var DATA_END = "\r\ndata_end";
-		
+		var amps = null;
+		var N = null;
+		var buffer = null;
+
 		var ParseTetrodeFile = function(file, SPIKE_FORMAT, BYTES_PER_SPIKE){
-		
+			buffer = N = amps = null; // invalidate old stuff
+
 			// Read the first 1024 bytes as a string to get the header and find the data start
 			var reader = new FileReaderSync();
 			var topStr = reader.readAsBinaryString(file.slice(0, 1024 + 1));
@@ -43,25 +47,19 @@ T.PAR = function(){
 				header.num_spikes = 0;
 			}
 	
-            var N = header.num_spikes;
+            N = header.num_spikes;
     	    var dataLen = parseInt(N)*BYTES_PER_SPIKE;
 		
 			//read the data section of the file as an array buffer
-    		var buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
-			
-			main.TetrodeFileRead(null,header,buffer,[buffer]);
-			
+    		buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
+			var buffer_copy = buffer.slice(); // this is annoying, really we just need one copy which we aren't going to modify
+			main.TetrodeFileRead(null,header,buffer_copy,[buffer_copy]);
+			GetTetrodeAmplitude(false); // pre-cache amps, main is about to ask for them.
 		}
 		
-		var GetTetrodeAmplitude = function(buffer,N){
-		
-			var C = 4; //TODO: generalise this properly everywhere in the code
-			var W = 50; //TODO: generalise this properly everywhere in the code
-			
-			var oldData = new Int8Array(buffer);
-			var NxC = N*C;
-			var amps = new Uint8Array(NxC);
-			
+		var GetTetrodeAmplitude_sub = function(oldData, amps, NxC, W){
+			NxC = NxC | 0; // int
+			W = W | 0; // int
 			for(var i=0,p=0;i<NxC;i++){
 				p += 4; // skip timestamp 
 				var min = 127;
@@ -72,8 +70,21 @@ T.PAR = function(){
 				}
 				amps[i] = max-min; 
 			}
-
-			main.GotTetAmps(amps.buffer,[amps.buffer]);
+		}
+		var GetTetrodeAmplitude = function(call_main){
+			if (!amps){
+				var C = 4; //TODO: generalise this properly everywhere in the code
+				var W = 50; //TODO: generalise this properly everywhere in the code
+				
+				var oldData = new Int8Array(buffer);
+				var NxC = N*C;
+				amps = new Uint8Array(NxC);
+				GetTetrodeAmplitude_sub(oldData, amps, NxC, W);
+			}
+			if(call_main){
+				var amps_copy = amps.buffer.slice(0)
+				main.GotTetAmps(amps_copy,[amps_copy]);
+			}
 		}
 	
 		
@@ -522,8 +533,7 @@ T.PAR = function(){
 	}	
 	var GetTetrodeAmplitudeWithWorker = function(buffer,header,N,callback){
 		callbacks.tet.push(callback); 
-		buffer = buffer.slice(0); //we clone it so there is still a copy in the main thread;
-		tetWorker.GetTetrodeAmplitude(buffer,N,[buffer]);
+		tetWorker.GetTetrodeAmplitude(true);
     }
 	var GotTetAmps = function(ampsBuffer){
         callbacks.tet.shift()(new Uint8Array(ampsBuffer));
@@ -582,7 +592,7 @@ T.PAR = function(){
 		callbacks.eeg.shift()({header: header,buffer:buffer});
 	}
 	
-	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude*"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
+	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
 	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","ParseCluFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	

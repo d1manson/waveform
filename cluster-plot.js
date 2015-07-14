@@ -79,6 +79,13 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
     }
     
     
+    var Render_one_group_one_plot = function(im, inds, canvS, C, c1_, c2_, color){
+		for(var k=0; k<inds.length; k++){
+			var amp1 = canvS - 1 - amps[inds[k]*C + c1_];
+			var amp2 =  amps[inds[k]*C + c2_];
+			im[amp1*canvS + amp2] = color;
+		}
+    }
 	var RenderSlots = function(slots){
         
         if(meanTMode)
@@ -106,11 +113,7 @@ T.CP = function($canvasParent,ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 				var im = imData32[m];
 				var c1_ = chanList[c1];
 				var c2_ = chanList[c2];
-				for(var k=0;k<inds.length;k++){
-					var amp1 = canvS - 1 - amps[inds[k]*C + c1_];
-					var amp2 =  amps[inds[k]*C + c2_];
-					im[amp1*canvS + amp2] = color;
-				}
+				Render_one_group_one_plot(im, inds, canvS, C, c1_, c2_, color);
 			}
 		}
 

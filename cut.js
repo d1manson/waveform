@@ -141,22 +141,30 @@ T.CUT = function(ORG){//class factory
 		return this._.immutablesSlots[k] || {};
 	}
 	
+	var decrement = function(data){
+		for(var i=0;i<data.length;i++)
+			data[i]--;
+	}
+	var arg_split = function(data){
+		var inds = [[]];
+		for(var i=0; i<data.length; i++)
+			if(inds[data[i]] === undefined)
+				inds[data[i]] = [i];//new subarray
+			else
+				inds[data[i]].push(i);//append to existing subarray
+		return inds;
+	}
+
 	var DoConstruction = function(data_type,data,description){
 		switch (data_type){
 
 		case 1.1: //data is an array specifying the group of each spike, clu-style
-			for(var i=0;i<data.length;i++)
-				data[i]--;
+			decrement(data);
 			//once we've subtracted one from group numbers can continue on to tint-style cut loading...
 				
 		case 1: //data is an array specifying the group of each spike, tint-style
 			this._.N = data.length;
-			var cutInds = [[]];
-			for(var i=0;i<data.length;i++)
-				if(cutInds[data[i]] == undefined)
-					cutInds[data[i]] = [i];//new subarray
-				else
-					cutInds[data[i]].push(i);//append to existing subarray
+			var cutInds = arg_split(data);
 			
 			//now that we have an array of inds arrays, we can make the immutables
 			for(var i =0;cutInds.length;i++)
