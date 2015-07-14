@@ -171,8 +171,10 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 
 	var PlotHist = function(histBuffer,slotInd,maxDeltaT,generation){
 		var hist = new Uint32Array(histBuffer);
-        var $canvas = $("<canvas width='" + plotOpts.W + "' height='" + plotOpts.H + "' />");
-        var ctx = $canvas.get(0).getContext('2d');
+		var canvas_el = document.createElement("canvas");
+		canvas_el.width = plotOpts.W;
+		canvas_el.height = plotOpts.H;
+        var ctx = canvas_el.getContext('2d');
 
 		var xStep = plotOpts.W/(hist.length-1); //the last bin has fewer points due to rounding or something (I think?)
 		var maxCount = M.max(hist);
@@ -191,7 +193,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 		ctx.strokeStyle="red";
 		ctx.stroke();
 
-		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas); //send the plot back to main
+		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,canvas_el); //send the plot back to main
     }
 
     var SlotsInvalidated = function(newlyInvalidatedSlots,isNewCut){ // this = cut object

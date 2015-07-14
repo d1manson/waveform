@@ -287,7 +287,7 @@ T.CutSlotLog = function(slotInd,msg,m_type){
 	}
 }
 
-T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas,info_str){
+T.CutSlotCanvasUpdate = function(slotInd,canvasNum,canvas_el,info_str){
 	//this callback recieves the newly rendered canvases from the waveform rendering and ratemap rendering modules
 	//these rendering modules recieve slot-invalidation events directly from the cut module and can choose to ignore them or
 	//spend any length of time rendering a new canvas.  They must hwoever guarantee to call this function in chronological order for
@@ -300,7 +300,7 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas,info_str){
 	if(!t)
 		return;
 
-	if($canvas)	{
+	if(canvas_el)	{
 		var xF = 1;
 		var yF = 1;
 		
@@ -308,21 +308,29 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas,info_str){
 			case T.CANVAS_NUM_WAVE:
 				xF = T.xFactor*T.SPECIAL_SCALING;
 				yF = T.yFactor*T.SPECIAL_SCALING*T.WV.HEIGHT_SCALE;
-				$canvas.css({width: $canvas.get(0).width *xF + 'px',height: $canvas.get(0).height *yF  + 'px'}); //apply css scaling
+				//apply css scaling
+				canvas_el.style.width = canvas_el.width*xF + 'px';
+				canvas_el.style.height = canvas_el.height*yF + 'px';
 				break;
 			case T.CANVAS_NUM_RM:
-				$canvas.css({height:  T.TILE_RM_HEIGHT + 'px'}); //apply css scaling
+				canvas_el.style.height = T.TILE_RM_HEIGHT + 'px';  //apply css scaling
 				t.group_spa_max = info_str;
 				break;
 			case T.CANVAS_NUM_RM_DIR: //TODO: probably want some special scaling for direction ratemaps that isn't the same as XY-maps
-				$canvas.css({height:  T.TILE_DIR_RM_HEIGHT + 'px'}); //apply css scaling
+				canvas_el.style.height = T.TILE_DIR_RM_HEIGHT + 'px';  //apply css scaling
 				break;
 			case T.CANVAS_NUM_TC:
 				// for temporal autocorr leave it at 1
 				break;
 		}
     }else{
-		$canvas = $("<canvas width='0' height='0' style='width:0px;height:0px;'></canvas>"); //create a zero-size canvas if we weren't given anything
+    	 //create a zero-size canvas if we weren't given anything
+		canvas_el = document.createElement("canvas");
+		canvas_el.width = 0;
+		canvas_el.height = 0;
+		canvas_el.style.width = "0px";
+		canvas_el.style.height = "0px";
+
 		switch (canvasNum){
 			case T.CANVAS_NUM_RM:
 				t.group_spa_max = info_str;
@@ -330,10 +338,9 @@ T.CutSlotCanvasUpdate = function(slotInd,canvasNum,$canvas,info_str){
 		}
     }
 
-	t.updateCanvas($canvas.get(0),canvasNum);
-
+	t.updateCanvas(canvas_el,canvasNum);
 	for(var i=0;i<T.canvasUpdatedListeners.length;i++)
-		T.canvasUpdatedListeners[i](canvasNum,$canvas,g);
+		T.canvasUpdatedListeners[i](canvasNum,$(canvas_el),g);
 }
 
 T.CreateTile = function(i){
