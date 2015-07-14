@@ -153,9 +153,9 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	
 	@-webkit-keyframes fadeout{
 	0%     { opacity: 1;  }
-	25%   { opacity: 1;   }
+	33%   { opacity: 1;   }
 	50%   { opacity: 0;   }
-	75%   { opacity: 0;   }
+	83%   { opacity: 0;   }
 	100%   { opacity: 1;   }
 	}
 	</style>
@@ -205,6 +205,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
 		el.$.over.style.cssText = '';
 		el.$.sticker.style.right = '';
+		el.$.sticker.style.webkitAnimation = '';
 		el.$.blind.style.cssText = '';
 		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = '';})
 	}
@@ -218,14 +219,15 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	
 	var StyleHover = function(el){
 		ResetStyle(el);
-		el.$.sticker.style.right = '26px';
 	}
 	var StyleProxiamte = function(el){
 		StyleMoving(el);
 		el.style.backgroundColor = '';
 		//TODO: need to deal with animation prefixing
 		el.style.opacity = '1';
-		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1s linear infinite';})
+		el.$.sticker.style.right = '26px';
+		el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
+		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1.5s linear infinite';})
 	}
 	
 	var StyleMoving = function(el){
