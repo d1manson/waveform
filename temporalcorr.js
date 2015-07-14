@@ -18,9 +18,6 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 			(new DataView(b)).setInt16(0,256,true);
 			return (new Int16Array(b))[0] == 256? 'L' : 'B';
 		}();
-		var sort = function(x){ //in-place sort
-			Array.prototype.sort.call(x,function(a,b){return a-b;}); 
-		}
 		var rDivide = function(x,d){ //in-place divide by scalar
 			for(var i=0;i<x.length;i++)
 				x[i] /= d; //if x is integer this division will give the floor of x/d
@@ -40,6 +37,13 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 				(m < X[i]) && (m = X[i])
 			return m; 
         }
+        var pick = function(from, indices){
+			// Take elements specified by indicies from the 1d array "from".
+			var result =  new from.constructor(indices.length); //make an array of the same type as the from array
+			for(var i=0;i<indices.length;i++)
+				result[i] = from[indices[i]];
+			return result;
+		}
 		// ==============================================
 
 		var allSpikeTimes = null;
@@ -105,35 +109,33 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 			allSpikeTimes = new Uint32Array(buffer); // in miliseconds
 		}
 
+		var GetGroupHist_sub = function(spikeTimes, D, b, nBs){
+			var ret = new Uint32Array(nBs);
+
+			// For every pair of spikes separated in time by no more than time D, bin
+			// up the time separation, with bin size b, and record it in hist, ret.
+			for(var laterInd=1, earlierInd = 0; laterInd< spikeTimes.length; laterInd++){
+				var laterTime = spikeTimes[laterInd];
+				while (spikeTimes[earlierInd] < laterTime - D)
+					earlierInd++;
+				for(var i=earlierInd; i<laterInd; i++)
+					ret[Math.floor((laterTime - spikeTimes[i])/b)]++;
+			}
+			return ret;
+		}
+
 		var GetGroupHist = function(slot){
 			if(allSpikeTimes == null)
 				return;
 
-			var cutInds = slot.inds;
-
 			// note maxDeltaT and allSpikeTimes should be in the same units, represented as uin32s.
-			var spikeTimes = new Uint32Array(cutInds.length);
-			for(var i=0;i<cutInds.length;i++)
-				spikeTimes[i] = allSpikeTimes[cutInds[i]]
+			var spikeTimes = pick(allSpikeTimes, slot.inds);
 
-			sort(spikeTimes);
-			var diffs = [];
-
-			// For every pair of spikes separated in time by no more than maxDeltaT, record
-			// the time separation in the diffs array.
-			for(var laterInd=1, earlierInd = 0;laterInd<spikeTimes.length;laterInd++){
-				var laterTime = spikeTimes[laterInd];
-				while (spikeTimes[earlierInd] < laterTime - desiredMaxDeltaT)
-					earlierInd++;
-				for(var i=earlierInd;i<laterInd;i++)
-					diffs.push(laterTime - spikeTimes[i]);
-			}
-
-			var diffs = new Uint16Array(diffs);
-			rDivide(diffs,binSize); //in-place integer division does a = floor(a/b)
-
-			var ret = hist(diffs,Math.floor(desiredMaxDeltaT/binSize));	
+			// build pairwise-diff histogram
+			var ret = GetGroupHist_sub(spikeTimes, desiredMaxDeltaT, binSize, Math.floor(desiredMaxDeltaT/binSize));
+			
 			//ret[0] += cutInds.length; //to take acount of the self difference for each spike
+
 			slot.maxDeltaT = desiredMaxDeltaT;
 			main.PlotHist(ret.buffer,slot.num,desiredMaxDeltaT,slot.generation,[ret.buffer]);
 
