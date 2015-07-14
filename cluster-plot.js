@@ -185,7 +185,7 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 	}
 
 	var LoadTetrodeData = function(N_val,amps_in){
-		var old_canvs = canvasParent_el.getElementsByTagName('canvas');
+		var old_canvs = Array.prototype.slice.call(canvasParent_el.getElementsByTagName('canvas'),0);
 		for(var i=0;i<old_canvs.length;i++)
 			canvasParent_el.removeChild(old_canvs[i]);
 
