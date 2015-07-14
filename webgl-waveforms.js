@@ -592,7 +592,7 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		while(newlyPreparedSlots.length){
 			var s = newlyPreparedSlots .pop();
 			$(r.$canvases[s.num]).data('slot_num',s.num);
-			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, $(r.$canvases[s.num]));
+			CanvasUpdateCallback(s.num, TILE_CANVAS_NUM, r.$canvases[s.num]);
 			r.invalidatedSlots[s.num] = 0; // note that this could have been done at any point above (because, due to single-threadedness, no invalidation events can occur during execution of this function)
 			r.slotColMap[s.num] = r.desiredColormap < 0? r.desiredColormap : s.group_history.slice(-1)[0];
 			r.slotGeneration[s.num] = s.generation;

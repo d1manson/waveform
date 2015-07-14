@@ -663,8 +663,10 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			return;
 	    var S = 78; //size in pix
 		var data = new Float32Array(dataBuffer);
-		var $canvas = $("<canvas width='" + S + "' height='" + S + "' />");
-        var ctx = $canvas.get(0).getContext('2d');
+		var canvas_el = document.createElement("canvas");
+		canvas_el.width = S;
+		canvas_el.height = S;
+        var ctx = canvas_el.getContext('2d');
 
         // draw axes
         ctx.beginPath();
@@ -687,14 +689,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		i = 0;
 		ctx.lineTo(S/2-costable[i]*S/2*data[i], S/2-sintable[i]*S/2*data[i]);
 		ctx.stroke();   
-		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,$canvas); //send the plot back to main
+		CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM2,canvas_el); //send the plot back to main
 	}
 	
 	var ShowIm = function(imBuffer,maxRate,meanRate,slotInd,sizeXY,generation,imType){
         if((imType == IM_RATEMAP && !show[0]) || (imType == IM_RATEMAP_SPEED && !show[2]))
 			return;
-        var $canvas = $("<canvas width='" + sizeXY[0] + "' height='" + sizeXY[1] + "' />");
-        var ctx = $canvas.get(0).getContext('2d');
+		var canvas_el = document.createElement("canvas");
+		canvas_el.width = sizeXY[0];
+		canvas_el.height = sizeXY[1];
+        var ctx = canvas_el.getContext('2d');
 
 		var imData = ctx.createImageData(sizeXY[0],sizeXY[1]);
 		imData.data.set(new Uint8ClampedArray(imBuffer));
@@ -702,14 +706,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		
 		switch(imType){
 			case IM_RATEMAP:
-				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,$canvas, Math.round(maxRate*10)/10 ); //send the plot back to main
+				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM,canvas_el, Math.round(maxRate*10)/10 ); //send the plot back to main
 				break;
 			case IM_RATEMAP_SPEED:
-				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM3,$canvas, undefined ); //send the plot back to main
+				CanvasUpdateCallback(slotInd,TILE_CANVAS_NUM3,canvas_el, undefined ); //send the plot back to main
 				break;
 			case IM_SPIKES_FOR_PATH:
-				$canvas.toggleClass("poslayer",true);
-				SpikeForPathCallback($canvas);  //send the plot back to main
+				canvas_el.className = "poslayer";
+				SpikeForPathCallback($(canvas_el));  //send the plot back to main
 				break;
 		}
 			
