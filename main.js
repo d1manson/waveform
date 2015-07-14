@@ -442,7 +442,7 @@ if (!confirm("Do you really want to clear all data and settings and reload the p
 }
 
 T.ShowGitHub = function(){
-	window.open("https://github.com/d1manson/waveform/tree/master#wiki","_blank");
+	window.open("https://github.com/d1manson/waveform/tree/gh-pages#wiki","_blank");
 }
 
 T.TogglePalette = function(val){
