@@ -602,22 +602,33 @@ T.PAR = function(){
         return callbacks.cut.length + callbacks.set.length + callbacks.tet.length + callbacks.pos.length;
     }
     
+
+    // The next three funcs are helpers for GetTetrodeTime
+    var Swap32_vector = function(X){
+    	for(var i=0;i<X.length; i++)
+			X[i] = Swap32(X[i]);
+    }
+    var Take_Strided = function(ret, X, stride){
+    	// Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
+    	// n = ret.length
+		for(var i=0,p=0; i<ret.length; i++, p+= stride)
+			ret[i] = X[p]; 
+    }
+    var Divide = function(X,c){
+    	for(var i=0; i< X.length; i++)
+    		X[i] /= c;
+    }
+
     var GetTetrodeTime = function(buffer,header,N){ //get spike times in milliseconds as a Uint32Array 
         var times = new Uint32Array(N);
     	var data = new Int32Array(buffer);
 
-		for(var i=0; i<N; i++)
-			times[i] = data[BYTES_PER_SPIKE/4*i]; //we are accessing the buffer as 4byte ints, we want the first 4bytes of the i'th spike
+    	Take_Strided(times, data, BYTES_PER_SPIKE/4);
 
 		if (endian == 'L') 
-			for(var i=0;i<N; i++)
-				times[i] = Swap32(times[i]);
+			Swap32_vector(times)
 
-		var timebase = parseInt(header.timebase);
-
-		timebase /= 1000; //get it in miliseconds
-		for(var i=0;i<N;i++)
-			times[i] /= timebase;
+		Divide(times, parseInt(header.timebase)/1000) // get times in miliseconds
             
         return times;
     }
