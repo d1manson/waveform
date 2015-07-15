@@ -223,6 +223,7 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 				var canvas_el = document.createElement("canvas");
 				canvas_el.width = canvS;
 				canvas_el.height = canvS;
+				canvas_el.className = "cluster_canv";
 				canvasParent_el.appendChild(canvas_el);
 				ctxes.push(canvas_el.getContext('2d'));
 			}
