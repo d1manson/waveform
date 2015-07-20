@@ -41,6 +41,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cTetHeader = null; //object with key name pairs
 	var cPosBuffer = null; //arraybuffer
 	var cPosDir = null;
+	var cPosDir_needs_adjusting = false;  // when we load set file we read correction angle and adjust cposdir.
 	var cPosHeader = null; //object with key name pairs
 	var cSetHeader = null; //object with key name pairs
 	var cEegBuffer = null; //arraybuffer
@@ -54,6 +55,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
 	var pos_header_override = {}; //key-values to override when reading pos header
 	var use_both_leds = 1;
+	var getdir_callback = null;
 
 	var cState = {set:0,pos:0,cut:0,tet:0}; 
 		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
@@ -350,11 +352,25 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				makeNullCutFromN = false;
 			}else if(filetype == "set"){
 				cSetHeader = data.header;
+
+				//this is majorly hacky and horrible ..it is needed because set file has the led bearings when usign 2 LED direction
+				if(cPosDir && cPosDir.length && cPosDir_needs_adjusting){
+					AdjustCPosDir();
+					if(getdir_callback) 
+						getdir_callback(cPosDir);
+					getdir_callback = null;
+				}
 			}else if(filetype == "pos"){
 				if(!hLivingPos.alive) return;
 				cPosBuffer = data.buffer;
 				cPosHeader = data.header;
 				cPosDir = data.dir;
+				if(cPosDir && cPosDir.length){
+					if(cSetHeader || !cExp.set_file)
+						AdjustCPosDir();
+					else
+						cPosDir_needs_adjusting = true;
+				}
 			}else if(filetype == "eeg"){
 				if(!hLivingEeg.alive) return;
 				cEegBuffer = data.buffer;
@@ -367,6 +383,25 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		}
 	}
 	
+	var AdjustCPosDir = function(){
+		/* Either set is loaded first, in which case pos is loaded second and should call this (in InternalPARcallback),
+		   Or pos is loaded first, and thus set is loaded second, in which case set should call this (again, in InternalPARcallback).
+		   The final case is when there is a pos file, but no set file available. In such cases pos should call this function
+		   from InternalPARcallback. And we will make a dummy 0-correction. 
+		   Strictly speaking there is another edge case: if you drop in a set file after loading a pos file, then you will not
+		   get the right result, but who cares, right?
+		*/
+		if(!cExp.set_file){
+			cPosDir_needs_adjusting = false;
+			return;
+		}
+		var pi = 3.1415;
+		var correction = parseInt(cSetHeader.lightBearing_1)/180*pi; 
+		for(var i=0;i<cPosDir.length;i++)
+			cPosDir[i] -= correction;
+		cPosDir_needs_adjusting = false;
+	}
+
     var UpdateURLHistory= function(exp_name,tet_num){
         if(!exp_name || !tet_num)
             return; //don't update if the thing to update is nonsense
@@ -410,7 +445,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			cLoadingExp.alive = false; //if there was anything previously loading, we need to stop it
 			cSetHeader = null;
-			cPosHeader = null; cPosBuffer = null; cPosDir = null; cEegHeader = null; cEegBuffer = null;
+			cPosHeader = null; cPosBuffer = null; cPosDir = null; cEegHeader = null; cEegBuffer = null; getdir_callback = null;
 			cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; cState.eeg = 0;//we are starting from scratch here
 
 			cLoadingExp = new living();		
@@ -605,13 +640,23 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	}
 
 
-	var GetDir = function(){
+	var GetDir = function(callback){
 		//TODO: this should be returned by the pos file loader as with posbuffer (or whatever it's called these days)
 		// Also it should use both LEDs.
 		if(!cPosBuffer)
+			return; //this shouldn't happen
+
+		if(cPosDir_needs_adjusting){ // this happens if pos file loads before set file (and there is a set file to be loaded)
+			getdir_callback = callback;
 			return;
-		if(cPosDir && cPosDir.length > 0)
-			return cPosDir; // 2LED dir
+		}
+
+		if(cPosDir && cPosDir.length > 0){	
+			if(callback)
+				callback(cPosDir); // 2LED dir
+			else
+				return cPosDir;
+		}
 
 		var xy = new Int16Array(cPosBuffer);
 		var dir = new Float32Array(xy.length/2);
@@ -620,7 +665,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			dir[i] = Math.atan2(xy[2*i+1] - xy[2*i-1],xy[2*i+0] - xy[2*i-2]) + pi;
 		}
 		dir[0] = dir[1];
-		return dir;
+		if (callback)
+			callback(dir);
+		else
+			return dir;
 	}
 	
 	var GetCTetT = function(callback){ //get the timestamp for each spike

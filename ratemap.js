@@ -856,12 +856,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             var xs = POS_W/(parseInt(posHeader.max_vals[1])-0);
             var ys = POS_H/(parseInt(posHeader.max_vals[0])-0);
                 
-			LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
-                        parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
-                        xs<ys? xs: ys /*min of the two*/,
-                        posHeader.max_vals,
-						ORG.GetDir());
-			
+            ORG.GetDir(function(dir){
+            	LoadPosData(parseInt(posHeader.num_pos_samples), ORG.GetPosBuffer(),
+	                        parseInt(posHeader.timebase),parseInt(posHeader.units_per_meter),
+	                        xs<ys? xs: ys /*min of the two*/,
+	                        posHeader.max_vals, dir);
+						});
 		}
 			
 	}
