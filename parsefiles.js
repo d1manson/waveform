@@ -379,11 +379,11 @@ T.PAR = function(){
 		for(var i=0; i<X.length/2; i++){
 			var i1 = i*2+0;
 			var i2 = i*2+1;
-			if(X[i1] != NAN16){
+			if(X[i1] && X[i1] != NAN16){
 				n1++;
 				sum_1 += X[i1];
 			}
-			if(X[i2] != NAN16){
+			if(X[i2] && X[i2] != NAN16){
 				n2++;
 				sum_2 += X[i2];
 			}
@@ -395,9 +395,9 @@ T.PAR = function(){
 		for (var i=0; i<X.length/2; i++){
 			var i1 = i*2+0;
 			var i2 = i*2+1;
-			if(X[i1] != NAN16)
+			if(X[i1] && X[i1] != NAN16)
 				sum_1 += sqr(X[i1] - mean_1);
-			if(X[i2] != NAN16)
+			if(X[i2] && X[i2] != NAN16)
 				sum_2 += sqr(X[i2] - mean_2);
 		}
 		var std_1 = Math.sqrt(sum_1/n1); var std_2 = Math.sqrt(sum_2/n2);
@@ -455,10 +455,10 @@ T.PAR = function(){
 			if (USE_BOTH_LEDS){
 				// Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
 				// We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-				var XYpix = new Int16Array(take(new Int32Array(buffer), 4, BYTES_PER_POS_SAMPLE/4).buffer);
-				replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+				var XYpix = new Int16Array(take(new Int32Array(buffer), 3, BYTES_PER_POS_SAMPLE/4).buffer);
+				replaceVal_IN_PLACE(XYpix,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 				for(var i=0; i<nPos; i++){
-					if(XYpix[i*2 +1] != POS_NAN || XYpix[i*2 +1] != 0){
+					if(XYpix[i*2 +1] && XYpix[i*2 +1] != POS_NAN){
 						nLED = 2;
 						break;
 					}
@@ -499,6 +499,8 @@ T.PAR = function(){
 				var weight_1 = pix_props.n_1/nPos; var weight_2 = pix_props.n_2/nPos;
 
 				var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
+				header.POST_n_pix_led1 = "mean=" + pix_props.mean_1.toFixed(2) + " std=" + pix_props.std_1.toFixed(2) + " (nan count=" + (nPos - pix_props.n_1) + ")";
+				header.POST_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (nPos - pix_props.n_2) + ")";
 
 				// use std and mean to get z score of pix1 to pix1 and pix2
 				for( var i=1; i< nPos; i++){
@@ -546,13 +548,13 @@ T.PAR = function(){
 				}
 
 				// Swap XY1 with XY2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit XY in one go)
-				var n_swapped = swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
+				header.POST_n_swapped = swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
 			}
 			
 			var sampFreq = parseInt(header.sample_rate);
-			var nJumpy = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq)
+			header.POST_n_jumpy_led1 = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq)
 			if(nLED == 2)
-				 var nJumpy2 = JumpFilter(XY2, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
+				 header.POST_n_jumpy_led2 = JumpFilter(XY2, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
 
 			
 			interpXY(XY1,nPos);
@@ -569,15 +571,7 @@ T.PAR = function(){
 				XY = XY1;
 			}
 
-			header.n_jumpy = nJumpy;
-			if(nLED == 2){
-				header.n_jumpy2 = nJumpy2;
-				header.n_swapped = n_swapped;
-				var dir = GetDirection(XY1, XY2);
-			}else{
-				var dir = new Float32Array(0);
-			}
-
+			var dir = nLED == 2 ? GetDirection(XY1, XY2) : new Float32Array(0);
 
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
