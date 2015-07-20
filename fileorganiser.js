@@ -40,6 +40,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var cTetA = null; //uint16array of form A_11 A_12 A_13 A_14 A_21 A_22 ... A_n4 giving max-min on each wave
 	var cTetHeader = null; //object with key name pairs
 	var cPosBuffer = null; //arraybuffer
+	var cPosDir = null;
 	var cPosHeader = null; //object with key name pairs
 	var cSetHeader = null; //object with key name pairs
 	var cEegBuffer = null; //arraybuffer
@@ -353,6 +354,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 				if(!hLivingPos.alive) return;
 				cPosBuffer = data.buffer;
 				cPosHeader = data.header;
+				cPosDir = data.dir;
 			}else if(filetype == "eeg"){
 				if(!hLivingEeg.alive) return;
 				cEegBuffer = data.buffer;
@@ -408,7 +410,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 			cLoadingExp.alive = false; //if there was anything previously loading, we need to stop it
 			cSetHeader = null;
-			cPosHeader = null; cPosBuffer = null; cEegHeader = null; cEegBuffer = null;
+			cPosHeader = null; cPosBuffer = null; cPosDir = null; cEegHeader = null; cEegBuffer = null;
 			cState.pos = 0; cState.set = 0; cState.cut = 0; cState.tet = 0; cState.eeg = 0;//we are starting from scratch here
 
 			cLoadingExp = new living();		
@@ -608,7 +610,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		// Also it should use both LEDs.
 		if(!cPosBuffer)
 			return;
-			
+		if(cPosDir && cPosDir.length > 0)
+			return cPosDir; // 2LED dir
+
 		var xy = new Int16Array(cPosBuffer);
 		var dir = new Float32Array(xy.length/2);
 		var pi = 3.14159265;

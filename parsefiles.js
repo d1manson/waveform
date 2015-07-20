@@ -358,7 +358,7 @@ T.PAR = function(){
 	}		
 
 	var swap = function(A, B, do_swap){
-		var n;
+		var n = 0;
 		for(var i=0;i<A.length;i++) if(do_swap[i]){
 			var tmp = A[i];
 			A[i] = B[i];
@@ -376,7 +376,7 @@ T.PAR = function(){
 		var sum_1 = 0; var sum_2 = 0;
 		var n1 = 0; var n2 = 0;
 
-		for(var i=0; i<X.length; i++){
+		for(var i=0; i<X.length/2; i++){
 			var i1 = i*2+0;
 			var i2 = i*2+1;
 			if(X[i1] != NAN16){
@@ -392,7 +392,7 @@ T.PAR = function(){
 
 		// now get sum(sqr(xy-mean_xy)) and use to calculate nanstd...
 		sum_1 = 0; sum_2 = 0;  // NOTE: reusing sums vars!!!!
-		for (var i=0; i<X.length; i++){
+		for (var i=0; i<X.length/2; i++){
 			var i1 = i*2+0;
 			var i2 = i*2+1;
 			if(X[i1] != NAN16)
@@ -414,11 +414,22 @@ T.PAR = function(){
 		var weight_1 = weight_1/weight_sum;
 		var weight_2 = weight_2/weight_sum;
 		var ret = new XY1.constructor(XY1.length);
-		for(var i=0;i<XY1.length;i++){
+		for(var i=0;i<XY1.length/2;i++){
 			var ix = 2*i+0;
 			var iy = 2*i+1;
 			ret[ix] = XY1[ix]*weight_1 + XY1[ix]*weight_2;
 			ret[iy] = XY1[iy]*weight_1 + XY1[iy]*weight_2;
+		}
+		return ret;
+	}
+
+	var GetDirection = function(XY1, XY2){
+		var ret = new Float32Array(XY1.length/2);
+		var pi = 3.14159265;
+		for(var i=0;i<XY1.length/2;i++){
+			var ix = 2*i+0;
+			var iy = 2*i+1;
+			ret[i] = Math.atan2(XY2[iy] - XY1[iy], XY2[ix] - XY1[ix]) + pi;
 		}
 		return ret;
 	}
@@ -541,7 +552,7 @@ T.PAR = function(){
 			var sampFreq = parseInt(header.sample_rate);
 			var nJumpy = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq)
 			if(nLED == 2)
-				 var nJumpy2 = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
+				 var nJumpy2 = JumpFilter(XY2, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
 
 			
 			interpXY(XY1,nPos);
@@ -562,12 +573,16 @@ T.PAR = function(){
 			if(nLED == 2){
 				header.n_jumpy2 = nJumpy2;
 				header.n_swapped = n_swapped;
+				var dir = GetDirection(XY1, XY2);
+			}else{
+				var dir = new Float32Array(0);
 			}
+
 
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
 			header.units_per_meter = UNITS_PER_M;
-			main.PosFileRead(null,header, XY.buffer,[XY.buffer]);
+			main.PosFileRead(null,header, XY.buffer, dir.buffer, [XY.buffer, dir.buffer]);
 		}
 		
 		
@@ -717,10 +732,10 @@ T.PAR = function(){
 		callbacks.pos.push(state.callback);
     	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S,state.HEADER_OVERRIDE,state.USE_BOTH_LEDS);
     }
-	var PosFileRead = function(errorMessage,header,buffer){
+	var PosFileRead = function(errorMessage,header,buffer,dir_buffer){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.pos.shift()({header:header, buffer:buffer});
+		callbacks.pos.shift()({header:header, buffer:buffer,dir:new Float32Array(dir_buffer)});
 	}	
 	
 	var LoadSetWithWorker = function(file,callback){
