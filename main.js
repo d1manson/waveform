@@ -586,6 +586,7 @@ T.StoreData = function(){
 	
 	localStorage.posSmoothing = T.ORG.GetPosSmoothing();
 	localStorage.posMaxSpeed = T.ORG.GetPosMaxSpeed();
+	localStorage.useBothLEDs = T.ORG.GetUseBothLEDs();
 }
 
 T.ApplyStoredSettingsA = function(){
@@ -620,6 +621,7 @@ T.ApplyStoredSettingsB = function(e) {
 	T.TC.SetDeltaT(parseInt(localStorage.tcDeltaT || "500"));
 	T.ORG.SetPosSmoothing(parseFloat(localStorage.posSmoothing || "0.2"));
 	T.ORG.SetPosMaxSpeed(parseFloat(localStorage.posMaxSpeed || "5"));
+	T.ORG.SetUseBothLEDs(parseFloat(localStorage.useBothLEDs || "1"));
 }
 
 

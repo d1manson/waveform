@@ -171,8 +171,14 @@
 			position post processing
 		</div>
 		<div class='floating_body'>
-			Note that currently only the first LED's data is used even if two LEDs were tracked.
-			<br><br>
+			If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
+			the two spots have swapped. <br><br>
+			Use <span id='pos_led_val' class="slider_val">? LEDs</span>:<br>
+			<paper-slider class="nodrag" id="pos_led_slider" pin snaps min="1" max="2" step="1" value="1" style='width:80px'></paper-slider>
+			<br>
+
+			The following filtering and smoothing is applied to the one/two data streams separately. If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.<br><br>
+
 			Max speed <span id='pos_speed_val' class="slider_val">? m/s</span><br>
 			<paper-slider class="nodrag" id="pos_speed_slider" pin snaps min="0" max="10" step="0.25" value="5" style='width:300px'></paper-slider><br>
 			Where the speed appears to rise above this threshold the data is considered invalid.<br>

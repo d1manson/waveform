@@ -15,7 +15,9 @@
 var T = T || {};
 
 T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_text,$exp_list ,$tet_list,
-			$pos_smoothing_slider,$pos_speed_slider,$pos_smoothing_val,$pos_speed_val,$banner,$drop_excess_stuff, $keyboard_notifier){ // the T.ORG object was created by cut.js, here we add a lot more to it
+			el_pos_smoothing_slider,el_pos_speed_slider,el_pos_smoothing_val,el_pos_speed_val,$banner,$drop_excess_stuff, $keyboard_notifier,
+			el_pos_led_slider, el_pos_led_val
+			){ // the T.ORG object was created by cut.js, here we add a lot more to it
 
     var fileStatusCallbacks = $.Callbacks();
 
@@ -50,6 +52,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	var posMaxSpeed = 5; // meters per second (see PostProcessPos in parsefiles.js)
 	var posSmoothingWidth = 0.2 //box car seconds (see PostProcessPos in parsefiles.js)
 	var pos_header_override = {}; //key-values to override when reading pos header
+	var use_both_leds = 1;
 
 	var cState = {set:0,pos:0,cut:0,tet:0}; 
 		//STATE keeps track of what is loaded. For set,pos,cut and tet fields..
@@ -413,7 +416,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 			if(cExp && cExp.pos_file){
 				cLoadingPos = new living();
 				T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-					SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
+					SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override, USE_BOTH_LEDS: use_both_leds});
 			}
 			if(cExp && cExp.eeg_files[0]){
 				cLoadingEeg = new living();
@@ -559,48 +562,44 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 	}
 
-	var SetPosMaxSpeed = function(val,viaSlider){
-		posMaxSpeed = val;//
-		$pos_speed_val.text(val == 0? "off" : val + " m/s")
-		if(viaSlider !== true)
-			$pos_speed_slider.get(0).value = val;
 
+	var ReloadPosForNewSettings = function(){
 		if(cExp && cExp.pos_file){
 			cLoadingPos.alive = false;
 			cLoadingPos = new living();
 			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-                            SMOOTHING_W_S: posSmoothingWidth, MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
+                            SMOOTHING_W_S: posSmoothingWidth, MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override,  USE_BOTH_LEDS: use_both_leds});
 			fileStatusCallbacks.fireWith(null,[cState,null]);
-		}
+		}		
+	}
+	var SetPosMaxSpeed = function(val,viaSlider){
+		posMaxSpeed = val;//
+		el_pos_speed_val.textContent = val == 0? "off" : val + " m/s";
+		if(viaSlider !== true)
+			el_pos_speed_slider.value = val;
+		ReloadPosForNewSettings();
 	}
 
     var SetPosSmoothing = function(val,viaSlider){
 		posSmoothingWidth = val;//
-		$pos_smoothing_val.text(val == 0? "off" : val + " s")
+		el_pos_smoothing_val.textContent = val == 0? "off" : val + " s";
 		if(viaSlider !== true)
-			$pos_smoothing_slider.get(0).value = val;
-			
-		if(cExp && cExp.pos_file){
-			cLoadingPos.alive = false;
-			cLoadingPos = new living();
-			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-                            SMOOTHING_W_S: posSmoothingWidth,MAX_SPEED: posMaxSpeed,HEADER_OVERRIDE: pos_header_override});
-			fileStatusCallbacks.fireWith(null,[cState,null]);
-		}
+			el_pos_smoothing_slider.value = val;
+		ReloadPosForNewSettings();	
 	}
     
     
 	var SetPosHeaderOverride = function(val){
 		pos_header_override = SimpleClone(val);
+		ReloadPosForNewSettings();		
+	}
 
-		if(cExp && cExp.pos_file){
-			cLoadingPos.alive = false;
-			cLoadingPos = new living();
-			T.FS.ReadFile(cExp.pos_file,PAR.LoadPos,{callback: InternalPARcallback("pos"),
-                            SMOOTHING_W_S: posSmoothingWidth, MAX_SPEED: posMaxSpeed, HEADER_OVERRIDE: pos_header_override});
-			fileStatusCallbacks.fireWith(null,[cState,null]);
-		}
-		
+	var SetUseBothLEDs = function(val, viaSlider){
+		use_both_leds = val == 2 ? 1 : 0;
+		el_pos_led_val.textContent = val == 2? "2 LEDs (if available) BUGGY CODE ALERT!!!" : "just 1 LED (even if 2 available)";
+		if(viaSlider !== true)
+			el_pos_led_slider.value = val;
+		ReloadPosForNewSettings();	
 	}
 
 
@@ -795,8 +794,9 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	
 	
 
-	$pos_smoothing_slider.on("change",function(){SetPosSmoothing(this.value,true)});
-	$pos_speed_slider.on("change",function(){SetPosMaxSpeed(this.value,true)});
+	el_pos_smoothing_slider.addEventListener("change",function(){SetPosSmoothing(this.value,true)});
+	el_pos_speed_slider.addEventListener("change",function(){SetPosMaxSpeed(this.value,true)});
+	el_pos_led_slider.addEventListener("change",function(){SetUseBothLEDs(this.value,true)});
 
 	$files_panel.on("dragstart",".file_brick",SaveFileDragStart)
 				.on("dragend",".file_brick",SaveFileDragEnd);
@@ -835,6 +835,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetPosMaxSpeed = function(){return posMaxSpeed;};
     ORG.SetPosSmoothing = SetPosSmoothing;
     ORG.GetPosSmoothing = function(){return posSmoothingWidth;};
+    ORG.SetUseBothLEDs = SetUseBothLEDs;
+    ORG.GetUseBothLEDs = function(){return use_both_leds;};
 	ORG.GetSpeedHist = GetSpeedHist;
 	ORG.GetEEGBuffer = function(){return cEegBuffer;};
 	ORG.GetEEGHeader = function(){return cEegHeader;};
@@ -843,8 +845,10 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),
-	$('#pos_smoothing_slider'),$('#pos_speed_slider'),$('#pos_smoothing_val'),$('#pos_speed_val'),$('.drop_banner'),$('.github_button_filedrop,#works_with_chrome'),
-	$('.keyboard_focus_notifier')
+	document.getElementById('pos_smoothing_slider'),document.getElementById('pos_speed_slider'),
+	document.getElementById('pos_smoothing_val'),document.getElementById('pos_speed_val')
+	,$('.drop_banner'),$('.github_button_filedrop,#works_with_chrome'),
+	$('.keyboard_focus_notifier'), document.getElementById('pos_led_slider'), document.getElementById('pos_led_val')
 );
 
 

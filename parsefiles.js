@@ -91,7 +91,7 @@ T.PAR = function(){
 	}
 		
 	var posWorkerCode = function(){
-		"use strict";
+		"use strict"; // POS WORKER
 		var NAN16 = -32768; //custom nan value, equal to minimum int16 value	
 		var endian = function(){
 			var b = new ArrayBuffer(2);
@@ -123,7 +123,7 @@ T.PAR = function(){
 				src[i] = replace;
 		}
 		
-		var pow2 = function(a){return a*a;}
+		var sqr = function(a){return a*a;}
 	
 		var clone = function(a){ 
 			if(a.slice){
@@ -149,7 +149,7 @@ T.PAR = function(){
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
 
-		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,HEADER_OVERRIDE){
+		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,HEADER_OVERRIDE,USE_BOTH_LEDS){
 			// Read the file as a string to get the header and find the data start
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
@@ -185,9 +185,11 @@ T.PAR = function(){
     				data[k] = Swap16(data[k]);
     		}
 
-			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S);
+			PostProcessPos(header,buffer,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,USE_BOTH_LEDS);
 		}
 		
+
+
 		var interpXY_sub = function(XY,x_a,y_a,x_b,y_b,i,nNans){
 			//interpolates from element i-1 back to i-nNans, where element i is x_b,y_b and element i-nNans-1 is x_a,x_b
 			var dX = (x_b-x_a)/(nNans+1);
@@ -198,6 +200,48 @@ T.PAR = function(){
 			}
 		}
         
+    	var interpXY = function(XY,nPos){
+     	   /* 
+     	   	Interpolates linearly across nan blocks for single XY stream.
+     	   	Does it in place.
+
+			TODO: verify that this does exactly what we want
+     	   */
+
+ 	   		// Find first (x,y) that is non-nan
+			for(var start=0; start<nPos; start++){
+				var ix = start*2+0;
+				var iy = start*2+1;
+				if(XY[ix] != NAN16 && XY[iy] !=NAN16)
+					break;
+			}
+
+			var ix = start*2+0;
+			var iy = start*2+1;	
+            var x_a = XY[ix];
+            var y_a = XY[iy];
+            var nNans = start; //this will cause first non-nan to be copied back through all previous nan values
+            for(var i=start;i<nPos;i++){
+				var ix = i*2+0;
+				var iy = i*2+1;	
+                var x_b = XY[ix];
+                var y_b = XY[iy];
+                if(x_b == NAN16 || y_b == NAN16){
+                    nNans++;
+                }else{
+					if(nNans) 
+						interpXY_sub(XY, x_a, y_a, x_b, y_b, i, nNans)
+                    x_a = x_b;
+                    y_a = y_b;
+                    nNans = 0;
+                }
+            }
+			
+			if(nNans) //fill end-nan values with last non-nan val
+				interpXY_sub(XY, x_a, y_a, x_a, y_a, i, nNans);
+
+        }
+
 		var smoooth1D_IN_PLACE = function(X,stride,k){
             //Box car smoothing of length 2*k + 1
 			// (If we pretend the stride=1) The first few values of X will be:
@@ -260,136 +304,249 @@ T.PAR = function(){
             }
             
 	}
+
+	var JumpFilter = function(XY, nPos, MAX_SPEED, UNITS_PER_M, sampFreq){
+		/*
+			For a single stream of XY values, it finds the first non-nan point,
+			and then checks the speed required to reach the next point, given the
+			sampling rate.  If the speed is too high, it skips that point and calcualtes
+			the speed required to get to the following point. This continues until,
+			the speed requirement is satisfied. The "skipped" points are set to NAN, inplace.
+			The number of points skipped over is returned as an integer.
+		*/
+
+		if(!MAX_SPEED)
+			return 0;
+
+		var sqrMaxSampStep = sqr(MAX_SPEED*UNITS_PER_M /sampFreq);
+
+		// Find first (x,y) that is non-nan
+		for(var start=0; start<nPos; start++){
+			var ix = start*2+0;
+			var iy = start*2+1;
+			if(XY[ix] != NAN16 && XY[iy] !=NAN16)
+				break;
+		}
+				
+		var ix = start*2+0;
+		var iy = start*2+1;		
+		var x_from = XY[ix];
+		var y_from = XY[iy];
+		var jumpLen = 1;
 		
-		var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE,
+		// Set big jump sections to nan
+		for(var i=start+1,nJumpy=0; i<nPos; i++){
+			var ix = i*2+0;
+			var iy = i*2+1;
+			// check if this pos is already nan
+			// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
+			if ( XY[ix] == NAN16 || XY[iy] == NAN16 || 
+				(sqr(x_from-XY[ix]) + sqr(y_from-XY[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
+				//sample is nan or speed is too large, so make this a jump
+				XY[ix] = XY[iy] = NAN16; 
+				nJumpy++;
+				jumpLen++;
+			}else{
+				//speed is sufficiently small, so this point is ok
+				jumpLen = 1;
+				x_from = XY[ix];
+				y_from = XY[iy];
+			}
+		}
+
+		return nJumpy;
+	}		
+
+	var swap = function(A, B, do_swap){
+		for(var i=0;i<A.length;i++) if(do_swap[i]){
+			var tmp = A[i];
+			A[i] = B[i];
+			B[i] = tmp;
+		}
+	}
+
+	var nanmean_and_std_2 = function(X){
+		/* 
+			X is nx2 array, we want nancount, nanmean, and nanstd for both columns.
+		*/
+
+		var sum_1 = 0; var sum_2 = 0;
+		var n1 = 0; var n2 = 0;
+
+		for(var i=0; i<X.length; i++){
+			var i1 = i*2+0;
+			var i2 = i*2+1;
+			if(X[i1] != NAN16){
+				n1++;
+				sum_1 += X[i1];
+			}
+			if(X[i2] != NAN16){
+				n2++;
+				sum_2 += X[i2];
+			}
+		}
+		var mean_1 = sum_1/n1; var mean_2 = sum_2/n2;
+
+		// now get sum(sqr(xy-mean_xy)) and use to calculate nanstd...
+		sum_1 = 0; sum_2 = 0;  // NOTE: reusing sums vars!!!!
+		for (var i=0; i<X.length; i++){
+			var i1 = i*2+0;
+			var i2 = i*2+1;
+			if(X[i1] != NAN16)
+				sum_1 += sqr(X[i1] - mean_1);
+			if(X[i2] != NAN16)
+				sum_2 += sqr(X[i2] - mean_2);
+		}
+		var std_1 = Math.sqrt(sum_1/n1); var std_2 = Math.sqrt(sum_2/n2);
+
+		return {mean_1: mean1, mean_2: mean_2, std_1: std_1, std_2: std_2, n_1: n1, n_2: n2};
+	}
+
+	var CombineXY = function(XY1, XY2, weight_1, weight_2){
+		/*
+			XY1 and XY2 are both streams of (x,y) values. 
+			We combine them into a single stream according to the ratio of the weights.
+		*/
+		var weight_sum = (weight_1 + weight_2);
+		var weight_1 = weight_1/weight_sum;
+		var weight_2 = weight_2/weight_sum;
+		var ret = new XY1.constructor(XY1.length);
+		for(var i=0;i<XY1.length;i++){
+			var ix = 2*i+0;
+			var iy = 2*i+1;
+			ret[ix] = XY1[ix]*weight_1 + XY1[ix]*weight_2;
+			ret[iy] = XY1[iy]*weight_1 + XY1[iy]*weight_2;
+		}
+		return ret;
+	}
+
+	var PostProcessPos = function(header,buffer,BYTES_PER_POS_SAMPLE,
 					MAX_SPEED, /*meters per second, e.g. 5 */
-					SMOOTHING_W_S /* box car smoothing width in seconds, e.g. 0.2 */
+					SMOOTHING_W_S, /* box car smoothing width in seconds, e.g. 0.2 */
+					USE_BOTH_LEDS
 					){
 		
 			var data = new Int16Array(buffer);
 			var elementsPerPosSample = BYTES_PER_POS_SAMPLE/2;
 			var nPos = parseInt(header.num_pos_samples); 
 			var end = nPos * elementsPerPosSample; 
-			var nLED = parseInt(header.colactive_2) ? 2 : 1;
+			var nLED = parseInt(header.colactive_2) && USE_BOTH_LEDS ? 2 : 1;
 			var POS_NAN = 1023;
 
-			var XY = new Int16Array(nPos*2);
-			var XY = new Int16Array(
-							take(new Int32Array(buffer),1,BYTES_PER_POS_SAMPLE/4).buffer
-						 ); // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-			replaceVal_IN_PLACE(XY,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+			 // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
+			var XY1 = new Int16Array(take(new Int32Array(buffer),1,BYTES_PER_POS_SAMPLE/4).buffer);
+			replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			
 			if(nLED == 2){
-				var XY2 = new Int16Array(nPos*2);
-				var XY2 = new Int16Array(
-							take(new Int32Array(buffer),2,BYTES_PER_POS_SAMPLE/4).buffer
-						 ); // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+				 // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+				var XY2 = new Int16Array(take(new Int32Array(buffer), 2, BYTES_PER_POS_SAMPLE/4).buffer);
 				replaceVal_IN_PLACE(XY2,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			
+				// With 2 leds, we are going to need pixel counts for swap filter				
+				var XYpix = new Int16Array(take(new Int32Array(buffer), 4, BYTES_PER_POS_SAMPLE/4).buffer);
+				replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			}
 			
 			if(header.need_to_subtract_mins){
 				var min_x = parseInt(header.window_min_x);
 				var min_y = parseInt(header.window_min_y);
-				minus(XY,min_x,min_y);
+				minus(XY1, min_x, min_y);
 				if(nLED == 2)
-					minus(XY2,min_x,min_y);
+					minus(XY2, min_x, min_y);
 			}
 
 			var ppm = parseInt(header.pixels_per_metre);
 			var UNITS_PER_M = 1000;
-			times_IN_PLACE(XY,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+			times_IN_PLACE(XY1, UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
 			if(nLED == 2)
-				times_IN_PLACE(XY2,UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+				times_IN_PLACE(XY2, UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
 
 			if(nLED == 2){
-				// chcek for and apply LED swaping
-				for(var i = 1; i<nPos; i++){
-					if(XY[i*2] == NAN16 || XY[i*2+1] == NAN16 || XY2[i*2] == NAN16 || XY2[i*2+1 == NAN16]){
-						i++; // if this is nan, then skip the next iteration too becauwse we are doing diffs
-						continue;
+				// check for and apply LED swaping...
+				var shrunk_or_switched = Uint8Array(nPos);  
+
+				var SWAPPING_THRESH_PIX = 5; // it's a bit odd, but it seems this was always defined in pixels not cms.
+
+				// firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
+				// where "closer" is defined as z-score, i.e. distance/std for the relevant distribution.
+				pix_props = nanmean_and_std_2(XYpix);
+				var weight_1 = pix_props.n_1/nPos; var weight_2 = pix_props.n_2/nPos;
+
+				var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
+
+				// use std and mean to get z score of pix1 to pix1 and pix2
+				for( var i=1; i< nPos; i++){
+					var i1 = i*2+0;
+					var i2 = i*2+1;
+					if(XYpix[i1] != NAN16 && XYpix[i2] != NAN16){
+						var z11 = (mean_1 - XYpix[i1])/std_1;
+						var z12 = (XYpix[i1] - mean_2)/std_2;
+						shrunk_or_switched[i] |= z11 > z12;
 					}
-					//var dist12 = 
 				}
-				/*
-				MATLAB:
 
-				led_pos_tmp = led_pos(1:size(led_pix,1),:,:);
-				led_pos_tmp(isnan(led_pos_tmp)) = 0;
 
-				dist12 = sqrt(sum(((led_pos_tmp(2:end,1,:)-led_pos_tmp(1:end-1,2,:)).^2),3));
-				dist11 = sqrt(sum(((led_pos_tmp(2:end,1,:)-led_pos_tmp(1:end-1,1,:)).^2),3));
-				dist21 = sqrt(sum(((led_pos_tmp(2:end,2,:)-led_pos_tmp(1:end-1,1,:)).^2),3));
-				dist22 = sqrt(sum(((led_pos_tmp(2:end,2,:)-led_pos_tmp(1:end-1,2,:)).^2),3));
+				// Now we calculate jump distance (from time i-1 to time i)
+				// four distnaces: led1 to led1, led1 to led2, led2 to led1, led2 to led2.
+				// if the recorded version of distance is more than SWAPPING_THRESH_PIX further
+				// than the potential "swapped" version, then consider it a swap.
 
-				pos = 2:size(led_pix,1);
-				switched = (dist12 < dist11-thresh) & ( isnan(led_pos(pos, 2, 1)) |(dist21 < dist22-thresh) );
+				// Find first (x,y) that is non-nan on both XY and XY2
+				for(var start=0; start<nPos; start++){
+					var ix = start*2+0;
+					var iy = start*2+1;
+					if(XY1[ix] != NAN16 && XY1[iy] !=NAN16 && XY2[ix] != NAN16 && XY2[iy] !=NAN16)
+						break;
+				}
 
-				% Check if size of big light has shrunk to be closer to that of small light (as Z score)
-				z11 = (mean_npix(1) - led_pix(2:end, 1))/std_npix(1);
-				z12 = (led_pix(2:end, 1) - mean_npix(2))/std_npix(2);
-				shrunk = z11 > z12;
-				swap_list = find( switched & shrunk ) + 1;
-				*/
+				for(var i = start+1; i<nPos; i++){
+					// we are going to do diffs with XY_i - XY_(i-1)
+					var ix = i*2+0;
+					var iy = i*2+1;
+					var i_1x = i*2-2;
+					var i_1y = i*2-1;
+					if(XY1[ix] == NAN16 || XY1[iy] == NAN16 || XY2[ix] == NAN16 || XY2[iy] == NAN16){
+						i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
+						continue; 
+					}
+
+					var dist12 = Math.hypot(XY1[ix] - XY2[i_1x],  XY1[iy] - XY2[i_1y]);
+					var dist11 = Math.hypot(XY1[ix] - XY1[i_1x],  XY1[iy] - XY1[i_1y]);
+					var dist21 = Math.hypot(XY2[ix] - XY1[i_1x],  XY2[iy] - XY1[i_1y]);
+					var dist22 = Math.hypot(XY2[ix] - XY2[i_1x],  XY2[iy] - XY2[i_1y]);
+
+					shrunk_or_switched[i] |= (dist12 < dist11-SWAPPING_THRESH_PIX) || (dist21 < dist22 - SWAPPING_THRESH_PIX);
+
+				}
+
+				// Swap XY1 with XY2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit XY in one go)
+				swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
 			}
 			
 			var sampFreq = parseInt(header.sample_rate);
-			var pow2MaxSampStep = pow2(MAX_SPEED*UNITS_PER_M /sampFreq);
+			var nJumpy = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq)
+			if(nLED == 2)
+				 nJumpy2 = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
+
 			
-			// Find first (x,y) that is non-nan
-			for(var start=0;start<nPos;start++)
-				if(XY[start*2+0] != NAN16 && XY[start*2+1] !=NAN16)
-					break;
-					
-			if(MAX_SPEED){					
-				var x_from = XY[start*2+0];
-				var y_from = XY[start*2+1];
-				var jumpLen = 1;
-				
-				// Set big jump sections to nan
-				for(var i=start+1,nJumpy=0; i<nPos; i++){
-					
-					// check if this pos is already nan
-					// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
-					if ( XY[i*2+0] == NAN16 || XY[i*2+1] == NAN16 || 
-						(pow2(x_from-XY[i*2+0]) + pow2(y_from-XY[i*2+1])) / pow2(jumpLen) > pow2MaxSampStep ){
-						//sample is nan or speed is too large, so make this a jump
-						XY[i*2 + 0] = XY[i*2 + 1] = NAN16; 
-						nJumpy++;
-						jumpLen++;
-					}else{
-						//speed is sufficiently small, so this point is ok
-						jumpLen = 1;
-						x_from = XY[i*2 + 0];
-						y_from = XY[i*2 + 1];
-					}
-				}
-			}
-			
-            //Interpolation...		TODO: verify that this does exactly what we want
-            var x_a = XY[start*2+0];
-            var y_a = XY[start*2+1];
-            var nNans = start; //this will cause first non-nan to be copied back through all previous nan values
-            for(var i=start;i<nPos;i++){
-                var x_b = XY[i*2+0];
-                var y_b = XY[i*2+1];
-                if(x_b == NAN16 || y_b == NAN16){
-                    nNans++;
-                }else{
-					if(nNans) 
-						interpXY_sub(XY,x_a,y_a,x_b,y_b,i,nNans)
-                    x_a = x_b;
-                    y_a = y_b;
-                    nNans = 0;
-                }
-            }
-			
-			if(nNans) //fill end-nan values with last non-nan val
-				interpXY_sub(XY,x_a,y_a,x_a,y_a,i,nNans)
+			interpXY(XY1,nPos);
+			if(nLED == 2)
+				interpXY(XY2,nPos);
 
     		var k = Math.floor(sampFreq*SMOOTHING_W_S/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired			
-			smoooth1D_IN_PLACE(XY,2,k)			
-			header.n_jumpy = nJumpy; //includes untracked
+			smoooth1D_IN_PLACE(XY1, 2, k);
+			var XY;
+			if(nLED == 2){
+				smoooth1D_IN_PLACE(XY2, 2, k);
+				XY = CombineXY(XY1, XY2, weight_1, weight_2);
+			}else{
+				XY = XY1;
+			}
+
+			header.n_jumpy = nJumpy;
+			if(nLED == 2)
+				header.n_jumpy2 = nJumpy2;
+
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
 			header.units_per_meter = UNITS_PER_M;
