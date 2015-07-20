@@ -358,11 +358,14 @@ T.PAR = function(){
 	}		
 
 	var swap = function(A, B, do_swap){
+		var n;
 		for(var i=0;i<A.length;i++) if(do_swap[i]){
 			var tmp = A[i];
 			A[i] = B[i];
 			B[i] = tmp;
+			n++;
 		}
+		return n;
 	}
 
 	var nanmean_and_std_2 = function(X){
@@ -399,7 +402,7 @@ T.PAR = function(){
 		}
 		var std_1 = Math.sqrt(sum_1/n1); var std_2 = Math.sqrt(sum_2/n2);
 
-		return {mean_1: mean1, mean_2: mean_2, std_1: std_1, std_2: std_2, n_1: n1, n_2: n2};
+		return {mean_1: mean_1, mean_2: mean_2, std_1: std_1, std_2: std_2, n_1: n1, n_2: n2};
 	}
 
 	var CombineXY = function(XY1, XY2, weight_1, weight_2){
@@ -430,21 +433,33 @@ T.PAR = function(){
 			var elementsPerPosSample = BYTES_PER_POS_SAMPLE/2;
 			var nPos = parseInt(header.num_pos_samples); 
 			var end = nPos * elementsPerPosSample; 
-			var nLED = parseInt(header.colactive_2) && USE_BOTH_LEDS ? 2 : 1;
+			
 			var POS_NAN = 1023;
 
 			 // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
 			var XY1 = new Int16Array(take(new Int32Array(buffer),1,BYTES_PER_POS_SAMPLE/4).buffer);
 			replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			
+			var nLED = 1;
+			if (USE_BOTH_LEDS){
+				// Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
+				// We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
+				var XYpix = new Int16Array(take(new Int32Array(buffer), 4, BYTES_PER_POS_SAMPLE/4).buffer);
+				replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
+				for(var i=0; i<nPos; i++){
+					if(XYpix[i*2 +1] != POS_NAN || XYpix[i*2 +1] != 0){
+						nLED = 2;
+						break;
+					}
+				} // if we make it to the end of the loop then nLED reamined as =1.
+
+			}
+
 			if(nLED == 2){
 				 // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
 				var XY2 = new Int16Array(take(new Int32Array(buffer), 2, BYTES_PER_POS_SAMPLE/4).buffer);
 				replaceVal_IN_PLACE(XY2,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			
-				// With 2 leds, we are going to need pixel counts for swap filter				
-				var XYpix = new Int16Array(take(new Int32Array(buffer), 4, BYTES_PER_POS_SAMPLE/4).buffer);
-				replaceVal_IN_PLACE(XY1,POS_NAN,NAN16); //switch from axona custom nan value to our custom nan value
 			}
 			
 			if(header.need_to_subtract_mins){
@@ -463,13 +478,13 @@ T.PAR = function(){
 
 			if(nLED == 2){
 				// check for and apply LED swaping...
-				var shrunk_or_switched = Uint8Array(nPos);  
+				var shrunk_or_switched = new Uint8Array(nPos);  
 
 				var SWAPPING_THRESH_PIX = 5; // it's a bit odd, but it seems this was always defined in pixels not cms.
 
 				// firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
 				// where "closer" is defined as z-score, i.e. distance/std for the relevant distribution.
-				pix_props = nanmean_and_std_2(XYpix);
+				var pix_props = nanmean_and_std_2(XYpix);
 				var weight_1 = pix_props.n_1/nPos; var weight_2 = pix_props.n_2/nPos;
 
 				var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
@@ -520,13 +535,13 @@ T.PAR = function(){
 				}
 
 				// Swap XY1 with XY2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit XY in one go)
-				swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
+				var n_swapped = swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
 			}
 			
 			var sampFreq = parseInt(header.sample_rate);
 			var nJumpy = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq)
 			if(nLED == 2)
-				 nJumpy2 = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
+				 var nJumpy2 = JumpFilter(XY1, nPos, MAX_SPEED, UNITS_PER_M, sampFreq);
 
 			
 			interpXY(XY1,nPos);
@@ -544,8 +559,10 @@ T.PAR = function(){
 			}
 
 			header.n_jumpy = nJumpy;
-			if(nLED == 2)
+			if(nLED == 2){
 				header.n_jumpy2 = nJumpy2;
+				header.n_swapped = n_swapped;
+			}
 
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
@@ -698,7 +715,7 @@ T.PAR = function(){
 	
 	var LoadPosWithWorker = function(file,state){
 		callbacks.pos.push(state.callback);
-    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S,state.HEADER_OVERRIDE);
+    	posWorker.ParsePosFile(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,state.MAX_SPEED,state.SMOOTHING_W_S,state.HEADER_OVERRIDE,state.USE_BOTH_LEDS);
     }
 	var PosFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
