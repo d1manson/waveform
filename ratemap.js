@@ -181,8 +181,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			for(var i=0;i<=P_COLORS;i++)
 				buf8[i*4+3] = 255;
 
-			buf8[0*4+0]= 255; buf8[0*4+1]=255; buf8[0*4+2]=255; //white
-
+			//buf8[0*4+0]= 255; buf8[0*4+1]=255; buf8[0*4+2]=255; //white
+			buf8[0*4+3] = 0; // invisible
 			buf8[1*4+2]= 198;
 			buf8[2*4+1]= 162; buf8[2*4+2]= 255; 
 			buf8[3*4+0]= 56; buf8[3*4+1]= 235; buf8[3*4+2]=32; 
