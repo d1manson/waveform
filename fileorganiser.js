@@ -633,7 +633,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 
 	var SetUseBothLEDs = function(val, viaSlider){
 		use_both_leds = val == 2 ? 1 : 0;
-		el_pos_led_val.textContent = val == 2? "2 LEDs (if available) BUGGY CODE ALERT!!!" : "just 1 LED (even if 2 available)";
+		el_pos_led_val.textContent = val == 2? "2 LEDs (if available)" : "just 1 LED (even if 2 available)";
 		if(viaSlider !== true)
 			el_pos_led_slider.value = val;
 		ReloadPosForNewSettings();	
