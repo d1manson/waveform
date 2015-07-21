@@ -431,7 +431,9 @@ T.PAR = function(){
 		for(var i=0;i<XY1.length/2;i++){
 			var ix = 2*i+0;
 			var iy = 2*i+1;
-			ret[i] = Math.atan2(XY2[iy] - XY1[iy], XY2[ix] - XY1[ix]) + pi;
+			var dy = XY2[iy] - XY1[iy];
+			var dx = XY2[ix] - XY1[ix];
+			ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : Math.atan2(dy, dx) + pi;
 		}
 		return ret;
 	}

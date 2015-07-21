@@ -662,7 +662,13 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var dir = new Float32Array(xy.length/2);
 		var pi = 3.14159265;
 		for(var i=1;i<dir.length;i++){
-			dir[i] = Math.atan2(xy[2*i+1] - xy[2*i-1],xy[2*i+0] - xy[2*i-2]) + pi;
+			var ix = 2*i+0;
+			var iy = 2*i+1;
+			var ix_1 = 2*i-2;
+			var iy_1 = 2*i-1;
+			var dy = xy[iy] - xy[iy_1];
+			var dx = xy[ix] - xy[ix_1];
+			dir[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : Math.atan2(dy, dx) + pi;
 		}
 		dir[0] = dir[1];
 		if (callback)
