@@ -536,7 +536,9 @@ T.PAR = function(){
 					var i_1x = i*2-2;
 					var i_1y = i*2-1;
 					if(XY1[ix] == NAN16 || XY1[iy] == NAN16 || XY2[ix] == NAN16 || XY2[iy] == NAN16){
+						shrunk_and_switched[i] = 0;
 						i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
+						shrunk_and_switched[i] = 0;
 						continue; 
 					}
 
