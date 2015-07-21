@@ -340,8 +340,10 @@ T.PAR = function(){
 			var iy = i*2+1;
 			// check if this pos is already nan
 			// or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
-			if ( XY[ix] == NAN16 || XY[iy] == NAN16 || 
-				(sqr(x_from-XY[ix]) + sqr(y_from-XY[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
+			if(XY[ix] == NAN16 || XY[iy] == NAN16){
+				XY[ix] = XY[iy] = NAN16; //just in case only one or the other was nan
+				jumpLen++; // note we don't count njumpy here
+			}else if ((sqr(x_from-XY[ix]) + sqr(y_from-XY[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
 				//sample is nan or speed is too large, so make this a jump
 				XY[ix] = XY[iy] = NAN16; 
 				nJumpy++;
