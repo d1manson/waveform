@@ -486,7 +486,7 @@ T.PAR = function(){
 			}
 
 			var ppm = parseInt(header.pixels_per_metre);
-			var UNITS_PER_M = 1000;
+			var UNITS_PER_M = 10000;
 			times_IN_PLACE(XY1, UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
 			if(nLED == 2)
 				times_IN_PLACE(XY2, UNITS_PER_M/ppm,NAN16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)

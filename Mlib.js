@@ -6,6 +6,14 @@ Unfortunately this is a compelte mess in terms of N-dimensions, strides, in plac
 var M = {
 	IN_PLACE: {in_place:true}, //some of the functions below can take this as a flag and perform the calculation "in place", i.e. using one of the inputs as the output
 		
+	debug_print : function(X, formatter){
+		// formatter is a function taking an element of X and returning a string
+		var w = window.open("");
+		for(var i=0;i<X.length;i++)
+			w.document.write(formatter(X[i]) + "<br>");
+		
+	},
+
 	sub: function(X,info){
 		//This function is an atempt to encapsulate all the indexing needs in one place and use an info object to explicitly state the indexing request
 		if('inds' in info){
