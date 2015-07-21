@@ -425,7 +425,7 @@ T.PAR = function(){
 		return ret;
 	}
 
-	var GetDirection = function(XY1, XY2, correction){
+	var GetDirection = function(XY1, XY2){
 		var ret = new Float32Array(XY1.length/2);
 		var pi = 3.14159265;
 		for(var i=0;i<XY1.length/2;i++){
@@ -578,7 +578,7 @@ T.PAR = function(){
 			}
 
 
-			var dir = nLED == 2 ? GetDirection(XY1, XY2, parseInt(header.lightBearing_1)) : new Float32Array(0);
+			var dir = nLED == 2 ? GetDirection(XY1, XY2) : new Float32Array(0);
 
 			header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*UNITS_PER_M/ppm ,
 							   (parseInt(header.window_max_x)-parseInt(header.window_min_x))*UNITS_PER_M/ppm ]; //TODO: decide which way round we want x and y
