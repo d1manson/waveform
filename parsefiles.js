@@ -491,7 +491,7 @@ T.PAR = function(){
 
 			if(nLED == 2){
 				// check for and apply LED swaping...
-				var shrunk_or_switched = new Uint8Array(nPos);  
+				var shrunk_and_switched = new Uint8Array(nPos);  
 
 				var SWAPPING_THRESH_PIX = 5; // it's a bit odd, but it seems this was always defined in pixels not cms.
 
@@ -505,13 +505,13 @@ T.PAR = function(){
 				header.POST_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (nPos - pix_props.n_2) + ")";
 
 				// use std and mean to get z score of pix1 to pix1 and pix2
-				for( var i=1; i< nPos; i++){
+				for( var i=0; i< nPos; i++){
 					var i1 = i*2+0;
 					var i2 = i*2+1;
-					if(XYpix[i1] != NAN16 && XYpix[i2] != NAN16){
+					if(XYpix[i1] && XYpix[i2] && XYpix[i1] != NAN16 && XYpix[i2] != NAN16){
 						var z11 = (mean_1 - XYpix[i1])/std_1;
 						var z12 = (XYpix[i1] - mean_2)/std_2;
-						shrunk_or_switched[i] |= z11 > z12;
+						shrunk_and_switched[i] = z11 > z12;
 					}
 				}
 
@@ -529,7 +529,7 @@ T.PAR = function(){
 						break;
 				}
 
-				for(var i = start+1; i<nPos; i++){
+				for(var i = start+1; i<nPos; i++)if(shrunk_and_switched[i]){
 					// we are going to do diffs with XY_i - XY_(i-1)
 					var ix = i*2+0;
 					var iy = i*2+1;
@@ -545,12 +545,12 @@ T.PAR = function(){
 					var dist21 = Math.hypot(XY2[ix] - XY1[i_1x],  XY2[iy] - XY1[i_1y]);
 					var dist22 = Math.hypot(XY2[ix] - XY2[i_1x],  XY2[iy] - XY2[i_1y]);
 
-					shrunk_or_switched[i] |= (dist12 < dist11-SWAPPING_THRESH_PIX) || (dist21 < dist22 - SWAPPING_THRESH_PIX);
+					shrunk_and_switched[i] = (dist12 < dist11-SWAPPING_THRESH_PIX) || (dist21 < dist22 - SWAPPING_THRESH_PIX);
 
 				}
 
 				// Swap XY1 with XY2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit XY in one go)
-				header.POST_n_swapped = swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_or_switched);
+				header.POST_n_swapped = swap(new Uint32Array(XY1.buffer), new Uint32Array(XY2.buffer), shrunk_and_switched);
 			}
 			
 			var sampFreq = parseInt(header.sample_rate);
