@@ -900,6 +900,8 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	ORG.GetEEGHeader = function(){return cEegHeader;};
 	ORG.SetPosHeaderOverride = SetPosHeaderOverride;
 	ORG.GetDir = GetDir;
+	ORG.GenerateDirCSVForDebug = function(){M.debug_print(GetDir(),function(x){return Math.round(x/3.1415*180);})};
+	ORG.GenerateXYCSVForDebug = function(){M.debug_print(new Uint16Array(cPosBuffer),function(x){return x;},2)};
     return ORG;
 
 }(T.ORG, T.PAR, T.CUT, $('#files_panel'),$(document),$('.file_drop'),T.FS,$('.tilewall_text'),$('#exp_list'),$('#tet_list'),

@@ -6,12 +6,21 @@ Unfortunately this is a compelte mess in terms of N-dimensions, strides, in plac
 var M = {
 	IN_PLACE: {in_place:true}, //some of the functions below can take this as a flag and perform the calculation "in place", i.e. using one of the inputs as the output
 		
-	debug_print : function(X, formatter){
-		// formatter is a function taking an element of X and returning a string
+	debug_print : function(X, formatter, s){
+		/* formatter is a function taking an element of X and returning a string
+			s is optional and is the number of columns:  X is assumed to be of the form
+			x_11 x_12 ... x_1s x21 x22 ... x2_s ... xn_s.
+		*/
 		var w = window.open("");
-		for(var i=0;i<X.length;i++)
-			w.document.write(formatter(X[i]) + "<br>");
-		
+		if(s){
+			for(var i=0; i<X.length/s; i++){
+				for(var j=0; j<s; j++)
+					w.document.write(formatter(X[i*s + j]) + (j == s-1 ? "<br>" : ","));
+			}
+		}else{
+			for(var i=0;i<X.length;i++)
+				w.document.write(formatter(X[i]) + "<br>");
+		}		
 	},
 
 	sub: function(X,info){

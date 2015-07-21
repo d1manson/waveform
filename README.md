@@ -83,6 +83,8 @@ _Right clicking with a touchpad._ In some cases right clicking can be emulated b
 Some stuff doesn't yet have a proper user-interface implementation, but can be accessed by pressing `F12` and going to `Console`:   
 + `T.ORG.SetPosHeaderOverride({window_max_x: '300',window_max_y: '400'})` - the stuff inside the `{...}` can be any values in the pos header. The override occurs immediately after reading the header, before even reading the binary part of the data. Thus you can override ppm before speed filter, or just override window min/max for ratemaps etc.  Note that normally the `window_min_x/y` values are not subtracted from the read in data, but if you do want them to be subtracted then provide  `need_to_subtract_mins: 1` in the list of overrides.  
 
++ `T.ORG.GenerateXYCSVForDebug()` and `T.ORG.GenerateDirCSVForDebug()`. Both these functions open a new tab, and populate it with csv data which can be copy-pasted into Excel or a text document.  Note the direction data is computed from displacement when using 1-spot LED, or from relative positions when using full 2-spot LED. You may need to allow popups in order for the new tabs to actually open.    
+
 #### Change Log
 * Added speed plots.
 * Merge tool now slowly flashes dragged group's plots while over another group.

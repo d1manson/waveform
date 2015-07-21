@@ -98,8 +98,8 @@
 			Bin size <span id='dir_binsize_val' class="slider_val">6 degrees</span><br>
 			Smoothing kernel boxcar <span id='dir_binsize_val' class="slider_val">(2x2+1) bins</span><br>
 			<br><br>
-			WARNING: directional plots are still in alpha testing (unlike everything else which is just about in beta!).  Currently, when data for both LEDs is loaded, we use the direction acording to the
-			relative position of the two LEDs, when only one LED is loaded we use the temporal displacement. Both have problems: the 2-spot method requires data for both LEDs at all moments in the trial, and the identity of each LED to be correctly identified.  Filtering and interpolation ("post processing") attempt to deal with most issues in the data, but if the second spot tracking is poor then the directional data will be especially misleading.  Using 1-spot LED is bad when the animal is not moving much because tiny changes in the position of its head will be treated as "displacement" even though these dispalcements are rather less meaningful than the displacements during "proper" running/walking episodes.  If the output of the tracking and post-processing is a short period of no movement, then the dispoalcement is zero and no directional data is used for that moment in the trial.
+			WARNING: directional plots do not match Tint as well as ratemaps, especially for 2-spot LED mode.<br><br>
+			<br> In 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode, the direction of movement is used ("dir_disp").
 
 			<!--<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
 			<br><br>
