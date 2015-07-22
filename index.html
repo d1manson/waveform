@@ -88,7 +88,12 @@
 			<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
 			<br><br>
 			Smoothing kernel boxcar <span id='rm_smoothing_val' class="slider_val">(2x?+1) by (2x?+1) bins</span><br>
-			<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider><br>
+			<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider>
+
+			<br><br>
+			The peak rate is shown as "spa max" when you move your cursor over a group.
+			<br>
+
 		</div>
 	</div>
 	
@@ -96,16 +101,16 @@
 		<div class='floating_title'>Directional ratemap [c]</div>
 		<div class='floating_body'>
 			Bin size <span id='dir_binsize_val' class="slider_val">6 degrees</span><br>
-			Smoothing kernel boxcar <span id='dir_binsize_val' class="slider_val">(2x2+1) bins</span><br>
+			<paper-slider class="nodrag" id="dir_binsize_slider" pin snaps min="2" max="15" step="1" value="6" style='width:300px'></paper-slider>
 			<br><br>
-			WARNING: directional plots do not match Tint as well as ratemaps, especially for 2-spot LED mode.<br><br>
-			<br> In 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode, the direction of movement is used ("dir_disp").
+			Smoothing kernel boxcar <span id='dir_smoothing_val' class="slider_val">(2x2+1) bins</span><br>
+			<paper-slider class="nodrag" id="dir_smoothing_slider" pin snaps min="0" max="10" step="1" value="2" style='width:300px'></paper-slider>
 
-			<!--<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
 			<br><br>
-			Smoothing kernel boxcar <span id='rm_smoothing_val' class="slider_val">(2x?+1) by (2x?+1) bins</span><br>
-			<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider><br>
-			-->
+
+			Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode, the direction of movement is used (this is sometimes refered to as "displacement direction").
+			<br>
+
 		</div>
 	</div>
 	

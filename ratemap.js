@@ -3,7 +3,8 @@
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,TILE_CANVAS_NUM3,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
-				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks){
+				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks,
+				el_dir_binsize_val,el_dir_binsize_slider,el_dir_smoothing_val,el_dir_smoothing_slider){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
@@ -162,8 +163,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		var desiredCmPerBin = 2.5;
 		var desiredCmsPerBin = 4;
         var desiredSmoothingW = 2;
-		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15..maybe larger factors too if you really want
-		var desiredSmoothingDir = 2; //TODO: lookup what knid of smoothing needs to be done for dir plots.
+		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15,30
+		var desiredSmoothingDir = 2; 
 		var desiredPosDataId = 0; //Each time we load a pos we increment this, and obviosuly we desire that all ratemap use the most recent pos data 
 		var expLenInSeconds = null; //used for meanTime plot
  		var ratemapTimer = null;
@@ -243,8 +244,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
             ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
     	    desiredSmoothingW = v;
 			CachePosBinIndsAndDwellMap(); //when we change the smoothing we have to redo this stuff
-			QueueAllSlotsLazy();
-		    
+			QueueAllSlotsLazy();   
+        }
+        var SetSmoothingDir = function(v){
+        	if(v == desiredSmoothingDir)
+        		return; //no point doing anything if the value isn't new
+
+            ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
+    	    desiredSmoothingDir = v;
+			CachePosBinIndsAndDwellMap_Dir(); //when we change the smoothing we have to redo this stuff
+			QueueAllSlotsLazy();   
         }
 		var SetBinSizeCms = function(v){
 			if(v == desiredCmsPerBin)
@@ -265,7 +274,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 					slots[i].posDataId != desiredPosDataId ||				
 					show[0] && ( slots[i].smoothingW != desiredSmoothingW ||
 								 slots[i].cmPerBin != desiredCmPerBin	  ) ||
-					show[1] && slots[i].degPerBin != desiredDegPerBin ||
+					show[1] && (slots[i].degPerBin != desiredDegPerBin || 
+								slots[i].smoothingDeg != desiredSmoothingDir) ||
 					show[2] && slots[i].cmsPerBin != desiredCmsPerBin
 					))
 				QueueSlot(i);
@@ -505,6 +515,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
 				
 			slot.degPerBin = desiredDegPerBin;
+			slot.smoothingDeg = desiredSmoothingDir;
 			main.PlotDirData(ratemap.buffer, slot.num, slot.generation,IM_RATEMAP_DIR,[ratemap.buffer]);
 		}
 		var GetGroupRatemap_Speed = function(slot){
@@ -631,6 +642,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var desiredCmPerBin = 2.5;
 	var desiredSmoothingW = 2;
 	var desiredDegPerBin = 6;
+	var desiredSmoothingDir = 2;
 	var sintable = null;
 	var costable = null;
 			
@@ -784,8 +796,16 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 	}
 	
-	var SetBinSizeDeg = function(v,viaSlider){
-		//TODO: have a slider
+	var _deg_binsize_mapping = ['','',2,3,4,6,6,6,6,10,10,10,10,15,15,15,15,15,15,15,15];
+
+	var SetBinSizeDeg = function(v,viaSlider){		
+
+		if (v > _deg_binsize_mapping.length)
+			v = 30;
+		else
+			v =  _deg_binsize_mapping[v];
+		el_dir_binsize_val.textContent = v + " degrees";
+		el_dir_binsize_slider.value = v;
 		
 		theWorker.SetBinSizeDeg(v);
 		desiredDegPerBin = v;
@@ -801,7 +821,17 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		}
 
 	}
+	var SetSmoothingDir = function(v,viaSlider){
+		el_dir_smoothing_val.textContent = v == 0 ? 'off' :  "(2x" + v + "+1) bins";
+		if(viaSlider !== true)
+			el_dir_smoothing_slider.value = v;
+		
+
+		theWorker.SetSmoothingDir(v);
+		desiredSmoothingDir = v;
 	
+	}
+
 	var SetCmPerBin = function(v,viaSlider){
 		$binSizeVal.text(v + " cm")
 		desiredCmPerBin = v;
@@ -884,7 +914,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	
 	var theWorker = BuildBridgedWorker(workerFunction,
 										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW",
-                                            "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg",
+                                            "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg", "SetSmoothingDir",
                                             "SetShow"],
 										["ShowIm*","PlotDirData*"],[ShowIm,PlotDirData],
 										WORKER_CONSTANTS);
@@ -893,6 +923,9 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 
 	$binSizeSlider.on("change",function(e){SetCmPerBin(this.value,true);});
 	$smoothingSlider.on("change",function(e){SetSmoothingW(this.value,true);});
+	el_dir_binsize_slider.addEventListener("change",function(){SetBinSizeDeg(this.value,true)});
+	el_dir_smoothing_slider.addEventListener("change",function(){SetSmoothingDir(this.value,true)});
+
 	SetBinSizeDeg(6);
     
 	ORG.AddCutChangeCallback(SlotsInvalidated);
@@ -908,6 +941,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         SetSmoothingW: SetSmoothingW,
 		SetBinSizeDeg: SetBinSizeDeg,
 		GetBinSizeDeg: function(){return desiredDegPerBin;},
+		GetSmoothingDir: function(){return desiredSmoothingDir;},
+		SetSmoothingDir: SetSmoothingDir,
 		RenderSpikesForPath: RenderSpikesForPath,
 		SetRenderMode: SetRenderMode
 	}
@@ -916,5 +951,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
   T.CutSlotCanvasUpdate, T.CutSlotLog, T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.CANVAS_NUM_RM_SPEED,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
-	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks)
+	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks,
+	document.getElementById('dir_binsize_val'),document.getElementById('dir_binsize_slider'),
+	document.getElementById('dir_smoothing_val'),document.getElementById('dir_smoothing_slider'))
 
