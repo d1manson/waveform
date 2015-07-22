@@ -495,7 +495,8 @@ T.PAR = function(){
 				// check for and apply LED swaping...
 				var shrunk_and_switched = new Uint8Array(nPos);  
 
-				var SWAPPING_THRESH_PIX = 5; // it's a bit odd, but it seems this was always defined in pixels not cms.
+				var SWAPPING_THRESH_CM = 1; // it's a bit odd, but it seems this was always defined in pixels not cms.
+				var SWAPPING_THRESH = SWAPPING_THRESH_CM * (UNITS_PER_M/100);
 
 				// firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
 				// where "closer" is defined as z-score, i.e. distance/std for the relevant distribution.
@@ -520,7 +521,7 @@ T.PAR = function(){
 
 				// Now we calculate jump distance (from time i-1 to time i)
 				// four distnaces: led1 to led1, led1 to led2, led2 to led1, led2 to led2.
-				// if the recorded version of distance is more than SWAPPING_THRESH_PIX further
+				// if the recorded version of distance is more than SWAPPING_THRESH further
 				// than the potential "swapped" version, then consider it a swap.
 
 				// Find first (x,y) that is non-nan on both XY and XY2
@@ -549,7 +550,7 @@ T.PAR = function(){
 					var dist21 = Math.hypot(XY2[ix] - XY1[i_1x],  XY2[iy] - XY1[i_1y]);
 					var dist22 = Math.hypot(XY2[ix] - XY2[i_1x],  XY2[iy] - XY2[i_1y]);
 
-					shrunk_and_switched[i] = (dist12 < dist11-SWAPPING_THRESH_PIX) || (dist21 < dist22 - SWAPPING_THRESH_PIX);
+					shrunk_and_switched[i] = (dist12 < dist11-SWAPPING_THRESH) && (dist21 < dist22 - SWAPPING_THRESH);
 
 				}
 

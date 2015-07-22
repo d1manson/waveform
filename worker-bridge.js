@@ -48,6 +48,8 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 	extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
 	extraWorkerStr.push("\n};\n");
 	extraWorkerStr.push("var console = {\nlog:\n function(str){self.postMessage({foo:'console_log',args:[str]})}\n}\n");
+	extraWorkerStr.push("var copy_typedarray_to_main = function(x,name){\n var buffer = x.buffer.slice(0);\nself.postMessage({foo: 'copy_typedarray_to_main', args:[buffer,name,x.constructor.name,[buffer]]});\n}");
+
 	var fullWorkerStr = "\n\n/*==== VARS ADDED BY BuildBridgeWorker ==== */\n\n" + 
 						extraWorkerTopStr.join("\n") + 
 						"\n\n/*==== START OF CUSTOM WORKER CODE ==== */\n\n" +
@@ -63,6 +65,11 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 	theWorker.onmessage = function(e){
 		if(e.data.foo == "console_log"){ 
 			console.log(e.data.args[0]);
+			return;
+		}
+		if(e.data.foo == "copy_typedarray_to_main"){
+			var constructor = window[e.data.args[2]];
+			window[e.data.args[1]] = new constructor(e.data.args[0]);
 			return;
 		}
 		var fooInd = mainExportNames.indexOf(e.data.foo);
