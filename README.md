@@ -86,6 +86,7 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 + `T.ORG.GenerateXYCSVForDebug()` and `T.ORG.GenerateDirCSVForDebug()`. Both these functions open a new tab, and populate it with csv data which can be copy-pasted into Excel or a text document.  Note the direction data is computed from displacement when using 1-spot LED, or from relative positions when using full 2-spot LED. You may need to allow popups in order for the new tabs to actually open.    
 
 #### Change Log
+* Added support for 2LEDs, and fixed directional plotting.
 * Added speed plots.
 * Merge tool now slowly flashes dragged group's plots while over another group.
 * Removed speed-hist-drift rendering mode.

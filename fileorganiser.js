@@ -398,7 +398,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var pi = 3.1415;
 		var correction = parseInt(cSetHeader.lightBearing_1)/180*pi; 
 		for(var i=0;i<cPosDir.length;i++)
-			cPosDir[i] -= correction;
+			cPosDir[i] = (cPosDir[i] + correction)  % (2*pi);
 		cPosDir_needs_adjusting = false;
 	}
 
@@ -652,10 +652,12 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		}
 
 		if(cPosDir && cPosDir.length > 0){	
-			if(callback)
+			if(callback){
 				callback(cPosDir); // 2LED dir
-			else
+				return;
+			}else{
 				return cPosDir;
+			}
 		}
 
 		var xy = new Int16Array(cPosBuffer);
