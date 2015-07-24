@@ -12,18 +12,18 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 **Bugs, features, and feedback.** If you are using the application, I'd love to know!  If you find any bugs then definitely report them as soon as possible.  There are many features I'd like to add at some point, but most of them are rather time consuming to implement using the current framework. However, if you let me know what it is you want, I may be more inclined to implement it, especially if it's one of the less tricky things to do.
 
 #### Screenshots
-Example view of the whole application, with a few things labeled:    
-![screenshot](/screenshot1.png "screenshot with labels")
+Example view of the whole application, with a few things labeled. This is slightly out of date:    
+![screenshot](/img/screenshot1.png "screenshot with labels")
 
 Some screenshots of individual features:     
 
 |                                   |                                         |
 |:----------------------------------|:---------------------------------------:|
-|Merger tool                        | ![mergetool](/mergertool.png)           |
-|Splitter tool                      | ![splittertool](/splittertool.png)      |
-|Cluster painting tool              | ![paintingtool](/clusterpainting.png)  |        
-|Wave rendering in  "density" mode   | ![density](/countmode.png)              |  
-|Cluster rendering in "drift" mode  | ![drift](/drift.png)                    |  
+|Merger tool                        | ![mergetool](/img/mergertool.png)           |
+|Splitter tool                      | ![splittertool](/img/splittertool.png)      |
+|Cluster painting tool              | ![paintingtool](/img/clusterpainting.png)  |        
+|Wave rendering in  "density" mode   | ![density](/img/countmode.png)              |  
+|Cluster rendering in "drift" mode  | ![drift](/img/drift.png)                    |  
 
 
 #### Quickstart   (... it's short and worth reading!)
