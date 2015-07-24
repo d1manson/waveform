@@ -1,6 +1,6 @@
 "use strict";
 
-T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaTVal){
+T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_deltaTVal){
 
 	// === WORKER ==================================================
 	var workerFunction = function(){
@@ -258,12 +258,12 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 	var SetDeltaT = function(v,viaSlider){
 		desiredMaxDeltaT = v;
 		if(v < 1000)
-			$deltaTVal.text(v + " ms");
+			el_deltaTVal.textContent = v + " ms";
 		else
-			$deltaTVal.text(v/1000 + " s");
+			el_deltaTVal.textContent = v/1000 + " s";
 		theWorker.SetMaxDeltaT(v); //the worker will send back one hist for each slot that it has previously been sent
 		if(viaSlider !== true)
-			$deltaTSlider.get(0).value = v;
+			el_deltaTSlider.value = v;
 	}
 
 
@@ -283,7 +283,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 	var DeltaTSilder_Change = function(e){
 		SetDeltaT(this.value,true);
 	}
-	$deltaTSlider.on("change",DeltaTSilder_Change );
+	el_deltaTSlider.addEventListener("change",DeltaTSilder_Change );
 	
 	ORG.AddCutChangeCallback(SlotsInvalidated);
 	ORG.AddFileStatusCallback(FileStatusChanged);
@@ -297,4 +297,5 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,$deltaTSlider,$deltaT
 		GetDeltaT: function(){return desiredMaxDeltaT;}
     };
 
-}(T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC, T.ORG, $('#tc_deltaT_slider'),$('#tc_deltaT_val'));
+}(T.CutSlotCanvasUpdate, T.CANVAS_NUM_TC, T.ORG,
+	 document.getElementById('tc_deltaT_slider'),document.getElementById('tc_deltaT_val'));

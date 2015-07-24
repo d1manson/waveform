@@ -1,7 +1,7 @@
 "use strict"; 
 
 
-T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
+T.CP = function(el_canvasParent, el_cluster_info, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks){
 
 	//TODO: it may be woth moving the plotting into a worker..could also do the painting and mouse-over-group detection in the worker.
     // for the painting it might be best to send the finished painted overlay to the worker for processing rather than trying to paint
@@ -134,7 +134,7 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 		if(meanTMode)
 			return;
 		
-		var allCanvs = $(this).parent().find('canvas');
+		var allCanvs = $(this.parentNode).find('canvas');
 		for(var plotInd=0;plotInd<allCanvs.length;plotInd++)
 			if(allCanvs[plotInd] == this)
 				break;
@@ -185,9 +185,9 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 	}
 
 	var LoadTetrodeData = function(N_val,amps_in){
-		var old_canvs = Array.prototype.slice.call(canvasParent_el.getElementsByTagName('canvas'),0);
+		var old_canvs = Array.prototype.slice.call(el_canvasParent.getElementsByTagName('canvas'),0);
 		for(var i=0;i<old_canvs.length;i++)
-			canvasParent_el.removeChild(old_canvs[i]);
+			el_canvasParent.removeChild(old_canvs[i]);
 
 		ctxes = [];
 		chanList = [];
@@ -224,7 +224,7 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 				canvas_el.width = canvS;
 				canvas_el.height = canvS;
 				canvas_el.className = "cluster_canv";
-				canvasParent_el.appendChild(canvas_el);
+				el_canvasParent.appendChild(canvas_el);
 				ctxes.push(canvas_el.getContext('2d'));
 			}
 		canvasesAreNew = true;
@@ -320,14 +320,16 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 
 	}
 
-    var $cssBlock = $("<style>.cluster_canv{width:" + canvS + "px; height:" + canvS + "px;}</style>").appendTo($('head'));
-    cssSize = canvS;
+	var el_cssBlock = document.createElement('style');
+	el_cssBlock.type = 'text/css';
+	el_cssBlock.innerHTML = ".cluster_canv{width:" + canvS + "px; height:" + canvS + "px;}";
+	document.getElementsByTagName("head")[0].appendChild(el_cssBlock);
     
+    cssSize = canvS;
+
     var SetSize = function(s){
         s = s< 64 ? 64 : s > 512 ? 512 : s;
-        var $oldCss = $cssBlock; 
-        $cssBlock = $("<style>.cluster_canv{width:" + s + "px;height:" + s + "px}</style>"); 
-        $oldCss.replaceWith($cssBlock);
+        el_cssBlock.innerHTML = ".cluster_canv{width:" + s + "px;height:" + s + "px}"; 
         cssSize = s;
     }
     
@@ -343,10 +345,11 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
 	ORG.AddFileStatusCallback(FileStatusChanged);
 	modeChangeCallbacks.push(SetRenderMode);
 	
-	T.$cluster_panel.on({"mousemove": ClusterPlot_MouseMove,
+
+	$(el_canvasParent).on({'mousemove': ClusterPlot_MouseMove,
 						  "mouseout": function(){T.SetGroupOver(-1)}
 						},"canvas");
-	T.$cluster_info.on({'mouseover': function(){T.SetGroupOver($(this).attr('data-group'));},
+	$(el_cluster_info).on({'mouseover': function(){T.SetGroupOver($(this).attr('data-group'));},
 					    "mouseout" : function(){T.SetGroupOver(-1)},
 						"mousedown" : ClusterStickerMouseDown
 						},'.cluster-sticker');
@@ -357,4 +360,5 @@ T.CP = function(canvasParent_el, ORG,PALETTE_B,PALETTE_FLAG,modeChangeCallbacks)
             SetSize: SetSize,
             GetSize: function(){return cssSize;}}; 
 
-} (T.$cluster_panel.get(0),T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer),T.modeChangeCallbacks);
+} (document.getElementById('cluster_panel'), document.getElementById('cluster_info'),
+	T.ORG, T.PALETTE_TIME, new Uint32Array(T.PALETTE_FLAG.buffer),T.modeChangeCallbacks);

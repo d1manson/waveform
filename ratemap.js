@@ -3,7 +3,7 @@
 T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,TILE_CANVAS_NUM3,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
-				$binSizeSlider,$smoothingSlider,$binSizeVal,$smoothingVal,modeChangeCallbacks,
+				el_binSizeSlider,el_smoothingSlider,el_binSizeVal,el_smoothingVal,modeChangeCallbacks,
 				el_dir_binsize_val,el_dir_binsize_slider,el_dir_smoothing_val,el_dir_smoothing_slider){
 				
 	var IM_SPIKES_FOR_PATH = 1;
@@ -833,23 +833,23 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	}
 
 	var SetCmPerBin = function(v,viaSlider){
-		$binSizeVal.text(v + " cm")
+		el_binSizeVal.textContent = v + " cm";
 		desiredCmPerBin = v;
 		theWorker.SetBinSizeCm(v); //the worker will send back one hist for each slot that it has previously been sent
 		if(viaSlider !== true)
-			$binSizeSlider.get(0).value = v;
+			el_binSizeSlider.value = v;
 	}
     var SetSmoothingW = function(v,viaSlider){
 		if(v == 0)
-			$smoothingVal.text("off");
+			el_smoothingVal.textContent = "off";
 		else if(v == 1)
-			$smoothingVal.text("(2+1) by (2+1) bins");
+			el_smoothingVal.textContent = "(2+1) by (2+1) bins";
 		else
-			$smoothingVal.text("(2x" + v + "+1) by (2x" + v + "+1) bins");
+			el_smoothingVal.textContent = "(2x" + v + "+1) by (2x" + v + "+1) bins";
         desiredSmoothingW = v;
         theWorker.SetSmoothingW(v);
         if(viaSlider !== true)
-    		$smoothingSlider.get(0).value = v;
+    		el_smoothingSlider.value = v;
     }
 	var RenderSpikesForPath = function(g){
 	    var color = PALETTE_FLAG[g];
@@ -921,8 +921,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	//console.log("ratemap BridgeWorker is:\n  " + theWorker.blobURL);
 
 
-	$binSizeSlider.on("change",function(e){SetCmPerBin(this.value,true);});
-	$smoothingSlider.on("change",function(e){SetSmoothingW(this.value,true);});
+	el_binSizeSlider.addEventListener("change",function(e){SetCmPerBin(this.value,true);});
+	el_smoothingSlider.addEventListener("change",function(e){SetSmoothingW(this.value,true);});
 	el_dir_binsize_slider.addEventListener("change",function(){SetBinSizeDeg(this.value,true)});
 	el_dir_smoothing_slider.addEventListener("change",function(){SetSmoothingDir(this.value,true)});
 
@@ -951,7 +951,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
   T.CutSlotCanvasUpdate, T.CutSlotLog, T.CANVAS_NUM_RM,T.CANVAS_NUM_RM_DIR,T.CANVAS_NUM_RM_SPEED,T.ORG,
   T.POS_PLOT_WIDTH,T.POS_PLOT_HEIGHT,T.SpikeForPathCallback,
   new Uint32Array(T.PALETTE_FLAG.buffer),new Uint32Array(T.PALETTE_TIME.buffer),
-	$('#rm_binsize_slider'),$('#rm_smoothing_slider'),$('#rm_binsize_val'),$('#rm_smoothing_val'),T.modeChangeCallbacks,
+	document.getElementById('rm_binsize_slider'),document.getElementById('rm_smoothing_slider'),
+	document.getElementById('rm_binsize_val'),document.getElementById('rm_smoothing_val'),T.modeChangeCallbacks,
 	document.getElementById('dir_binsize_val'),document.getElementById('dir_binsize_slider'),
 	document.getElementById('dir_smoothing_val'),document.getElementById('dir_smoothing_slider'))
 
