@@ -207,7 +207,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.$.sticker.style.right = '';
 		el.$.sticker.style.webkitAnimation = '';
 		el.$.blind.style.cssText = '';
-		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = '';})
+		forEachInNodeList(el.shadowRoot.querySelectorAll('canvas'),function(el){el.style.webkitAnimation = '';})
 	}
 	
 	var StyleActive = function(el){
@@ -227,7 +227,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.style.opacity = '1';
 		el.$.sticker.style.right = '26px';
 		el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-		forEachInNodeList(el.shadowRoot.getElementsByTagName('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1.5s linear infinite';})
+		forEachInNodeList(el.shadowRoot.querySelectorAll('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1.5s linear infinite';})
 	}
 	
 	var StyleMoving = function(el){
