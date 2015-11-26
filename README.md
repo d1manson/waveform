@@ -11,6 +11,11 @@ Daniel decided that browsers are good for rapid design of user-friendly interfac
 
 **Bugs, features, and feedback.** If you are using the application, I'd love to know!  If you find any bugs then definitely report them as soon as possible.  There are many features I'd like to add at some point, but most of them are rather time consuming to implement using the current framework. However, if you let me know what it is you want, I may be more inclined to implement it, especially if it's one of the less tricky things to do. (I have an ambitious plan to rebuild the application in a specailly-designed famework that I've called "[Venomous](https://github.com/d1manson/venomous)" - although the framework and new waveform application are a long way from being built you can explore the draft structure for the [Waveform analysis pipeline](http://d1manson.github.io/venomous/explorer/) using the Venomous Explorer tool.)
 
+#### Demo (on YouTube)
+Click image to open in YouTube:    
+
+[![link to youtube](http://img.youtube.com/vi/36o69CPu-1E/0.jpg)](http://www.youtube.com/watch?v=36o69CPu-1E)
+
 #### Screenshots
 Example view of the whole application, with a few things labeled. This is slightly out of date:    
 ![screenshot](/img/screenshot1.png "screenshot with labels")
