@@ -206,7 +206,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', end
 .drop_banner{
     font-size: 4em;
     position: absolute;
-    bottom: 130px;
+    bottom: 430px;
     text-align: center;
     width: 100%;
 }
@@ -230,11 +230,14 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', end
     background: #ddd;
     border-color: #777;
 }
+#youtube_demo_img:hover {
+    content: url('img/demo_youtube_hover.png');
+}
 .file_drop_text,
 .tilewall_text{
 margin: auto;
 position: absolute;
-height: 100px;
+height: 400px;
 bottom: 0px;
 top: 0px;
 left: 0px;
