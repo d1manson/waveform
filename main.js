@@ -824,8 +824,6 @@ T.InitButtons = function(){
 	$('#drift_button').click(T.DriftButtonClick);
 }
 
-
-$('core-tooltip').on('mouseenter',function(){this.setPosition();}); //POLYMER BUGFIX
 T.$main_toolbar = $('.main_toolbar');
 T.$hidden_clipboard = $('.hidden_clipboard');
 T.$tilewall = $('.tilewall');

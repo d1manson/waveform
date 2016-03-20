@@ -7,7 +7,7 @@
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 <link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
-<link rel="import" href="polymer/core-tooltip.html">
+<link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="polymer/core-icon-button.html">
 <link rel="import" href="polymer/core-toolbar.html">
 <link rel="import" href="polymer/paper-slider.html">
@@ -205,66 +205,66 @@
 <div class="main_wrapper">
 	
 <core-toolbar class="main_toolbar compact"><div class="fit">
-	<core-tooltip label="help on GitHub [?]" position="right">					
+	<paper-tooltip label="help on GitHub [?]" position="right">					
 	<core-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label="keyboard shortcuts [k]">					
+	<paper-tooltip label="keyboard shortcuts [k]">					
 	<core-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label='undo [z]'>
+	<paper-tooltip label='undo [z]'>
 	<core-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label='file headers [h]'>
+	<paper-tooltip label='file headers [h]'>
 		<core-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label='toggle drift [d]'>
+	<paper-tooltip label='toggle drift [d]'>
 	<core-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label="toggle palette [p]">
+	<paper-tooltip label="toggle palette [p]">
 	<core-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 
-	<core-tooltip label="sort on group size [n]">
+	<paper-tooltip label="sort on group size [n]">
 		<core-icon-button icon="sort" id='reorder_n_button'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label="sort on channel amplitude">
+	<paper-tooltip label="sort on channel amplitude">
 		<core-icon-button icon="sort" id='reorder_A_button'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 			
-	<core-tooltip label="position post processing settings">
+	<paper-tooltip label="position post processing settings">
 		<core-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></core-icon-button>
-	</core-tooltip>
+	</paper-tooltip>
 	
-	<core-tooltip label="channel 1 [1]">
+	<paper-tooltip label="channel 1 [1]">
 		<div class="button display_button">c1</div>
-	</core-tooltip>
-	<core-tooltip label="channel 2 [2]">
+	</paper-tooltip>
+	<paper-tooltip label="channel 2 [2]">
 		<div class="button display_button">c2</div>
-	</core-tooltip>
-	<core-tooltip label="channel 3 [3]">
+	</paper-tooltip>
+	<paper-tooltip label="channel 3 [3]">
 		<div class="button display_button">c3</div>
-	</core-tooltip>
-	<core-tooltip label="channel 4 [4]">
+	</paper-tooltip>
+	<paper-tooltip label="channel 4 [4]">
 		<div class="button display_button">c4</div>
-	</core-tooltip>
-	<core-tooltip label="spatial ratemap [r]">
+	</paper-tooltip>
+	<paper-tooltip label="spatial ratemap [r]">
 		<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
-	</core-tooltip>
-	<core-tooltip label="directional ratemap [c]">
+	</paper-tooltip>
+	<paper-tooltip label="directional ratemap [c]">
 		<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
-	</core-tooltip>
-	<core-tooltip label="speed ratemap [v]">
+	</paper-tooltip>
+	<paper-tooltip label="speed ratemap [v]">
 		<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
-	</core-tooltip>
-	<core-tooltip label="temporal autocorrelation [t]">
+	</paper-tooltip>
+	<paper-tooltip label="temporal autocorrelation [t]">
 		<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
-	</core-tooltip>
+	</paper-tooltip>
 
 </div></core-toolbar>
 
@@ -302,15 +302,15 @@
 		<div class="side_panel_row">
 			<div id="cluster_info" class="cluster_info above_scrollable_area">
 					<div class="cluster_painter">
-						<core-tooltip label="destination group [e]" position="right">
+						<paper-tooltip label="destination group [e]" position="right">
 							<div class='cluster-sticker' id='painter-dest'>?</div> 
-						</core-tooltip>
+						</paper-tooltip>
 						&#8592; { 
-						<core-tooltip label="source groups [f]">
+						<paper-tooltip label="source groups [f]">
 							<div id='painter-src'>
 								<div class='cluster-sticker'>?</div>
 							</div> 
-						</core-tooltip>
+						</paper-tooltip>
 						}
 					</div>
 					<div class="cluster_others">

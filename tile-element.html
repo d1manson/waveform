@@ -26,32 +26,18 @@ And the following methods:
 						google docs - the size of the image is dictated by the number of bins. (The waveforms have both height and width specified so they are the expected size).  That's helpful in a way
 						but rather consfusing to say the least.
 
-A tile can be in one of several states, (normal,active,moving,proximate,hover, and disabled). Transitioning between states is done by setting element.something = true or false....
-	from normal state: 
-		active=true  	=> active  ..usually, but...
-						=> hover  ...if movingTile is currently not null
-		disabled=true 	=>disabled
-	from active state:
-		moving=true  	=> moving 
-		active=false 	=> normal
-		disabled=true 	=>disabled
-	from moving state:
-		proximate=true 	=> proximate
-		moving=false 	=> active  
-		..setting active will be ignored and not cause an error
-	from proxiamte state:
-		proximate=false => moving 
-		moving=false 	=> active 
-	from hover state:
-		active=false 	=> normal
-	from disabled state:
-		disabled=false	=> normal
-I'm not quite sure why it's so complciated, it would probably be better to just set the state directly.
+There are several boolean flags that control the tile's state:
+	active,moving,proximate,disabled
+There are rules about how they can be combined, and more.  When all flags are false, the tile
+is in null state. When another tile is moving, it cannot be active instead it is hover.
 -->
-<link rel="import" href="polymer/polymer.html">
-<link rel="import" href="polymer/core-tooltip.html">
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="cross-hair.html">
-<polymer-element name="tile-element" attributes="group_num group_color_1 group_color_2 group_n group_spa_max">
+
+<dom-module id="tile-element">
+
 <template>
 	<style>
 	:host {
@@ -133,16 +119,15 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	height:50px;
 	}
 	.caption-inner{
-		border-top: 1px solid #000;
-		padding-top: 2px;
+	border-top: 1px solid #000;
+	padding-top: 2px;
 	}
 	.caption-inner:nth-of-type(1){
-		border-top: 0px;
+	border-top: 0px;	
 	}
-
 	.caption-inner-label{
-		font-weight: bold;
-		font-size: 0.8em;
+	font-weight: bold;
+	font-size: 0.8em;
 	}
 	/*
 	.grabbed_info .tile-buttons{
@@ -150,7 +135,20 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	}
 
 	*/
-	
+	.canvas_part_1{
+	display: inline-block;
+	}
+	.canvas_part_2{
+	display: inline-block;
+	flex-direction: column;
+	}
+	.tile-side{
+	display: flex;
+	flex-direction: column;	
+	}
+	.flex{
+	flex:2;
+	}
 	@-webkit-keyframes fadeout{
 	0%     { opacity: 1;  }
 	33%   { opacity: 1;   }
@@ -159,26 +157,28 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	100%   { opacity: 1;   }
 	}
 	</style>
-	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
-	<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
-	<div style="display:inline-block;" layout vertical>
-	<div>
-		<canvas class='dir-rm' width='0' height='0' style='width:0px'></canvas>
-		<canvas class='speed-rm' width='0' height='0' style='width:0px'></canvas>
+	<div class="canvas_part_1">
+		<canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
+		<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	</div>
-	<div><canvas class='tc' width='0' height='0' style='width:0px;'></canvas></div>
+	<div class="canvas_part_2">
+		<div>
+			<canvas class='dir-rm' width='0' height='0' style='width:0px'></canvas>
+			<canvas class='speed-rm' width='0' height='0' style='width:0px'></canvas>
+		</div>
+		<div>
+			<canvas class='tc' width='0' height='0' style='width:0px;'></canvas>
+		</div>
 	</div>
-	<div id='sticker' class='tile-sticker' style="background-color:{{group_color_1}};color:{{group_color_2}};">{{group_num}}</div>
+	<div id='sticker' class='tile-sticker' style$="background-color:[[group_color_1]];color:[[group_color_2]];">[[group_num]]</div>
 	<div id='over' class='tile-over hidden_grabbed'>
-		<div class='tile-side' layout vertical>
-			<div flex></div>
+		<div class='tile-side'>
+			<div class="flex"></div>
 			<div class='tile-caption'>
-				<template if="{{group_spa_max}}">
-					<div class="caption-inner">{{group_spa_max}}Hz
-						<div class="caption-inner-label">spa max</div>
-					</div>
-				</template>
-				<div class="caption-inner">{{group_n}}
+				<div style$='display:[[_show(group_spa_max)]]' class="caption-inner">[[group_spa_max]]Hz
+					<div class="caption-inner-label">spa max</div>
+				</div>
+				<div class="caption-inner">[[group_n]]
 					<div class="caption-inner-label">n spikes</div>
 				</div>
 			</div>
@@ -192,13 +192,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	"use strict";
 	
 	var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
-	var activeTile = null; 
-	var ACTIVE = 'a'; 
-	var HOVER = 'h';
-	var MOVING = 'm';
-	var PROXIMATE = 'p';
-	var DISABLED = 'd';
-	// falsy state is anything else
 	
 	var ResetStyle = function(el){
 		var display = el.style.display;
@@ -207,7 +200,10 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.$.sticker.style.right = '';
 		el.$.sticker.style.webkitAnimation = '';
 		el.$.blind.style.cssText = '';
-		forEachInNodeList(el.shadowRoot.querySelectorAll('canvas'),function(el){el.style.webkitAnimation = '';})
+		var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+		for(var ii=0; ii<canvases.length; ii++)
+			canvases[ii].style.webkitAnimation = '';
+		Polymer.dom.flush();
 	}
 	
 	var StyleActive = function(el){
@@ -220,6 +216,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 	var StyleHover = function(el){
 		ResetStyle(el);
 	}
+
 	var StyleProxiamte = function(el){
 		StyleMoving(el);
 		el.style.backgroundColor = '';
@@ -227,7 +224,10 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.style.opacity = '1';
 		el.$.sticker.style.right = '26px';
 		el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-		forEachInNodeList(el.shadowRoot.querySelectorAll('canvas'),function(el){el.style.webkitAnimation = 'fadeout 1.5s linear infinite';})
+		var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+		for(var ii=0; ii<canvases.length; ii++)
+			canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
+		Polymer.dom.flush();
 	}
 	
 	var StyleMoving = function(el){
@@ -246,30 +246,88 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		el.$.blind.style.display = 'block';
 		el.style.pointerEvents = 'none';
 	}
-	
-	var LogIt = function(el,attr,val){
-		//console.log("[g" + el.group_num + "] setting " + attr + "=" + val + " when state_=" + el.state_);
-	}
-	
-	var forEachInNodeList = function(nodelist,foo){
-	Array.prototype.forEach.call(Array.prototype.slice.call(nodelist), foo); //no wonder I've been using jQuery...why on earth does this have to be so lengthy?
-	}
-	
-    Polymer('tile-element',{
-		group_num: -1,
-		group_color_1: '#666',
-		group_color_2: '#f00',
-		group_n: '???',
-		updateCanvas: function(newCanv,canvasNum){
-			var oldCanv = this.shadowRoot.querySelectorAll('canvas')[canvasNum];
+			
+    Polymer({
+    	is:'tile-element',
+    	properties: {
+			group_num: {
+				type: Number,
+				notify: true,
+				value: -1,
+				reflectToAttribute: true
+			},
+			group_color_1: {
+				type: String,
+				notify: true,
+				value: '#666',
+				reflectToAttribute: true
+			},
+			group_color_2: {
+				type: String,
+				notify: true,
+				value: '#f00',
+				reflectToAttribute: true
+			},
+			group_n: {
+				type: String,
+				notify: true,
+				value: '???',
+				reflectToAttribute: true
+			},
+			group_spa_max: {
+				type: String,
+				notify: true,
+				value: null,
+				reflectToAttribute: true
+			},
+			state: {
+				notify: true,
+				value: null,
+				readOnly: true
+			},
+			moving: {
+				type: Boolean,
+				value: false,
+				notify: true
+			},
+			active: {
+				type: Boolean,
+				value: false,
+				notify: true
+			},
+			proximate: {
+				type: Boolean,
+				value: false,
+				notify: true
+			},
+			disabled: {
+				type: Boolean,
+				value: false,
+				notify: true
+			},
+			borderWidth: {
+				type: Number,
+				value: 1,
+				computed: 'compute_border_width(moving)'
+			}
+    	},
+    	observers: [
+    		'_update_state(active, moving, proximate, disabled)'
+    	],
+    	_show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
+    		return val ? '' : 'none';
+    	},
+		updateCanvas: function(newCanv, canvasNum){
+			var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
 			for(var i=0;i <oldCanv.classList.length; i++)
 				newCanv.classList.add(oldCanv.classList[i]);
-			oldCanv.parentNode.replaceChild(newCanv,oldCanv);  
+			oldCanv.parentNode.insertBefore(newCanv, oldCanv);
+			oldCanv.parentNode.removeChild(oldCanv);  
 		},
 		updateCrossHair: function(canvasNum,x,y){
 			/* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
 				if x is null/undefined, any existing crosshair will be removed. 	*/
-			var canv = this.shadowRoot.querySelectorAll('canvas')[canvasNum];
+			var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
 			var xh = canv.nextElementSibling
 			xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
 			
@@ -287,7 +345,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		},
 		getCanvInfo: function(canvasNum,pageX,pageY){
 			//TODO: if no pageX and pageY then life should be more simple...
-			var canv =  this.shadowRoot.querySelectorAll('canvas')[canvasNum];
+			var canv =  Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
 			var totalOffsetX = 0;
 			var totalOffsetY = 0;
 			var el = canv;
@@ -312,50 +370,49 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 						el: canv}
 		},
 
-		get state(){return this.state_;},
-		get moving(){return this.state_ === MOVING || this.state_ === PROXIMATE;},
-		
-		get borderWidth(){
-			return this.state_ == MOVING || this.state_ == PROXIMATE ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
-		},
-		set active(val){
-			LogIt(this,'active',val);
-			if(this.state_ === MOVING || this.state_ === PROXIMATE){
-				console.warn("tile cannot have have its active state altered while it is moving.");
-				return;
-			}
-				
-			if(val){
-				if(movingTile){	
-					//if another tile is moving, then this tile is being "hovered" not being "active"
-					this.state_ = HOVER
-					StyleHover(this);
-				}else{
-					this.state_ = ACTIVE;
-					StyleActive(this);
-				}
-			}else{
-				this.state_ = null;
-				ResetStyle(this);
-			}
-			
+		compute_border_width: function(moving){
+			return moving ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
 		},
 
-		set proximate(val){
-			//LogIt(this,'proximate',val);
-			if(val){
-				if(this.state_ === PROXIMATE)
-					return; //nothing new 
-				if(this.state_ !== MOVING)
-					throw "tile cannot become proximate unless it was first in moving state. (state_=" + this.state_ + ")"
-				this.state_ = PROXIMATE;
-				StyleProxiamte(this);
-			}else if(this.state_ === PROXIMATE){
-				this.state_ = MOVING;
-				StyleMoving(this);
+		_update_state: function(active, moving, proximate, disabled){
+			// This was preciously expressed in a much more complicated way
+
+			if(movingTile === this && !moving)
+				movingTile = null; // no longer moving
+
+			if(disabled){
+				if(moving)
+					throw "cannot disable tile while moving";
+				this.set('active', false); // may have been true
+				StyleDisabled(this);
+			} else if(moving){
+				if(movingTile === null){
+					movingTile = this;
+					StyleMoving(this);
+				} else if(movingTile === this){
+					if(proximate){
+						StyleProxiamte(this);
+					}else{
+						StyleMoving(this);
+					}
+				} else {
+					throw "cannot set this tile to moving while another tile is still moving.";
+				}
+			} else if(active){
+				if(movingTile === null){
+					StyleActive(this);
+				} else {
+					// here active actually means hover
+					StyleHover(this);
+				}
+			} else {
+				ResetStyle(this);
 			}
+
+			if(proximate && !moving)
+				console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
 		},
-		
+
 		get placeholder(){
 			if(!this.placeholder_){
 				var p = document.createElement('div');
@@ -374,37 +431,6 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 				throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
 			this.placeholder_ = null;
 		},
-		set moving(val){
-			LogIt(this,'moving',val);
-			if(val){
-				//start moving...
-				if(movingTile)
-					throw "Tile with group_num=" + movingTile.group_num + " is already moving, cannot move this tile (with group_num=" + this.group_num + ")"
-				if(this.state_ !== ACTIVE)
-					throw "Tile cannot start moving without first being active."
-				this.state_ = MOVING;
-				movingTile = this;
-				StyleMoving(this,true);			
-			}else{
-				if(!(this.state_ === MOVING || this.state_ === PROXIMATE))
-					throw "tile cannot stop moving unless it was already moving."
-				this.state_ = ACTIVE;
-				movingTile = null; 
-				StyleActive(this);
-			}		
-		},
-		set disabled(val){
-			//LogIt(this,'disabled',val);
-			if(this.state_ && !(this.state_ === ACTIVE || this.state_ === DISABLED))
-				throw "you cannot change a tile's disabled stae unless it is in normal, active or disabled state."
-			if(val){
-				this.state_ = DISABLED;
-				StyleDisabled(this);
-			}else{
-				this.state_ = null;
-				ResetStyle(this);
-			}
-		},
 		shake: function(){
 			this.classList.add('shake');
 		},
@@ -414,7 +440,7 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 		StopProp: function(e){console.log('so, what?');e.stopPropagation();},
 		getCopyOfCanvs: function(withSticker){
 			var div = document.createElement('div');
-			var oldCanvs = this.shadowRoot.querySelectorAll('canvas');
+			var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
 			for(var i = 0;i<oldCanvs.length;i++){
 				var img = document.createElement('img');
 				if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
@@ -435,10 +461,10 @@ I'm not quite sure why it's so complciated, it would probably be better to just 
 			return div;
 		},
 		getCanv: function(canvNum){
-			return this.shadowRoot.querySelectorAll('canvas')[canvNum];
+			return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
 		}
 	});
 </script>
 
   
-</polymer-element>
+</dom-module>

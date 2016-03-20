@@ -107,7 +107,7 @@ T.Tool.TileMouseDown_BeginMerger = function(event){
 	s.targetOffY = null;
 	s.lastClientX= event.clientX;
 	s.lastClientY= event.clientY;
-	s.extraBorderSize= -this.borderWidth;//we assume its got same borders all round
+	s.extraBorderSize = -this.borderWidth;//we assume its got same borders all round
 	$(this.placeholder).insertAfter($h);
 	this.moving = true;
 	s.extraBorderSize += this.borderWidth; //it's now got a different border width because it's moving
@@ -167,7 +167,8 @@ T.Tool.EndMerger = function(){
 	var p = h.placeholder;
 	p.parentNode.removeChild(p);
 	h.placeholder = null;
-	h.moving = false; //also ends proximate if it was on
+	h.proximate = false;
+	h.moving = false;
 	h.shake();
 	T.$tilewall.removeAttr('tilemoving');
 	T.Tool.cState = T.Tool.STATES.NOTHING;
