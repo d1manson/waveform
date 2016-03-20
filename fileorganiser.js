@@ -241,7 +241,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 	}
 	
 	var SortExpTetCuts = function(expCutArray){
-		// this sorts the cuts left to right:   cut instances last created --> first created, cut files last modified --> first modified
+		// this sorts the cuts left to right:   cut instances last created -- > first created, cut files last modified -- > first modified
 		// the cut instances are already sorted internally, but the cut files may be anywhere in the list and in any order.
 		
 		if (expCutArray.length <= 1)

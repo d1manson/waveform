@@ -91,6 +91,7 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 + `T.ORG.GenerateXYCSVForDebug()` and `T.ORG.GenerateDirCSVForDebug()`. Both these functions open a new tab, and populate it with csv data which can be copy-pasted into Excel or a text document.  Note the direction data is computed from displacement when using 1-spot LED, or from relative positions when using full 2-spot LED. You may need to allow popups in order for the new tabs to actually open.    
 
 #### Change Log
+* Switched to Polymer 1.4 (previously less than 1.0).
 * Added support for 2LEDs, and fixed directional plotting.
 * Added speed plots.
 * Merge tool now slowly flashes dragged group's plots while over another group.
@@ -137,6 +138,15 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 * Can now display path data in the spatial panel on the left.   The impelementation of this is currently fairly ruidmentary: it only uses the first tracking LED, doesn't do any filtering and may not match the path shown in Tint.
 * A heirarchical autoclusering method has been partially implemented. See below. 
 * Can now drag cut file back onto the desktop to save it. 
+
+
+#### Building
+
+You need `npm` to run `vulcanize`, and `bower` to install the polymer dependecies defined in `bower.json`.  You also need some way to run a server on localhost, I use python and `python -m SimpleHTTPServer`, which gives you `localhost:8000` by default.  During development you can go to `localhost:8000\index_full.html` rather than repeatedly running `vulcanize` (if you want).  The vulcanize command is:
+
+```
+vulcanize index_full.html -o index.html;
+```
 
 #### Understanding the code
 
