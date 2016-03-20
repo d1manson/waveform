@@ -145,7 +145,7 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 You need `npm` to run `vulcanize`, and `bower` to install the polymer dependecies defined in `bower.json`.  You also need some way to run a server on localhost, I use python and `python -m SimpleHTTPServer`, which gives you `localhost:8000` by default.  During development you can go to `localhost:8000\index_full.html` rather than repeatedly running `vulcanize` (if you want).  The vulcanize command is:
 
 ```
-vulcanize index_full.html -o index.html;
+vulcanize index_full.html -o index.html --inline-scripts --strip-comments
 ```
 
 #### Understanding the code
