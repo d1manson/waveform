@@ -301,7 +301,7 @@ T.CP = function(el_canvasParent, el_cluster_info, ORG,PALETTE_B,PALETTE_FLAG,mod
 			var im = imData32[m];
 			//apply colormap, leaving 0-alpha in pixels with no counts
 			for(var i=0;i<tTotal.length;i++)
-				im[i] = counts[i] ? PALETTE_B[Math.floor(tTotalSmooth[i] * factor)] : 0;
+				im[i] = counts[i] ? PALETTE_B[0 | (tTotalSmooth[i] * factor)] : 0;
 
 		}
 

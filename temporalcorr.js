@@ -109,9 +109,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 			allSpikeTimes = new Uint32Array(buffer); // in miliseconds
 		}
 
-		var GetGroupHist_sub = function(spikeTimes, D, b, nBs){
-			var ret = new Uint32Array(nBs);
-
+		var GetGroupHist_sub = function(ret, spikeTimes, D, b){
 			// For every pair of spikes separated in time by no more than time D, bin
 			// up the time separation, with bin size b, and record it in hist, ret.
 			for(var laterInd=1, earlierInd = 0; laterInd< spikeTimes.length; laterInd++){
@@ -119,9 +117,8 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 				while (spikeTimes[earlierInd] < laterTime - D)
 					earlierInd++;
 				for(var i=earlierInd; i<laterInd; i++)
-					ret[Math.floor((laterTime - spikeTimes[i])/b)]++;
+					ret[0 | ((laterTime - spikeTimes[i])/b)]++;
 			}
-			return ret;
 		}
 
 		var GetGroupHist = function(slot){
@@ -132,7 +129,8 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 			var spikeTimes = pick(allSpikeTimes, slot.inds);
 
 			// build pairwise-diff histogram
-			var ret = GetGroupHist_sub(spikeTimes, desiredMaxDeltaT, binSize, Math.floor(desiredMaxDeltaT/binSize));
+			var ret = new Uint32Array(Math.floor(desiredMaxDeltaT/binSize));
+			GetGroupHist_sub(ret, spikeTimes, desiredMaxDeltaT, binSize);
 			
 			//ret[0] += cutInds.length; //to take acount of the self difference for each spike
 
@@ -240,7 +238,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 
 
 	var SetShow = function(v){
-		if(show ==v)
+		if(show == v)
 			return;
 		show = v;
         if(!cCut)

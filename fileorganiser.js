@@ -713,7 +713,7 @@ T.ORG = function(ORG, PAR, CUT, $files_panel, $document, $drop_zone,FS,$status_t
 		var binInd = new Uint8Array(nPos);
 		for(var i=0;i<nPos-1;i++){
 			var speed = Math.hypot(data[i*2+2]-data[i*2+0],data[i*2+3]-data[i*2+1]);
-			binInd[i] = Math.floor(speed*f);
+			binInd[i] = 0 | (speed*f);
 			if (binInd[i] < MAX_SPEED)
 				hist[binInd[i]]++;
 		}
