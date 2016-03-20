@@ -71,10 +71,6 @@ user-select: initial;
 position: fixed;
 z-index:100;
 }
-.main_toolbar{
-background: #efefef;
-box-shadow: inset 0 0 2px 1px #ccc;
-}
 .menu_toggle{
 position: fixed;
 top: 0px;

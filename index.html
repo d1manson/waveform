@@ -8,15 +8,16 @@
 <link rel="stylesheet" type="text/css" href="main.css">
 <link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
-<link rel="import" href="polymer/core-icon-button.html">
-<link rel="import" href="polymer/core-toolbar.html">
-<link rel="import" href="polymer/paper-slider.html">
+<link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="custom-toolbar.html">
+<link rel="import" href="bower_components/paper-slider/paper-slider.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="cross-hair.html">
+<link rel="import" href="bower_components/iron-icons/iron-icons.html">
 </head>
 
 <body>
-<core-iconset id="meta"></core-iconset>
+<paper-iconset id="meta"></paper-iconset>
 
 
 <div class="hidden_clipboard"></div>
@@ -204,69 +205,93 @@
 
 <div class="main_wrapper">
 	
-<core-toolbar class="main_toolbar compact"><div class="fit">
-	<paper-tooltip label="help on GitHub [?]" position="right">					
-	<core-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label="keyboard shortcuts [k]">					
-	<core-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label='undo [z]'>
-	<core-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label='file headers [h]'>
-		<core-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label='toggle drift [d]'>
-	<core-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label="toggle palette [p]">
-	<core-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></core-icon-button>
-	</paper-tooltip>
+<custom-toolbar class="main_toolbar">
+	<div>
+	<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
+	<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+	</div>
 
-	<paper-tooltip label="sort on group size [n]">
-		<core-icon-button icon="sort" id='reorder_n_button'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label="sort on channel amplitude">
-		<core-icon-button icon="sort" id='reorder_A_button'></core-icon-button>
-	</paper-tooltip>
-			
-	<paper-tooltip label="position post processing settings">
-		<core-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></core-icon-button>
-	</paper-tooltip>
-	
-	<paper-tooltip label="channel 1 [1]">
-		<div class="button display_button">c1</div>
-	</paper-tooltip>
-	<paper-tooltip label="channel 2 [2]">
-		<div class="button display_button">c2</div>
-	</paper-tooltip>
-	<paper-tooltip label="channel 3 [3]">
-		<div class="button display_button">c3</div>
-	</paper-tooltip>
-	<paper-tooltip label="channel 4 [4]">
-		<div class="button display_button">c4</div>
-	</paper-tooltip>
-	<paper-tooltip label="spatial ratemap [r]">
-		<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
-	</paper-tooltip>
-	<paper-tooltip label="directional ratemap [c]">
-		<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
-	</paper-tooltip>
-	<paper-tooltip label="speed ratemap [v]">
-		<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
-	</paper-tooltip>
-	<paper-tooltip label="temporal autocorrelation [t]">
-		<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
-	</paper-tooltip>
+	<div>
+	<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
+	<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+	</div>
 
-</div></core-toolbar>
+	<div>
+	<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
+	<paper-tooltip>undo [z]</paper-tooltip>
+	</div>
+
+	<div>
+	<paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
+	<paper-tooltip>file headers [h]</paper-tooltip>
+	</div>
+
+	<div>
+	<paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
+	<paper-tooltip>toggle drift [d]</paper-tooltip>
+	</div>
+
+	<div>
+	<paper-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></paper-icon-button>
+	<paper-tooltip>toggle palette [p]</paper-tooltip>
+	</div>
+
+	<div>
+	<paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
+	<paper-tooltip>sort on group size [n]</paper-tooltip>
+	</div>
+
+	<div>
+	<paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
+	<paper-tooltip>sort on channel amplitude</paper-tooltip>
+	</div>	
+
+	<div>
+	<paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
+	<paper-tooltip>position post processing settings</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button">c1</div>
+	<paper-tooltip>channel 1 [1]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button">c2</div>
+	<paper-tooltip>channel 2 [2]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button">c3</div>
+	<paper-tooltip>channel 3 [3]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button">c4</div>
+	<paper-tooltip>channel 4 [4]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
+	<paper-tooltip>spatial ratemap [r]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
+	<paper-tooltip>directional ratemap [c]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
+	<paper-tooltip>speed ratemap [v]</paper-tooltip>
+	</div>
+
+	<div>
+	<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
+	<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+	</div>
+
+</custom-toolbar>
 
 <div id="all_below_toolbar">
 	<div class="keyboard_focus_notifier no_focus"></div>
@@ -334,7 +359,7 @@
 
 
 
-<core-icon-button icon="menu" class="menu_toggle"></core-icon-button>
+<paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
 
 
 <div class="file_drop">
