@@ -6,8 +6,7 @@
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
-<script src="polymer/platform.js"></script>
-<link rel="import" href="polymer/core-splitter.html">
+<link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
 <link rel="import" href="polymer/core-tooltip.html">
 <link rel="import" href="polymer/core-icon-button.html">
 <link rel="import" href="polymer/core-toolbar.html">
@@ -203,7 +202,7 @@
 
 
 
-<div class="main_wrapper" vertical layout>
+<div class="main_wrapper">
 	
 <core-toolbar class="main_toolbar compact"><div class="fit">
 	<core-tooltip label="help on GitHub [?]" position="right">					
@@ -269,24 +268,24 @@
 
 </div></core-toolbar>
 
-<div id="all_below_toolbar" flex horizontal layout>
+<div id="all_below_toolbar">
 	<div class="keyboard_focus_notifier no_focus"></div>
 	
-	<div class="side_panel" vertical layout>
+	<div class="side_panel">
 
-		<div class="side_panel_row side_panel_row" vertical layout>
+		<div class="side_panel_row side_panel_row">
 			<div class='button_group above_scrollable_area' id='tet_list'>
 				<div class='tetrode_title'>tetrode:</div>
 			</div>
-			<div class="scrollable_area" id="files_panel" flex>
-			<div class='exp_list' id='exp_list'></div>
+			<div class="scrollable_area side_panel_row_flex" id="files_panel">
+				<div class='exp_list' id='exp_list'></div>
 			</div>
 		</div>
 		
-		<core-splitter direction="up"></core-splitter>
+		<iron-splitter direction="up"></iron-splitter>
 
-		<div class="side_panel_row" vertical layout>
-			<div class="grabbable" id="spatial_panel" flex>
+		<div class="side_panel_row">
+			<div class="grabbable side_panel_row_flex" id="spatial_panel">
 				<canvas id="posplot" class='poslayer' width="200" height="200"></canvas> 
 				<canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
 			</div>
@@ -298,9 +297,9 @@
 			</div>
 		</div>
 
-		<core-splitter direction="up"></core-splitter>
+		<iron-splitter direction="up"></iron-splitter>
 		
-		<div class="side_panel_row side_panel_row" flex vertical layout>
+		<div class="side_panel_row">
 			<div id="cluster_info" class="cluster_info above_scrollable_area">
 					<div class="cluster_painter">
 						<core-tooltip label="destination group [e]" position="right">
@@ -317,18 +316,17 @@
 					<div class="cluster_others">
 					</div>
 				</div>
-			<div id="cluster_panel" class="scrollable_area grabbable" flex>
+			<div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
 			<cross-hair id='cluster_crosshair' showBars=0></cross-hair>
 			</div>
 		</div>
 	
 	</div>
 
-	<core-splitter direction="left"></core-splitter>
+	<iron-splitter direction="left"></iron-splitter>
 	
-
-	<div class="tilewall" flex>
-	<div class="tilewall_text">No data selected. Choose a trial from the available files.</div>
+	<div class="tilewall">
+		<div class="tilewall_text">No data selected. Choose a trial from the available files.</div>
 	</div>
 </div>
 

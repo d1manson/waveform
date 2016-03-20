@@ -583,7 +583,7 @@ T.StoreData = function(){
 	localStorage.paletteMode = T.paletteMode;
     localStorage.painterR = T.Tool.PainterState.r;
     localStorage.clusterPlotSize = T.CP.GetSize();
-    localStorage.splitterPercents = JSON.stringify($.map($('core-splitter').get(),function(el){return el.getSize('%');}));
+    localStorage.splitterPercents = JSON.stringify($.map($('iron-splitter').get(),function(el){return el.getSizePc();}));
 	localStorage.showToolbar = T.$main_toolbar.is(":visible");
 	
 	localStorage.posSmoothing = T.ORG.GetPosSmoothing();
@@ -612,10 +612,10 @@ T.ApplyStoredSettingsB = function(e) {
 	//this is run when the web components are loaded and ready for action
 	$.map(
 		zip([
-			$('core-splitter').get(),
-			JSON.parse(localStorage.splitterPercents || "[30,30,25]") 
+			$('iron-splitter').get(),
+			JSON.parse(localStorage.splitterPercents || '[30,30,25]') 
 		]),function(el_n_val){
-			el_n_val[0].setSize(el_n_val[1],'%')
+			el_n_val[0].setSizePc(el_n_val[1])
 	});
 
 	T.RM.SetCmPerBin(parseFloat(localStorage.BIN_SIZE_CM || "2.5"));
