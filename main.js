@@ -606,6 +606,7 @@ T.ApplyStoredSettingsA = function(){
 		T.SetDisplayIsOn({chanIsOn: [1,1,1,1], mapIsOn: [1,1], tAutocorrIsOn: 1});
 		T.TogglePalette(-1);
 	}
+	T.ApplyStoredSettingsB(); // in the past we had to wait for webcomponents, but not anymore
 }
 
 T.ApplyStoredSettingsB = function(e) {
@@ -866,7 +867,6 @@ $(window).on('focus',function(){
 
 $(document).bind("contextmenu",function(e){return false;})
 		    .ready(T.DocumentReady);
-$(window).on('polymer-ready',T.ApplyStoredSettingsB);
 window.onbeforeunload = T.StoreData;
 
 

@@ -327,15 +327,13 @@
 		<div class="side_panel_row">
 			<div id="cluster_info" class="cluster_info above_scrollable_area">
 					<div class="cluster_painter">
-						<paper-tooltip label="destination group [e]" position="right">
-							<div class='cluster-sticker' id='painter-dest'>?</div> 
-						</paper-tooltip>
-						&#8592; { 
-						<paper-tooltip label="source groups [f]">
-							<div id='painter-src'>
-								<div class='cluster-sticker'>?</div>
-							</div> 
-						</paper-tooltip>
+						<div class='cluster-sticker' id='painter-dest'>?</div> 
+						<paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
+						&#8592; {
+						<div id='painter-src'>
+							<div class='cluster-sticker'>?</div>
+						</div> 
+						<paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
 						}
 					</div>
 					<div class="cluster_others">
