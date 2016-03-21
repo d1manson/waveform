@@ -574,6 +574,7 @@ T.StoreData = function(){
     
 	localStorage.BIN_SIZE_CM = T.RM.GetCmPerBin();
     localStorage.rmSmoothingW = T.RM.GetSmoothingW();
+    localStorage.rmMaxRateHz = T.RM.GetMaxRateHz();
     localStorage.dirSmoothing = T.RM.GetSmoothingDir();
     localStorage.dirBinSize = T.RM.GetBinSizeDeg();
 	localStorage.tcDeltaT = T.TC.GetDeltaT();
@@ -623,6 +624,7 @@ T.ApplyStoredSettingsB = function(e) {
     T.RM.SetSmoothingW(parseInt(localStorage.rmSmoothingW || "2"));
     T.RM.SetBinSizeDeg(parseInt(localStorage.dirBinSize || "6"));
     T.RM.SetSmoothingDir(parseInt(localStorage.dirSmoothing || "2"));
+    T.RM.SetMaxRateHz(parseInt(localStorage.rmMaxRateHz || "-1"));
 
 	T.TC.SetDeltaT(parseInt(localStorage.tcDeltaT || "500"));
 	T.ORG.SetPosSmoothing(parseFloat(localStorage.posSmoothing || "0.2"));

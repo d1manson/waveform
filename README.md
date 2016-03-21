@@ -91,7 +91,8 @@ Some stuff doesn't yet have a proper user-interface implementation, but can be a
 + `T.ORG.GenerateXYCSVForDebug()` and `T.ORG.GenerateDirCSVForDebug()`. Both these functions open a new tab, and populate it with csv data which can be copy-pasted into Excel or a text document.  Note the direction data is computed from displacement when using 1-spot LED, or from relative positions when using full 2-spot LED. You may need to allow popups in order for the new tabs to actually open.    
 
 #### Change Log
-* Switched to Polymer 1.4 (previously less than 1.0).
+* Added spatial ratemap capping option.
+* Switched to Polymer 1.4 (previously less than 1.0). Now using vulcanize with bower dependencies.
 * Added support for 2LEDs, and fixed directional plotting.
 * Added speed plots.
 * Merge tool now slowly flashes dragged group's plots while over another group.
@@ -149,6 +150,8 @@ vulcanize index_full.html -o index.html --inline-scripts --strip-comments
 ```
 
 #### Understanding the code
+
+Warning: I do not recommend trying to modify the code, you are likely to waste a lot of time. Some parts are reasonably well-written, and there is a fair degree of modularity overal, but there is also very little in the way of consistency across the project.  The most significant shortcomming is that in many cruical places it is very "low level", in so far as it doesn't use a Maths library or a data-flow library.  If you really do want to make changes, then get in touch and I'll try and talk you out of it, or at the very least give you a list of things to watch out for!!    
 
 **Notes for serious future development**    
 There are a bunch of web standards/stuff which are in early stages of development at the time of writing, but which will be useful in future:  [Polymer 1.0](https://www.polymer-project.org/1.0/), [Shared Array Buffers](https://www.chromestatus.com/feature/4570991992766464) (and allied atomic/threading APIs), [Chrome asm.js optimisation](https://code.google.com/p/v8/issues/detail?id=2599), [WebGL 2.0](http://blog.tojicode.com/2013/09/whats-coming-in-webgl-20.html), [SIMD in JS](https://hacks.mozilla.org/2014/10/introducing-simd-js/) (in some form).   

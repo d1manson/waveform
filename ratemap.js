@@ -4,7 +4,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
                 CanvasUpdateCallback, CutSlotLog, TILE_CANVAS_NUM,TILE_CANVAS_NUM2,TILE_CANVAS_NUM3,ORG,
                 POS_W,POS_H,SpikeForPathCallback,PALETTE_FLAG,PALETTE_B,
 				el_binSizeSlider,el_smoothingSlider,el_binSizeVal,el_smoothingVal,modeChangeCallbacks,
-				el_dir_binsize_val,el_dir_binsize_slider,el_dir_smoothing_val,el_dir_smoothing_slider){
+				el_dir_binsize_val,el_dir_binsize_slider,el_dir_smoothing_val,el_dir_smoothing_slider,
+				el_maxRateHzVal, el_maxRateHzSlider){
 				
 	var IM_SPIKES_FOR_PATH = 1;
 	var IM_RATEMAP = 0;
@@ -161,6 +162,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
         var slots = [];
 		var ratemapSlotQueue = []; //holds a queue of which slotsInds need to be sent to the GetGroupRatemap function
 		var desiredCmPerBin = 2.5;
+		var desiredMaxRateHz = -1; // -1 means rescale for each map
 		var desiredCmsPerBin = 4;
         var desiredSmoothingW = 2;
 		var desiredDegPerBin = 6; //valid values: 2,3,4,6,10,15,30
@@ -219,6 +221,15 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			
 			// Note we don't actually do any updating here, the main thread must somehow force re-draw
 		}
+		var SetMaxRateHz = function(v){
+			if(v === desiredMaxRateHz)
+				return; //no point doing anything if the value isn't new
+
+			ClearQueue(); //we can clear the queue because we are going to re-compute all slots unless they were already computed for these settings, but in that case there would be no reason to compute them
+			desiredMaxRateHz = v;
+			CachePosBinIndsAndDwellMap(); //when we change the bin size we have to redo this stuff
+			QueueAllSlotsLazy();
+		}
 		var SetBinSizeCm = function(v){
 			if(v == desiredCmPerBin)
                 return; //no point doing anything if the value isn't new
@@ -273,7 +284,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 					slots[i] && (
 					slots[i].posDataId != desiredPosDataId ||				
 					show[0] && ( slots[i].smoothingW != desiredSmoothingW ||
-								 slots[i].cmPerBin != desiredCmPerBin	  ) ||
+								 slots[i].cmPerBin != desiredCmPerBin	  ||
+								 slots[i].maxRateHz != desiredMaxRateHz    ) ||
 					show[1] && (slots[i].degPerBin != desiredDegPerBin || 
 								slots[i].smoothingDeg != desiredSmoothingDir) ||
 					show[2] && slots[i].cmsPerBin != desiredCmsPerBin
@@ -488,11 +500,12 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			useMask(ratemap,unvisitedBins);
 
 			var max_map = max(ratemap);
-			var im = ToImageData(ratemap,max_map);
+			var im = ToImageData(ratemap, desiredMaxRateHz == -1 ? max_map : desiredMaxRateHz/posFreq);
 			slot.cmPerBin = desiredCmPerBin;
             slot.smoothingW = desiredSmoothingW;
 			slot.posDataId = desiredPosDataId;
-			main.ShowIm(im,max_map*posFreq, cutInds.length/expLenInSeconds,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
+			slot.maxRateHz = desiredMaxRateHz;
+			main.ShowIm(im, max_map*posFreq, cutInds.length/expLenInSeconds,slot.num, [nBinsX,nBinsY], slot.generation,IM_RATEMAP,[im]);
 
 		}
 		var GetGroupRatemap_Dir = function(slot){
@@ -543,7 +556,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			}else{
 				var factor = (PALETTE.length-1)/(max_map*(1+eps));
 				for(var i=0;i<map.length;i++)
-					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[1+Math.floor(map[i]*factor)];
+					im[i] = unvisitedBins[i]? PALETTE[0] : PALETTE[Math.min(1+(0 | (map[i]*factor)), PALETTE.length-1)];
 			}
 			return im.buffer; //this is how it's going to be sent back to the main thread
 		}
@@ -641,6 +654,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	var meanTMode = false;
 	var desiredCmPerBin = 2.5;
 	var desiredSmoothingW = 2;
+	var desiredMaxRateHz = -1;
 	var desiredDegPerBin = 6;
 	var desiredSmoothingDir = 2;
 	var sintable = null;
@@ -832,6 +846,14 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	
 	}
 
+	var SetMaxRateHz = function(v, viaSlider){
+		el_maxRateHzVal.textContent = v <=0 ? "individually scaled" : "scaled to max of " + v + " Hz";
+		desiredMaxRateHz = v === 0 ? -1 : v;
+		theWorker.SetMaxRateHz(desiredMaxRateHz);
+		if(viaSlider !== true)
+			el_maxRateHzSlider.value = v === -1 ? 0 : v;
+	}
+
 	var SetCmPerBin = function(v,viaSlider){
 		el_binSizeVal.textContent = v + " cm";
 		desiredCmPerBin = v;
@@ -913,7 +935,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	
 	
 	var theWorker = BuildBridgedWorker(workerFunction,
-										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW",
+										["SetPosData*","SetTetData*","SetBinSizeCm","SetSmoothingW", "SetMaxRateHz",
                                             "SetImmutable*","RenderSpikesForPath", "ClearCut","SetBinSizeDeg", "SetSmoothingDir",
                                             "SetShow"],
 										["ShowIm*","PlotDirData*"],[ShowIm,PlotDirData],
@@ -925,6 +947,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	el_smoothingSlider.addEventListener("change",function(e){SetSmoothingW(this.value,true);});
 	el_dir_binsize_slider.addEventListener("change",function(){SetBinSizeDeg(this.value,true)});
 	el_dir_smoothing_slider.addEventListener("change",function(){SetSmoothingDir(this.value,true)});
+	el_maxRateHzSlider.addEventListener("change",function(){SetMaxRateHz(this.value,true)});
+
 
 	SetBinSizeDeg(6);
     
@@ -943,6 +967,8 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 		GetBinSizeDeg: function(){return desiredDegPerBin;},
 		GetSmoothingDir: function(){return desiredSmoothingDir;},
 		SetSmoothingDir: SetSmoothingDir,
+		SetMaxRateHz: SetMaxRateHz,
+		GetMaxRateHz: function(){return desiredMaxRateHz;},
 		RenderSpikesForPath: RenderSpikesForPath,
 		SetRenderMode: SetRenderMode
 	}
@@ -954,5 +980,6 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 	document.getElementById('rm_binsize_slider'),document.getElementById('rm_smoothing_slider'),
 	document.getElementById('rm_binsize_val'),document.getElementById('rm_smoothing_val'),T.modeChangeCallbacks,
 	document.getElementById('dir_binsize_val'),document.getElementById('dir_binsize_slider'),
-	document.getElementById('dir_smoothing_val'),document.getElementById('dir_smoothing_slider'))
+	document.getElementById('dir_smoothing_val'),document.getElementById('dir_smoothing_slider'),
+	document.getElementById('rm_max_hz_val'),document.getElementById('rm_max_hz_slider'))
 
