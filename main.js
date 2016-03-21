@@ -358,8 +358,8 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 
 	while(T.tiles.length <= maxGroupNum){ //if there are too few tiles, add more
 		var t = T.CreateTile(T.tiles.length-1);
-		T.$tilewall.append(t);
-		$(t).hide();
+		T.el_tilewall.appendChild(t);
+		t.style.display = 'none';
 		T.tiles.push(t);
 	}
 
@@ -370,7 +370,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 			var old_tile_ind = T.cutSlotToTileMapping[k];
 			if(isNum(old_tile_ind)){
 				//hide the tile if one was associated to the slot
-				$(T.tiles[old_tile_ind]).hide(); 
+				T.tiles[old_tile_ind].style.display = 'none';
 				T.cutSlotToTileMapping[k] = null;
 			}
 			invalidatedSlots[k] = 0; //by getting rid of any existing tile for the slot we have just validated this slot
@@ -393,7 +393,7 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 				movingTile = T.tiles[old_tile_ind];
 				var oldTilePlaceholder = T.tiles[old_tile_ind] = T.CreateTile(old_tile_ind); // create and then insert a new tile to fill in the gap we are creating
 				$(movingTile).before($(oldTilePlaceholder)); //add the placeholder 
-				$(oldTilePlaceholder).hide(); //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
+				oldTilePlaceholder.style.display='none'; //had to add it to the DOM before hidding in order to for css to get applied and thus alow jQuery to know what display value should be on show
 			}else{
 				//source group has already been displaced
 				movingTile = displaced_tiles[old_tile_ind];
@@ -405,8 +405,8 @@ T.SetGroupDataTiles = function(invalidatedSlots_,isNew){ //this = cut object
 
 		var t_new = T.tiles[new_tile_ind];
 		t_new.group_num = new_tile_ind;
-		$(t_new).show()
-				.toggleClass('shake',false) //TODO: on a merger we may not want to cancel the shake
+		t_new.style.display = '';
+		t_new.classList.remove('shake') //TODO: on a merger we may not want to cancel the shake
 		t_new.group_n = slot_k.inds.length;
 		t_new.group_color_1 = T.PALETTE_FLAG_CSS[new_tile_ind];
 		t_new.group_color_2 = T.PALETTE_FLAG_CSS_TEXT[new_tile_ind];
@@ -829,7 +829,8 @@ T.InitButtons = function(){
 
 T.$main_toolbar = $('.main_toolbar');
 T.$hidden_clipboard = $('.hidden_clipboard');
-T.$tilewall = $('.tilewall');
+T.el_tilewall = document.getElementsByClassName('tilewall')[0];
+T.$tilewall = $(T.el_tilewall);
 T.$posplot = $('#posplot');
 T.$pos_overlay = $('#posoverlay');
 T.tiles = [];

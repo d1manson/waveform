@@ -282,6 +282,10 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
             console.log("Spike count is " + N_val  + ", which is greater than the limit of " + MAX_N + 
             	".  The waveform renderer will ignore the excess spikes, but other plots will use the full dataset.");
             N = MAX_N;
+            // TODO: fix: it seems that we created a buffer with no vertices or something.
+            // because we get a warning in the console.  See...
+            // http://stackoverflow.com/a/35925245/2399799
+            // There doesn't seem to be any major side effect of this warning though.
         } else {
         	N = N_val;
         }		
