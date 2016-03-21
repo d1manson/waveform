@@ -16017,7 +16017,7 @@ Polymer({
 	
 	<div class="side_panel">
 
-		<div class="side_panel_row side_panel_row">
+		<div class="side_panel_row">
 			<div class="button_group above_scrollable_area" id="tet_list">
 				<div class="tetrode_title">tetrode:</div>
 			</div>
@@ -16028,7 +16028,7 @@ Polymer({
 		
 		<iron-splitter direction="up"></iron-splitter>
 
-		<div class="side_panel_row">
+		<div class="side_panel_row side_panel_row_flex">
 			<div class="grabbable side_panel_row_flex" id="spatial_panel">
 				<canvas id="posplot" class="poslayer" width="200" height="200"></canvas> 
 				<canvas id="posoverlay" class="poslayer" width="200" height="200"></canvas> 
@@ -16041,7 +16041,7 @@ Polymer({
 			</div>
 		</div>
 
-		<iron-splitter direction="up"></iron-splitter>
+		<iron-splitter direction="down"></iron-splitter>
 		
 		<div class="side_panel_row">
 			<div id="cluster_info" class="cluster_info above_scrollable_area">
