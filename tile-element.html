@@ -321,8 +321,8 @@ is in null state. When another tile is moving, it cannot be active instead it is
 			var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
 			for(var i=0;i <oldCanv.classList.length; i++)
 				newCanv.classList.add(oldCanv.classList[i]);
-			oldCanv.parentNode.insertBefore(newCanv, oldCanv);
-			oldCanv.parentNode.removeChild(oldCanv);  
+			Polymer.dom(oldCanv.parentNode).insertBefore(newCanv, oldCanv);
+			Polymer.dom(oldCanv.parentNode).removeChild(oldCanv);  
 		},
 		updateCrossHair: function(canvasNum,x,y){
 			/* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
@@ -338,7 +338,7 @@ is in null state. When another tile is moving, it cannot be active instead it is
 					xh = document.createElement('cross-hair');
 					xh.w = parseInt(getComputedStyle(canv).width);
 					xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
-					canv.parentNode.insertBefore(xh,canv.nextElementSibling)//insert after the canvas
+					Polymer.dom(canv.parentNode).insertBefore(xh, canv.nextElementSibling)//insert after the canvas
 				}
 				xh.setXY(x,y);
 			}

@@ -208,40 +208,38 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		return new Uint8Array(A.buffer);
 	}
 	
-	var BuildVoltageDataBuffers_sub = function(oldData,newData,N){
-		// This is "version 2" of this code, we now read from oldData continguously,
-		// and write out in strides, whereas previously we wrote out contiguously 
-		// and read in strides.  This is roughly 4x faster, but still seems slower 
-		// than it ought to be.  ~80ms for 80k spikes, i.e. only 1k spikes per ms for large N.
-		// Note that what we are doing is similar to a transpose in terms of memory movement.
-        // TODO: can hopefully speed up by having two 16bit views on the oldDara, offset by 1 byte
-        // and view the new data also as 16bit...need two views on oldData for odd and even t.
-        // then one final t-iteration outside t loop. Not sure whether to use two views of newData,
-        // offset by 2N-bytes or whether to just keep the same number of (explicit) adds as we 
-        //currently have. ...seems this may not be possible without slicing the oldData in order to
-        //start an int16array offset byt 1 byte.
-		var q = -1;
-		var N2 = 2*N;
-		for(var i=0;i<N;i++){ //for each spike
-			var p = 2*i;
-			for(var c=0;c<4;c++){ //for each channel
-				q += 5;
-				for(var t=0;t<50-1;t++){ //for each time point (except the last one)
-					newData[p ] = oldData[q];
-					newData[p | 1] = oldData[++q]; // p is an even number, so p|1 is p+1
-					p += N2;
-				}
-			}
-		}
-	}
+	var BuildVoltageDataBuffers_sub = function(data_in, data_out_16, N){
+        // Note how we read from data_in contiguously, but write out non-contiguously.
+        // This is about 4x faster than doing it the other way around.
+        // It takes about 80ms for 80k spikes.
+        // DataView should allow for fast misaligned uint16 access of data_in, but currently it's slow...
+        // https://bugs.chromium.org/p/chromium/issues/detail?id=225811. Even if it's optimized in chrome
+        // it probably won't help by more than 5-10% I would think.
 	
+		var q = -1;
+  		var i, t, c, p;
+        for(i=0, p=0;i<N;i++,p=i){ //for each spike
+            for(c=0;c<4;c++){ //for each channel
+                q += 5;
+                for(t=0;t<50-1;t++){ //for each time point (except the last one)
+                    data_out_16[p] = data_in[q] | (data_in[++q] << 8); // TODO: deal properly with endianness of system (Note that even though we are drawing a stand alone line segment from a to b, we still need to know how they match up to times t and t+1)
+                    p += N;
+                }
+            }
+        }
+
+	}
+
 	var BuildVoltageDataBuffers = function(buffer,N){
 		// see UploadVoltage
-		var oldData = new Int8Array(buffer);
-		var newData = new Int8Array(4*(50-1)*N*2); //times 2 because each line has two ends
+		var oldData = new Uint8Array(buffer);
+		var newData = new Uint16Array(4*(50-1)*N);
 		
+		console.log("N=" + N)
+		console.time('BuildVoltageDataBuffers_sub')
 		BuildVoltageDataBuffers_sub(oldData,newData,N);
-		newData = Int8ToUint8(newData);
+		console.timeEnd('BuildVoltageDataBuffers_sub')
+		newData = Int8ToUint8(new Int8Array(newData.buffer));
 			
 		var allBuffers = [];
 		for(var c=0; c<4;c++){ //for each channel
