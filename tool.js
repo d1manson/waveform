@@ -469,8 +469,8 @@ T.Tool.GrabIt_DocumentKeyUp = function(e){
 	T.Tool.$GrabIt_Css.remove();
 }
 
-$(document).on("keydown",T.Tool.GrabIt_DocumentKeyDown)
-$(document).on("keyup",T.Tool.GrabIt_DocumentKeyUp)
+document.addEventListener("keydown",T.Tool.GrabIt_DocumentKeyDown, true);//true ensures we capture key event no matter what
+document.addEventListener("keyup",T.Tool.GrabIt_DocumentKeyUp, true);//true ensures we capture key event no matter what
 $(document).on("keypress",T.Tool.GrabIt_DocumentKeyPress)
 /* =========================== */
 
