@@ -81,7 +81,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
                 s = histSlotQueue.shift(); 
 			if(slots[s])
                 GetGroupHist(slots[s]);
-			histTimer  = histSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
+			histTimer  = histSlotQueue.length > 0 ? setImmediate(QueueTick) : 0;
             //TODO: may want to time the hist call and potentially do more within this tick
 		}
 
@@ -89,11 +89,11 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 			if(histSlotQueue.indexOf(slotInd) == -1)
 				histSlotQueue.push(slotInd);
 			if(!histTimer)
-				histTimer = setTimeout(QueueTick,1);
+				histTimer = setImmediate(QueueTick);
 		}
 
 		var ClearQueue = function(){
-			clearTimeout(histTimer);
+			clearImmediate(histTimer);
             histTimer = 0;
 			histSlotQueue = [];
 		}

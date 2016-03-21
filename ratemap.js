@@ -306,7 +306,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				if(show[2])
 					GetGroupRatemap_Speed(slots[s]);
 			}
-			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
+			ratemapTimer  = ratemapSlotQueue.length > 0 ? setImmediate(QueueTick) : 0;
             //TODO: may want to time the call and potentially do more within this tick
 		}
 
@@ -314,11 +314,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			if(ratemapSlotQueue.indexOf(slotInd) == -1)
 				ratemapSlotQueue.push(slotInd);
 			if(!ratemapTimer)
-				ratemapTimer = setTimeout(QueueTick,1);
+				ratemapTimer = setImmediate(QueueTick);
 		}
 
 		var ClearQueue = function(){
-			clearTimeout(ratemapTimer);
+			clearImmediate(ratemapTimer);
             ratemapTimer = 0;
 			ratemapSlotQueue = [];
 		}

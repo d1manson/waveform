@@ -16244,7 +16244,14 @@ Math.hypot = Math.hypot || function(a,b){return Math.sqrt(a*a+b*b);};</script>
 	extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
 	extraWorkerStr.push("\n};\n");
 	extraWorkerStr.push("var console = {\nlog:\n function(str){self.postMessage({foo:'console_log',args:[str]})}\n}\n");
-	extraWorkerStr.push("var copy_typedarray_to_main = function(x,name){\n var buffer = x.buffer.slice(0);\nself.postMessage({foo: 'copy_typedarray_to_main', args:[buffer,name,x.constructor.name,[buffer]]});\n}");
+	extraWorkerStr.push("var copy_typedarray_to_main = function(x,name){\n var buffer = x.buffer.slice(0);\nself.postMessage({foo: 'copy_typedarray_to_main', args:[buffer,name,x.constructor.name,[buffer]]});\n}\n");
+	// see https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js and https://developer.mozilla.org/en-US/docs/Web/API/Window/setImmediate
+	// this version doesn't both accepting args
+	extraWorkerStr.push("var last_task_h_=0; var tasks_={};\n"+
+						"var channel_ = new MessageChannel();\n"+
+					    "channel_.port1.onmessage = function(e) {var h=e.data; try {tasks_[h] && tasks_[h]();}finally{clearImmediate(h);}}\n" +
+					    "var setImmediate = function(cb) {tasks_[++last_task_h_] = cb;  channel_.port2.postMessage(last_task_h_); return last_task_h_;}\n" +
+					    "var clearImmediate = function(h){delete tasks_[h];}\n");
 
 	var fullWorkerStr = "\n\n/*==== VARS ADDED BY BuildBridgeWorker ==== */\n\n" + 
 						extraWorkerTopStr.join("\n") + 
@@ -17024,6 +17031,7 @@ T.PAR = function(){
 		var buffer = null;
 
 		var ParseTetrodeFile = function(file, SPIKE_FORMAT, BYTES_PER_SPIKE){
+			console.log("loading tet file")
 			buffer = N = amps = null; // invalidate old stuff
 
 			// Read the first 1024 bytes as a string to get the header and find the data start
@@ -17055,7 +17063,10 @@ T.PAR = function(){
     	    var dataLen = parseInt(N)*BYTES_PER_SPIKE;
 		
 			//read the data section of the file as an array buffer
+			var time_start = performance.now();
     		buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
+    		var time_end = performance.now();
+    		console.log('read_tet_buffer: ' + (time_end-time_start));
 			var buffer_copy = buffer.slice(); // this is annoying, really we just need one copy which we aren't going to modify
 			main.TetrodeFileRead(null,header,buffer_copy,[buffer_copy]);
 			GetTetrodeAmplitude(false); // pre-cache amps, main is about to ask for them.
@@ -17155,6 +17166,7 @@ T.PAR = function(){
 
 		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,HEADER_OVERRIDE,USE_BOTH_LEDS){
 			// Read the file as a string to get the header and find the data start
+			console.log("loading pos file")
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
 		
@@ -17596,13 +17608,14 @@ T.PAR = function(){
 	
 	var cutWorkerCode = function(){
 		"use strict";
-		
+
 		var REGEX_CUT_A = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
 		var REGEX_CUT_B = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
 		var REGEX_CUT_C = /[0-9]+/g;
 		var MAX_LENGTH_MATCH_CUT_B = 300;//this is needed so that when we read in chunks of the cut file we dont have to apply the regex_b to the whole thing each time
 
 		var ParseCutFile = function(file){
+			console.log("loading cut file")
 		
 			// Read the file as a string to get the header 
 			var reader = new FileReaderSync();
@@ -17660,6 +17673,7 @@ T.PAR = function(){
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
 		var ParseSetFile = function(file){
+			console.log("loading set file")
 			// Read the file as a string to get the header 
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
@@ -17778,20 +17792,20 @@ T.PAR = function(){
 	}
 
 	var LoadEEGWithWorker = function(file,callback){
-		callbacks.eeg.push(callback);
-		eegWorker.ParseEEGFile(file);
+		//callbacks.eeg.push(callback);
+		//eegWorker.ParseEEGFile(file);
 	}
 	var EEGFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.eeg.shift()({header: header,buffer:buffer});
+		//callbacks.eeg.shift()({header: header,buffer:buffer});
 	}
 	
 	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
 	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","ParseCluFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
-	var eegWorker = BuildBridgedWorker(eegWorkerCode,["ParseEEGFile"],["EEGFileRead"],[EEGFileRead]);	
+	//var eegWorker = BuildBridgedWorker(eegWorkerCode,["ParseEEGFile"],["EEGFileRead"],[EEGFileRead]);	
 	
     var GetPendingParseCount = function(){
         return callbacks.cut.length + callbacks.set.length + callbacks.tet.length + callbacks.pos.length;
@@ -21369,7 +21383,7 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 				if(show[2])
 					GetGroupRatemap_Speed(slots[s]);
 			}
-			ratemapTimer  = ratemapSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
+			ratemapTimer  = ratemapSlotQueue.length > 0 ? setImmediate(QueueTick) : 0;
             //TODO: may want to time the call and potentially do more within this tick
 		}
 
@@ -21377,11 +21391,11 @@ T.RM = function(BYTES_PER_SPIKE,BYTES_PER_POS_SAMPLE,POS_NAN,
 			if(ratemapSlotQueue.indexOf(slotInd) == -1)
 				ratemapSlotQueue.push(slotInd);
 			if(!ratemapTimer)
-				ratemapTimer = setTimeout(QueueTick,1);
+				ratemapTimer = setImmediate(QueueTick);
 		}
 
 		var ClearQueue = function(){
-			clearTimeout(ratemapTimer);
+			clearImmediate(ratemapTimer);
             ratemapTimer = 0;
 			ratemapSlotQueue = [];
 		}
@@ -22130,7 +22144,7 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
                 s = histSlotQueue.shift(); 
 			if(slots[s])
                 GetGroupHist(slots[s]);
-			histTimer  = histSlotQueue.length > 0 ? setTimeout(QueueTick,1) : 0;
+			histTimer  = histSlotQueue.length > 0 ? setImmediate(QueueTick) : 0;
             //TODO: may want to time the hist call and potentially do more within this tick
 		}
 
@@ -22138,11 +22152,11 @@ T.TC = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,el_deltaTSlider,el_de
 			if(histSlotQueue.indexOf(slotInd) == -1)
 				histSlotQueue.push(slotInd);
 			if(!histTimer)
-				histTimer = setTimeout(QueueTick,1);
+				histTimer = setImmediate(QueueTick);
 		}
 
 		var ClearQueue = function(){
-			clearTimeout(histTimer);
+			clearImmediate(histTimer);
             histTimer = 0;
 			histSlotQueue = [];
 		}

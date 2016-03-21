@@ -48,7 +48,14 @@ var BuildBridgedWorker = function(workerFunction,workerExportNames,mainExportNam
 	extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
 	extraWorkerStr.push("\n};\n");
 	extraWorkerStr.push("var console = {\nlog:\n function(str){self.postMessage({foo:'console_log',args:[str]})}\n}\n");
-	extraWorkerStr.push("var copy_typedarray_to_main = function(x,name){\n var buffer = x.buffer.slice(0);\nself.postMessage({foo: 'copy_typedarray_to_main', args:[buffer,name,x.constructor.name,[buffer]]});\n}");
+	extraWorkerStr.push("var copy_typedarray_to_main = function(x,name){\n var buffer = x.buffer.slice(0);\nself.postMessage({foo: 'copy_typedarray_to_main', args:[buffer,name,x.constructor.name,[buffer]]});\n}\n");
+	// see https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js and https://developer.mozilla.org/en-US/docs/Web/API/Window/setImmediate
+	// this version doesn't both accepting args
+	extraWorkerStr.push("var last_task_h_=0; var tasks_={};\n"+
+						"var channel_ = new MessageChannel();\n"+
+					    "channel_.port1.onmessage = function(e) {var h=e.data; try {tasks_[h] && tasks_[h]();}finally{clearImmediate(h);}}\n" +
+					    "var setImmediate = function(cb) {tasks_[++last_task_h_] = cb;  channel_.port2.postMessage(last_task_h_); return last_task_h_;}\n" +
+					    "var clearImmediate = function(h){delete tasks_[h];}\n");
 
 	var fullWorkerStr = "\n\n/*==== VARS ADDED BY BuildBridgeWorker ==== */\n\n" + 
 						extraWorkerTopStr.join("\n") + 

@@ -20,6 +20,7 @@ T.PAR = function(){
 		var buffer = null;
 
 		var ParseTetrodeFile = function(file, SPIKE_FORMAT, BYTES_PER_SPIKE){
+			console.log("loading tet file")
 			buffer = N = amps = null; // invalidate old stuff
 
 			// Read the first 1024 bytes as a string to get the header and find the data start
@@ -51,7 +52,10 @@ T.PAR = function(){
     	    var dataLen = parseInt(N)*BYTES_PER_SPIKE;
 		
 			//read the data section of the file as an array buffer
+			var time_start = performance.now();
     		buffer = reader.readAsArrayBuffer(file.slice(dataStart,dataStart+dataLen)); 
+    		var time_end = performance.now();
+    		console.log('read_tet_buffer: ' + (time_end-time_start));
 			var buffer_copy = buffer.slice(); // this is annoying, really we just need one copy which we aren't going to modify
 			main.TetrodeFileRead(null,header,buffer_copy,[buffer_copy]);
 			GetTetrodeAmplitude(false); // pre-cache amps, main is about to ask for them.
@@ -151,6 +155,7 @@ T.PAR = function(){
 
 		var ParsePosFile = function(file,POS_FORMAT,BYTES_PER_POS_SAMPLE,MAX_SPEED,SMOOTHING_W_S,HEADER_OVERRIDE,USE_BOTH_LEDS){
 			// Read the file as a string to get the header and find the data start
+			console.log("loading pos file")
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
 		
@@ -592,13 +597,14 @@ T.PAR = function(){
 	
 	var cutWorkerCode = function(){
 		"use strict";
-		
+
 		var REGEX_CUT_A = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
 		var REGEX_CUT_B = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
 		var REGEX_CUT_C = /[0-9]+/g;
 		var MAX_LENGTH_MATCH_CUT_B = 300;//this is needed so that when we read in chunks of the cut file we dont have to apply the regex_b to the whole thing each time
 
 		var ParseCutFile = function(file){
+			console.log("loading cut file")
 		
 			// Read the file as a string to get the header 
 			var reader = new FileReaderSync();
@@ -656,6 +662,7 @@ T.PAR = function(){
 		var REGEX_HEADER_B = /(\S*) ([\S ]*)/g
 
 		var ParseSetFile = function(file){
+			console.log("loading set file")
 			// Read the file as a string to get the header 
 			var reader = new FileReaderSync();
 			var fullStr = reader.readAsBinaryString(file);
@@ -774,20 +781,20 @@ T.PAR = function(){
 	}
 
 	var LoadEEGWithWorker = function(file,callback){
-		callbacks.eeg.push(callback);
-		eegWorker.ParseEEGFile(file);
+		//callbacks.eeg.push(callback);
+		//eegWorker.ParseEEGFile(file);
 	}
 	var EEGFileRead = function(errorMessage,header,buffer){
 		if(errorMessage)
 			throw(errorMessage);
-		callbacks.eeg.shift()({header: header,buffer:buffer});
+		//callbacks.eeg.shift()({header: header,buffer:buffer});
 	}
 	
 	var tetWorker = BuildBridgedWorker(tetWorkerCode,["ParseTetrodeFile","GetTetrodeAmplitude"],["TetrodeFileRead*","GotTetAmps*"],[TetrodeFileRead,GotTetAmps]);	
 	var posWorker = BuildBridgedWorker(posWorkerCode,["ParsePosFile"],["PosFileRead*"],[PosFileRead]);	
 	var cutWorker = BuildBridgedWorker(cutWorkerCode,["ParseCutFile","ParseCluFile","GetCutFileExpName"],["CutFileRead","CutFileGotExpName"],[CutFileRead, CutFileGotExpName]);	
 	var setWorker = BuildBridgedWorker(setWorkerCode,["ParseSetFile"],["SetFileRead"],[SetFileRead]);	
-	var eegWorker = BuildBridgedWorker(eegWorkerCode,["ParseEEGFile"],["EEGFileRead"],[EEGFileRead]);	
+	//var eegWorker = BuildBridgedWorker(eegWorkerCode,["ParseEEGFile"],["EEGFileRead"],[EEGFileRead]);	
 	
     var GetPendingParseCount = function(){
         return callbacks.cut.length + callbacks.set.length + callbacks.tet.length + callbacks.pos.length;
