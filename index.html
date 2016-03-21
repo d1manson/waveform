@@ -22384,6 +22384,8 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 
 //TODO: implement a drift colormap that's similar to count but gives mean time rather than just count
 
+	var MAX_N = 256*256*4; 
+
 	// Create an object to hold basic info about the offscreen canvas
 	var offCanv = function(){ 
 		var c = { //The following are all in units of actual pixels
@@ -22638,9 +22640,13 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
 		ready.cut = false;
 		cRender.alive = false; //stop render if there is one occuring
 
-		N = N_val;
-        if(!ValidN(N)) return;
-		
+        if (N_val>MAX_N){
+            console.log("Spike count is " + N_val  + ", which is greater than the limit of " + MAX_N + 
+            	".  The waveform renderer will ignore the excess spikes, but other plots will use the full dataset.");
+            N = MAX_N;
+        } else {
+        	N = N_val;
+        }		
 		UploadVoltage(buffer);
 		UploadIsTPlusOne(); //only needs to know N
 		SetCountModeColor(); //needs to know N (is only actually used when colormap is count mode)
@@ -23120,13 +23126,6 @@ T.WV = function(CanvasUpdateCallback, TILE_CANVAS_NUM, ORG,PALETTE_FLAG){
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     }
 
-	 var ValidN = function(test_N){
-        if (test_N>256*256*4){
-            error_callback("This only works when there are fewer than " + 256*256*4 +"spikes, but here there are " + test_N);
-            return null;
-        }
-        return N;
-    }
 
     var ValidGL = function(test_gl){
         if(!test_gl){
