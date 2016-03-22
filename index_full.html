@@ -7,6 +7,8 @@
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 <script> window.Polymer = {dom: 'shadow'}</script>
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="typed-array-manager.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
@@ -16,11 +18,14 @@
 <link rel="import" href="tile-element.html">
 <link rel="import" href="cross-hair.html">
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="undo-stack-view.html">
+<link rel="import" href="cut-object.html">
 </head>
 
 <body>
 <paper-iconset id="meta"></paper-iconset>
 
+<typed-array-manager></typed-array-manager>
 
 <div class="hidden_clipboard"></div>
 
@@ -381,7 +386,15 @@ other file types will be ignored<br>
 </div>
 
 <div style="position: fixed;top:0px;left: 0px;border:1px solid red;z-index: 200;">
-	<tile-wall></tile-wall>	
+	<template is="dom-bind">
+		<cut-object groups="{{cut_groups}}"
+					undo_stack="{{cut_undo_stack}}"
+					redo_stack="{{cut_redo_stack}}"></cut-object>
+		<tile-wall  groups="{{cut_groups}}"></tile-wall>
+		<undo-stack-view 
+					undo_stack="{{cut_undo_stack}}"
+					redo_stack="{{cut_redo_stack}}"></undo-stack-view>
+	</template>
 </div>
 
 <!-- public libraries and generic stuff for this app -->

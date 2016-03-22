@@ -1,0 +1,63 @@
+<!--
+CUSTOM ELEMENT: tac-plots
+BY: DM
+
+This is designed to be used inside a tile-wall element.  The "groups" array of the tilewall should be bound
+to this element's "groups" property.  Then whenever the tilewall's groups array is spliced this element will
+be notified and can update ratemaps acordingly, with the tilewall be notified of the updates.
+
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+
+<dom-module id="tac-plots">
+
+<template></template>
+
+
+<script>
+	"use strict";
+    Polymer({
+    	is:'tac-plots',
+    	properties: {
+			max_delta_t: {
+				type: Number,
+				value: 2
+			},
+			groups: {
+    			type: Array,
+    			value: function(){return [];},
+    			notify: true
+    		}
+    	},
+    	observers: [
+    		'groups_modified(groups.*)'
+    	],
+    	groups_modified: function(change){
+    		console.log(JSON.stringify(change))
+
+    		if(!change)	return;
+            var m = window.canvas_manager;
+            
+            change.indexSplices && change.indexSplices.forEach(function(s){
+    			s.removed.forEach(function(group){
+    				if(group.tac)
+	    				m.free_canvas(group.tac);
+    			}, this);
+
+    			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
+    				var group = this.groups[ii];
+
+    				// TODO: actually do this properly...
+    				group.tac = m.create_from_dims([128,30]);
+    			}
+    		}, this);
+
+    	}
+	});
+</script>
+
+  
+</dom-module>

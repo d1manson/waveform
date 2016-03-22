@@ -1,0 +1,59 @@
+<!--
+CUSTOM ELEMENT: typed-array-manager
+BY: DM
+
+Polymer bindings don't work with typed arrays, so if you want to use them you need something more complicated.
+This is similar to canvas-manager, though there is no managed-array element here (c.g. managed-canvas).
+
+Create at least one instance of the element and then you can access the singleton at window.typed_array_manager.
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+<dom-module id="typed-array-manager">
+<template>
+</template>
+<script>
+
+"use strict";
+
+(function(){
+
+    var arrays = {};
+    var last_id = 0;
+    var suffix = " (ta-manager)"; // can drop suffix using parseInt
+    var validate_id = function(id){
+        if((id + "").indexOf(suffix) === -1)
+            throw "typed-array-manager was passed invalid id";
+        return true;
+    }
+
+    Polymer({
+        is:'typed-array-manager',
+        properties: {},
+        observers: [],
+        created: function() {
+            if (!window.typed_array_manager)
+                window.typed_array_manager = this;
+            // note that we don't use "this" anywhere else, because all the state is kept 
+            // using the closure, not using the polymer element.  This means we have a singleton.
+        },
+        store_array: function(arr){
+            arrays[++last_id] = arr;
+            return last_id + suffix;
+        },
+        get_array: function(id){
+            return validate_id(id) && arrays[parseInt(id)];
+        },
+        free_array: function(id){
+            validate_id(id);
+            delete arrays[parseInt(id)];
+        }
+    });
+
+})();
+</script>
+
+  
+</dom-module>

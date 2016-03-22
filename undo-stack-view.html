@@ -1,0 +1,55 @@
+<!--
+CUSTOM ELEMENT: undo-stack-view
+BY: DM
+
+This is a read-only view of the undo-stack array of a cut-object.
+The array contains all the delta information, but we only care about
+the human-readable "description" here.
+
+It also shows the redo-stack.
+
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+
+<dom-module id="undo-stack-view">
+
+<template>
+    <div class='floating_title'>Action List [z]</div>
+    <div class='floating_body'>
+        <template is="dom-repeat" items="[[redo_stack]]">
+            <div class="redo">[[item.description]]</div>
+        </template>
+        <template is="dom-repeat" items="[[undo_stack]]" sort="[[_sort_reverse]]">
+            <div class="undo">[[item.description]]</div>
+        </template>
+    </div>
+</template>
+
+
+<script>
+	"use strict";
+    Polymer({
+    	is:'undo-stack-view',
+    	properties: {
+			undo_stack: {
+				type: Array,
+				value: function(){return [];},
+                notify: true
+    		},
+            redo_stack: {
+                type: Array,
+                value: function(){return [];},
+                notify: true
+            },
+            _sort_reverse: function(a,b){
+                return b.delta_id-a.delta_id;
+            }
+    	}
+	});
+</script>
+
+  
+</dom-module>

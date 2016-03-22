@@ -54,6 +54,10 @@ TODO: it may possibly be worth using an object pool, free list type thing.
       it may also be possible to use a WeakMap somehow, to avoid leaks entirely, but I'm 
       not sure how that plays with polymer's bindings.
 
+      It might be nice to reuse the typed-array-manager element here because they both do
+      similar things at heart, they just store different data, and the canavas-manger offers
+      some extra helper methods on top of the basic storage (ie. create canvas stuff).
+
 -->
 
 

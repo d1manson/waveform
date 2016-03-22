@@ -1,0 +1,64 @@
+<!--
+CUSTOM ELEMENT: cut-object
+BY: DM
+
+This is similar to rm-plots and friends, except that this element is not intended to be a singleton inside 
+a tile-wall element.  Instead, there can be many cut-object elements, one for each cut the user has loaded.
+
+The similarity with rm-plots is becuase the "groups" array of the tilewall should be bound
+to this element's "groups" property.  Each element of the groups array has an inds value which
+is an id for use with typed-array-manager.  This element provides various methods for splicing
+and dicing the cut, with each action modifying one or more of the inds values in the groups array.
+
+It also provides a pair of arrays called undo_stack and redo_stack.  They contain deltas, which
+(may) include id's for use with typed-array-manager.
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+
+<dom-module id="cut-object">
+
+<template></template>
+
+
+<script>
+	"use strict";
+    Polymer({
+    	is:'cut-object',
+    	properties: {
+			undo_stack: {
+				type: Array,
+				value: function(){return [];},
+                notify: true
+    		},
+            redo_stack: {
+                type: Array,
+                value: function(){return [];},
+                notify: true
+            },
+			groups: {
+    			type: Array,
+    			value: function(){return [];},
+    			notify: true
+    		}
+    	}, 
+        debug: function(){
+            // makes some fake groups 
+            var v = window.typed_array_manager;
+            this.push('groups',{
+                        group_num: 1,
+                        ids: v.store_array(new Uint8Array(100))
+                      });
+            this.push('undo_stack', {
+                       action: 'created',
+                       description: 'create cut for debug',
+                       delta_id: 0
+                    });
+        }
+	});
+</script>
+
+  
+</dom-module>
