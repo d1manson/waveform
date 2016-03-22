@@ -8,6 +8,7 @@
 <link rel="stylesheet" type="text/css" href="main.css">
 <script> window.Polymer = {dom: 'shadow'}</script>
 <link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/iron-localstorage/iron-localstorage.html">
 <link rel="import" href="typed-array-manager.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="iron-splitter.html">
@@ -20,6 +21,7 @@
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="undo-stack-view.html">
 <link rel="import" href="cut-object.html">
+<link rel="import" href="parsed-data.html">
 </head>
 
 <body>
@@ -386,16 +388,59 @@ other file types will be ignored<br>
 </div>
 
 <div style="position: fixed;top:0px;left: 0px;border:1px solid red;z-index: 200;">
-	<template is="dom-bind">
+	<template is="dom-bind" id="the_app">
+
+ 		<iron-localstorage
+	        name="waveform"
+	        value="{{options}}"
+	        on-iron-localstorage-load-empty="initializeDefaultOptions"
+	        ></iron-localstorage>
+
+		<div class="floatinginfo tc_info" style="display: initial;">
+			<div class='floating_title'>Temporal auto correlation [t]</div>
+			<div class='floating_body'>
+				Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
+				<paper-slider class="nodrag" pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
+				The number of bins is fixed at 100.
+			</div>
+		</div>
+
+		<parsed-data 
+		            duration="{{duration}}"
+					spike_times="{{spike_times}}"
+					pos_xy="{{pos_xy}}"
+					pos_dir="{{pos_dir}}"
+					amplitudes="{{amplitudes}}"
+					voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
 		<cut-object groups="{{cut_groups}}"
 					undo_stack="{{cut_undo_stack}}"
 					redo_stack="{{cut_redo_stack}}"></cut-object>
-		<tile-wall  groups="{{cut_groups}}"></tile-wall>
+
+		<tile-wall  groups="{{cut_groups}}"
+					duration="[[duration]]"
+					spike_times="[[spike_times]]"
+					pos_xy="[[pos_xy]]"
+					pos_dir="[[pos_dir]]"
+					voltages_for_gl="[[voltages_for_gl]]"
+					options="[[options]]"></tile-wall>
+
 		<undo-stack-view 
-					undo_stack="{{cut_undo_stack}}"
-					redo_stack="{{cut_redo_stack}}"></undo-stack-view>
+					undo_stack="[[cut_undo_stack]]"
+					redo_stack="[[cut_redo_stack]]"></undo-stack-view>
+
+
 	</template>
 </div>
+
+<script>
+"use strict";
+document.getElementById('the_app').initializeDefaultOptions = function(ev) {
+	this.options = {
+		max_delta_t: 500
+	};
+}
+
+</script>
 
 <!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  

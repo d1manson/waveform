@@ -26,6 +26,10 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 				type: Number,
 				value: 2
 			},
+            spike_times: {
+                type: String, // typed-array-manager id
+                value: ""
+            },
 			groups: {
     			type: Array,
     			value: function(){return [];},
@@ -33,7 +37,7 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		}
     	},
     	observers: [
-    		'groups_modified(groups.*)'
+    		'groups_modified(groups.*)', 'options_modified(max_delta_t)'
     	],
     	groups_modified: function(change){
     		console.log(JSON.stringify(change))
@@ -54,8 +58,10 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     				group.tac = m.create_from_dims([128,30]);
     			}
     		}, this);
-
-    	}
+    	},
+        options_modified: function(){
+            console.log("tac needs to render for max_delta_t: " + this.max_delta_t)
+        }
 	});
 </script>
 

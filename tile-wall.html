@@ -48,9 +48,11 @@ groups is an array of objects with the following properties:
 	As well as setting canvases in the groups array, they also record
 	the settings used to produce that canvas, e.g. groups[3].dir_smoothing.
 	 -->
-	<rm-plots groups="{{groups}}"></rm-plots> 
-	<tac-plots groups="{{groups}}"></tac-plots> 
-	<wave-plots groups="{{groups}}"></wave-plots> 
+	<rm-plots groups="{{groups}}" ></rm-plots> 
+	<tac-plots groups="{{groups}}" 
+			   max_delta_t="[[options.max_delta_t]]"
+			   spike_times="[[spike_times]]"></tac-plots> 
+	<wave-plots groups="{{groups}}" ></wave-plots> 
 	
 
 	<template is="dom-repeat" items="[[groups]]">
@@ -74,11 +76,39 @@ groups is an array of objects with the following properties:
     Polymer({
     	is:'tile-wall',
     	properties: {
+    		spike_times: {
+    			type: String, // typed-array-manager id
+    			value: ""
+    		},
     		groups: {
     			type: Array,
     			value: function(){return [];},
     			notify: true	
-    		}
+    		},
+    		duration: {
+                type: Number, // seconds
+                value: 0
+            },
+            spike_times: {
+                type: String,
+                value: "" // typed-array-manager id
+            },
+            pos_xy: {
+                type: String,
+                value: "" // typed-array-manager id
+            },
+            pos_dir: {
+                type: String,
+                value: "" // typed-array-manager id
+            },
+            voltages_for_gl: {
+                type: String,
+                value: "" // typed-array-manager id
+            },
+            options: {
+            	type: Object,
+            	value: {} // settings for plotting
+            }
     	},
     	observers: [
     		'groups_modified(groups.splices)'

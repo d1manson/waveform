@@ -1,0 +1,81 @@
+<!--
+CUSTOM ELEMENT: parsed-data
+BY: DM
+
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+
+<dom-module id="parsed-data">
+
+<template></template>
+
+
+<script>
+	"use strict";
+    Polymer({
+    	is:'parsed-data',
+    	properties: {
+            duration: {
+                type: Number, // seconds
+                value: 0,
+                notify: true
+            },
+            want_spike_times: {
+                type: Boolean,
+                value: true,
+                notify: true
+            },
+            spike_times: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
+            want_pos_xy: {
+                type: Boolean,
+                value: true,
+                notify: true
+            },
+            pos_xy: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
+            want_pos_dir: {
+                type: Boolean,
+                value: true,
+                notify: true
+            },
+            pos_dir: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
+            want_amplitudes: {
+                type: Boolean,
+                value: true,
+                notify: true
+            },
+            amplitudes: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
+            want_voltages_for_gl: {
+                type: Boolean,
+                value: true,
+                notify: true
+            },
+            voltages_for_gl: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            }
+    	}
+	});
+</script>
+
+  
+</dom-module>
