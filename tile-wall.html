@@ -23,7 +23,6 @@ groups is an array of objects with the following properties:
 <link rel="import" href="tac-plots.html">
 <link rel="import" href="wave-plots.html">
 
-
 <dom-module id="tile-wall">
 
 <template>
@@ -48,11 +47,25 @@ groups is an array of objects with the following properties:
 	As well as setting canvases in the groups array, they also record
 	the settings used to produce that canvas, e.g. groups[3].dir_smoothing.
 	 -->
-	<rm-plots groups="{{groups}}" ></rm-plots> 
-	<tac-plots groups="{{groups}}" 
-			   max_delta_t="[[options.max_delta_t]]"
-			   spike_times="[[spike_times]]"></tac-plots> 
-	<wave-plots groups="{{groups}}" ></wave-plots> 
+	<rm-plots 	groups="{{groups}}" 
+				spike_times="[[spike_times]]"
+				pos_xy="[[pos_xy]]"
+				pos_dir="[[pos_dir]]"
+				pos_speed="[[pos_speed]]"
+				show_pos_plots="[[options.show_pos_plots]]"
+				cm_per_spa_bin="[[options.cm_per_spa_bin]]"
+				smoothing_spa_bins="[[options.smoothing_spa_bins]]"
+				max_rate_spa="[[options.max_rate_spa]]"
+				deg_per_dir_bin="[[options.deg_per_dir_bin]]"
+				smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+	<tac-plots  groups="{{groups}}" 
+			    max_delta_t="[[options.max_delta_t]]"
+			    spike_times="[[spike_times]]"
+			    show="[[options.show_tac]]"></tac-plots> 
+	<wave-plots groups="{{groups}}" 
+				voltages_for_gl="[[voltages_for_gl]]"
+				palette_mode="[[options.waves_render_mode]]"
+				show_chans="[[options.show_waves]]"></wave-plots> 
 	
 
 	<template is="dom-repeat" items="[[groups]]">
@@ -98,6 +111,10 @@ groups is an array of objects with the following properties:
                 value: "" // typed-array-manager id
             },
             pos_dir: {
+                type: String,
+                value: "" // typed-array-manager id
+            },
+            pos_speed: {
                 type: String,
                 value: "" // typed-array-manager id
             },
