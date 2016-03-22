@@ -35,6 +35,7 @@ is in null state. When another tile is moving, it cannot be active instead it is
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="cross-hair.html">
+<link rel="import" href="canvas-manager.html">
 
 <dom-module id="tile-element">
 
@@ -162,6 +163,8 @@ is in null state. When another tile is moving, it cannot be active instead it is
 		<canvas width='0' height='0' style='width:0px;height:128px;'></canvas>
 	</div>
 	<div class="canvas_part_2">
+		<managed-canvas canv_id="[[dir_rm]]"></managed-canvas>
+		<managed-canvas canv_id="[[spa_rm]]"></managed-canvas>
 		<div>
 			<canvas class='dir-rm' width='0' height='0' style='width:0px'></canvas>
 			<canvas class='speed-rm' width='0' height='0' style='width:0px'></canvas>
@@ -274,6 +277,14 @@ is in null state. When another tile is moving, it cannot be active instead it is
 				value: '???',
 				reflectToAttribute: true
 			},
+			dir_rm: {
+				type: String, //canvas-manger id
+				value: ""
+			},
+			spa_rm: {
+				type: String, //canvas-manger id
+				value: ""
+			},
 			group_spa_max: {
 				type: String,
 				notify: true,
@@ -318,6 +329,7 @@ is in null state. When another tile is moving, it cannot be active instead it is
     		return val ? '' : 'none';
     	},
 		updateCanvas: function(newCanv, canvasNum){
+			return;
 			var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
 			for(var i=0;i <oldCanv.classList.length; i++)
 				newCanv.classList.add(oldCanv.classList[i]);

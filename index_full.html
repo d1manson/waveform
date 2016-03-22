@@ -7,6 +7,7 @@
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 <script> window.Polymer = {dom: 'shadow'}</script>
+<link rel="import" href="tile-wall.html">
 <link rel="import" href="iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
@@ -379,6 +380,9 @@ other file types will be ignored<br>
 <div id="works_with_chrome">v0.6.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/></div>
 </div>
 
+<div style="position: fixed;top:0px;left: 0px;border:1px solid red;z-index: 200;">
+	<tile-wall></tile-wall>	
+</div>
 
 <!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  

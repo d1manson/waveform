@@ -1,0 +1,151 @@
+<!--
+CUSTOM ELEMENT: canvas-manager
+BY: DM
+
+polymer doesn't allow you to use dom elements within a property, so if you want a canvas to be
+a part of a property you have to something more complicated...
+
+Note that elements can only be inserted into the dom in one place, if you insert in multiple places,
+only the element will only appear at the final location.
+
+Use one of the following methods to create a new canvas:
+    create_from_buffer(buffer, [dim_0, dim_1])
+    create_from_dims([dim_0, dim_1])
+They return an id for use with the following methods:
+    get_canvas(id)
+    get_2d_ctx(id)
+    free_canvas(id)
+Note you must free canvases when you no longer want them, otherwise there will be a memory leak.
+
+You can use it as follows, note that canvas-manger must come before any managed-canvas elements.
+The canvas-manger is a singleton, i.e. all instances share the same state:
+
+    <canvas-manager></canvas-manager> 
+    <managed-canvas></managed-canvas>
+    <managed-canvas></managed-canvas>
+
+    <script>
+    var m = window.canvas_manager;
+    var c_ids = [m.create_from_dims([100,150]), m.create_from_dims([100,20]), m.create_from_dims([20,100])];
+
+    var els = document.getElementsByTagName('managed-canvas');
+    els[0].canv_id = c_ids[0];
+    els[1].canv_id = c_ids[1];
+
+    var ctx = m.get_2d_ctx[c_ids[0]];
+    // ....
+    // do some drawing on the ctx. 
+    // the canvas is currently in the dom, so you will see the changes
+    // ...
+
+    els[0].canv_id = c_ids[2]; 
+    // Note how the original canvas is displaced from els[0]. You can insert it again 
+    // to either of the els, and it will still have the drawings.  Note that when you are
+    // completely finished with that canvas you *must* do the following:
+    m.free_canvas(c_ids[0]);
+    // otherwise it will be a memory leak
+    
+    // If you are using a managed-canvas within a dom-module, you can use declarative binding with canv_id:
+    // <managed-canvas canv_id="[[plot_canv_id]]"></managed_canvas>
+
+    </script>
+
+TODO: it may possibly be worth using an object pool, free list type thing.
+      it may also be possible to use a WeakMap somehow, to avoid leaks entirely, but I'm 
+      not sure how that plays with polymer's bindings.
+
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+<dom-module id="managed-canvas">
+<template></template>
+<script>
+"use strict";
+
+Polymer({
+    is:'managed-canvas',
+    properties: {
+        canv_id: {
+            type: String,
+            value: "",
+            observer: '_update'
+        }
+    },
+    _update: function(){
+        var old = Polymer.dom(this.root).firstChild;
+        if(old)
+            Polymer.dom(this.root).removeChild(old);
+        if(window.canvas_manager && this.canv_id !== "")
+            Polymer.dom(this.root).appendChild(window.canvas_manager.get_canvas(this.canv_id));
+    }
+});
+
+</script>
+</dom-module>
+
+<dom-module id="canvas-manager">
+<template>
+</template>
+<script>
+
+"use strict";
+
+(function(){
+
+    var canv_els = {};
+    var last_id = 0;
+    var suffix = " (canvas-manager)"; // can drop suffix using parseInt
+    var validate_id = function(id){
+        if((id + "").indexOf(suffix) === -1)
+            throw "canvas-manager was passed invalid id";
+        return true;
+    }
+
+    Polymer({
+        is:'canvas-manager',
+        properties: {},
+        observers: [],
+        created: function() {
+            if (!window.canvas_manager)
+                window.canvas_manager = this;
+            // note that we don't use "this" anywhere else, because all the state is kept 
+            // using the closure, not using the polymer element.  This means we have a singleton.
+        },
+        create_from_buffer: function(buffer, dims){
+            var el = document.createElement("canvas");
+            el.width = dims[0];
+            el.height = dims[1];
+            var ctx = el.getContext('2d');
+
+            var im_data = ctx.createImageData(dims[0], dims[1]);
+            im_data.data.set(new Uint8ClampedArray(buffer));
+            ctx.putImageData(im_data, 0, 0);
+            canv_els[++last_id] = el;
+            return last_id + suffix;
+        },
+        create_from_dims: function(dims){
+            var el = document.createElement("canvas");
+            el.width = dims[0];
+            el.height = dims[1];
+            canv_els[++last_id] = el;
+            return last_id + suffix;
+        },
+        get_canvas: function(id){
+            return validate_id(id) && canv_els[parseInt(id)];
+        },
+        get_2d_ctx: function(id){
+            return validate_id(id) && canv_els[parseInt(id)].getContext('2d');
+        },
+        free_canvas: function(id){
+            validate_id(id);
+            delete canv_els[parseInt(id)];
+        }
+    });
+
+})();
+</script>
+
+  
+</dom-module>
