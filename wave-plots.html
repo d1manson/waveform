@@ -40,10 +40,9 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		'groups_modified(groups.splices)'
     	],
     	groups_modified: function(change){
-    		console.log(JSON.stringify(change))
-    		if(!change || !change.indexSplices)
-    			return;
+    		if(!change || !change.indexSplices) return;
     		var m = window.canvas_manager;
+    		
     		change.indexSplices.forEach(function(s){
     			s.removed.forEach(function(group){
     				if(group.waves)

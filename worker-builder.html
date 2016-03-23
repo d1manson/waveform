@@ -208,7 +208,7 @@ var exec_main_b = function(/*arguments*/){
         this._worker = new Worker(url);
         this._listener = listener;
         this._title = title;
-        this._worker.onmessage = this._onmessage
+        this._worker.onmessage = this._onmessage.bind(this);
         return this;
     }
     
@@ -222,7 +222,7 @@ var exec_main_b = function(/*arguments*/){
     BuiltWorker.prototype.exec_b = function(/*arguments*/){
         var msg = {
         foo: arguments[0],
-        args: Array.prototype.slice.call(arguments,1, arguments.length-1),
+        args: Array.prototype.slice.call(arguments, 1, arguments.length-1),
         bufs: []
         };
         var x = arguments[arguments.length-1] || {};
@@ -252,7 +252,7 @@ var exec_main_b = function(/*arguments*/){
         }
         var foo = e.data.foo;
         try{
-            this._listener[foo].call(this._listener, e.data.args);
+            this._listener[foo].apply(this._listener, e.data.args);
         }catch(e){
             if(foo === "console.log"){
                 console.log(e.data.args);

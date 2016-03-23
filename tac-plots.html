@@ -6,6 +6,12 @@ This is designed to be used inside a tile-wall element.  The "groups" array of t
 to this element's "groups" property.  Then whenever the tilewall's groups array is spliced this element will
 be notified and can update ratemaps acordingly, with the tilewall be notified of the updates.
 
+    
+remember that we have sent this version to the main thread.
+Main should be careful not to delete the data until
+it recives a new copy for this k, or deltes k entirely, because the worker will
+not bother to recompute it if it believes main already has it.
+
 -->
 
 
@@ -16,17 +22,127 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 
 <script is='worker-builder' id="worker" title="tac-plots" type='javascript/worker'>
 "use strict";
-var desired_max_delta_t;
+
+var render_options = {
+    max_delta_t: undefined,
+    n_bins: 100
+};
 var spike_times;
+var group_inds = {}; // uses ta-manager id as keys
+var timer;
+var pending_renders = []; // holds a list of keys into group_inds, saying which are still due to be computed
+var group_rendered_with_options = {}; // stays in sync with group_inds
 
 var set_max_delta_t = function(v){
-    desired_max_delta_t = v;
+    render_options.max_delta_t = v;
+    pending_renders = [];    
+    if(spike_times){
+        for(var k in group_inds) if(group_inds.hasOwnProperty(k))
+            pending_renders.push(k);
+    }
+    maybe_run_timer();
 }
 
 var set_spike_times = function(arrays){
-    spike_times = arrays.spike_times; // could be undefined
+    spike_times = arrays.spike_times; 
+    pending_renders = [];    
+    if(spike_times){
+        for(var k in group_inds) if(group_inds.hasOwnProperty(k))
+            pending_renders.push(k);
+    }
+    maybe_run_timer();
 }
 
+var update_group_inds = function(changes, arrays){
+    // both add_ids and remove_ids are arrays of ta-maanger ids
+    // the actual arrays for add_ids are in the arrays map.
+
+    var remove_ids = changes.remove || [];
+    for(var ii=0; ii<remove_ids.length; ii++){
+        delete group_inds[remove_ids[ii]];
+        delete group_rendered_with_options[remove_ids[ii]];
+    }
+
+    var add_ids = changes.add || [];
+    for(var ii=0; ii<add_ids.length; ii++){
+        group_inds[add_ids[ii]] = arrays[add_ids[ii]];
+        pending_renders.push(add_ids[ii]);
+    }
+
+    maybe_run_timer();        
+}
+
+var maybe_run_timer = function(){
+    if(spike_times && pending_renders.length & !timer)
+        timer = setImmediate(timer_tick);
+}
+
+var timer_tick = function(){
+    timer = 0;
+    var k = pending_renders.pop();
+    
+    if(k && group_inds[k] && !is_equal_simple(group_rendered_with_options[k], render_options))
+        get_group_hist(k);
+
+    if(pending_renders.length)
+        maybe_run_timer();
+}
+
+var get_group_hist = function(k){
+    // note desired_max_delta_t and spike_times should both be in the same units
+    var group_times = pick(spike_times, group_inds[k]);
+
+    // build pairwise-diff histogram
+    var ret = new Uint32Array(render_options.n_bins+1);
+    get_group_hist_sub(ret, group_times, render_options.max_delta_t, 
+                        render_options.max_delta_t/render_options.n_bins);
+ 
+    group_rendered_with_options[k] = clone_simple(render_options);
+    exec_main_b('plot_hist', {
+        inds_id: k,
+        hist_name: 'hist',
+        render_options: group_rendered_with_options[k]
+    }, {hist: ret});
+}
+
+var get_group_hist_sub = function(ret, group_times, D, b){
+    // For every pair of spikes separated in time by no more than time D, bin
+    // up the time separation, with bin size b, and record it in hist, ret.
+    for(var later_idx=1, earlier_idx=0; later_idx<group_times.length; later_idx++){
+        var laterTime = group_times[later_idx];
+        while (group_times[earlier_idx] < laterTime - D)
+            earlier_idx++;
+        for(var i=earlier_idx; i<later_idx; i++)
+            ret[0 | ((laterTime - group_times[i])/b)]++;
+    }
+}
+
+// TODO: come with a better method than copy-pasting utility functions ....
+
+var pick = function(from, indices){
+    // Take elements specified by indicies from the 1d array "from".
+    var result =  new from.constructor(indices.length); //make an array of the same type as the from array
+    for(var i=0;i<indices.length;i++)
+        result[i] = from[indices[i]];
+    return result;
+}
+
+var clone_simple = function(obj){
+    return JSON.parse(JSON.stringify(obj));
+}
+
+var is_equal_simple = function(a, b){
+    // very simple....
+    if((a && !b) || (!a && b))
+        return false;
+    for(var aa in a) if(a.hasOwnProperty(aa))
+        if(b[aa] !== a[aa])
+            return false;
+    for(var bb in b) if(b.hasOwnProperty(bb))
+        if(b[bb] !== a[bb])
+            return false;
+    return true;
+}
 </script>
 
 <template></template>
@@ -63,26 +179,35 @@ var set_spike_times = function(arrays){
             this.worker.exec('set_max_delta_t', this.max_delta_t);
         },
     	groups_modified: function(change){
-    		console.log(JSON.stringify(change))
-            if(!this.worker) return;
-            
-    		if(!change)	return;
-            var m = window.canvas_manager;
-            
-            change.indexSplices && change.indexSplices.forEach(function(s){
+            if(!this.worker || !change || !change.value) return;
+            var inds_to_remove = [];
+            var inds_to_add = [];
+            var arrays = {};
+            var m = window.typed_array_manager;
+
+            change.value.indexSplices && change.value.indexSplices.forEach(function(s){
     			s.removed.forEach(function(group){
+                    if(group.inds)
+                        inds_to_remove.push(group_inds);
     				if(group.tac)
 	    				m.free_canvas(group.tac);
     			}, this);
 
     			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
     				var group = this.groups[ii];
-
+                    var arr = m.get_array_clone(group.inds);
+                    arrays[group.inds] = arr;
+                    inds_to_add.push(group.inds);
     				// TODO: actually do this properly...
-                    // this.worker.set_group_inds()
-    				group.tac = m.create_from_dims([128,30]);
+    				//group.tac = m.create_from_dims([128,30]);
     			}
     		}, this);
+
+            this.worker.exec_b('update_group_inds', {
+                add: inds_to_add,
+                remove: inds_to_remove                
+            }, arrays);
+
     	},
         options_modified: function(){
             if(!this.worker) return;
@@ -96,7 +221,15 @@ var set_spike_times = function(arrays){
                 if(!this.worker) return;
                 this.worker.exec('set_spike_times', {});
             }
+        },
+        plot_hist: function(data, arrays) {
+            // data.inds_id
+            // hist = arrays[data.hist_name]
+            // data.render_options
+            console.log("plot_hist for: " + data.inds_id + "   " + JSON.stringify(data.render_options));
+            console.dir(arrays[data.hist_name]);
         }
+
 	});
 </script>
 
