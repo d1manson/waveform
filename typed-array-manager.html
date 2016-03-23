@@ -46,6 +46,13 @@ Create at least one instance of the element and then you can access the singleto
         get_array: function(id){
             return validate_id(id) && arrays[parseInt(id)];
         },
+        get_array_clone: function(id){
+            // note that the clone is not put in the store. It is
+            // inteded to be used when dealing with workers, and needing to 
+            // transfer an array in its intereity to another thread.
+            var a = this.get_array(id);
+            return new a.constructor(a);
+        },
         free_array: function(id){
             validate_id(id);
             delete arrays[parseInt(id)];

@@ -10,15 +10,32 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
-
+<link rel="import" href="worker-builder.html">
 
 <dom-module id="tac-plots">
+
+<script is='worker-builder' id="worker" title="tac-plots" type='javascript/worker'>
+"use strict";
+var desired_max_delta_t;
+var spike_times;
+
+var set_max_delta_t = function(v){
+    desired_max_delta_t = v;
+}
+
+var set_spike_times = function(arrays){
+    spike_times = arrays.spike_times; // could be undefined
+}
+
+</script>
 
 <template></template>
 
 
 <script>
 	"use strict";
+    var worker_builder = Polymer.DomModule.import('tac-plots','#worker');
+
     Polymer({
     	is:'tac-plots',
     	properties: {
@@ -37,11 +54,18 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		}
     	},
     	observers: [
-    		'groups_modified(groups.*)', 'options_modified(max_delta_t)'
+    		'groups_modified(groups.*)', 
+            'options_modified(max_delta_t)',
+            'times_modified(spike_times)'
     	],
+        attached: function(){
+            this.worker = worker_builder.create_for(this);
+            this.worker.exec('set_max_delta_t', this.max_delta_t);
+        },
     	groups_modified: function(change){
     		console.log(JSON.stringify(change))
-
+            if(!this.worker) return;
+            
     		if(!change)	return;
             var m = window.canvas_manager;
             
@@ -55,12 +79,23 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     				var group = this.groups[ii];
 
     				// TODO: actually do this properly...
+                    // this.worker.set_group_inds()
     				group.tac = m.create_from_dims([128,30]);
     			}
     		}, this);
     	},
         options_modified: function(){
-            console.log("tac needs to render for max_delta_t: " + this.max_delta_t)
+            if(!this.worker) return;
+            this.worker.exec('set_max_delta_t', this.max_delta_t);
+        },
+        times_modified: function(){
+            if(this.spike_times){
+                var arr = window.typed_array_manager.get_array_clone(this.spike_times);
+                this.worker.exec_b('set_spike_times', {spike_times: arr});
+            } else {
+                if(!this.worker) return;
+                this.worker.exec('set_spike_times', {});
+            }
         }
 	});
 </script>
