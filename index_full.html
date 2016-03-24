@@ -418,8 +418,8 @@ other file types will be ignored<br>
 					amplitudes="{{amplitudes}}"
 					voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
 		<cut-object groups="{{cut_groups}}"
-					undo_stack="{{cut_undo_stack}}"
-					redo_stack="{{cut_redo_stack}}"></cut-object>
+					undo_stack_descriptions="{{cut_undo_stack}}"
+					redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
 		<tile-wall  groups="{{cut_groups}}"
 					duration="[[duration]]"
@@ -435,7 +435,6 @@ other file types will be ignored<br>
 					redo_stack="[[cut_redo_stack]]"></undo-stack-view>
 
 
-	</template>
 </div>
 
 <script>
@@ -461,21 +460,16 @@ document.getElementById('the_app').initializeDefaultOptions = function(ev) {
 
 </script>
 
+
 <!-- public libraries and generic stuff for this app -->
 <script src="jquery.min.js"></script>  
 <script src="jquery.mousewheel.min.js"></script>
 <script src="keymaster.min.js"></script>  
 <script src="utils.js"></script>
-<script src="worker-bridge.js"></script>
 <script src="filesystem.js"></script>
 <script src="Mlib.js"></script>
 <!--<script src="webgl-debug.js"></script> -->
 
-<!-- T.PAR, T.CUT, and T.ORG look after the files and cuts-->
-<script src="parsefiles.js"></script>
-<script src="cut.js"></script>
-
-<!-- main and T.Tool deal with the miscellaneous interaction tasks and persistence of settings etc.-->
 
 </body>
 </html>

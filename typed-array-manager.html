@@ -6,6 +6,12 @@ Polymer bindings don't work with typed arrays, so if you want to use them you ne
 This is similar to canvas-manager, though there is no managed-array element here (c.g. managed-canvas).
 
 Create at least one instance of the element and then you can access the singleton at window.typed_array_manager.
+
+TODO: it might be worth implementing this as a wrapper around a WeakMap, where the keys are (have to be) objects
+rather than strings.  This would mean we don't have to worry about garbage collection and memory leaks...although
+it makes it harder for the main thread to communicate with workers unless it maintains a basic version of the map,
+using normal keys...and then you would need to do manual garbage collection again...so maybe it's not worth it.
+
 -->
 
 
@@ -51,7 +57,7 @@ Create at least one instance of the element and then you can access the singleto
             // inteded to be used when dealing with workers, and needing to 
             // transfer an array in its intereity to another thread.
             var a = this.get_array(id);
-            return new a.constructor(a);
+            return a && new a.constructor(a);
         },
         free_array: function(id){
             validate_id(id);

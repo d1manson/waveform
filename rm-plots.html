@@ -10,15 +10,117 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
-
+<link rel="import" href="worker-builder.html">
 
 <dom-module id="rm-plots">
+
+<script is='worker-builder' id="worker" title="rm-plots" type='javascript/worker'>
+"use strict";
+
+var render_options = {
+};
+var spike_times;
+var taid_to_array = {}; // Note that in the worker, taid's are used only for arrays of spike-indices.
+var taid_to_rendered_options = {}; 
+var taids_pending_render = [];
+var timer;
+
+var set_cm_per_spa_bin = function(v){
+    render_options.cm_per_spa_bin = v;
+    taids_pending_render = [];    
+    if(spike_times){ // TODO: check other things too
+        for(var taid in taid_to_array) if(taid_to_array.hasOwnProperty(taid))
+            taids_pending_render.push(taid);
+    }
+    toggle_timer();
+}
+
+var set_spike_times = function(arrays){
+    spike_times = arrays.spike_times; 
+    taids_pending_render = [];    
+    if(spike_times){
+        for(var taid in taid_to_array) if(taid_to_array.hasOwnProperty(taid))
+            taids_pending_render.push(taid);
+    }
+    toggle_timer();
+}
+
+var update_taids = function(changes, arrays){
+    // both add_taids and remove_taids are arrays of ta-maanger ids
+    // the actual arrays for add_taids are in the arrays map.
+
+    var remove_taids = changes.remove || [];
+    for(var ii=0; ii<remove_taids.length; ii++){
+        delete taid_to_array[remove_taids[ii]];
+        delete taid_to_rendered_options[remove_taids[ii]];
+    }
+
+    var add_taids = changes.add || [];
+    for(var ii=0; ii<add_taids.length; ii++){
+        taid_to_array[add_taids[ii]] = arrays[add_taids[ii]];
+        taids_pending_render.push(add_taids[ii]);
+    }
+
+    toggle_timer();        
+}
+
+var toggle_timer = function(){
+    // turns timer on if there's work to be done, otherwise stops it (if it was running)
+    // note it's not actually a timer, because the interval is zero!
+    // the point of using this is that it enables messages from main thread to interupt
+    // between ticks, we can thus cancel work as an when needed.
+    if(spike_times && taids_pending_render.length)
+        timer = timer || setImmediate(timer_tick);
+    else
+        clearImmediate(timer);
+}
+
+var timer_tick = function(){
+    timer = 0;
+    var taid = taids_pending_render.pop();
+    
+    if(taid && taid_to_array[taid] && !is_equal_simple(taid_to_rendered_options[taid], render_options))
+        get_group_whatevers(taid);
+
+    toggle_timer();
+}
+
+
+
+// TODO: come with a better method than copy-pasting utility functions ....
+
+var pick = function(from, indices){
+    // Take elements specified by indicies from the 1d array "from".
+    var result =  new from.constructor(indices.length); //make an array of the same type as the from array
+    for(var i=0;i<indices.length;i++)
+        result[i] = from[indices[i]];
+    return result;
+}
+
+var clone_simple = function(obj){
+    return JSON.parse(JSON.stringify(obj));
+}
+
+var is_equal_simple = function(a, b){
+    // very simple....
+    if((a && !b) || (!a && b))
+        return false;
+    for(var aa in a) if(a.hasOwnProperty(aa))
+        if(b[aa] !== a[aa])
+            return false;
+    for(var bb in b) if(b.hasOwnProperty(bb))
+        if(b[bb] !== a[bb])
+            return false;
+    return true;
+}
+</script>
 
 <template></template>
 
 
 <script>
-	"use strict";
+    "use strict";
+
     Polymer({
     	is:'rm-plots',
     	properties: {
@@ -49,32 +151,42 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		}
     	},
     	observers: [
-    		'groups_modified(groups.splices)'
+    		'groups_modified(groups.*)'
     	],
+        attached: function(){
+            var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
+            this.worker = worker_builder.create_for(this);
+            this.worker.exec('set_cm_per_spa_bin', this.cm_per_spa_bin);
+            //this.taid_to_canvas = {};
+            //this.taid_to_rendered_options = {};
+            //this.taid_to_groups_idx = {};
+        },
     	groups_modified: function(change){
-    		console.log(JSON.stringify(change))
-    		if(!change || !change.indexSplices)
-    			return;
-    		var m = window.canvas_manager;
-    		change.indexSplices.forEach(function(s){
-    			s.removed.forEach(function(group){
-    				if(group.dir_rm)
-	    				m.free_canvas(group.dir_rm);
-	    			if(group.spa_rm)
-	    				m.free_canvas(group.spa_rm);
-	    			if(group.speed_rm)
-	    				m.free_canvas(group.speed_rm);
-    			}, this);
+            if(!this.worker || !change || !change.value) return;
+            var taids_to_remove = [];
+            var taids_to_add = [];
+            var arrays = {};
+            var m = window.canvas_manager;
+            if(change.path === 'groups.splices')
+                change.value.indexSplices.forEach(function(s){
+            		s.removed.forEach(function(group){
+        				if(group.dir_rm)
+    	    				m.free_canvas(group.dir_rm);
+    	    			if(group.spa_rm)
+    	    				m.free_canvas(group.spa_rm);
+    	    			if(group.speed_rm)
+    	    				m.free_canvas(group.speed_rm);
+        			}, this);
 
-    			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
-    				var group = this.groups[ii];
+        			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
+        				var group = this.groups[ii];
 
-    				// TODO: actually do this properly...
-    				group.spa_rm = m.create_from_dims([128,128]);
-    				group.dir_rm = m.create_from_dims([80,80]);
-    				group.speed_rm = m.create_from_dims([20,100]);
-    			}
-    		}, this);
+        				// TODO: actually do this properly...
+        				group.spa_rm = m.create_from_dims([128,128]);
+        				group.dir_rm = m.create_from_dims([80,80]);
+        				group.speed_rm = m.create_from_dims([20,100]);
+        			}
+    		  }, this);
     	}
 	});
 </script>

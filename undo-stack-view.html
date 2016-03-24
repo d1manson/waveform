@@ -15,15 +15,19 @@ It also shows the redo-stack.
 
 
 <dom-module id="undo-stack-view">
-
+<style>
+.redo{
+color: #ccc;
+}
+</style>
 <template>
     <div class='floating_title'>Action List [z]</div>
     <div class='floating_body'>
         <template is="dom-repeat" items="[[redo_stack]]">
-            <div class="redo">[[item.description]]</div>
+            <div class="redo">[[item]]</div>
         </template>
-        <template is="dom-repeat" items="[[undo_stack]]" sort="[[_sort_reverse]]">
-            <div class="undo">[[item.description]]</div>
+        <template is="dom-repeat" items="[[undo_stack]]" >
+            <div class="undo">[[item]]</div>
         </template>
     </div>
 </template>
@@ -31,6 +35,7 @@ It also shows the redo-stack.
 
 <script>
 	"use strict";
+    // TODO: probably should sort undo in reverse order
     Polymer({
     	is:'undo-stack-view',
     	properties: {
@@ -43,9 +48,6 @@ It also shows the redo-stack.
                 type: Array,
                 value: function(){return [];},
                 notify: true
-            },
-            _sort_reverse: function(a,b){
-                return b.delta_id-a.delta_id;
             }
     	}
 	});

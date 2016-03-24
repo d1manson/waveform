@@ -37,25 +37,26 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		}
     	},
     	observers: [
-    		'groups_modified(groups.splices)'
+    		'groups_modified(groups.*)'
     	],
     	groups_modified: function(change){
-    		if(!change || !change.indexSplices) return;
+    		if(!this.worker || !change || !change.value) return;
     		var m = window.canvas_manager;
-    		
-    		change.indexSplices.forEach(function(s){
-    			s.removed.forEach(function(group){
-    				if(group.waves)
-	    				m.free_canvas(group.waves);
+
+			if(change.path === 'groups.splices')
+                change.value.indexSplices.forEach(function(s){
+	    			s.removed.forEach(function(group){
+	    				if(group.waves)
+		    				m.free_canvas(group.waves);
+	    			}, this);
+
+	    			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
+	    				var group = this.groups[ii];
+
+	    				// TODO: actually do this properly...
+	    				group.waves = m.create_from_dims([128,30]);
+	    			}
     			}, this);
-
-    			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
-    				var group = this.groups[ii];
-
-    				// TODO: actually do this properly...
-    				group.waves = m.create_from_dims([128,30]);
-    			}
-    		}, this);
     	}
 	});
 </script>

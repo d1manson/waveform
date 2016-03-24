@@ -74,10 +74,10 @@ When defining a worker within a dom-module, use the following syntax...
         </script>
 
         <script>
-        var worker_factory = document._currentScript.previousElementSibling; // drop the underscore if not using webcomponents polyfill
         Polymer({
             is: 'my-widget',
             ready: function(){
+                var worker_factory = document._currentScript.previousElementSibling; // drop the underscore if not using webcomponents polyfill
                 this.worker = worker_factory.create_for(this);
             }
         })
