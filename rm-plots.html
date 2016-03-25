@@ -4,6 +4,18 @@ BY: DM
 
 See tac-plots.html for introductorary notes.
 
+This is a bit more complicated for a few reasons:
+
+Firstly, we have multiple plots being made for each set of indices: spa (aka 'xy'), dir, and speed.
+Whenever an order is required, they always come in that order, i.e. 0: spa, 1: dir, 2: speed.
+
+Secondly, we cache parts of the computation on the worker: the dwell map and pos bin indices etc.
+Changing certain things requires clearing different parts of the cache.  This logic is handled
+by the function clear_cache, which takes an array of strings that name the things which should
+be considered invalidated, this might be 'pos_xy', or 'cm_per_spa_bin', etc.
+
+Thirdly, there's just more inputs to the calculation, so there's more to keep track of.
+
 -->
 
 
@@ -16,37 +28,131 @@ See tac-plots.html for introductorary notes.
 "use strict";
 
 var render_options = {
+    cm_per_spa_bin: undefined,
+    smoothing_spa_bins: undefined,
+    max_rate_spa: undefined,
+    deg_per_dir_bin: undefined,
+    smoothing_dir_bins: undefined,
+    cps_per_speed_bin: 4 // currently not exposed as a user-configurable
 };
+var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
+
+var show;
 var spike_times;
+var spikes_timebase;
+var pos_timebase; // Note that changing the pos timebase will force clear all pos_xy, pos_dir, and pos_speed
+var pos_xy;
+var pos_units_per_cm;
+var pos_dir;
+var pos_speed;
 var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
 var key_to_rendered_options = {}; 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
 
-var set_options = function(opts){
-    for(var k in render_options){
-        render_options[k] = opts[k] === undefined ? render_options[k] : opts[k];
-    }
-    keys_pending_render = [];    
-    if(spike_times){
-        for(var key in key_to_array){
-            keys_pending_render.push(key);
-        }
-    }
-    toggle_timer();
+// cached stuff.... see clear_cache for logic for cleaning the cache
+var cached_spike_pos_ind;
+var cached_xy_bins;
+var cached_xy_dwell;
+var cached_dir_bins;
+var cached_dir_dwell;
+var cached_speed_bins;
+var cached_speed_dwell;
+var cached_spike_xy_bins;
+var cached_spike_dir_bins;
+var cached_spike_speed_bins;
+
+var palette = function(){
+    var p_colors = 5;
+    var buf8 = new Uint8Array(4*(p_colors+1));
+
+    //set all alpha values to opaque
+    for(var i=0;i<=p_colors;i++)
+        buf8[i*4+3] = 255;
+
+    //buf8[0*4+0]= 255; buf8[0*4+1]=255; buf8[0*4+2]=255; //white
+    buf8[0*4+3]= 000; // invisible
+    buf8[1*4+2]= 198;
+    buf8[2*4+1]= 162; buf8[2*4+2]= 255; 
+    buf8[3*4+0]= 056; buf8[3*4+1]= 235; buf8[3*4+2]= 032; 
+    buf8[4*4+0]= 248; buf8[4*4+1]= 221; 
+    buf8[5*4+0]= 255; buf8[5*4+1]= 032;
+
+    return new Uint32Array(buf8.buffer); //this is how to_image_data function wants it
+}();
+
+var set_show = function(v){
+    show = v;
+    make_all_keys_pending(); // this may be slightly overkill, but when it comes down to it we will only render stuff that needs it
+    touch_timer();
 }
 
-var set_spike_times = function(arrays){
-    spike_times = arrays.spike_times; 
-    keys_pending_render = [];    
-    if(spike_times){
-        for(var key in key_to_array){
-            keys_pending_render.push(key);
+var set_options = function(opts){
+    var to_clear = [];
+    for(var k in render_options){
+        if(opts[k] === undefined  && render_options[k] !== opts[k]){
+            render_options[k] =  opts[k];
+            to_clear.push(k);
         }
     }
-    toggle_timer();
+    clear_cache(to_clear);
+    make_all_keys_pending();
+    touch_timer();
 }
+
+var set_spike_times = function(timebase, arrays){
+    clear_cache(['spikes_timebase', 'spike_times']);
+    spikes_timebase = timebase;
+    spike_times = arrays.data; 
+    make_all_keys_pending();
+    touch_timer();
+}
+
+var set_pos_xy = function(timebase, units_per_cm, arrays){
+    if(timebase != pos_timebase){
+        pos_timebase = timebase;
+        pos_xy = pos_dir = pos_speed = undefined;
+        clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    }
+    pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
+    pos_xy = arrays.data;
+    // TODO: clear anything cached that related to pos_xy
+    make_all_keys_pending();
+    touch_timer();
+}
+
+var set_pos_dir = function(timebase, arrays){
+    if(timebase != pos_timebase){
+        pos_timebase = timebase;
+        pos_xy = pos_dir = pos_speed = undefined;
+        clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    }
+    pos_dir = arrays.data;
+    // TODO: clear anything cached that related to pos_dir
+    make_all_keys_pending();
+    touch_timer();
+}
+
+var set_pos_speed = function(timebase, arrays){
+    if(timebase != pos_timebase){
+        pos_timebase = timebase;
+        pos_xy = pos_dir = pos_speed = undefined;
+        clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    }
+    pos_speed = arrays.data;
+    // TODO: clear anything cached that related to pos_speed
+    make_all_keys_pending();
+    touch_timer();
+}
+
+var make_all_keys_pending = function(){
+    keys_pending_render = [];    
+    for(var key in key_to_array){
+        keys_pending_render.push(key);
+    }
+}
+
 
 var update_keys = function(changes, arrays){
 
@@ -77,15 +183,15 @@ var update_keys = function(changes, arrays){
         keys_pending_render.push(add_keys[ii]);
     }
 
-    toggle_timer();        
+    touch_timer();        
 }
 
-var toggle_timer = function(){
+var touch_timer = function(){
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && keys_pending_render.length)
+    if(spike_times && keys_pending_render.length && show !== 'nnn')
         timer = timer || setImmediate(timer_tick);
     else
         clearImmediate(timer);
@@ -103,16 +209,318 @@ var timer_tick = function(){
         }
     }
 
-    toggle_timer();
+    touch_timer();
+}
+
+
+//  The meat of the computation follows...
+// =========================================================
+
+var clear_cache = function(names){
+    // This is a bit fiddly, but at least it's all in one place, right?!
+
+    names = new Set(names);
+
+    if(names.has('spikes_timebase') || names.has('pos_timebase') || names.has('spike_times')){
+        cached_spike_pos_ind = undefined;
+        cached_spike_xy_bins = undefined;
+        cached_spike_dir_bins = undefined;
+        cached_spike_speed_bins = undefined;
+    }
+
+    if(names.has('pos_xy') || names.has('cm_per_spa_bin')){
+        cached_xy_bins = undefined;
+        cached_xy_dwell = undefined;
+        cached_xy_no_dwell = undefined;
+        cached_spike_xy_bins = undefined;
+    } else if(names.has('smoothing_spa_bins')){
+        cached_xy_dwell = undefined;
+    }
+     
+    if(names.has('pos_dir') || names.has('deg_per_dir_bin')){
+        cached_dir_bins = undefined;
+        cached_dir_dwell = undefined;
+        cached_spike_dir_bins = undefined;
+    } else if(names.has('smoothing_dir_bins')){
+        cached_dir_dwell = undefined;
+    }
+
+    if(names.has('pos_speed') || name.has('max_speed') || name.has('cps_per_speed_bin')){
+        cached_speed_bins = undefined;
+        cached_speed_dwell = undefined;
+        cached_spike_speed_bins = undefined;
+    }   
+
+    // TODO: we could deal with adding more stuff to pending here perhaps??
+
+}
+
+var make_cached_spike_pos_ind = function(){    
+    // cached_spike_pos_ind gives the indices into pos_xy, pos_dir, pos_speed for each spike
+    if(! (pos_timebase && spikes_timebase && spike_times))
+        return;
+
+    cached_spike_pos_ind = new Uint32Array(spike_times.length);
+    
+    var factor = pos_timebase / spikes_timebase;
+    for(var i=0; i<cached_spike_pos_ind.length; i++)
+        cached_spike_pos_ind[i] = spike_times[i]*factor; //integer result, so implicitly the floor 
+
+    return true;
+}
+
+
+
+var make_cached_xy_bins_and_dwell = function(){
+    if( !(pos_xy && cached_spike_pos_ind && 
+          render_options.cm_per_spa_bin && render_options.smoothing_spa_bins !== undefined) )
+        return;
+
+    var factor = 1/pos_units_per_cm/render_options.cm_per_spa_bin;
+    cached_xy_bins = new Uint8ClampedArray(pos_xy.length);
+    for(var i=0;i<pos_xy.length;i++)
+        cached_xy_bins[i] = pos_xy[i] * factor;           
+    
+    //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
+    cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
+                
+    // TODO: get max vals from somewhere???
+    n_bins_xy_1 = Math.ceil(max_vals[1]*factor) + 1; // +1 is because of zero indexing
+    n_bins_xy_0 = Math.ceil(max_vals[0]*factor) + 1;   
+
+    var dwell = hist_2(cached_xy_bins, n_bins_xy_1, n_bins_xy_0);
+    // TODO: check whether the zero bin has supuriously high data from NaN's, and force it to zero if needed
+
+    //before we do the smoothing we need to remmber which bins were unvisted
+    cached_xy_no_dwell = is_zero(dwell);
+
+    //ok now we do the smoothing
+    cached_xy_dwell = get_smoothed(dwell, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
+
+    return true;
+}
+
+var make_cached_dir_bins_and_dwell = function(){
+    if( !(pos_dir && cached_spike_pos_ind && 
+          render_options.deg_per_dir_bin && render_options.smoothing_dir_bins !== undefined) )
+        return;
+
+    var factor = 180/pi/render_options.deg_per_dir_bin;
+    cached_dir_bins = new Uint8ClampedArray(pos_dir.length);
+    for(var i=0;i<pos_dir.length;i++)
+        cached_dir_bins[i] = pos_dir[i] * factor;
+    
+    cached_spike_dir_bins = pick(cached_dir_bins, cached_spike_pos_ind); 
+
+    var n_bins_dir = 360/render_options.deg_per_dir_bin;
+
+    var dwell = hist_1(cached_dir_bins, n_bins_dir+1); //the +1'th bin will be combined with the zero'th bin...
+    dwell[0] += dwell[n_bins_dir];
+    dwell = dwell.subarray(0, n_bins_dir);
+                
+    cached_dir_dwell = get_smoothed1DPeriodic(dwell, render_options.smoothing_dir_bins);
+
+    return true;
+}
+
+
+var make_cached_speed_bins_and_dwell = function(){
+    if( !(pos_speed && cached_spike_pos_ind &&
+          render_options.cps_per_speed_bin && render_options.max_speed) )
+        return;
+        
+    var factor = 1/render_options.cps_per_speed_bin;
+    cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
+    var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
+    // we use an extra bin for everything invalid
+    for(var i=0;i<pos_dir.length;i++)
+        cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
+                                n_valid_speed_bins : pos_speed[i] * factor;
+    
+    cached_spike_speed_bins = pick(cached_speed_bins, cached_spike_pos_ind); 
+    cached_speed_dwell = hist_1(cached_speed_bins, n_valid_speed_bins+1);
+    cached_speed_dwell = cached_speed_dwell.subarray(0, n_valid_speed_bins);
+
+    return true;
+}
+
+
+
+var get_group_xy_rm = function(key){
+    var group_inds = key_to_array[key];
+
+    var group_xy_bins = pick(cached_spike_xy_bins, group_inds); //cached_spike_xy_bins was stored as 2byte blocks, which is what we want here
+    var spike = hist_2(new Uint8Array(group_xy_bins.buffer), n_bins_xy_1, n_bins_xy_0); //now we treat it as 1 byte blocks
+    // TODO: see note about zero-bin in make_cached_xy_bins_and_dwell
+
+    var spike = get_smoothed(spike, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
+    var ratemap = r_divide_float(spike, cached_xy_dwell);
+    useMask(ratemap, cached_xy_no_dwell);
+
+    var max_map = max(ratemap);
+    var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
+
+    // TODO: send something to main somehow!
+    // im, max_map*pos_timebase, group_inds.length/expLenInSeconds, [n_bins_xy_1, n_bins_xy_0]);
+
+}
+
+var to_image_data = function(map, max_map){
+    // we use palette which is a Uint32Array, though really the underlying data is 4 bytes of RGBA
+
+    var im = new Uint32Array(map.length);
+
+     //for binning, we want values on interval [1 P], so use eps (lazy solution):
+    var eps = 0.0000001;
+    if(max_map == 0){
+        for(var i=0; i<map.length; i++)
+            im[i] = cached_xy_no_dwell[i]? palette[0] : palette[1];
+    }else{
+        var factor = (palette.length-1)/(max_map*(1+eps));
+        for(var i=0;i<map.length;i++)
+            im[i] = cached_xy_no_dwell[i]? palette[0] : palette[Math.min(1+(0 | (map[i]*factor)), palette.length-1)];
+    }
+    return im;
+}
+
+var get_group_dir_rm = function(key){
+    var group_inds = key_to_array[key];
+
+    var n_bins_dir = cached_dir_dwell.length;
+    var group_dir_bins = pick(cached_spike_dir_bins,group_inds); 
+
+    var spike = hist_1(group_dir_bins, n_bins_dir+1);
+    spike[0] += spike[n_bins_dir];
+    spike = spike.subarray(0, n_bins_dir);
+
+    var spike = get_smoothed_1d_periodic(spike, render_options.smoothing_dir_bins); 
+    var ratemap = r_divide_float(spike, cached_dir_dwell);
+    
+    // scale ratemap to have max 1...(for easy plotting)
+    var f = 1/max(ratemap);
+    for(var i=0;i<ratemap.length;i++)
+        ratemap[i] *=f; 
+    // replace nans with zero..TODO: this isn't right there are problems..!
+    for(var i=0; i<ratemap.length; i++)
+        ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
+        
+    // TODO: send something to main somehow!
+    // ratemap 
+
+}
+
+var get_group_speed_rm = function(key){
+    var group_inds = key_to_array[key];
+
+    var group_speed_bins = pick(cached_spike_speed_bins, group_inds); 
+    var spike = hist_1(group_speed_bins, cached_speed_dwell.length + 1);
+    spike = spike.subarray(0, spike.length-1);
+
+    var ratemap = r_divide_float(spike, cached_speed_dwell);
+                    
+    var im = plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
+
+    // TODO: send something to main somehow!
+    // im , speed_plot_size;
+
+}       
+
+
+
+var plot_histogram = function(w, h, vals){
+    var color_a = 0xff000000;
+    var color_b = 0x88000000;
+    var color_ax = 0xff0000ff;
+    var im = new Uint32Array(w*h);
+
+    var f = w/max(vals);
+    for(var i=0, y=0;i<vals.length && y<h;i++,y++){
+        var h = f*vals[i];
+        for (var k=0;k<3;k++){
+            for(var x=0;x<h;x++)
+                im[y*w+w-1-x] = color_a;
+            im[y*w+w-1] = color_ax;
+            y++;
+        }
+        for(var x=0;x<h;x++)
+            im[y*w+w-1-x] = color_b;
+        im[y*w+w-1] = color_ax;
+    }
+    return im;
 }
 
 // TODO: come with a better method than copy-pasting utility functions ....
 
+var hist_1 = function(inds, n_bins){
+    var result = new Uint32Array(n_bins); 
+    var n = inds.length;
+    
+    for(var i=0;i<n;i++){
+        result[inds[i]]++;
+    }
+    return result;
+}
+
+var hist_2 = function(inds_xy, n_1, n_0){
+    var result = new Uint32Array(n_0*n_1); 
+    var n = inds_xy.length/2;
+
+    for(var i=0; i<n; i++){
+        result[inds_xy[i*2+1]*n_1 + inds_xy[i*2+0]]++;
+    }
+    return result;
+}
+
+var is_zero = function(vector){
+    var result = new Uint8ClampedArray(vector.length);
+    for(var i=0;i<vector.length;i++)
+        result[i] = (vector[i]===0);
+    return result;
+}
+
+var get_smoothed_1d_periodic = function(x, w){
+    // kernel is box-car of size 2w+1
+    var n = x.length;
+    var result = new Uint32Array(n);
+    for(var i=0; i<N; i++){
+        for(var k=-w;k<=w; k++){
+            result[i] += x[(i+k) % n];
+        }
+    }
+    return result;
+}
+
+var get_smoothed = function(matrix, n_1, n_0, w){
+    var result = new Uint32Array(matrix.length);
+    // kernel is box-car of size 2w+1
+
+    for(var ky=-w; ky<=w; ky++)for(var kx=-w; kx<=w; kx++){//for each offset within the kernel square
+        var start_0 = ky<0? 0 : ky;
+        var start_1 = kx<0? 0 : kx;
+        var end_0 = ky>0? n_0 : n_0+ky;
+        var end_1 = kx>0? n_1 : n_1+kx;
+
+        for(var y=start_0; y<end_0; y++)for(var x=start_1; x<end_1; x++){
+            result[y*n_1 +x] += matrix[(y-ky)*n_1 +(x-kx)];
+        }
+    }   
+    return result; 
+}
+
+var max = function(x){
+    var m = x[0];
+    for(var i = 1;i< x.length; i++){
+        (m < x[i]) && (m = x[i]);
+    }
+    return m; 
+}
+
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
     var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-    for(var i=0;i<indices.length;i++)
+    for(var i=0;i<indices.length;i++){
         result[i] = from[indices[i]];
+    }
     return result;
 }
 
@@ -122,14 +530,19 @@ var clone_simple = function(obj){
 
 var is_equal_simple = function(a, b){
     // very simple....
-    if((a && !b) || (!a && b))
+    if((a && !b) || (!a && b)){
         return false;
-    for(var aa in a) if(a.hasOwnProperty(aa))
-        if(b[aa] !== a[aa])
+    }
+    for(var aa in a) if(a.hasOwnProperty(aa)){
+        if(b[aa] !== a[aa]){
             return false;
-    for(var bb in b) if(b.hasOwnProperty(bb))
-        if(b[bb] !== a[bb])
+        }
+    }
+    for(var bb in b) if(b.hasOwnProperty(bb)){
+        if(b[bb] !== a[bb]){
             return false;
+        }
+    }
     return true;
 }
 </script>
@@ -143,6 +556,22 @@ var is_equal_simple = function(a, b){
     Polymer({
     	is:'rm-plots',
     	properties: {
+            pos_xy: {
+                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                value: function(){ return {};}
+            },
+            pos_dir: {
+                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                value: function(){ return {};}
+            },
+            pos_speed: {
+                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                value: function(){ return {};}
+            },
+            spike_times: {
+                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                value: function(){ return {};}
+            },
 			cm_per_spa_bin: {
 				type: Number,
 				value: 2
@@ -177,7 +606,11 @@ var is_equal_simple = function(a, b){
     		'_groups_set(groups)',
             '_groups_spliced(groups.splices)',
             '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
-            '_show_changed(show)'
+            '_show_changed(show)',
+            '_pos_xy_modified(pos_xy)',
+            '_pos_dir_modified(pos_dir)',
+            '_pos_speed_modified(pos_speed)',
+            '_times_modified(spike_times)'
     	],
         created: function(){
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
@@ -188,6 +621,10 @@ var is_equal_simple = function(a, b){
             this.key_to_rendered_options = {};
             this.key_is_on_worker = {};
             this.key_generation = 0;
+            this.times_is_on_worker = false;
+            this.pos_xy_is_on_worker = false;
+            this.pos_dir_is_on_worker = false;
+            this.pos_speed_is_on_worker = false;
         },
         _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
             var am = window.typed_array_manager;
@@ -266,19 +703,99 @@ var is_equal_simple = function(a, b){
             this._update_keys(dedupes.removed, dedupes.added, this.key_generation, this.key_generation);
         },
         _show_changed: function(){
-            if(this.show !== 'nnn'){
+            if(this.show !== 'nnn'){    
                 var added = Object.keys(this.key_is_on_worker).filter(function(k){
                     return !this.key_is_on_worker[k];
                 }, this);
                 this._update_keys([], added, this.key_generation, this.key_generation);
+                if(!this.times_is_on_worker){
+                    this._times_modified();
+                }
+                if(this.show[0] === 'y' && !this.pos_xy_is_on_worker){
+                    this._pos_xy_modified();
+                }
+                if(this.show[1] === 'y' && !this.pos_dir_is_on_worker){
+                    this._pos_dir_modified();
+                }
+                if(this.show[2] === 'y' && !this.pos_speed_is_on_worker){
+                    this._pos_speed_modified();
+                }
             } else if (!this.show.match(/^[yn]{3}$/)){
                 // nothing to do here
             } else {
                 throw "invalid value for show";
             }
+            if(this.worker){
+                this.worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
+            }
         },
-        _options_modified: function(){
-            // TODO: inform worker
+        _pos_xy_modified: function(){
+            if(this.show && this.show[0] === 'y'){
+                if(this.pos_xy){
+                    var arr = window.typed_array_manager.get_array_clone(this.pos_xy.data);
+                    this.worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
+                } else {
+                    if(!this.worker) return;
+                    this.worker.exec('set_pos_xy', {});
+                }
+                this.pos_xy_is_on_worker = true;
+            } else {
+                if(!this.pos_xy && this.pos_xy_is_on_worker){
+                    this.worker.exec('set_pos_xy', {});
+                }
+                this.pos_xy_is_on_worker = false;
+            }
+        },
+        _pos_dir_modified: function(){
+            if(this.show && this.show[1] === 'y'){
+                if(this.pos_dir){
+                    var arr = window.typed_array_manager.get_array_clone(this.pos_dir.data);
+                    this.worker.exec_b('set_pos_dir', this.pos_dir.timebase {data: arr});
+                } else {
+                    if(!this.worker) return;
+                    this.worker.exec('set_pos_dir', {});
+                }
+                this.pos_dir_is_on_worker = true;
+            } else {
+                if(!this.pos_dir && this.pos_dir_is_on_worker){
+                    this.worker.exec('set_pos_dir', {});
+                }
+                this.pos_dir_is_on_worker = false;
+            }
+        },
+        _pos_speed_modified: function(){
+            if(this.show && this.show[2] === 'y'){
+                if(this.pos_speed){
+                    var arr = window.typed_array_manager.get_array_clone(this.pos_speed.data);
+                    this.worker.exec_b('set_pos_speed', this.pos_speed.timebase, {data: arr});
+                } else {
+                    if(!this.worker) return;
+                    this.worker.exec('set_pos_speed', {});
+                }
+                this.pos_speed_is_on_worker = true;
+            } else {
+                if(!this.pos_speed && this.pos_speed_is_on_worker){
+                    this.worker.exec('set_pos_speed', {});
+                }
+                this.pos_speed_is_on_worker = false;
+            }
+        },
+         _times_modified: function(){
+            if(this.show !== 'nnn'){
+                if(this.spike_times){
+                    var arr = window.typed_array_manager.get_array_clone(this.spike_times.data);
+                    this.worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
+                } else {
+                    if(!this.worker) return;
+                    this.worker.exec('set_spike_times', {});
+                }
+                this.times_is_on_worker = true;
+            } else {
+                if(!this.spike_times && this.times_is_on_worker){
+                    this.worker.exec('set_spike_times', {});
+                }
+                this.times_is_on_worker = false;
+            }
         }
 	});
 </script>

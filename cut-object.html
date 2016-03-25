@@ -330,7 +330,9 @@ doesn't have a worker, but it uses a similar system.
         },
         init_cut: function(cut_file, n_spikes){
             var m = window.typed_array_manager;
-            this.set('redo_stack', []);
+            this.set('redo_stack_descriptions', []);
+            this.redo_stack = [];
+            this.set('n_spikes', n_spikes);
             
             if(cut_file){
                 cut_file = m.get_array(cut_file);

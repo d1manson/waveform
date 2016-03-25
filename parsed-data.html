@@ -35,14 +35,35 @@ BY: DM
                 value: 0,
                 notify: true
             },
+            spike_times: {
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase
+            },
+            pos_xy: {
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase, and units_per_cm
+            },
+            pos_dir: {
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase
+            },
+            pos_speed: {
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase
+            },
+            amplitudes: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
+            voltages_for_gl: {
+                type: String,
+                value: "", // typed-array-manager id
+                notify: true
+            },
             want_spike_times: {
                 type: Boolean,
                 value: true,
-                notify: true
-            },
-            spike_times: {
-                type: String,
-                value: "", // typed-array-manager id
                 notify: true
             },
             want_pos_xy: {
@@ -50,19 +71,9 @@ BY: DM
                 value: true,
                 notify: true
             },
-            pos_xy: {
-                type: String,
-                value: "", // typed-array-manager id
-                notify: true
-            },
             want_pos_dir: {
                 type: Boolean,
                 value: true,
-                notify: true
-            },
-            pos_dir: {
-                type: String,
-                value: "", // typed-array-manager id
                 notify: true
             },
             want_pos_speed: {
@@ -70,29 +81,14 @@ BY: DM
                 value: true,
                 notify: true
             },
-            pos_speed: {
-                type: String,
-                value: "", // typed-array-manager id
-                notify: true
-            },
             want_amplitudes: {
                 type: Boolean,
                 value: true,
                 notify: true
             },
-            amplitudes: {
-                type: String,
-                value: "", // typed-array-manager id
-                notify: true
-            },
             want_voltages_for_gl: {
                 type: Boolean,
                 value: true,
-                notify: true
-            },
-            voltages_for_gl: {
-                type: String,
-                value: "", // typed-array-manager id
                 notify: true
             }
     	}

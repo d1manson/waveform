@@ -35,11 +35,20 @@ var render_options = {
     n_bins: 100
 };
 var spike_times;
+var timebase;
 var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
 var key_to_rendered_options = {}; 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
+var show;
+
+var set_show = function(v){
+    show = v;
+    // note that we don't meddle with the keys_pending_render list here
+    // instead we use the timer to decide whether or not to bother doing any rendering
+    touch_timer();
+}
 
 var set_options = function(opts){
     for(var k in render_options){
@@ -51,18 +60,19 @@ var set_options = function(opts){
             keys_pending_render.push(key);
         }
     }
-    toggle_timer();
+    touch_timer();
 }
 
-var set_spike_times = function(arrays){
-    spike_times = arrays.spike_times; 
+var set_spike_times = function(timebase_, arrays){
+    timebase = timebase_;
+    spike_times = arrays.data; 
     keys_pending_render = [];    
     if(spike_times){
         for(var key in key_to_array){
             keys_pending_render.push(key);
         }
     }
-    toggle_timer();
+    touch_timer();
 }
 
 var update_keys = function(changes, arrays){
@@ -94,15 +104,15 @@ var update_keys = function(changes, arrays){
         keys_pending_render.push(add_keys[ii]);
     }
 
-    toggle_timer();        
+    touch_timer();        
 }
 
-var toggle_timer = function(){
+var touch_timer = function(){
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && keys_pending_render.length)
+    if(spike_times && keys_pending_render.length && show === 'y')
         timer = timer || setImmediate(timer_tick);
     else
         clearImmediate(timer);
@@ -120,7 +130,7 @@ var timer_tick = function(){
         }
     }
 
-    toggle_timer();
+    touch_timer();
 }
 
 var get_group_hist = function(key){
@@ -129,8 +139,8 @@ var get_group_hist = function(key){
 
     // build pairwise-diff histogram
     var ret = new Uint32Array(render_options.n_bins+1);
-    get_group_hist_sub(ret, group_times, render_options.max_delta_t, 
-                        render_options.max_delta_t/render_options.n_bins);
+    get_group_hist_sub(ret, group_times, render_options.max_delta_t*timebase, 
+                        render_options.max_delta_t*timebase/render_options.n_bins);
  
     key_to_rendered_options[key] = clone_simple(render_options);
     exec_main_b('plot_hist', {
@@ -169,14 +179,19 @@ var clone_simple = function(obj){
 
 var is_equal_simple = function(a, b){
     // very simple....
-    if((a && !b) || (!a && b))
+    if((a && !b) || (!a && b)){
         return false;
-    for(var aa in a)
-        if(b[aa] !== a[aa])
+    }
+    for(var aa in a){
+        if(b[aa] !== a[aa]){
             return false;
-    for(var bb in b)
-        if(b[bb] !== a[bb])
+        }
+    }
+    for(var bb in b){
+        if(b[bb] !== a[bb]){
             return false;
+        }
+    }
     return true;
 }
 </script>
@@ -196,8 +211,8 @@ var is_equal_simple = function(a, b){
 				value: 2
 			},
             spike_times: {
-                type: String, // key
-                value: ""
+                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                value: function(){ return {};}
             },
             show: {
                 type: String, // "y" or "n" (to match other modules which have multiple toggle-able things)
@@ -223,8 +238,9 @@ var is_equal_simple = function(a, b){
             this.key_to_rendered_options = {};
             this.key_is_on_worker = {};
             this.key_generation = 0;
+            this.times_is_on_worker = false;
         },
-         _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
+        _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
             var am = window.typed_array_manager;
             var cm = window.canvas_manager;
 
@@ -287,12 +303,20 @@ var is_equal_simple = function(a, b){
             });
         },
         _times_modified: function(){
-            if(this.spike_times){
-                var arr = window.typed_array_manager.get_array_clone(this.spike_times);
-                this.worker.exec_b('set_spike_times', {spike_times: arr});
+            if(this.show === 'y'){
+                if(this.spike_times){
+                    var arr = window.typed_array_manager.get_array_clone(this.spike_times.data);
+                    this.worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
+                } else {
+                    if(!this.worker) return;
+                    this.worker.exec('set_spike_times', {});
+                }
+                this.times_is_on_worker = true;
             } else {
-                if(!this.worker) return;
-                this.worker.exec('set_spike_times', {});
+                if(!this.spike_times && this.times_is_on_worker){
+                    this.worker.exec('set_spike_times', {});
+                }
+                this.times_is_on_worker = false;
             }
         },
         _show_changed: function(){
@@ -301,10 +325,16 @@ var is_equal_simple = function(a, b){
                     return !this.key_is_on_worker[k];
                 }, this);
                 this._update_keys([], added, this.key_generation, this.key_generation);
+                if(!this.times_is_on_worker){
+                    this._times_modified();
+                }
             } else if (this.show === 'n'){
                 // nothing to do here
             } else {
                 throw "invalid value for show";
+            }
+            if(this.worker){
+                this.worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
             }
         },
         plot_hist: function(data, arrays) {

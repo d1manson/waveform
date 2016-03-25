@@ -103,20 +103,20 @@ groups is an array of objects with the following properties:
                 value: 0
             },
             spike_times: {
-                type: String,
-                value: "" // typed-array-manager id
+				type: Object,
+                value: function(){ return {};} // data (taid), timebase
             },
             pos_xy: {
-                type: String,
-                value: "" // typed-array-manager id
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase, and units_per_cm
             },
             pos_dir: {
-                type: String,
-                value: "" // typed-array-manager id
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase
             },
             pos_speed: {
-                type: String,
-                value: "" // typed-array-manager id
+                type: Object,
+                value: function(){ return {};} // data (taid), timebase
             },
             voltages_for_gl: {
                 type: String,
@@ -128,11 +128,10 @@ groups is an array of objects with the following properties:
             }
     	},
     	observers: [
-    		'groups_modified(groups.splices)'
+    		'groups_modified(groups.*)'
     	],
     	groups_modified: function(change){
     		console.log("tile-wall detected groups change")
-    		console.log(JSON.stringify(change));
     	}
 	});
 </script>
