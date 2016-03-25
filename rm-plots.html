@@ -2,9 +2,7 @@
 CUSTOM ELEMENT: rm-plots
 BY: DM
 
-This is designed to be used inside a tile-wall element.  The "groups" array of the tilewall should be bound
-to this element's "groups" property.  Then whenever the tilewall's groups array is spliced this element will
-be notified and can update ratemaps acordingly, with the tilewall be notified of the updates.
+See tac-plots.html for introductorary notes.
 
 -->
 
@@ -20,45 +18,63 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 var render_options = {
 };
 var spike_times;
-var taid_to_array = {}; // Note that in the worker, taid's are used only for arrays of spike-indices.
-var taid_to_rendered_options = {}; 
-var taids_pending_render = [];
+var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
+var key_to_rendered_options = {}; 
+var keys_pending_render = [];
 var timer;
+var key_generation = 0;
 
-var set_cm_per_spa_bin = function(v){
-    render_options.cm_per_spa_bin = v;
-    taids_pending_render = [];    
-    if(spike_times){ // TODO: check other things too
-        for(var taid in taid_to_array) if(taid_to_array.hasOwnProperty(taid))
-            taids_pending_render.push(taid);
+var set_options = function(opts){
+    for(var k in render_options){
+        render_options[k] = opts[k] === undefined ? render_options[k] : opts[k];
+    }
+    keys_pending_render = [];    
+    if(spike_times){
+        for(var key in key_to_array){
+            keys_pending_render.push(key);
+        }
     }
     toggle_timer();
 }
 
 var set_spike_times = function(arrays){
     spike_times = arrays.spike_times; 
-    taids_pending_render = [];    
+    keys_pending_render = [];    
     if(spike_times){
-        for(var taid in taid_to_array) if(taid_to_array.hasOwnProperty(taid))
-            taids_pending_render.push(taid);
+        for(var key in key_to_array){
+            keys_pending_render.push(key);
+        }
     }
     toggle_timer();
 }
 
-var update_taids = function(changes, arrays){
-    // both add_taids and remove_taids are arrays of ta-maanger ids
-    // the actual arrays for add_taids are in the arrays map.
+var update_keys = function(changes, arrays){
 
-    var remove_taids = changes.remove || [];
-    for(var ii=0; ii<remove_taids.length; ii++){
-        delete taid_to_array[remove_taids[ii]];
-        delete taid_to_rendered_options[remove_taids[ii]];
+    if(changes.generation_remove !== key_generation)
+        throw "key generation mismatch";
+
+    // note we don't both to remove keys from the pending list
+    // unless we change key generation, in which case we drop 
+    // everything that's pending. This is ensures that when we
+    // attempt a render we can be sure that if we do find the
+    // array for the given key we know it's for the relevant 
+    // generation and that it's still wanted.
+
+    var remove_keys = changes.remove || [];
+    for(var ii=0; ii<remove_keys.length; ii++){
+        delete key_to_array[remove_keys[ii]];
+        delete key_to_rendered_options[remove_keys[ii]];
     }
 
-    var add_taids = changes.add || [];
-    for(var ii=0; ii<add_taids.length; ii++){
-        taid_to_array[add_taids[ii]] = arrays[add_taids[ii]];
-        taids_pending_render.push(add_taids[ii]);
+    if(changes.generation_add !== changes.generation_remove){
+        keys_pending_render = [];
+        key_generation = changes.generation_add;
+    }
+
+    var add_keys = changes.add || [];
+    for(var ii=0; ii<add_keys.length; ii++){
+        key_to_array[add_keys[ii]] = arrays[add_keys[ii]];
+        keys_pending_render.push(add_keys[ii]);
     }
 
     toggle_timer();        
@@ -69,7 +85,7 @@ var toggle_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && taids_pending_render.length)
+    if(spike_times && keys_pending_render.length)
         timer = timer || setImmediate(timer_tick);
     else
         clearImmediate(timer);
@@ -77,15 +93,18 @@ var toggle_timer = function(){
 
 var timer_tick = function(){
     timer = 0;
-    var taid = taids_pending_render.pop();
-    
-    if(taid && taid_to_array[taid] && !is_equal_simple(taid_to_rendered_options[taid], render_options))
-        get_group_whatevers(taid);
+
+    // find one valid thing to render...
+    while(keys_pending_render.length > 0){
+        var key = keys_pending_render.pop();
+        if(key && key_to_array[key] && !is_equal_simple(key_to_rendered_options[key], render_options)){
+            get_group_hist(key);
+            break;
+        }
+    }
 
     toggle_timer();
 }
-
-
 
 // TODO: come with a better method than copy-pasting utility functions ....
 
@@ -144,6 +163,10 @@ var is_equal_simple = function(a, b){
 				type: Number,
 				value: 2
 			},
+            show: {
+                type: String,
+                value: 'yyy'
+            },
     		groups: {
     			type: Array,
     			value: function(){return [];},
@@ -151,43 +174,112 @@ var is_equal_simple = function(a, b){
     		}
     	},
     	observers: [
-    		'groups_modified(groups.*)'
+    		'_groups_set(groups)',
+            '_groups_spliced(groups.splices)',
+            '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
+            '_show_changed(show)'
     	],
-        attached: function(){
+        created: function(){
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
             this.worker = worker_builder.create_for(this);
-            this.worker.exec('set_cm_per_spa_bin', this.cm_per_spa_bin);
-            //this.taid_to_canvas = {};
-            //this.taid_to_rendered_options = {};
-            //this.taid_to_groups_idx = {};
+            this.key_to_spa_canvas = {};
+            this.key_to_dir_canvas = {};
+            this.key_to_speed_canvas = {};
+            this.key_to_rendered_options = {};
+            this.key_is_on_worker = {};
+            this.key_generation = 0;
         },
-    	groups_modified: function(change){
-            if(!this.worker || !change || !change.value) return;
-            var taids_to_remove = [];
-            var taids_to_add = [];
-            var arrays = {};
-            var m = window.canvas_manager;
-            if(change.path === 'groups.splices')
-                change.value.indexSplices.forEach(function(s){
-            		s.removed.forEach(function(group){
-        				if(group.dir_rm)
-    	    				m.free_canvas(group.dir_rm);
-    	    			if(group.spa_rm)
-    	    				m.free_canvas(group.spa_rm);
-    	    			if(group.speed_rm)
-    	    				m.free_canvas(group.speed_rm);
-        			}, this);
+        _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
+            var am = window.typed_array_manager;
+            var cm = window.canvas_manager;
 
-        			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
-        				var group = this.groups[ii];
+            var added_arrays = {};
+            if (this.show !== 'nnn'){
+                // get clones of new arrays to send to worker
+                for(var ii=0; ii<keys_to_add.length; ii++){
+                    var key = keys_to_add[ii];
+                    var taid = this.groups_collection.getItem(key).inds;
+                    added_arrays[key] = am.get_array_clone(taid);
+                    this.key_is_on_worker[key] = true;
+                }
+            } else {
+                // if we are not showing the plots, we don't actually get 
+                // any arrays, but we need to remmeber that we never sent them
+                // to the worker.
+                for(var ii=0; ii<keys_to_add.length; ii++){
+                    this.key_is_on_worker[key] = false;
+                }
+                keys_to_add = [];
+            }
 
-        				// TODO: actually do this properly...
-        				group.spa_rm = m.create_from_dims([128,128]);
-        				group.dir_rm = m.create_from_dims([80,80]);
-        				group.speed_rm = m.create_from_dims([20,100]);
-        			}
-    		  }, this);
-    	}
+            // inform worker of the new/deleted arrays
+            this.worker.exec_b('update_keys', {
+                add: keys_to_add,
+                remove: keys_to_remove,
+                generation_remove: generation_remove,
+                generation_add: generation_add
+            }, added_arrays);
+
+            // free canvases, it's our responsiblity to do this, whereas 
+            // freeing the inds arrays was the responsibility of cut-obj.
+            for(var ii=0; ii<keys_to_remove.length; ii++){
+                var key = keys_to_remove[ii];
+                var c1 = this.key_to_spa_canvas[key];
+                if(c1){
+                    cm.free_canvas(c1);
+                    delete this.key_to_spa_canvas[key];
+                }
+                var c2 = this.key_to_dir_canvas[key];
+                if(c2){
+                    cm.free_canvas(c2);
+                    delete this.key_to_dir_canvas[key];
+                }
+                var c3 = this.key_to_speed_canvas[key];
+                if(c3){
+                    cm.free_canvas(c3);
+                    delete this.key_to_speed_canvas[key];
+                }
+                delete this.key_to_rendered_options[key];
+                delete this.key_is_on_worker[key]; // we can also forget this
+            }
+        },
+        _options_modified: function(){
+            this.worker.exec('set_options', {
+                cm_per_spa_bin: this.cm_per_spa_bin,
+                smoothing_spa_bins: this.smoothing_spa_bins,
+                max_rate_spa: this.max_rate_spa,
+                deg_per_dir_bin: this.deg_per_dir_bin,
+                smoothing_dir_bins: this.smoothing_dir_bins
+            });
+        },
+        _groups_set: function(new_val, old_val){
+            var removed = this.groups_collection ? 
+                            this.groups_collection.getKeys() : []; 
+            this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            var added = this.groups_collection ? 
+                            this.groups_collection.getKeys() : []; 
+            this._update_keys(removed, added, this.key_generation, ++this.key_generation); // added keys are for a new generation
+        },
+        _groups_spliced: function(splices){
+            if(!splices) return;
+            var dedupes = Utils.dedupe(splices.keySplices);
+            this._update_keys(dedupes.removed, dedupes.added, this.key_generation, this.key_generation);
+        },
+        _show_changed: function(){
+            if(this.show !== 'nnn'){
+                var added = Object.keys(this.key_is_on_worker).filter(function(k){
+                    return !this.key_is_on_worker[k];
+                }, this);
+                this._update_keys([], added, this.key_generation, this.key_generation);
+            } else if (!this.show.match(/^[yn]{3}$/)){
+                // nothing to do here
+            } else {
+                throw "invalid value for show";
+            }
+        },
+        _options_modified: function(){
+            // TODO: inform worker
+        }
 	});
 </script>
 

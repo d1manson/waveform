@@ -2,9 +2,7 @@
 CUSTOM ELEMENT: wave-plots
 BY: DM
 
-This is designed to be used inside a tile-wall element.  The "groups" array of the tilewall should be bound
-to this element's "groups" property.  Then whenever the tilewall's groups array is spliced this element will
-be notified and can update ratemaps acordingly, with the tilewall be notified of the updates.
+See tac-plots.html for introductorary notes.
 
 -->
 
@@ -37,27 +35,50 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
     		}
     	},
     	observers: [
-    		'groups_modified(groups.*)'
+    		'_groups_set(groups)',
+    		'_groups_spliced(groups.splices)'
     	],
-    	groups_modified: function(change){
-    		if(!this.worker || !change || !change.value) return;
-    		var m = window.canvas_manager;
+    	created: function(){
+    		this.key_to_canvas = {};
+    		this.key_to_rendered_options = {};
+    	},
+    	_update_keys: function(keys_to_remove, keys_to_add){
+            var am = window.typed_array_manager;
+            var cm = window.canvas_manager;
 
-			if(change.path === 'groups.splices')
-                change.value.indexSplices.forEach(function(s){
-	    			s.removed.forEach(function(group){
-	    				if(group.waves)
-		    				m.free_canvas(group.waves);
-	    			}, this);
+            // get clones of new arrays to send to worker
+            var added_arrays = {};
+            for(var ii=0; ii<keys_to_add.length; ii++){
+                var key = keys_to_add[ii];
+                var taid = this.groups_collection.getItem(key).inds;
+                added_arrays[key] = am.get_array_clone(taid);
+            }
 
-	    			for(var ii=s.index, stop = s.index+s.addedCount; ii<stop; ii++){
-	    				var group = this.groups[ii];
-
-	    				// TODO: actually do this properly...
-	    				group.waves = m.create_from_dims([128,30]);
-	    			}
-    			}, this);
-    	}
+            // free canvases, it's our responsiblity to do this, whereas 
+            // freeing the inds arrays was the responsibility of cut-obj.
+            for(var ii=0; ii<keys_to_remove.length; ii++){
+                var key = keys_to_remove[ii];
+                var canvas = this.key_to_canvas[key];
+                if(canvas){
+                	cm.free_canvas(canvas);
+            	}
+                delete this.key_to_canvas[key];
+                delete this.key_to_rendered_options[key];
+            }
+        },
+        _groups_set: function(new_val, old_val){
+            var removed = this.groups_collection ? 
+                            this.groups_collection.getKeys() : []; 
+            this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            var added = this.groups_collection ? 
+                            this.groups_collection.getKeys() : []; 
+            this._update_keys(removed, added);
+        },
+        _groups_spliced: function(splices){
+        	if(!splices) return;
+            var dedupes = Utils.dedupe(splices.keySplices);
+            this._update_keys(dedupes.removed, dedupes.added);
+        }
 	});
 </script>
 
