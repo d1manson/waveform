@@ -50,4 +50,30 @@ Utils.dedupe = function(splices){
 	
 }
 
+
+// setImmediate (on main thread), but we just the same impementation as worker-builder
+// taken/adapted from https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js
+(function(){
+	// exports window.setImmediate and window.clearImmediate
+	var last_task_h=0;
+    var tasks = {};
+    window._immediate_channel = new MessageChannel();
+    _immediate_channel.port1.onmessage = function(e) {
+        var h = e.data;
+        try {
+            tasks[h] && tasks[h]();
+        } finally {
+            clearImmediate(h);
+        }
+    }
+    window.setImmediate = function(cb) {
+        tasks[++last_task_h] = cb;
+        _immediate_channel.port2.postMessage(last_task_h);
+        return last_task_h;
+    }
+    window.clearImmediate = function(h){
+        delete tasks[h];
+    }
+})();
+
 </script>
