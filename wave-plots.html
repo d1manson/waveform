@@ -32,6 +32,17 @@ There are two rendering modes:
 	reasoanbly complicated though.
 
 
+As far as I can tell, OES_texture_float gives 32bit float for each of r, g, and b. This gives
+precise integer representation from 0 to 16million, which is plenty if we are trying to count
+occurences.
+
+TODO: it would be fun to add a drift rendering mode, that uses the g channel to store accumulate
+time, and then divide total time by number of counts (stored in the red channel), so as to get
+the mean time, as done in other places where drift rendering is used.
+If you do this, you probably want to express time in seconds, so as to get the most out of the
+range of 32bit floats...although I think you would have to come up with some fairly contrived
+data if you wanted to observe the limitations of the 32bit precision.
+
 -->
 
 
@@ -132,9 +143,8 @@ return {
 	 
 
 	fragment_density_1: `
-		uniform highp vec4 count_color;
 		void main(void) {
-			gl_FragColor = count_color;
+			gl_FragColor = 1.;  // it's that simple
 		}
 	`,
 
@@ -158,9 +168,10 @@ return {
 		precision mediump float;
 		uniform sampler2D u_src;
 		varying vec2 v_tex_coord;
+		uniform highp normalising_factor;
 		void main() {
 			highp vec4 src = texture2D(u_src, v_tex_coord);
-			highp float counts = sqrt(src.r);
+			highp float counts = sqrt(src.r*normalising_factor);
 			gl_FragColor = vec4(counts > 0.5 ?
 									 counts > 0.75 ?
 										 n_c. - n_c.*counts 
@@ -285,17 +296,17 @@ var WavesRenderer = function(debug){
 	this._locs_flag.palette = gl.getUniformLocation(this._prog_flag, "palette");
 
 	this._locs_density_1 = {};
-	this._locs_density_1.wave_xy_offset = gl.getAttribLocation(this._prog_flag, "wave_xy_offset");
-	this._locs_density_1.is_t_plus_one = gl.getAttribLocation(this._prog_flag, "is_t_plus_one");
-	this._locs_density_1.count_color = gl.getAttribLocation(this._prog_flag, "count_color");
-	this._locs_density_1.voltage = gl.getAttribLocation(this._prog_flag, "voltage");
-	this._locs_density_1.t_x_offset = gl.getUniformLocation(this._prog_flag, "t_x_offset");
+	this._locs_density_1.wave_xy_offset = gl.getAttribLocation(this._locs_density_1, "wave_xy_offset");
+	this._locs_density_1.is_t_plus_one = gl.getAttribLocation(this._locs_density_1, "is_t_plus_one");
+	this._locs_density_1.voltage = gl.getAttribLocation(this._locs_density_1, "voltage");
+	this._locs_density_1.t_x_offset = gl.getUniformLocation(this._locs_density_1, "t_x_offset");
 
 	this._locs_density_2 = {};
-	this._locs_density_2.a_position = gl.getUniformLocation(this._prog_flag, "a_position");
-	this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._prog_flag, "a_tex_coord");
-	this._locs_density_2.u_src = gl.getUniformLocation(this._prog_flag, "u_src");
-	this._locs_density_2.oneTex = gl.getUniformLocation(this._prog_flag, "oneTex");
+	this._locs_density_2.a_position = gl.getUniformLocation(this._locs_density_2, "a_position");
+	this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._locs_density_2, "a_tex_coord");
+	this._locs_density_2.u_src = gl.getUniformLocation(this._locs_density_2, "u_src");
+	this._locs_density_2.oneTex = gl.getUniformLocation(this._locs_density_2, "oneTex");
+	this._locs_density_2.normalising_factor = gl.getAttribLocation(this._locs_density_2, "normalising_factor");
 
 	// create all the neccessarry buffers (no space is actually allocated at this stage for data)
 	this._buf_wave = gl.createBuffer();
@@ -327,7 +338,7 @@ var WavesRenderer = function(debug){
 	for(var ii=0; ii<n_c*(n_w-1); ii++)
 		this._n_t_to_okeys.push(new Set()); // slightly wasteful, but probably not terrible in the grand scheme of things
 	this._okey_to_rendered_options = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
-	
+	this.show = 'y'; // currently you cannot toggle individual channels.
 	this._timer = 0;
 }
 
@@ -381,7 +392,6 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
 	gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
 	gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0); 
 
-	gl.uniform4fv(this._locs_density_1.count_color, [1/this._n*10, 0, 0, 1]); 
 }
 
 
@@ -399,6 +409,8 @@ WavesRenderer.prototype._switch_to_density_2_prog = function(){
 	gl.uniform1i(this._locs_density_2.u_src, float_texture_register_ind); 
 	gl.activeTexture(gl.TEXTURE0 + float_texture_register_ind);
 	gl.bindTexture(gl.TEXTURE_2D, this._off_texture); 
+
+	gl.uniform4fv(this._locs_density_2.normalising_factor, 1/this._n); 
 	
 	gl.uniform1f(this._locs_density_2.oneTex,1/off_canv_w); 
 	gl.disable(gl.BLEND); 
@@ -413,8 +425,8 @@ WavesRenderer.prototype._run_density_2_prog = function(){
 
 WavesRenderer.prototype.set_n = function(n){
 	this._n = n;
-	if(this._active_sub_prog === 'density_1'){
-		gl.uniform4fv(this._locs_density_1.count_color, [1/this._n*10, 0, 0, 1]); 
+	if(this._active_sub_prog === 'density_2'){
+		gl.uniform4fv(this._locs_density_2.normalising_factor, 1/this._n); 
 	} 
 
 	// uploads an 2n-length vector to the gpu, the vector is of the form 0 1 0 1 ... 0 1
@@ -671,7 +683,7 @@ WavesRenderer.prototype.touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from elsewhere to interupt
     // between ticks, we can thus cancel work as and when needed.
-    if(this._okey_to_part_rendered.size /* && show === 'y'*/)
+    if(this._okey_to_part_rendered.size && this.show === 'y')
         this._timer = this._timer || setImmediate(this._timer_tick.bind(this));
     else
         clearImmediate(this._timer);
@@ -877,10 +889,14 @@ Polymer({
 		this._render.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
 	},
 	_show_chans_changed: function(){
+		// note that unlike in rm/tac-plots, we let the renderer deal
+		// with the complexities of show/hide, i.e. _update_okeys always
+		// sends it the full update lists.  That's because sending messages
+		// in this case does not invlove cloning and posting arrays.
 		if(this.show_chans === 'yyyy'){
-			// do something
+			this._render.show = 'y';
 		} else if (this.show_chans === 'nnnn'){
-			// do something else
+			this._render.show = 'n';
 		} else {
 			this.set('show_chans', 'yyyy');
 			console.log("currently channels cannot be toggled individually");

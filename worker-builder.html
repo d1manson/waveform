@@ -108,7 +108,13 @@ self.onmessage = function(e){
             e.data.args.push(buffers);
         }
         self[e.data.foo].apply(null, e.data.args);
-    } else {
+    } else if (e.data.foo === '_ports'){
+        var a = {};
+        for(var ii=0; ii< e.data.ports.length; ii++){
+            a[e.data.args[0][ii]] = e.data.ports[ii];
+        }
+        self.got_ports(a);
+    }else {
         throw "worker '" + self._title + "' got bad message: " + (e.data && e.data.foo ? e.data.foo : JSON.stringify(e.data));
     }
 };
@@ -197,6 +203,14 @@ var exec_main_b = function(/*arguments*/){
     }
 })();
 
+
+// often helpful to have when doing compute stuff
+var endian = function(){
+    var b = new ArrayBuffer(2);
+    (new DataView(b)).setInt16(0,256,true);
+    return (new Int16Array(b))[0] == 256? 'L' : 'B';
+}();
+
 </script>
 
 
@@ -262,6 +276,22 @@ var exec_main_b = function(/*arguments*/){
                 throw e;
             }
         }
+    }
+
+    BuiltWorker.prototype.send_ports = function(a){
+        // a is a map from port name to port,
+        // i.e. analgous to the last arg in exec_b.
+        var ports = [];
+        var names = [];
+        for(var k in a){
+            ports.push(a[k]);
+            names.push(a);
+        }
+        this._worker.postMessage({
+            foo: '_ports',
+            args: names,
+        }, ports);
+
     }
 
     Polymer({

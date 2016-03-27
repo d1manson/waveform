@@ -2,13 +2,379 @@
 CUSTOM ELEMENT: parsed-data
 BY: DM
 
+TODO: don't use file names, use something that is more unique, perhaps 
+have a weakmap from file object to key, and increment that, as in Polymer collection.
+
+The current selection of files is held in the 'files' proeprty.
+When the user jumps somewhere in the file organiser, this 'files' object
+is updated.  This module then sends out null-ing notfications for the
+data which is no longer valid, but leaves whatever it can i.e. if we change
+tet but not trial, or cut but not tet we don't need to invalidate everything.
+
+It then issues io requests to the io-worker, providing a specific priority order,
+so that the stuff that the files will will reqiure a lot of compute (i.e. tet files)
+will be loaded in preference to other things.
+
+Once the io-worker has read some data off-disk, it transfers it directly to the
+relevant other worker for parsing.  When that other worker is done parsing, it
+transfers the data to the main thread.
+
+TODO: when changing files, why not keep the old data in a short FIFO cache, there should
+be no problem having 2-5 sets of data simultaneuosly..it's only going to be 100MB or something.
+Except in the case of pos, where you can change how the parse happens, you probably want to
+keep the cache on the main thread.  But for pos, you could just store the raw file, at the
+point it is delivered...and main thread should somehow keep track of what pos has in its cache...
+which might be difficult now that there are three threads involved!!!
+
+Note that we don't bother with a timer on the parser threads, so you could end up with a queue
+of things, where (as always) we only care about the last thing on the queue, so actually processing
+the rest is a waste. but whatever.
+
+Files can be refered to by "fkey", which is constructed as follows:
+    file.lastModifiedDate + " " + file.name
+Because the name comes second, you can still read the extension easily.
+
 -->
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
-
+<link rel="import" href="worker-builder.html">
 
 <dom-module id="parsed-data">
+
+<script is='worker-builder' id="io_worker" title="io-worker" type='javascript/worker'>
+"use strict";
+
+var ports = {};
+var pending_files = {};
+var types = ['tet', 'set', 'pos', 'cut']; // this is the priority order
+
+var got_ports = function(ports_){
+    ports = ports_;
+}
+
+var read_files = function(files){
+    pending_files = files;
+    touch_timer();
+}
+
+var touch_timer = function(){
+    for(var ii=0; ii<types.length; ii++){
+        if(pending_files[types[ii]]){
+            timer = timer || setImmediate(timer_tick);
+            return;
+        }
+    }
+    clearImmediate(timer);
+}
+
+var timer_tick = function(){
+    for(var ii=0; ii<types.length; ii++){
+        if(!pending_files[types[ii]]){
+            continue;
+        }
+        var reader = new FileReaderSync();
+        var buf = reader.readAsArrayBuffer(pending_files[types[ii]]);
+        ports[types[ii]].postMessage({
+            fkey: file.lastModifiedDate + " " + file.name, buffer: buf
+        }, [buf]);
+        pending_files[types[ii]] = undefined;
+        break;
+    }
+    touch_timer();
+}
+</script>
+    if(top_str.slice(data_start, data_start + data_end.length) === data_end){
+        header.num_spikes_claimed = header.num_spikes;
+        header.num_spikes = 0;
+    }
+
+    var n = header.num_spikes;
+
+<script is='worker-builder' id="pos_parser" title="pos-parser" type='javascript/worker'>
+"use strict";
+
+var got_ports = function(ports){
+    self.io_port = ports.pos;
+    io_port.onmessage = function(e){
+        var fkey = e.data.fkey;
+        var top_str = new TextDecoder('utf-8').decode(e.data.buffer.slice(0, 1204+1));
+        parse_pos_file(top_str, e.data.buffer, fkey);
+    }
+}
+
+</script>
+
+
+<script is='worker-builder' id="tet_parser" title="tet-parser" type='javascript/worker'>
+"use strict";
+// TODO: it might be nice, though complicated, to batch the tet parsing, that would
+// allow the io to overlap with the compute, both of which are about 1ms/1k spikes.
+
+var got_ports = function(ports){
+    self.io_port = ports.tet;
+    io_port.onmessage = function(e){
+        var fkey = e.data.fkey;
+        var top_str = new TextDecoder('utf-8').decode(e.data.buffer.slice(0, 1204+1));
+        parse_tet_file(top_str, e.data.buffer, fkey);
+    }
+}
+
+var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+var regex_header_b = /(\S*) ([\S ]*)/g
+var data_end = "\r\ndata_end";
+var n_c = 4;
+var n_w = 50;
+var bytes_per_spike = N_c*(4 + N_w);
+
+// TODO: deal properly with "wants"    
+var want_amplitudes = true;
+var want_times = true;
+var want_gl_data = true;
+
+var parse_tet_file = function(top_str, buffer, fkey){
+
+    var match = regex_header_a.exec(top_str);
+    if(!match){
+        throw 'did not find end of header in tet fkey.';
+    }
+
+    var data_start = match.index + match[0].length;
+    var header = {};
+    var header_str = match[0];
+    while (match = regex_header_b.exec(header_str))
+        header[match[1]] = match[2];
+
+    if (header.spike_format !== "t,ch1,t,ch2,t,ch3,t,ch4"){
+        throw "uncregonised spike format used in tet fkey";
+    }
+    
+    // sometimes DACQ creates a header with num_spikes >0, but there are no spikes
+    // (this happens when you choose not to record a given tetrode but a fkey previously existed)
+    var data_len = parseInt(N)*bytes_per_spike;
+
+    //read the data section of the fkey as an array buffer
+    buffer = buffer.slice(data_start, data_start+data_len);
+
+    exec_main('got_tet_header', header);
+
+    // TODO: test whether it's faster to iterate over the data once and compute everything
+    // or to iterate once for each thing of interest (which is a bit more complicated)
+    // if we stick with the multiple separate iterations, then decide on a good priority order
+    // that gives users the best perception of speed...gl data probably comes first as it is
+    // worth having even without cut data, whereas the other two are less helpful without cut
+    // data.
+
+    if(want_gl_data){
+        var data =  build_gl_data(buffer, n);
+        exec_main_b('got_gl_data', {
+            data: 'data', 
+            fkey: fkey
+        }, {data: data});
+    }
+
+    if(want_times){
+        var data =  get_times(buffer, n);
+        exec_main_b('got_times', {
+            data: 'data', 
+            fkey: fkey
+        }, {data: data});
+    }
+
+    if(want_amplitudes){
+        var data = get_amplitudes(buffer, n);
+        exec_main_b('got_amplitudes', {
+            data: 'data', 
+            fkey: fkey
+        }, {data: data});
+    }
+}
+
+var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
+    // Note how we read from data_in contiguously, but write out non-contiguously.
+    // This is about 4x faster than doing it the other way around.
+    // It takes about 80ms for 80k spikes.
+    // DataView should allow for fast misaligned uint16 access of data_in, but currently it's slow...
+    // https://bugs.chromium.org/p/chromium/issues/detail?id=225811. Even if it's optimized in chrome
+    // it probably won't help by more than 5-10% I would think.
+
+    var q = -1;
+    var i, t, c, p;
+    for(i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
+        for(c=0;c<n_c;c++){ //for each channel
+            q += 5;
+            for(t=0;t<n_w-1;t++){ //for each time point (except the last one)
+                data_out_16[p] = data_in[q] | (data_in[++q] << 8); // TODO: deal properly with endianness of system 
+                // (Note that even though we are drawing a stand alone line segment from a to b, we still need to know how they match up to times t and t+1)
+                p += n_spikes;
+            }
+        }
+    }
+}
+
+var i8_to_u8 = function(a){
+    // Takes an int8array, A, adds 128 to each element and views it as a uint8 array.
+    // this is done inplace.
+    // See http://en.wikipedia.org/wiki/Signed_number_representations for info.
+    // We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
+    // TODO: it may be possible to avoid this conversion, if the gl-shader code is modified
+    a = new Uint32Array(a.buffer); 
+    for(var i=0;i<a.length;i++)
+        a[i] ^= 0x80808080;
+    return new Uint8Array(a.buffer);
+}
+
+var build_gl_data = function(buffer, n_spikes){
+    var old_data = new Uint8Array(buffer);
+    var newdData = new Uint16Array(n_c*(n_w-1)*n_spikes);
+    
+    build_gl_data_sub(old_data, new_data, n_spikes);
+    return i8_to_u8(new Int8Array(new_data.buffer));        
+}
+
+var swap_32_vector = function(x){
+    for(var i=0;i<x.length; i++){
+        var val = x[i];
+        x[i] = ((val & 0xFF) << 24)
+               | ((val & 0xFF00) << 8)
+               | ((val >> 8) & 0xFF00)
+               | ((val >> 24) & 0xFF);
+    }
+}
+
+var take_strided = function(ret, X, stride){
+    // Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
+    // n = ret.length
+    for(var i=0,p=0; i<ret.length; i++, p+= stride)
+        ret[i] = X[p]; 
+}
+
+var get_times = function(buffer, n_spikes){ //get spike times in milliseconds as a Uint32Array 
+    var times = new Uint32Array(n_spikes);
+    var data = new Int32Array(buffer);
+    take_strided(times, data, bytes_per_spike/4);
+    if (endian === 'L') 
+        swap_32_vector(times);
+    return times;
+}
+
+var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
+    n_sc = n_sc | 0; // int
+    n_w = n_w | 0; // int
+    var min, max, t;
+    for(var i=0, p=0; i<n_sc; i++){
+        p += 4; // skip timestamp 
+        min = 127;
+        max = -128;
+        for(t=0; t<n_w; t++,p++){
+            (old_data[p] > max) && (max = old_data[p]);
+            (old_data[p] < min) && (min = old_data[p]);
+        }
+        amps[i] = max-min; 
+    }
+}
+
+var get_amplitudes = function(buffer, n_spikes){
+    var old_data = new Int8Array(buffer);
+    var amps = new Uint8Array(n_spikes * n_c);
+    get_amplitude_sub(old_data, amps, n_spikes * n_c, n_w);
+}
+
+</script>
+
+
+<script is='worker-builder' id="set_parser" title="set-parser" type='javascript/worker'>
+"use strict";
+
+var got_ports = function(ports){
+    self.io_port = ports.set;
+    io_port.onmessage = function(e){
+        var fkey = e.data.fkey;
+        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        parse_set_file(full_str, fkey);
+    }
+}
+
+var regex_header_b = /(\S*) ([\S ]*)/g
+
+var ParseSetFile = function(full_str, fkey){
+    var header = {};
+    var match;
+    while (match = regex_header_b.exec(full_str))
+        header[match[1]] = match[2];
+    exec_main('set_file_parsed', {
+        fkey: fkey,
+        header: header});
+}
+
+</script>
+
+
+<script is='worker-builder' id="cut_parser" title="cut-parser" type='javascript/worker'>
+"use strict";
+
+var got_ports = function(ports){
+    self.io_port = ports.cut;
+    io_port.onmessage = function(e){
+        var fkey = e.data.fkey;
+        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        parse_cut_file(full_str, fkey);
+    }
+}
+
+var regex_cut_a = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
+var regex_cut_b = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
+var regex_cut_c = /([0-9]+)/g;
+var max_length_match_cut_b = 300;//this is needed so that when we read in chunks of the cut fkey we dont have to apply the regex_b to the whole thing each time
+
+var parse_cut_file = function(full_str, fkey){
+    var match = regex_cut_a.exec(full_str);      
+    var cut_props = {};
+    cut_props.n_clusters =  parseInt(match[1]);
+    cut_props.n_channels =  parseInt(match[2]);
+    cut_props.n_params =  parseInt(match[3]);
+
+    match = regex_cut_b.exec(full_str);
+    cut_props.exp = match[1];
+    cut_props.n_spikes = parseInt(match[2]);
+    cut_props.data_start = match.index + match[0].length;
+    cut_props.is_clu = false;
+
+    var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
+    var cut = new Uint32Array(cut_as_str.length);
+    for(var ii=0; ii<cut.length; ii++){
+        cut[ii] = parseInt(cut_as_str[ii]);
+    }
+    exec_main_b('cut_file_parsed', {
+        fkey: fkey,
+        header: cut_props,
+        cut: "cut"}, {
+            cut: cut
+        });
+}
+
+var parse_clu_file = function(full_str, fkey){
+    var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
+    var cut_props = {
+        n_clusters: parseInt(cut_as_str[0]),  // TODO: check +/- 1
+        n_spikes: cut_as_str.length-1,
+        is_clu: true
+    }
+    var cut = new Uint32Array(cut_as_str.length-1);
+    for(var ii=0; ii<cut.length; ii++){
+        cut[ii] = parseInt(cut_as_str[ii+1]);
+    }
+    exec_main_b('cut_file_parsed', {
+        fkey: fkey,
+        header: cut_props,
+        cut: "cut"}, {
+            cut: cut
+        });
+}
+
+// TODO: just get exp name
+
+</script>
 
 <template></template>
 
@@ -18,6 +384,11 @@ BY: DM
     Polymer({
     	is:'parsed-data',
     	properties: {
+            files: {
+                type: Object,
+                value: function(){return {};}, // cut, tet, set, pos files by name
+                observer: 'files_changed'
+            },
             use_n_leds: {
                 type: Number, //1 or 2
                 value: 2
@@ -56,10 +427,9 @@ BY: DM
                 value: "", // typed-array-manager id
                 notify: true
             },
-            voltages_for_gl: {
-                type: String,
-                value: "", // typed-array-manager id
-                notify: true
+            data_for_gl: {
+                type: Object,
+                value: function(){return {};} // has n value and typed-array-manager id for gl voltages
             },
             want_spike_times: {
                 type: Boolean,
@@ -86,12 +456,46 @@ BY: DM
                 value: true,
                 notify: true
             },
-            want_voltages_for_gl: {
+            want_data_for_gl: {
                 type: Boolean,
                 value: true,
                 notify: true
             }
-    	}
+    	}, created: function(){
+            // this is slightly gratuitous as the set worker and cut workers really don't do all that much
+            // but it's unlikely to be worse having them as workers.
+            this._worker_io = Polymer.DomModule.import('parsed-data', '#io_worker').create_for(this);
+            this._worker_set = Polymer.DomModule.import('parsed-data', '#set_parser').create_for(this);
+            this._worker_tet = Polymer.DomModule.import('parsed-data', '#tet_parser').create_for(this);
+            this._worker_pos = Polymer.DomModule.import('parsed-data', '#pos_parser').create_for(this);
+            this._worker_cut = Polymer.DomModule.import('parsed-data', '#cut_parser').create_for(this);
+            var ports_for_io = {};
+
+            var c = new MessageChannel();
+            ports_for_io['set'] = c.port1;
+            this._worker_set.send_ports(c.port2);
+
+            c = new MessageChannel();
+            ports_for_io['tet'] = c.port1;;
+            this._worker_tet.send_ports(c.port2);
+
+            c = new MessageChannel();
+            ports_for_io['pos'] = c.port1;;
+            this._worker_pos.send_ports(c.port2);
+
+            c = new MessageChannel();
+            ports_for_io['cut'] = c.port1;;
+            this._worker_cut.send_ports(c.port2);
+
+            this._worker_io.send_ports(ports_for_io);
+
+        },files_changed: function(old_files, new_files){
+
+            // whatever has changed, we need to first set the parsed data to null,
+            // and only afterwards can we parse the data.
+
+
+        }
 	});
 </script>
 
