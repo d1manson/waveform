@@ -1,5 +1,6 @@
 # <a name="wiki"/> Waveform
 
+
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so.
 
 **To use the application** do one of the following:
@@ -150,6 +151,37 @@ vulcanize index_full.html -o index.html --inline-scripts --strip-comments
 ```
 
 #### Understanding the code
+
+There are a bunch of things called "keys", used for refering to specific objects in specific ways:
+
+* key - Polymer.Collection assigns a key to each unique item that it encounters, whether that item is an object or string/number (I actually don't know the full details of this).  We sometimes request and use this key in our own code, particularlly when communicating between worker and main thread.  It always refers to a particular "box" arround and immutable list of cut indices, or rather to the immutable cut indices themselves.  Note that the key is only unique within the cut array..two different cut arrays will (in general) reuse the same key names for entirely different data.  We thus often qualify the "key" with a "generation" number.  See cut-obj or tac-plots for details.
+
+* okey - when only working on the main thread (i.e. in wave-plots), we can use the object itself as a key (when using Map/WeakMap rather than basic JS objects).  okey refers to the same "box" as does "key", but here it is the actual box rather than a string name for it.
+
+* akey - when we store typed arrays as polymer component properties, we do not use the array directly, but instead store the array with the "typed-array-manager", which then gives us an "akey" with which to refer to it. These akeys are strings with the prefix " (ta-manager)".  They are fully unique.
+
+* ckey - this is similar to the akey, but is for canvases rather than arrays.  See canvas-manger. TODO: actually apply this nomenclature.
+
+* fkey - again, similar to akey, but is for files.  The fkey is the modified-date followed by the file name. This means that two files with the same name still have unique fkeys.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Warning: I do not recommend trying to modify the code, you are likely to waste a lot of time. Some parts are reasonably well-written, and there is a fair degree of modularity overal, but there is also very little in the way of consistency across the project.  The most significant shortcomming is that in many cruical places it is very "low level", in so far as it doesn't use a Maths library or a data-flow library.  If you really do want to make changes, then get in touch and I'll try and talk you out of it, or at the very least give you a list of things to watch out for!!    
 

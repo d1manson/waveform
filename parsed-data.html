@@ -1,9 +1,10 @@
 <!--
 CUSTOM ELEMENT: parsed-data
-BY: DM
+bY: DM
 
-TODO: don't use file names, use something that is more unique, perhaps 
-have a weakmap from file object to key, and increment that, as in Polymer collection.
+Files can be refered to by "fkey", which is constructed as follows:
+    file.lastModifiedDate + " " + file.name
+because the name comes second, you can still read the extension easily.
 
 The current selection of files is held in the 'files' proeprty.
 When the user jumps somewhere in the file organiser, this 'files' object
@@ -11,29 +12,67 @@ is updated.  This module then sends out null-ing notfications for the
 data which is no longer valid, but leaves whatever it can i.e. if we change
 tet but not trial, or cut but not tet we don't need to invalidate everything.
 
-It then issues io requests to the io-worker, providing a specific priority order,
-so that the stuff that the files will will reqiure a lot of compute (i.e. tet files)
-will be loaded in preference to other things.
+On the io-worker thread we have a setImmediate "timer", which ensures that all pending messages from main thread
+are seen between each file-read operation.  We don't have such a timer on the set/tet/pos/cut threads.
 
-Once the io-worker has read some data off-disk, it transfers it directly to the
-relevant other worker for parsing.  When that other worker is done parsing, it
-transfers the data to the main thread.
+Caching...
 
-TODO: when changing files, why not keep the old data in a short FIFO cache, there should
-be no problem having 2-5 sets of data simultaneuosly..it's only going to be 100MB or something.
-Except in the case of pos, where you can change how the parse happens, you probably want to
-keep the cache on the main thread.  But for pos, you could just store the raw file, at the
-point it is delivered...and main thread should somehow keep track of what pos has in its cache...
-which might be difficult now that there are three threads involved!!!
+Main thread issues requests to io-worker thread, which in turn issues requests to set/cut/tet/pos threads.
+There is a buffer cache on tet/pos threads, which is managed by (i.e. add/delete instructions issued by)
+the io-worker.  And there is an entierly spearate parsed-data cache on the main thread, the various parts 
+of which are managed by the corresponding upstream workers (i.e. cut/set/tet/pos).
 
-Note that we don't bother with a timer on the parser threads, so you could end up with a queue
-of things, where (as always) we only care about the last thing on the queue, so actually processing
-the rest is a waste. but whatever.
+Requests begin either when the user switches to a set-pos-tet-cut tuple, some of which may be null, and some of which
+may be uncahnged from the previous setting.  Or when the user changes the pos setttings, or changes which parts of the 
+tet file it needs (i.e. header, times, amps, gl_data).  The caching scheme alows the main thread to fulfill some
+of the request directly from its own cache, sending whatever remains to the io-worker as a single request.
+Any types (i.e. 'set', 'tet' etc.) in the request sent to the io-worker will overwrite the previous request for
+the given file type, with null being used to signify no-file (undefined is treated as though the type were absent).
 
-Files can be refered to by "fkey", which is constructed as follows:
-    file.lastModifiedDate + " " + file.name
-Because the name comes second, you can still read the extension easily.
+The io-worker knows exactly which files are already in the cache of the corresponding workers, and can immedaitely
+forward those requests.  Anything not in cache will be read off disk in a specific order of type priority (i.e.
+tet files should be read off disk first, then pos files...see code for the current logic used).  The workers, 
+when they receive requests from the io-thread know whether any of the requested parts is already in the main-thread's
+cache, and can avoid re-computing that.  
 
+To seee why this is all helpful, consider an indecisve user trying to load tet file a, then b, then a again, in very 
+quick succession.  By the time the user makes the third request, the main thread doesn't yet have the parsed data
+in its cahce, so it has to issue a full request to the io-worker.  The io-worker may have ended up loading file-a
+due to the first request, or it may never have bothered, instead loading file-b.  In the frist case (where it did
+load file-a), when the third request arrives, it knows that the tet worker currently has the buffer in its cache, so
+ there's no need to load it again.  (Assuming the io-worker didn't request the buffer to be deleted from the
+ tet's cache in the meantime - and if the io-worker had issued this request it would well know that the buffer wasn't in cache.)
+ In the second case (where it didn't load file-a initally), the io-worker will now read it off disk and send it to
+ the tet-worker to parse (and put in its cache).  Whichever of the two cases happend, the tet-worker will end up
+with a request to parse a buffer that it does indeed have access to.  However, if the file-a request made it through twice, then
+the tet-worker knows that it already sent data to the main-thread (and hasn't yet requested main thread to delte it
+from the cache) thus it knows that in fact main thread already has the data being requested, so there is no need
+to do anything.
+
+In summary, it's complciated!  Also, in summary, there is one cache on the main thread with fully-parsed results,
+and an entirely separate cache on the pos/tet threads, which contains raw buffers.  In both cases, the cache is
+manged by the upstream worker, which in the case of the tet/pos-worker is the io-worker, and in the case of the
+main thread is the tet/pos-worker.  Hopefully this arrangement ensures that if something is available in cache
+it's never redundantly laoded/computed de novo, and it also ensures that each request recived by tet/set/pos/cut
+worker can be processed at the point it is received (ie. without resorting to throwing messages backwards and 
+forwards to get data to where it needs to be), and it ensures that no data needs to be copied unneccasrily - it
+can all be transfered to its destination using transferable buffers.
+
+...well, there is a contrived scenario in which we don't end up with the optimal result, which is if the tet
+worker sends the required parsed data to main thread, after main threada has issued a second request for it,
+and then immediately afterwards the io-thread asks to delete the buffer from the tet cache..then the io-worker
+will mistakenly think it needs to load the data off disk in order for the tet worker to be able to return the
+results..but in fact, the main will get its data delivered, and the worker won't recompute it, so all that's
+bad here is that we laoded a file off disk when we didn't actually need it..and anyway it's probably more or 
+less impossible for the delete request to get into the chain in this way.
+
+
+Just to clarify, the workers do the following: 
+    set - always sends header to main, cache uses fkey 
+    cut - always sends header+data to main, cache uses fkey 
+    pos - always sends header, xy, dir, and speed to main, cache uses object with fkey and post_processing options*
+    tet - sends one or more of header, amps, times, gl_data. cache uses fkey
+* note that obejcts' identities are not relevant, it's the value of their properties that counts
 -->
 
 
@@ -47,20 +86,31 @@ Because the name comes second, you can still read the extension easily.
 
 var ports = {};
 var pending_files = {};
-var types = ['tet', 'set', 'pos', 'cut']; // this is the priority order
+var pending_options = {};
+var types = new Set(['tet', 'set', 'pos', 'cut']); // this is the priority order
+var parsers_cached_fkeys = {
+    tet: new Set(), // tracks which fkeys tet worker currently holds in its cache buffers
+    pos: new Set() // same for pos
+}
+var max_cache_size = 4; // pretty arbitrary, especially as it's not type-specific
 
 var got_ports = function(ports_){
     ports = ports_;
 }
 
-var read_files = function(files){
-    pending_files = files;
+var read_files = function(files, options){
+    for(var t in types){
+        if(files[t] !== undefined){
+            pending_files[t] = files[t];
+            pending_options[t] = options[t];
+        }
+    }
     touch_timer();
 }
 
 var touch_timer = function(){
-    for(var ii=0; ii<types.length; ii++){
-        if(pending_files[types[ii]]){
+    for(var t in type){
+        if(pending_files[t]){
             timer = timer || setImmediate(timer_tick);
             return;
         }
@@ -69,37 +119,641 @@ var touch_timer = function(){
 }
 
 var timer_tick = function(){
-    for(var ii=0; ii<types.length; ii++){
-        if(!pending_files[types[ii]]){
+    // if there are any files already cached, then issue those requests immediately
+    for(var t in types){
+        if(!pending_files[t] || !parsers_cached_fkeys[t]){
             continue;
         }
+        var file = pending_files[t];
+        var fkey = file.lastModifiedDate + " " + file.name;
+        var cache = parsers_cached_fkeys[t];
+        if(cache.has(fkey)){
+            // bump in FIFO
+            cache.delete(fkey); 
+            cache.add(fkey); 
+            ports[t].postMessage({
+                fkey: pending_files[t],
+                options: pending_options[t]
+            });
+            pending_files[t] = undefined;
+            pending_options[t] = undefined;
+        }
+    }
+
+    // now, load zero or one files from disk and issue request to corresponding worker
+    // crucially, we do this in the priority order defined by the types array
+    for(var t in types){
+        if(!pending_files[t]){
+            continue;
+        }
+        var file = pending_files[t];
+        var fkey = file.lastModifiedDate + " " + file.name;
+        var cache = parsers_cached_fkeys[t];
+        var delete_from_cache;
+        if(cache){
+            // note that fkey can't have been in the cache already, because we tested for that in the above loop.
+            cache.add(fkey);
+            if(cache.size > max_cache_size){
+                delete_from_cache = cache.keys().next().value;
+                cache.delete(delete_from_cache);
+            }
+        }
         var reader = new FileReaderSync();
-        var buf = reader.readAsArrayBuffer(pending_files[types[ii]]);
-        ports[types[ii]].postMessage({
-            fkey: file.lastModifiedDate + " " + file.name, buffer: buf
+        var buf = reader.readasarraybuffer(file);
+        ports[t].postMessage({
+            fkey: fkey,
+            buffer: buf,
+            options: pending_options[t],
+            delete_from_cache: delete_from_cache
         }, [buf]);
-        pending_files[types[ii]] = undefined;
+        pending_files[t] = undefined;
+        pending_options[t] = undefined;
         break;
     }
+
+    // and keep going...
     touch_timer();
 }
 </script>
-    if(top_str.slice(data_start, data_start + data_end.length) === data_end){
-        header.num_spikes_claimed = header.num_spikes;
-        header.num_spikes = 0;
-    }
 
-    var n = header.num_spikes;
 
 <script is='worker-builder' id="pos_parser" title="pos-parser" type='javascript/worker'>
 "use strict";
+
+var fkey_to_buffer = new Map();
+
+var main_cached_options = new Set(); // set of objects each giving options and fkey
+var max_cache_size = 4; // arbitrary
 
 var got_ports = function(ports){
     self.io_port = ports.pos;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var top_str = new TextDecoder('utf-8').decode(e.data.buffer.slice(0, 1204+1));
-        parse_pos_file(top_str, e.data.buffer, fkey);
+
+         // add/delete entries in buffer cache, based on instructions from io-worker
+        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
+        // check to see if main cache actually holds the requested data     
+        var options = e.data.options;
+        options.fkey = fkey;
+        for(var obj in main_cached_options){
+            if(is_equal_simple(obj, options)){
+                // bump in FIFO
+                main_cached_options.delete(obj);
+                main_cached_options.add(obj);
+                return; // nothing to be done
+            }
+        }
+        
+        // pre-emptively add to the record of main cache and decide what, if anything, to remove
+        main_cached_options.add(options);
+        var delete_from_cache;
+        if(main_cached_options.size > max_cache_size){
+            delete_from_cache = main_cached_options.keys().next().value;
+            main_cached_options.delete(delete_from_cache);
+        }
+
+        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
+        parse_pos_file(top_str, buffer, fkey, options, delete_from_cache);
+
+    }
+}
+
+
+var is_equal_simple = function(a, b){
+    // very simple....
+    if((a && !b) || (!a && b)){
+        return false;
+    }
+    for(var aa in a){
+        if(b[aa] !== a[aa]){
+            return false;
+        }
+    }
+    for(var bb in b){
+        if(b[bb] !== a[bb]){
+            return false;
+        }
+    }
+    return true;
+}
+
+var swap_16 = function (val) {
+    return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
+}
+
+var take = function(data,offset,stride){
+    // takes every stride'th element from data, starting with the offset'th element
+    
+    var n = data.length/stride;
+    var res = new data.constructor(n);
+    
+    for(var i=0,j=offset;i<n;i++,j+=stride){
+        res[i] = data[j];
+    }
+    return res;
+}
+
+var times_in_place = function(src, factor, skip_val){
+    for(var i=0;i<src.length;i++)if(src[i] != skip_val){
+        src[i] *= factor;
+    }
+}
+
+var replace_val_in_place = function(src, find, replace){
+    for(var i=0;i<src.length;i++)if(src[i] == find){
+        src[i] = replace;
+    }
+}
+
+var sqr = function(a){return a*a;}
+
+var clone = function(a){ 
+    if(a.slice){
+        return a.slice(0); //for basic arrays and pure arraybuffer
+    }else{
+        return new a.constructor(a);
+    }
+}
+
+var minus = function(a, b, c){
+    // we subtract b and c from alternate elemetns of a, inplace, nan16 is skipped
+    for(var i=0;i<a.length;i++){
+        a[i] -= a[i] == nan16? 0 : b;
+        i++;
+        a[i] -= a[i] == nan16? 0 : c;
+    }
+}
+
+var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+var regex_header_b = /(\S*) ([\S ]*)/g
+
+var bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
+
+var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache){
+    var match = regex_header_a.exec(top_str);
+    if(!match){
+        throw 'did not find end of header in pos file.';
+    }
+
+    var data_start = match.index + match[0].length;
+    var header = {};
+    var header_str = match[0];
+    while (match = regex_header_b.exec(header_str))
+        header[match[1]] = match[2];
+
+    if (header.pos_format !== "t,x1,y1,x2,y2,numpix1,numpix2"){
+        throw "uncregonised pos format used in pos file";
+    }
+    
+    // apply overrides
+    for (k in header_override){
+        if(header[k] !== undefined){
+            header[k+"_original"] = header[k];
+        }
+        header[k] = header_override[k];
+    }
+
+    var data_len = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
+    buffer = buffer.subarray(data_start, data_start+data_len);
+
+    if(endian == 'L'){
+        var data = new Int16array(buffer);
+        for (var k=0; k<data.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
+            data[k] = swap_16(data[k]);
+        }
+    }
+
+    var pos = post_process(buffer, header, options);
+
+    exec_main_b('got_pos',{
+        fkey: fkey,
+        header: header,
+        xy: 'xy',
+        dir: 'dir',
+        speed: 'speed',
+        delete_from_cache: delete_from_cache,
+    }, {
+        xy: pos.xy,
+        dir: get_dir(pos),
+        speed: get_speed(pos)
+    });
+
+}
+
+
+
+var interp_xy_sub = function(xy,x_a,y_a,x_b,y_b,i,n_nans){
+    //interpolates from element i-1 back to i-n_nans, where element i is x_b,y_b and element i-n_nans-1 is x_a,x_b
+    var dx = (x_b-x_a)/(n_nans+1);
+    var dy = (y_b-y_a)/(n_nans+1);
+    for(var j=0;j<n_nans;j++){
+        xy[(i-n_nans + j)*2+0] = x_a + (j+1)*dx;
+        xy[(i-n_nans + j)*2+1] = y_a + (j+1)*dy; 
+    }
+}
+
+var interp_xy = function(xy,n_pos){
+   /* 
+    Interpolates linearly across nan blocks for single xy stream.
+    Does it in place.
+
+    TODO: verify that this does exactly what we want
+   */
+
+    // Find first (x,y) that is non-nan
+    for(var start=0; start<n_pos; start++){
+        var ix = start*2+0;
+        var iy = start*2+1;
+        if(xy[ix] != nan16 && xy[iy] !=nan16)
+            break;
+    }
+
+    var ix = start*2+0;
+    var iy = start*2+1; 
+    var x_a = xy[ix];
+    var y_a = xy[iy];
+    var n_nans = start; //this will cause first non-nan to be copied back through all previous nan values
+    for(var i=start;i<n_pos;i++){
+        var ix = i*2+0;
+        var iy = i*2+1; 
+        var x_b = xy[ix];
+        var y_b = xy[iy];
+        if(x_b == nan16 || y_b == nan16){
+            n_nans++;
+        }else{
+            if(n_nans) 
+                interp_xy_sub(xy, x_a, y_a, x_b, y_b, i, n_nans)
+            x_a = x_b;
+            y_a = y_b;
+            n_nans = 0;
+        }
+    }
+    
+    if(n_nans) //fill end-nan values with last non-nan val
+        interp_xy_sub(xy, x_a, y_a, x_a, y_a, i, n_nans);
+
+}
+
+var smooth_1d_in_place = function(x, stride, k){
+    //box car smoothing of length 2*k + 1
+    // (If we pretend the stride=1) The first few values of x will be:
+    //  x[0] = (x[0] + x[1] + ... + x[k])/(k+1)
+    //  x[1] = (x[0] + x[1] + ... + x[k+1])/(k+2)
+    //  ... and then we get to..
+    //  x[b] = (x[b-k] + ... + x[b] + ... x[b+k])/(2*k+1)
+    // and then we ramp down at the end as with the start.
+             
+    //a couple of checks for unimplemented generalisations...
+    if(stride != 2)
+        throw("stride must be 2");
+    if(2*k+1 > 256)
+        throw("smoothing kernel max length is 256")
+    if(k==0)
+        return; //no smoothing
+
+    /* Note: (a & 0xff) is (a mod 256) */
+    var n = x.length/2;
+    
+    var circ_buff_1 = new x.constructor(256);
+    var circ_buff_2 = new x.constructor(256);
+    var tot_1 = 0;
+    var tot_2 = 0;
+    
+    //a is the lowest-index in the sum, b is the central and destination index, c is the highgest index in the sum
+    var a=-2*k,b=-k,c=0; 
+    
+    // ramp up part 1: push the first k values into the buffer and sum
+    for(;c<k;a++,b++,c++){
+        tot_1 += circ_buff_1[c & 0xff] = x[c*2 + 0]; 
+        tot_2 += circ_buff_2[c & 0xff] = x[c*2 + 1];
+    }
+    
+    // ramp up part 2: calculate the first k values
+    for(;a<0;a++,b++,c++){
+        tot_1 += circ_buff_1[c & 0xff] = x[c*2 + 0]; 
+        tot_2 += circ_buff_2[c & 0xff] = x[c*2 + 1];
+        x[b*2+0] = tot_1 / (c+1);
+        x[b*2+1] = tot_2 / (c+1);
+    }
+        
+    // main section
+    var d = 2*k+1;
+    for(;c<n;a++,b++,c++){
+        tot_1 += circ_buff_1[c & 0xff] = x[c*2 + 0]; 
+        tot_2 += circ_buff_2[c & 0xff] = x[c*2 + 1];
+        x[b*2+0] = tot_1/d;
+        x[b*2+1] = tot_2/d;
+        tot_1 -= circ_buff_1[a & 0xff]; 
+        tot_2 -= circ_buff_2[a & 0xff];
+    }
+    
+    // ramp down: calculate last k values
+    for(;b<n;a++,b++,c++){
+        x[b*2+0] = tot_1 / (n-a);
+        x[b*2+1 ] = tot_2 / (n-a);
+        tot_1 -= circ_buff_1[a & 0xff]; 
+        tot_2 -= circ_buff_2[a & 0xff];
+    }
+    
+}
+
+var jump_filter = function(xy, n_pos, pos_timebase){
+    /*
+        For a single stream of xy values, it finds the first non-nan point,
+        and then checks the speed required to reach the next point, given the
+        sampling rate.  If the speed is too high, it skips that point and calcualtes
+        the speed required to get to the following point. This continues until,
+        the speed requirement is satisfied. The "skipped" points are set to NaN, inplace.
+        The number of points skipped over is returned as an integer.
+    */
+
+    if(!options.max_speed)
+        return 0;
+
+    var sqrMaxSampStep = sqr(options.max_speed*units_per_m /pos_timebase);
+
+    // Find first (x,y) that is non-nan
+    for(var start=0; start<n_pos; start++){
+        var ix = start*2+0;
+        var iy = start*2+1;
+        if(xy[ix] != nan16 && xy[iy] !=nan16)
+            break;
+    }
+            
+    var ix = start*2+0;
+    var iy = start*2+1;     
+    var x_from = xy[ix];
+    var y_from = xy[iy];
+    var jumpLen = 1;
+
+    // Set big jump sections to nan
+    for(var i=start+1,nJumpy=0; i<n_pos; i++){
+        var ix = i*2+0;
+        var iy = i*2+1;
+        // check if this pos is already nan
+        // or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
+        if(xy[ix] == nan16 || xy[iy] == nan16){
+            xy[ix] = xy[iy] = nan16; //just in case only one or the other was nan
+            jumpLen++; // note we don't count njumpy here
+        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
+            //sample is nan or speed is too large, so make this a jump
+            xy[ix] = xy[iy] = nan16; 
+            nJumpy++;
+            jumpLen++;
+        }else{
+            //speed is sufficiently small, so this point is ok
+            jumpLen = 1;
+            x_from = xy[ix];
+            y_from = xy[iy];
+        }
+    }
+
+    return nJumpy;
+}       
+
+var swap = function(a, b, do_swap){
+    var n = 0;
+    for(var i=0;i<a.length;i++) if(do_swap[i]){
+        var tmp = a[i];
+        a[i] = b[i];
+        b[i] = tmp;
+        n++;
+    }
+    return n;
+}
+
+var nanmean_and_std_2 = function(x){
+    /* 
+        x is nx2 array, we want nancount, nanmean, and nanstd for both columns.
+    */
+
+    var sum_1 = 0; var sum_2 = 0;
+    var n1 = 0; var n2 = 0;
+
+    for(var i=0; i<x.length/2; i++){
+        var i1 = i*2+0;
+        var i2 = i*2+1;
+        if(x[i1] && x[i1] != nan16){
+            n1++;
+            sum_1 += x[i1];
+        }
+        if(x[i2] && x[i2] != nan16){
+            n2++;
+            sum_2 += x[i2];
+        }
+    }
+    var mean_1 = sum_1/n1; var mean_2 = sum_2/n2;
+
+    // now get sum(sqr(xy-mean_xy)) and use to calculate nanstd...
+    sum_1 = 0; sum_2 = 0;  // NOTE: reusing sums vars!!!!
+    for (var i=0; i<x.length/2; i++){
+        var i1 = i*2+0;
+        var i2 = i*2+1;
+        if(x[i1] && x[i1] != nan16)
+            sum_1 += sqr(x[i1] - mean_1);
+        if(x[i2] && x[i2] != nan16)
+            sum_2 += sqr(x[i2] - mean_2);
+    }
+    var std_1 = Math.sqrt(sum_1/n1); var std_2 = Math.sqrt(sum_2/n2);
+
+    return {mean_1: mean_1, mean_2: mean_2, std_1: std_1, std_2: std_2, n_1: n1, n_2: n2};
+}
+
+var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
+    /*
+        xy_1 and xy_2 are both streams of (x,y) values. 
+        We combine them into a single stream according to the ratio of the weights.
+    */
+    var weight_sum = (weight_1 + weight_2);
+    var weight_1 = weight_1/weight_sum;
+    var weight_2 = weight_2/weight_sum;
+    var ret = new xy_1.constructor(xy_1.length);
+    for(var i=0;i<xy_1.length/2;i++){
+        var ix = 2*i+0;
+        var iy = 2*i+1;
+        ret[ix] = xy_1[ix]*weight_1 + xy_1[ix]*weight_2;
+        ret[iy] = xy_1[iy]*weight_1 + xy_1[iy]*weight_2;
+    }
+    return ret;
+}
+
+var get_dir = function(pos){
+    // TODO: if n_led is 1
+    var xy_1 = pos.xy_1;
+    var xy_2 = pox.xy_2;
+
+    var ret = new Float32array(xy_1.length/2);
+    var pi = 3.14159265;
+    for(var i=0;i<xy_1.length/2;i++){
+        var ix = 2*i+0;
+        var iy = 2*i+1;
+        var dy = xy_2[iy] - xy_1[iy];
+        var dx = xy_2[ix] - xy_1[ix];
+        ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+    }
+    return ret;
+}
+
+var get_speed = function(pos){
+    var xy = pos.xy;
+    var ret = new Float32array(xy.length/2);
+    for(var ii=0; ii<xy.length; ii+=2){
+         ret[ii>>1] = Math.hypot(xy[i+2]-xy[i+0], xy[i+3]-xy[i+1]);
+    }
+    return ret;
+}
+
+
+var post_process = function(buffer, header, options){
+
+    var data = new Int16array(buffer);
+    var elements_per_pos_sample = bytes_per_pos_sample/2;
+    var n_pos = parseInt(header.num_pos_samples); 
+    var end = n_pos * elements_per_pos_sample; 
+    
+    var pos_nan = 1023;
+
+     // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
+    var xy_1 = new Int16array(take(new Int32array(buffer), 1, bytes_per_pos_sample/4).buffer);
+    replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
+    
+    var n_led = 1;
+    if (options.use_both_leds){
+        // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
+        // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
+        var xy_pix = new Int16array(take(new Int32array(buffer), 3, bytes_per_pos_sample/4).buffer);
+        replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
+        for(var i=0; i<n_pos; i++){
+            if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
+                n_led = 2;
+                break;
+            }
+        } // if we make it to the end of the loop then n_led reamined as =1.
+
+    }
+
+    if(n_led == 2){
+         // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+        var xy_2 = new Int16array(take(new Int32array(buffer), 2, bytes_per_pos_sample/4).buffer);
+        replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
+    
+    }
+    
+    if(options.need_to_subtract_mins){
+        var min_x = parseInt(header.window_min_x);
+        var min_y = parseInt(header.window_min_y);
+        minus(xy_1, min_x, min_y);
+        if(n_led == 2)
+            minus(xy_2, min_x, min_y);
+    }
+
+    var ppm = parseInt(header.pixels_per_metre);
+    var units_per_m = 10000;
+    times_in_place(xy_1, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+    if(n_led == 2)
+        times_in_place(xy_2, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+
+    if(n_led == 2){
+        // check for and apply LED swaping...
+        var shrunk_and_switched = new Uint8array(n_pos);  
+
+        options.swapping_thresh_cm = 1; // it's a bit odd, but it seems this was always defined in pixels not cms.
+        var swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
+
+        // firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
+        // where "closer" is defined as z-score, i.e. distance/std for the relevant distribution.
+        var pix_props = nanmean_and_std_2(xy_pix);
+        var weight_1 = pix_props.n_1/n_pos; var weight_2 = pix_props.n_2/n_pos;
+
+        var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
+        header.post_n_pix_led1 = "mean=" + pix_props.mean_1.toFixed(2) + " std=" + pix_props.std_1.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_1) + ")";
+        header.psot_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
+
+        // use std and mean to get z score of pix1 to pix1 and pix2
+        for( var i=0; i< n_pos; i++){
+            var i1 = i*2+0;
+            var i2 = i*2+1;
+            if(xy_pix[i1] && xy_pix[i2] && xy_pix[i1] != nan16 && xy_pix[i2] != nan16){
+                var z11 = (mean_1 - xy_pix[i1])/std_1;
+                var z12 = (xy_pix[i1] - mean_2)/std_2;
+                shrunk_and_switched[i] = z11 > z12;
+            }
+        }
+
+
+        // Now we calculate jump distance (from time i-1 to time i)
+        // four distnaces: led1 to led1, led1 to led2, led2 to led1, led2 to led2.
+        // if the recorded version of distance is more than swapping_thresh further
+        // than the potential "swapped" version, then consider it a swap.
+
+        // Find first (x,y) that is non-nan on both xy and xy_2
+        for(var start=0; start<n_pos; start++){
+            var ix = start*2+0;
+            var iy = start*2+1;
+            if(xy_1[ix] != nan16 && xy_1[iy] !=nan16 && xy_2[ix] != nan16 && xy_2[iy] !=nan16)
+                break;
+        }
+
+        for(var i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
+            // we are going to do diffs with XY_i - XY_(i-1)
+            var ix = i*2+0;
+            var iy = i*2+1;
+            var i_1x = i*2-2;
+            var i_1y = i*2-1;
+            if(xy_1[ix] == nan16 || xy_1[iy] == nan16 || xy_2[ix] == nan16 || xy_2[iy] == nan16){
+                shrunk_and_switched[i] = 0;
+                i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
+                shrunk_and_switched[i] = 0;
+                continue; 
+            }
+
+            var dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
+            var dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
+            var dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
+            var dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
+
+            shrunk_and_switched[i] = (dist12 < dist11-swapping_thresh) && (dist21 < dist22 - swapping_thresh);
+
+        }
+
+        // Swap xy_1 with xy_2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit xy in one go)
+        header.post_n_swapped = swap(new Uint32array(xy_1.buffer), new Uint32array(xy_2.buffer), shrunk_and_switched);
+    }
+    
+    var pos_timebase = parseInt(header.sample_rate);
+    header.post_n_jumpy_led1 = jump_filter(xy_1, n_pos, options.max_speed, units_per_m, pos_timebase)
+    if(n_led == 2)
+         header.post_n_jumpy_led2 = jump_filter(xy_2, n_pos, options.max_speed, units_per_m, pos_timebase);
+
+    
+    interp_xy(xy_1,n_pos);
+    if(n_led == 2)
+        interp_xy(xy_2,n_pos);
+
+    var k = Math.floor(pos_timebase*options.smoothing_secs/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired         
+    smooth_1d_in_place(xy_1, 2, k);
+    var xy;
+    if(n_led == 2){
+        smooth_1d_in_place(xy_2, 2, k);
+        xy = combine_xy(xy_1, xy_2, weight_1, weight_2);
+    }else{
+        xy = xy_1;
+    }
+
+    header.max_vals = [(parseInt(header.window_max_y)-parseInt(header.window_min_y))*units_per_m/ppm ,
+                       (parseInt(header.window_max_x)-parseInt(header.window_min_x))*units_per_m/ppm ]; //TODO: decide which way round we want x and y
+    header.units_per_meter = units_per_m;
+
+    return {
+        xy: xy,
+        xy_1: xy_1,
+        xy_2: n_led == 2 ? xy_2,
+        header: header
     }
 }
 
@@ -111,12 +765,75 @@ var got_ports = function(ports){
 // TODO: it might be nice, though complicated, to batch the tet parsing, that would
 // allow the io to overlap with the compute, both of which are about 1ms/1k spikes.
 
+var fkey_to_buffer = new Map();
+
+var main_cached_options = new Set();
+var max_cache_size = 4; //aribtrary
+
 var got_ports = function(ports){
     self.io_port = ports.tet;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var top_str = new TextDecoder('utf-8').decode(e.data.buffer.slice(0, 1204+1));
-        parse_tet_file(top_str, e.data.buffer, fkey);
+
+        // add/delete entries in buffer cache, based on instructions from io-worker
+        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
+        // check to see if main cache actually holds any of the requested data        
+        options.fkey = fkey;
+        for(var cached_options in main_cached_options){
+            if(cached_options.fkey === fkey)
+                // bump in FIFO
+                main_cached_options.delete(cached_options);
+                main_cached_options.add(cached_options);
+                fkey_in_cache = cached_options;
+                // remove the things that are already in cache
+                if(cached_options.times){
+                    delete options.times;
+                }
+                if(cached_options.amps){
+                    delete options.amps;
+                }
+                if(cached_options.gl_data){
+                    delete options.gl_data;
+                }
+                if(options.times || options.amps || options.gl_data){
+                    break; // there is at least some work to be done
+                } else{
+                    return; // nothing new requested
+                }
+            }
+        }   
+
+        if (!cached_options || cached_options.fkey !== fkey){
+            // create new entry in main cache record, and possibly delete something
+            cached_options = {fkey: fkey};
+            main_cached_options.add(cached_options);
+            if(main_cached_options.size > max_cache_size){
+                var delete_from_cache = main_cached_options.keys().next().value;
+                exec_main('delete_from_tet_cache', delete_from_cache);
+                main_cached_options.delete(delete_from_cache);
+            }
+        }
+        
+        // pre-emptively record what we are about to put in main cache
+        if(options.times){
+            cached_options.times = 1;
+        }
+        if(options.gl_data){
+            cached_options.gl_data = 1;
+        }
+        if(options.amps){
+            cached_options.amps = 1;
+        }
+
+        // and actually do the work...
+        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
+        parse_tet_file(top_str, buffer, fkey, options);
+
     }
 }
 
@@ -127,16 +844,11 @@ var n_c = 4;
 var n_w = 50;
 var bytes_per_spike = N_c*(4 + N_w);
 
-// TODO: deal properly with "wants"    
-var want_amplitudes = true;
-var want_times = true;
-var want_gl_data = true;
-
-var parse_tet_file = function(top_str, buffer, fkey){
+var parse_tet_file = function(top_str, buffer, fkey, options){
 
     var match = regex_header_a.exec(top_str);
     if(!match){
-        throw 'did not find end of header in tet fkey.';
+        throw 'did not find end of header in tet file.';
     }
 
     var data_start = match.index + match[0].length;
@@ -146,15 +858,20 @@ var parse_tet_file = function(top_str, buffer, fkey){
         header[match[1]] = match[2];
 
     if (header.spike_format !== "t,ch1,t,ch2,t,ch3,t,ch4"){
-        throw "uncregonised spike format used in tet fkey";
+        throw "uncregonised spike format used in tet file";
     }
     
-    // sometimes DACQ creates a header with num_spikes >0, but there are no spikes
-    // (this happens when you choose not to record a given tetrode but a fkey previously existed)
+    // sometimes DaCQ creates a header with num_spikes >0, but there are no spikes
+    // (this happens when you choose not to record a given tetrode but a file previously existed)
+    if(top_str.slice(data_start, data_start + data_end.length) === data_end){
+        header.num_spikes_claimed = header.num_spikes;
+        header.num_spikes = 0;
+    }
+    var n = header.num_spikes;
     var data_len = parseInt(N)*bytes_per_spike;
 
     //read the data section of the fkey as an array buffer
-    buffer = buffer.slice(data_start, data_start+data_len);
+    buffer = buffer.subarray(data_start, data_start+data_len);
 
     exec_main('got_tet_header', header);
 
@@ -165,7 +882,7 @@ var parse_tet_file = function(top_str, buffer, fkey){
     // worth having even without cut data, whereas the other two are less helpful without cut
     // data.
 
-    if(want_gl_data){
+    if(options.gl_data){
         var data =  build_gl_data(buffer, n);
         exec_main_b('got_gl_data', {
             data: 'data', 
@@ -173,7 +890,7 @@ var parse_tet_file = function(top_str, buffer, fkey){
         }, {data: data});
     }
 
-    if(want_times){
+    if(options.times){
         var data =  get_times(buffer, n);
         exec_main_b('got_times', {
             data: 'data', 
@@ -181,7 +898,7 @@ var parse_tet_file = function(top_str, buffer, fkey){
         }, {data: data});
     }
 
-    if(want_amplitudes){
+    if(options.amps){
         var data = get_amplitudes(buffer, n);
         exec_main_b('got_amplitudes', {
             data: 'data', 
@@ -213,23 +930,23 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
 }
 
 var i8_to_u8 = function(a){
-    // Takes an int8array, A, adds 128 to each element and views it as a uint8 array.
+    // Takes an int8array, a, adds 128 to each element and views it as a uint8 array.
     // this is done inplace.
     // See http://en.wikipedia.org/wiki/Signed_number_representations for info.
     // We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
     // TODO: it may be possible to avoid this conversion, if the gl-shader code is modified
-    a = new Uint32Array(a.buffer); 
+    a = new Uint32array(a.buffer); 
     for(var i=0;i<a.length;i++)
         a[i] ^= 0x80808080;
-    return new Uint8Array(a.buffer);
+    return new Uint8array(a.buffer);
 }
 
 var build_gl_data = function(buffer, n_spikes){
-    var old_data = new Uint8Array(buffer);
-    var newdData = new Uint16Array(n_c*(n_w-1)*n_spikes);
+    var old_data = new Uint8array(buffer);
+    var newdData = new Uint16array(n_c*(n_w-1)*n_spikes);
     
     build_gl_data_sub(old_data, new_data, n_spikes);
-    return i8_to_u8(new Int8Array(new_data.buffer));        
+    return i8_to_u8(new Int8array(new_data.buffer));        
 }
 
 var swap_32_vector = function(x){
@@ -242,16 +959,16 @@ var swap_32_vector = function(x){
     }
 }
 
-var take_strided = function(ret, X, stride){
+var take_strided = function(ret, x, stride){
     // Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
     // n = ret.length
     for(var i=0,p=0; i<ret.length; i++, p+= stride)
-        ret[i] = X[p]; 
+        ret[i] = x[p]; 
 }
 
-var get_times = function(buffer, n_spikes){ //get spike times in milliseconds as a Uint32Array 
-    var times = new Uint32Array(n_spikes);
-    var data = new Int32Array(buffer);
+var get_times = function(buffer, n_spikes){ //get spike times in milliseconds as a Uint32array 
+    var times = new Uint32array(n_spikes);
+    var data = new Int32array(buffer);
     take_strided(times, data, bytes_per_spike/4);
     if (endian === 'L') 
         swap_32_vector(times);
@@ -275,8 +992,8 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
 }
 
 var get_amplitudes = function(buffer, n_spikes){
-    var old_data = new Int8Array(buffer);
-    var amps = new Uint8Array(n_spikes * n_c);
+    var old_data = new Int8array(buffer);
+    var amps = new Uint8array(n_spikes * n_c);
     get_amplitude_sub(old_data, amps, n_spikes * n_c, n_w);
 }
 
@@ -286,12 +1003,34 @@ var get_amplitudes = function(buffer, n_spikes){
 <script is='worker-builder' id="set_parser" title="set-parser" type='javascript/worker'>
 "use strict";
 
+var max_cache_size = 4; // arbitrary
+var main_cached_fkeys = new Set();
+
 var got_ports = function(ports){
     self.io_port = ports.set;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        if(main_cached_fkeys.has(fkey)){
+            // bump in FIFO
+            main_cached_fkeys.delete(fkey);
+            main_cached_fkeys.add(fkey);
+            return;
+        }
         var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
-        parse_set_file(full_str, fkey);
+        
+        main_cached_fkeys.add(fkey);
+        var delete_from_cache;
+        if(main_cached_fkeys.size > max_cache_size){
+            delete_from_cache = main_cached_fkeys.keys().next().value;
+            main_cached_fkeys.delete(delete_from_cache);
+        }
+
+        var header = parse_set_file(full_str, fkey);
+        exec_main('set_file_parsed', {
+            fkey: fkey,
+            header: header,
+            delete_from_cache: delete_from_cache});
+
     }
 }
 
@@ -302,9 +1041,7 @@ var ParseSetFile = function(full_str, fkey){
     var match;
     while (match = regex_header_b.exec(full_str))
         header[match[1]] = match[2];
-    exec_main('set_file_parsed', {
-        fkey: fkey,
-        header: header});
+    return header;
 }
 
 </script>
@@ -313,12 +1050,35 @@ var ParseSetFile = function(full_str, fkey){
 <script is='worker-builder' id="cut_parser" title="cut-parser" type='javascript/worker'>
 "use strict";
 
+var max_cache_size = 4; // arbitrary
+var main_cached_fkeys = new Set();
+
 var got_ports = function(ports){
     self.io_port = ports.cut;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        if(main_cached_fkeys.has(fkey)){
+            // bump in FIFO
+            main_cached_fkeys.delete(fkey);
+            main_cached_fkeys.add(fkey);
+            return; // main already has it, so no need to send it.
+        }
         var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
-        parse_cut_file(full_str, fkey);
+
+        // TODO: clu/cut based on extension
+        var msg = parse_cut_file(full_str, fkey);
+        
+        var cut = msg.cut;
+        msg.cut = "cut";
+        msg.fkey = fkey;
+        main_cached_fkeys.add(fkey);
+        if(main_cached_fkeys.size > max_cache_size){
+            msg.delete_from_cache = main_cached_fkeys.keys().next().value;
+            main_cached_fkeys.delete(msg.delete_from_cache);
+        }
+
+        exec_main_b('cut_file_parsed', msg, {cut : cut});
+
     }
 }
 
@@ -341,16 +1101,16 @@ var parse_cut_file = function(full_str, fkey){
     cut_props.is_clu = false;
 
     var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
-    var cut = new Uint32Array(cut_as_str.length);
+    var cut = new Uint32array(cut_as_str.length);
     for(var ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii]);
     }
-    exec_main_b('cut_file_parsed', {
-        fkey: fkey,
+
+    return {
         header: cut_props,
-        cut: "cut"}, {
-            cut: cut
-        });
+        cut: cut
+    }
+
 }
 
 var parse_clu_file = function(full_str, fkey){
@@ -360,16 +1120,15 @@ var parse_clu_file = function(full_str, fkey){
         n_spikes: cut_as_str.length-1,
         is_clu: true
     }
-    var cut = new Uint32Array(cut_as_str.length-1);
+    var cut = new Uint32array(cut_as_str.length-1);
     for(var ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii+1]);
     }
-    exec_main_b('cut_file_parsed', {
-        fkey: fkey,
+
+    return {
         header: cut_props,
-        cut: "cut"}, {
-            cut: cut
-        });
+        cut: cut
+    }
 }
 
 // TODO: just get exp name
@@ -408,19 +1167,19 @@ var parse_clu_file = function(full_str, fkey){
             },
             spike_times: {
                 type: Object,
-                value: function(){ return {};} // data (taid), timebase
+                value: function(){ return {};} // data (akey), timebase
             },
             pos_xy: {
                 type: Object,
-                value: function(){ return {};} // data (taid), timebase, and units_per_cm
+                value: function(){ return {};} // data (akey), timebase, and units_per_cm
             },
             pos_dir: {
                 type: Object,
-                value: function(){ return {};} // data (taid), timebase
+                value: function(){ return {};} // data (akey), timebase
             },
             pos_speed: {
                 type: Object,
-                value: function(){ return {};} // data (taid), timebase
+                value: function(){ return {};} // data (akey), timebase
             },
             amplitudes: {
                 type: String,
@@ -432,36 +1191,30 @@ var parse_clu_file = function(full_str, fkey){
                 value: function(){return {};} // has n value and typed-array-manager id for gl voltages
             },
             want_spike_times: {
-                type: Boolean,
-                value: true,
-                notify: true
-            },
-            want_pos_xy: {
-                type: Boolean,
-                value: true,
-                notify: true
-            },
-            want_pos_dir: {
-                type: Boolean,
-                value: true,
-                notify: true
-            },
-            want_pos_speed: {
-                type: Boolean,
+                type: boolean,
                 value: true,
                 notify: true
             },
             want_amplitudes: {
-                type: Boolean,
+                type: boolean,
                 value: true,
                 notify: true
             },
             want_data_for_gl: {
-                type: Boolean,
+                type: boolean,
                 value: true,
                 notify: true
             }
-    	}, created: function(){
+    	}, observers: [
+            '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
+            '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
+        ],
+        created: function(){
+            this._cut_from_fkey = new Map();
+            this._set_from_fkey = new Map();
+            this._pos_from_options = new Map(); // key=options object giving fkey and parse options; value= {header, xy, dir, speed}
+            this._tet_from_fkey = new Map(); // contains objects with one or more of {header, amps, times, gl_data}
+
             // this is slightly gratuitous as the set worker and cut workers really don't do all that much
             // but it's unlikely to be worse having them as workers.
             this._worker_io = Polymer.DomModule.import('parsed-data', '#io_worker').create_for(this);
@@ -489,10 +1242,16 @@ var parse_clu_file = function(full_str, fkey){
 
             this._worker_io.send_ports(ports_for_io);
 
-        },files_changed: function(old_files, new_files){
+        }, files_changed: function(old_files, new_files){
 
             // whatever has changed, we need to first set the parsed data to null,
             // and only afterwards can we parse the data.
+
+
+        }, _pos_options_changed: function(){
+
+
+        }, _tet_options_changed: function(){
 
 
         }

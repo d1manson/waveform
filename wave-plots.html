@@ -482,7 +482,7 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
 }
 
 var _prepare_render_metrics = function(okeys, from_t, to_t){
-	// okeys is an array of objs, each with .inds property that gives a taid.
+	// okeys is an array of objs, each with .inds property that gives a akey.
 
 	var okeys = Array.from(okeys); // if it was a set, then make it an array with well-defined order
 
@@ -528,7 +528,7 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
 }
 
 var _upload_okey_data = function(){
-	// okeys is an array of objs, each with .inds property that gives a taid.
+	// okeys is an array of objs, each with .inds property that gives a akey.
 	// if render mode is flag it must also provide a .group_num property.
 
 	// Convert easy pixel coords to the weird [-128, 127] x [-128, 127] coordinates.

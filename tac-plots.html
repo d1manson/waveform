@@ -211,7 +211,7 @@ var is_equal_simple = function(a, b){
 				value: 2
 			},
             spike_times: {
-                type: Object, // array taid "data" and timebase Number in same units as max_delta_t
+                type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};}
             },
             show: {
@@ -249,8 +249,8 @@ var is_equal_simple = function(a, b){
                 // get clones of new arrays to send to worker
                 for(var ii=0; ii<keys_to_add.length; ii++){
                     var key = keys_to_add[ii];
-                    var taid = this.groups_collection.getItem(key).inds;
-                    added_arrays[key] = am.get_array_clone(taid);
+                    var akey = this.groups_collection.getItem(key).inds;
+                    added_arrays[key] = am.get_array_clone(akey);
                     this.key_is_on_worker[key] = true;
                 }
             } else {
