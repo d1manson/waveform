@@ -78,6 +78,8 @@ Note that in the worker we bump parsed data in the FIFO when it is re-requested,
 hears about those re-requests.  Perhaps the main thread should send bump signals to the worker when it
 uses something from cache.  Exactly what happens to these signals doesn't matter, they're just to improve
 the utilization of the cqche.
+
+TODO: angle correction for dir from set file.
 -->
 
 
@@ -90,6 +92,7 @@ the utilization of the cqche.
 <script is='worker-builder' id="io_worker" title="io-worker" type='javascript/worker'>
 "use strict";
 
+var timer = 0;
 var ports = {};
 var pending_files = {};
 var pending_options = {};
@@ -115,7 +118,7 @@ var read_files = function(files, options){
 }
 
 var touch_timer = function(){
-    for(var t in type){
+    for(var t in types){
         if(pending_files[t]){
             timer = timer || setImmediate(timer_tick);
             return;
@@ -644,9 +647,10 @@ var post_process = function(buffer, header, options){
 
     }
 
+    var xy_2;
     if(n_led == 2){
          // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
-        var xy_2 = new Int16array(take(new Int32array(buffer), 2, bytes_per_pos_sample/4).buffer);
+        xy_2 = new Int16array(take(new Int32array(buffer), 2, bytes_per_pos_sample/4).buffer);
         replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
     
     }
@@ -758,7 +762,7 @@ var post_process = function(buffer, header, options){
     return {
         xy: xy,
         xy_1: xy_1,
-        xy_2: n_led == 2 ? xy_2,
+        xy_2: xy_2,
         header: header
     }
 }
@@ -791,7 +795,7 @@ var got_ports = function(ports){
         // check to see if main cache actually holds any of the requested data        
         options.fkey = fkey;
         for(var cached_options in main_cached_options){
-            if(cached_options.fkey === fkey)
+            if(cached_options.fkey === fkey){
                 // bump in FIFO
                 main_cached_options.delete(cached_options);
                 main_cached_options.add(cached_options);
@@ -848,7 +852,7 @@ var regex_header_b = /(\S*) ([\S ]*)/g
 var data_end = "\r\ndata_end";
 var n_c = 4;
 var n_w = 50;
-var bytes_per_spike = N_c*(4 + N_w);
+var bytes_per_spike = n_c*(4 + n_w);
 
 var parse_tet_file = function(top_str, buffer, fkey, options){
 
@@ -860,8 +864,9 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     var data_start = match.index + match[0].length;
     var header = {};
     var header_str = match[0];
-    while (match = regex_header_b.exec(header_str))
+    while (match = regex_header_b.exec(header_str)){
         header[match[1]] = match[2];
+    }
 
     if (header.spike_format !== "t,ch1,t,ch2,t,ch3,t,ch4"){
         throw "uncregonised spike format used in tet file";
@@ -1208,17 +1213,17 @@ var parse_clu_file = function(full_str, fkey){
                 value: function(){return {};} // has n value and typed-array-manager id for gl voltages
             },
             want_spike_times: {
-                type: boolean,
+                type: Boolean,
                 value: true,
                 notify: true
             },
             want_amplitudes: {
-                type: boolean,
+                type: Boolean,
                 value: true,
                 notify: true
             },
             want_data_for_gl: {
-                type: boolean,
+                type: Boolean,
                 value: true,
                 notify: true
             }
@@ -1245,19 +1250,19 @@ var parse_clu_file = function(full_str, fkey){
 
             var c = new MessageChannel();
             ports_for_io['set'] = c.port1;
-            this._worker_set.send_ports(c.port2);
+            this._worker_set.send_ports({set: c.port2});
 
             c = new MessageChannel();
             ports_for_io['tet'] = c.port1;;
-            this._worker_tet.send_ports(c.port2);
+            this._worker_tet.send_ports({tet: c.port2});
 
             c = new MessageChannel();
             ports_for_io['pos'] = c.port1;;
-            this._worker_pos.send_ports(c.port2);
+            this._worker_pos.send_ports({pos: c.port2});
 
             c = new MessageChannel();
             ports_for_io['cut'] = c.port1;;
-            this._worker_cut.send_ports(c.port2);
+            this._worker_cut.send_ports({cut: c.port2});
 
             this._worker_io.send_ports(ports_for_io);
 
@@ -1347,11 +1352,11 @@ var parse_clu_file = function(full_str, fkey){
                 this._make_tet_request(new_fkeys.tet, new_files.tet, request, options);
             }
 
-            this._worker_io.read_files(request, options); 
+            this._worker_io.exec('read_files', request, options); 
 
         }, _pos_options_changed: function(){
             var options = this._make_pos_options();
-            this.io_worker.read_files({
+            this._worker_io.exec('read_files', {
                 pos: this._files.pos,
             }, {
                 pos: options
@@ -1419,8 +1424,8 @@ var parse_clu_file = function(full_str, fkey){
 
         }, _tet_options_changed: function(){
             var request = {}, options = {};
-            this._make_tet_request(this._fkeys.tet, this._files.tet request, options);
-            this._worker_io.read_files(request, options); 
+            this._make_tet_request(this._fkeys.tet, this._files.tet, request, options);
+            this._worker_io.exec('read_files', request, options); 
         }, cut_file_parsed: function(msg, arrays){
             var am = window.typed_array_manager;
             this._cut_from_fkey[msg.fkey] = am.store_array(arrays['cut']);
@@ -1495,7 +1500,7 @@ var parse_clu_file = function(full_str, fkey){
             if(msg.delete_from_cache){
                 this._set_from_fkey.delete(msg.delete_from_cache);
             }
-        } _use_set: function(header){
+        }, _use_set: function(header){
             this.set('duration', parseInt(header.duration));
         }
 	});

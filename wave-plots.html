@@ -47,7 +47,7 @@ data if you wanted to observe the limitations of the 32bit precision.
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
-
+<link rel="import" href="palettes.html">
 
 <dom-module id="wave-plots">
 
@@ -63,6 +63,8 @@ data if you wanted to observe the limitations of the 32bit precision.
 
 var WavesRenderer = (function(){
 
+var palette_flag_register_ind = 2;
+var float_texture_register_ind = 0; //this may need to be fixed at 0, not sure
 
 var n_c = 4; // number of channels
 var n_w = 50; // number of t points per channel
@@ -82,8 +84,8 @@ var shader_strs = (function(){
 // multiline, template strings are nice, but it's wierd that they use the enclosing scope
 // rather than accepting a .format(dict) like in python, anyway....
 
-var delta_t_x_offset: (off_canv_dt/off_canv_w*2).toPrecision(3);
-var y_factor: (2/(off_canv_h/off_canv_wave_h)).toPrecision(3);
+var delta_t_x_offset = (off_canv_dt/off_canv_w*2).toPrecision(3);
+var y_factor =  (2/(off_canv_h/off_canv_wave_h)).toPrecision(3);
 
 return {
 
@@ -144,7 +146,7 @@ return {
 
 	fragment_density_1: `
 		void main(void) {
-			gl_FragColor = 1.;  // it's that simple
+			gl_FragColor = vec4(1., 0., 0., 1.);  // it's that simple
 		}
 	`,
 
@@ -168,17 +170,17 @@ return {
 		precision mediump float;
 		uniform sampler2D u_src;
 		varying vec2 v_tex_coord;
-		uniform highp normalising_factor;
+		uniform highp float normalising_factor;
 		void main() {
 			highp vec4 src = texture2D(u_src, v_tex_coord);
 			highp float counts = sqrt(src.r*normalising_factor);
 			gl_FragColor = vec4(counts > 0.5 ?
 									 counts > 0.75 ?
-										 n_c. - n_c.*counts 
-										: n_c.*counts-2. 
+										 4. - 4.*counts 
+										: 4.*counts-2. 
 									: counts > 0.25 ?
-										 2. - n_c.*counts 
-										: counts*n_c.
+										 2. - 4.*counts 
+										: counts*4.
 								 ,
 								 counts < 0.5 ? 
 								 		2.*counts 
@@ -218,7 +220,8 @@ var get_shader_from_string = function(gl, str, type){
 	return shader;
 }
 
-var validate_program = function(gl, test_prog, throw_on_error);
+var validate_program = function(gl, test_prog, throw_on_error){
+	gl.validateProgram(test_prog);
 	if (!gl.getProgramParameter(test_prog, gl.VALIDATE_STATUS)){
 		console.log("Error during program validation:\n" + gl.getProgramInfoLog(test_prog));
 		if(throw_on_error){
@@ -296,22 +299,22 @@ var WavesRenderer = function(debug){
 	this._locs_flag.palette = gl.getUniformLocation(this._prog_flag, "palette");
 
 	this._locs_density_1 = {};
-	this._locs_density_1.wave_xy_offset = gl.getAttribLocation(this._locs_density_1, "wave_xy_offset");
-	this._locs_density_1.is_t_plus_one = gl.getAttribLocation(this._locs_density_1, "is_t_plus_one");
-	this._locs_density_1.voltage = gl.getAttribLocation(this._locs_density_1, "voltage");
-	this._locs_density_1.t_x_offset = gl.getUniformLocation(this._locs_density_1, "t_x_offset");
+	this._locs_density_1.wave_xy_offset = gl.getAttribLocation(this._prog_density_1, "wave_xy_offset");
+	this._locs_density_1.is_t_plus_one = gl.getAttribLocation(this._prog_density_1, "is_t_plus_one");
+	this._locs_density_1.voltage = gl.getAttribLocation(this._prog_density_1, "voltage");
+	this._locs_density_1.t_x_offset = gl.getUniformLocation(this._prog_density_1, "t_x_offset");
 
 	this._locs_density_2 = {};
-	this._locs_density_2.a_position = gl.getUniformLocation(this._locs_density_2, "a_position");
-	this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._locs_density_2, "a_tex_coord");
-	this._locs_density_2.u_src = gl.getUniformLocation(this._locs_density_2, "u_src");
-	this._locs_density_2.oneTex = gl.getUniformLocation(this._locs_density_2, "oneTex");
-	this._locs_density_2.normalising_factor = gl.getAttribLocation(this._locs_density_2, "normalising_factor");
+	this._locs_density_2.a_position = gl.getUniformLocation(this._prog_density_2, "a_position");
+	this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._prog_density_2, "a_tex_coord");
+	this._locs_density_2.u_src = gl.getUniformLocation(this._prog_density_2, "u_src");
+	this._locs_density_2.oneTex = gl.getUniformLocation(this._prog_density_2, "oneTex");
+	this._locs_density_2.normalising_factor = gl.getAttribLocation(this._prog_density_2, "normalising_factor");
 
 	// create all the neccessarry buffers (no space is actually allocated at this stage for data)
 	this._buf_wave = gl.createBuffer();
 	this._bufs_voltage = Array((n_w-1)*n_c);
-	for(var i=0;i<buffs.voltage.length;i++)
+	for(var i=0;i<this._bufs_voltage.length;i++)
 		this._bufs_voltage[i] = gl.createBuffer();
 	this._buf_is_t_plus_one = gl.createBuffer();
 	
@@ -324,7 +327,7 @@ var WavesRenderer = function(debug){
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]), gl.STATIC_DRAW);
 
 	// upload flag palette texture
-	upload_palette(gl, palette_flag_register_ind, palette_flag); 
+	upload_palette(gl, palette_flag_register_ind, Palettes.flag); 
 
 	// turn off depth testing since we want to just render in order (negative z is still invisible)
 	gl.disable(gl.DEPTH_TEST);
@@ -515,6 +518,7 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
 		for(var col=0; col<n_cols; col++, p++){
 			x_offset[p] = col*(n_t*off_canv_dt + off_canv_wave_gap);
 			y_offset[p] = row*off_canv_wave_h;
+		}
 	}
 
 	return {
@@ -549,7 +553,7 @@ var _upload_okey_data = function(){
 		// just need to provide x and y
 
 		var data_i8 = new Int8Array(this._n*4);
-		var data_i16 new Int16Array(data_i8.buffer);
+		var data_i16 = new Int16Array(data_i8.buffer);
 		data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
 		
 		for(var ii=0; ii<n_okeys; ii++){
@@ -566,7 +570,7 @@ var _upload_okey_data = function(){
 		// TODO: test whether it's faster to provide the full rgb color rather than a palette index. I suspect it might be.
 
 		var data_i8 = new Int8Array(this._n*6);
-		var data_i16 new Int16Array(data_i8.buffer);
+		var data_i16 = new Int16Array(data_i8.buffer);
 		data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
 
 		for(var ii=0; ii<n_okeys; ii++){
@@ -617,7 +621,7 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
 			okey.group_num){
 			// this matches the last canvas we sent, so abandon any partial render (if there was one)
 			if(this._okey_to_part_rendered.has(okey)){
-				this._n_t_to_okeys[this._okey_to_part_rendered[okey]].n_t].delete(okey);
+				this._n_t_to_okeys[this._okey_to_part_rendered[okey].n_t].delete(okey);
 				this._okey_to_part_rendered.delete(okey);
 			}
 		} if (!this._okey_to_part_rendered.has(okey)){
@@ -661,9 +665,9 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
 
 	for(var ii=0; ii<okeys_to_add.length; ii++){
 		var okey = okeys_to_add[ii];
-		this._okey_to_part_rendered.add(okey, {
+		this._okey_to_part_rendered[okey] = {
 			n_t: 0
-		});
+		};
 		this._n_t_to_okeys[0].add(okey);
 	}
 
@@ -678,7 +682,7 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
 
 
 
-WavesRenderer.prototype.touch_timer = function(){
+WavesRenderer.prototype._touch_timer = function(){
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from elsewhere to interupt
@@ -800,7 +804,7 @@ WavesRenderer.prototype._timer_tick = function(){
 		this._render_metrics.from_t += this._render_metrics.batch_t;
 	}
 
-	this.touch_timer(); // and so it continues...
+	this._touch_timer(); // and so it continues...
 }
 
 WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
@@ -881,7 +885,11 @@ Polymer({
 	created: function(){
 		this.okey_to_canvas = new Map(); // this is not weak, because we need to free canvas-manger id's
 		this.okey_to_rendered_options = {};
-		this._renderer = new WavesRenderer();
+		try{
+			this._renderer = new WavesRenderer();
+		} catch (e){
+			console.log("failed to create renderer....\n" + e);
+		}
 	},
 	data_for_gl_changed: function(){
 		var am = window.typed_array_manager;
@@ -925,7 +933,7 @@ Polymer({
     },
     _groups_set: function(new_val, old_val){
         this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
-        this._update_keys(old_val, new_val);
+        this._update_okeys(old_val || [], new_val, []);
     },
     _groups_spliced: function(splices){
     	if(!splices) return;

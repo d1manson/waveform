@@ -48,15 +48,16 @@ Utils.dedupe = function(splices){
 		added: added
 	};
 	
-}
+};
 
-utils.simple_clone = function(a){
+Utils.simple_clone = function(a){
 	var b = {};
 	for(aa in a){
 		b[aa] = a[aa];
 	}
 	return b;
-}
+};
+
 Utils.is_equal_simple = function(a, b){
     // very simple....
     if((a && !b) || (!a && b)){
@@ -73,7 +74,7 @@ Utils.is_equal_simple = function(a, b){
         }
     }
     return true;
-}
+};
 
 
 // setImmediate (on main thread), but we just the same impementation as worker-builder

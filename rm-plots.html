@@ -79,12 +79,12 @@ var palette = function(){
         buf8[i*4+3] = 255;
 
     //buf8[0*4+0]= 255; buf8[0*4+1]=255; buf8[0*4+2]=255; //white
-    buf8[0*4+3]= 000; // invisible
+    buf8[0*4+3]= 0; // invisible
     buf8[1*4+2]= 198;
     buf8[2*4+1]= 162; buf8[2*4+2]= 255; 
-    buf8[3*4+0]= 056; buf8[3*4+1]= 235; buf8[3*4+2]= 032; 
+    buf8[3*4+0]= 56; buf8[3*4+1]= 235; buf8[3*4+2]= 32; 
     buf8[4*4+0]= 248; buf8[4*4+1]= 221; 
-    buf8[5*4+0]= 255; buf8[5*4+1]= 032;
+    buf8[5*4+0]= 255; buf8[5*4+1]= 32;
 
     return new Uint32Array(buf8.buffer); //this is how to_image_data function wants it
 }();
@@ -252,7 +252,7 @@ var clear_cache = function(names){
         cached_dir_dwell = undefined;
     }
 
-    if(names.has('pos_speed') || name.has('max_speed') || name.has('cps_per_speed_bin')){
+    if(names.has('pos_speed') || names.has('max_speed') || names.has('cps_per_speed_bin')){
         cached_speed_bins = undefined;
         cached_speed_dwell = undefined;
         cached_spike_speed_bins = undefined;
@@ -757,7 +757,7 @@ var is_equal_simple = function(a, b){
             if(this.show && this.show[1] === 'y'){
                 if(this.pos_dir){
                     var arr = window.typed_array_manager.get_array_clone(this.pos_dir.data);
-                    this.worker.exec_b('set_pos_dir', this.pos_dir.timebase {data: arr});
+                    this.worker.exec_b('set_pos_dir', this.pos_dir.timebase, {data: arr});
                 } else {
                     if(!this.worker) return;
                     this.worker.exec('set_pos_dir', {});

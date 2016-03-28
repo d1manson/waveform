@@ -1,0 +1,166 @@
+<!--
+CUSTOM ELEMENT: file-organiser
+by: DM
+-->
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/iron-list/iron-list.html">
+<link rel="import" href="utils.html">
+
+<dom-module id="file-organiser">
+<style>
+.trial{
+background: #f5f5f5;
+padding: 5px;
+border: 1px solid #ccc;
+cursor: pointer;
+display: block;
+right: 2px;
+left: 2px;
+width: initial !important;
+}
+.trial_top{
+margin-bottom: 4px;
+}
+.trial_bottom{
+
+}
+.trial_title{
+font-weight: bold;
+display: inline-block;
+margin-right: 4px;
+font-size: 12px;
+}
+.trial_set,
+.trial_pos,
+.trial_tet,
+.trial_cut{
+display: inline-block;
+border: 1px #000 solid;
+padding: 1px 2px 1px 2px;
+margin-left: 1px;
+background: #ddd;
+cursor: default;
+font-size: 10px;
+}
+.trial_tet_block{
+display: inline-block;
+border-left: 2px solid #000;
+margin-right: 4px;
+margin-bottom: 2px;
+}
+.trial_pos,
+.trial_set{
+background: #ddb550;
+border-color: #552510;
+color: #552510;
+border-width: 2px;
+}
+.trial_cut{
+background: #fbb;
+border-color: #500;
+color: #500;
+}
+.trial_cut.obj{
+background: #bbF;
+border-color: #005;
+color: #005;
+}
+iron-list{
+flex: 2;
+overflow-x: hidden !important;
+}
+:host{
+display: flex;
+flex-direction: column;
+font-size: 0px;
+};
+</style>
+<template>
+  <div class="tet_switcher">
+  1 2 3 4 5 etc.
+  </div>
+  <iron-list items="[[trials]]" as="trial">
+    <template><div class='trial'>
+	    <div class='trial_top'>
+		    <div class='trial_title'>trial '[[trial.name]]'</div>
+		    <div class='trial_set' style$='display:[[_show(trial.set)]];' title$='[[trial.set_caption]]'>~.set</div>
+		    <div class='trial_pos' style$='display:[[_show(trial.pos)]];' title$='[[trial.pos_caption]]'>~.pos</div>
+		</div>
+		<div class='trial_bottom'>
+			<template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
+				<div class='trial_tet_block'>
+					<div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
+					<template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
+						<div class$='trial_cut [[cut.cut_type]]' title$='[[cut.caption]]'>[[cut.short_name]]</div>
+					</template>
+				</div>
+			</template>
+		</div>
+    </div></template>
+  </iron-list>
+</template>
+
+<script>
+	
+Polymer({
+	is: 'file-organiser',
+	properties: {
+		trials: {
+			type: Array,
+			value: function(){ return [
+					{
+						name: "2241 2015-04-14 1",
+						set: 'sdsadsdf',
+						pos: 'adssadasd',
+						set_caption: 'sdsadsdf modified 10-Oct-2015 12:30',
+						tets: [
+							{
+								tet: 'sdfsdf',
+								tet_num: 2,
+								cuts: [
+									{
+										cut_type: '.cut',
+										short_name: '~_2.cut'
+									}
+								]
+							},
+							{
+								tet: 'sdfsdf',
+								tet_num: 3,
+								cuts: [
+									{
+										cut_type: '.cut',
+										short_name: '~_3.cut'
+									},
+									{
+										cut_type: 'obj',
+										short_name: '~a_3.cut'
+									}
+								]
+							},
+							{
+								tet: 'sdfsdf',
+								tet_num: 4,
+								cuts: [
+									{
+										cut_type: '.cut',
+										short_name: '~_4.cut'
+									}
+								]
+							}
+						]
+					}
+
+
+				];}
+		}
+	}, created: function(){
+		this._file_from_fkey = new Map();
+	}, _show: function(v){
+		return v ? '' : 'none';
+	}
+})
+
+</script>
+</dom-module>

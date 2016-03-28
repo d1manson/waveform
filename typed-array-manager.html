@@ -50,12 +50,14 @@ using normal keys...and then you would need to do manual garbage collection agai
             return last_akey + suffix;
         },
         get_array: function(akey){
+            if(!akey) return
             return validate_akey(akey) && arrays[parseInt(akey)];
         },
         get_array_clone: function(akey){
             // note that the clone is not put in the store. It is
             // inteded to be used when dealing with workers, and needing to 
             // transfer an array in its intereity to another thread.
+            if(!akey) return
             var a = this.get_array(akey);
             return a && new a.constructor(a);
         },

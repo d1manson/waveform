@@ -103,15 +103,18 @@ self.onmessage = function(e){
             var buffers = {};
             for(var ii=0; ii<e.data.bufs.length; ii++){
                 var item = e.data.bufs[ii];
-                buffers[item.name] = new self[item.constructor](item.buffer);
+                buffers[item.name] = item.constructor === "ArrayBuffer" ? item.buffer : new self[item.constructor](item.buffer);
+            }
+            for(var ii=0; ii<e.data.undefineds.length; ii++){
+                buffers[e.data.undefineds[ii]] = undefined;
             }
             e.data.args.push(buffers);
         }
         self[e.data.foo].apply(null, e.data.args);
     } else if (e.data.foo === '_ports'){
         var a = {};
-        for(var ii=0; ii< e.data.ports.length; ii++){
-            a[e.data.args[0][ii]] = e.data.ports[ii];
+        for(var ii=0; ii< e.ports.length; ii++){
+            a[e.data.args[ii]] = e.ports[ii];
         }
         self.got_ports(a);
     }else {
@@ -237,18 +240,23 @@ var endian = function(){
         var msg = {
         foo: arguments[0],
         args: Array.prototype.slice.call(arguments, 1, arguments.length-1),
-        bufs: []
+        bufs: [],
+        undefineds: []
         };
         var x = arguments[arguments.length-1] || {};
         var buffers = [];
         // x is a map from labels to typedarrays
         for(var k in x)if(x.hasOwnProperty(k)){
-            buffers.push(x[k].buffer);
-            msg.bufs.push({
-                buffer: x[k].buffer,
-                name: k,
-                constructor: x[k].constructor.name
-            });
+            if(x[k] && x[k].buffer){
+                buffers.push(x[k].buffer);
+                msg.bufs.push({
+                    buffer: x[k].buffer,
+                    name: k,
+                    constructor: x[k].constructor.name
+                });
+            } else {
+                msg.undefineds.push(k);
+            }
         }
         this._worker.postMessage(msg, buffers);
     }
@@ -285,7 +293,7 @@ var endian = function(){
         var names = [];
         for(var k in a){
             ports.push(a[k]);
-            names.push(a);
+            names.push(k);
         }
         this._worker.postMessage({
             foo: '_ports',
