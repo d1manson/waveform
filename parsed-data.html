@@ -3,7 +3,7 @@ CUSTOM ELEMENT: parsed-data
 bY: DM
 
 Files can be refered to by "fkey", which is constructed as follows:
-    file.lastModifiedDate + " " + file.name
+    file.lastModified + " " + file.name
 because the name comes second, you can still read the extension easily.
 
 The current selection of files is held in the 'files' proeprty.
@@ -134,7 +134,7 @@ var timer_tick = function(){
             continue;
         }
         var file = pending_files[t];
-        var fkey = file.lastModifiedDate + " " + file.name;
+        var fkey = file.lastModified + " " + file.name;
         var cache = parsers_cached_fkeys[t];
         if(cache.has(fkey)){
             // bump in FIFO
@@ -156,7 +156,7 @@ var timer_tick = function(){
             continue;
         }
         var file = pending_files[t];
-        var fkey = file.lastModifiedDate + " " + file.name;
+        var fkey = file.lastModified + " " + file.name;
         var cache = parsers_cached_fkeys[t];
         var delete_from_cache;
         if(cache){
@@ -168,7 +168,7 @@ var timer_tick = function(){
             }
         }
         var reader = new FileReaderSync();
-        var buf = reader.readasarraybuffer(file);
+        var buf = reader.readAsArraybuffer(file);
         ports[t].postMessage({
             fkey: fkey,
             buffer: buf,
@@ -1154,8 +1154,6 @@ var parse_clu_file = function(full_str, fkey){
     }
 }
 
-// TODO: just get exp name
-
 </script>
 
 <template></template>
@@ -1436,7 +1434,7 @@ var parse_clu_file = function(full_str, fkey){
                 this._cut_from_fkey.delete(msg.delete_from_cache);
             }
         }, _fkey_from_file: function(file){
-            return file ? file.lastModifiedDate + " " + file.name : "";
+            return file ? file.lastModified + " " + file.name : "";
         }, _make_pos_options: function(){
             return {
                 use_both_leds: this.use_n_leds,

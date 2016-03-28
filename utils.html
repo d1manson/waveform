@@ -76,6 +76,24 @@ Utils.is_equal_simple = function(a, b){
     return true;
 };
 
+//Escape a user specified string for use in regex search.
+// Taken from http://stackoverflow.com/a/3561711
+Utils.regex_escape= function(s) {
+    return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
+
+
+//Takes an Array of strings and returns a regex which can be used for finding items in the set given in the list
+// with the longest possible match returned. e.g.
+// regex_from_list(["hello","world","hello world"]).exec("this hello world life") will match on "hello world".
+Utils.regex_from_list = function(a){
+	if(!a.length)
+		return null;
+	return RegExp(a.sort(function(a,b){
+									return b.length-a.length;
+						 	 }).map(Utils.regex_escape).join("|"));
+};
+
 
 // setImmediate (on main thread), but we just the same impementation as worker-builder
 // taken/adapted from https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js
