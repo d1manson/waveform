@@ -50,6 +50,31 @@ Utils.dedupe = function(splices){
 	
 }
 
+utils.simple_clone = function(a){
+	var b = {};
+	for(aa in a){
+		b[aa] = a[aa];
+	}
+	return b;
+}
+Utils.is_equal_simple = function(a, b){
+    // very simple....
+    if((a && !b) || (!a && b)){
+        return false;
+    }
+    for(var aa in a){
+        if(b[aa] !== a[aa]){
+            return false;
+        }
+    }
+    for(var bb in b){
+        if(b[bb] !== a[bb]){
+            return false;
+        }
+    }
+    return true;
+}
+
 
 // setImmediate (on main thread), but we just the same impementation as worker-builder
 // taken/adapted from https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js

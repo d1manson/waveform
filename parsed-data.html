@@ -73,11 +73,17 @@ Just to clarify, the workers do the following:
     pos - always sends header, xy, dir, and speed to main, cache uses object with fkey and post_processing options*
     tet - sends one or more of header, amps, times, gl_data. cache uses fkey
 * note that obejcts' identities are not relevant, it's the value of their properties that counts
+
+Note that in the worker we bump parsed data in the FIFO when it is re-requested, but only when the worker
+hears about those re-requests.  Perhaps the main thread should send bump signals to the worker when it
+uses something from cache.  Exactly what happens to these signals doesn't matter, they're just to improve
+the utilization of the cqche.
 -->
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="worker-builder.html">
+<link rel="import" href="utils.html">
 
 <dom-module id="parsed-data">
 
@@ -329,10 +335,12 @@ var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache)
     }
 
     var pos = post_process(buffer, header, options);
+    delete options.fkey;
 
     exec_main_b('got_pos',{
         fkey: fkey,
         header: header,
+        options: options,
         xy: 'xy',
         dir: 'dir',
         speed: 'speed',
@@ -608,7 +616,6 @@ var get_speed = function(pos){
     return ret;
 }
 
-
 var post_process = function(buffer, header, options){
 
     var data = new Int16array(buffer);
@@ -662,7 +669,6 @@ var post_process = function(buffer, header, options){
         // check for and apply LED swaping...
         var shrunk_and_switched = new Uint8array(n_pos);  
 
-        options.swapping_thresh_cm = 1; // it's a bit odd, but it seems this was always defined in pixels not cms.
         var swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
 
         // firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
@@ -818,7 +824,7 @@ var got_ports = function(ports){
                 main_cached_options.delete(delete_from_cache);
             }
         }
-        
+
         // pre-emptively record what we are about to put in main cache
         if(options.times){
             cached_options.times = 1;
@@ -873,7 +879,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     //read the data section of the fkey as an array buffer
     buffer = buffer.subarray(data_start, data_start+data_len);
 
-    exec_main('got_tet_header', header);
+    exec_main('got_tet_header', fkey, header);
 
     // TODO: test whether it's faster to iterate over the data once and compute everything
     // or to iterate once for each thing of interest (which is a bit more complicated)
@@ -886,7 +892,8 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
         var data =  build_gl_data(buffer, n);
         exec_main_b('got_gl_data', {
             data: 'data', 
-            fkey: fkey
+            fkey: fkey,
+            n_spikes: n
         }, {data: data});
     }
 
@@ -894,7 +901,8 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
         var data =  get_times(buffer, n);
         exec_main_b('got_times', {
             data: 'data', 
-            fkey: fkey
+            fkey: fkey,
+            n_spikes: n
         }, {data: data});
     }
 
@@ -902,7 +910,8 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
         var data = get_amplitudes(buffer, n);
         exec_main_b('got_amplitudes', {
             data: 'data', 
-            fkey: fkey
+            fkey: fkey,
+            n_spikes: n
         }, {data: data});
     }
 }
@@ -1052,6 +1061,7 @@ var ParseSetFile = function(full_str, fkey){
 
 var max_cache_size = 4; // arbitrary
 var main_cached_fkeys = new Set();
+var regex_ext = /\.([0-9a-z]+)$/i;
 
 var got_ports = function(ports){
     self.io_port = ports.cut;
@@ -1066,7 +1076,15 @@ var got_ports = function(ports){
         var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
 
         // TODO: clu/cut based on extension
-        var msg = parse_cut_file(full_str, fkey);
+        var ext = fkey.match(regex_ext)[1]
+        var msg;
+        if(ext === 'clu'){
+            msg = parse_clu_file(full_str, fkey);
+        } else if (ext === 'cut') {
+            msg = parse_cut_file(full_str, fkey);
+        } else {
+            throw "urecognised cut type";
+        }
         
         var cut = msg.cut;
         msg.cut = "cut";
@@ -1143,11 +1161,6 @@ var parse_clu_file = function(full_str, fkey){
     Polymer({
     	is:'parsed-data',
     	properties: {
-            files: {
-                type: Object,
-                value: function(){return {};}, // cut, tet, set, pos files by name
-                observer: 'files_changed'
-            },
             use_n_leds: {
                 type: Number, //1 or 2
                 value: 2
@@ -1181,6 +1194,10 @@ var parse_clu_file = function(full_str, fkey){
                 type: Object,
                 value: function(){ return {};} // data (akey), timebase
             },
+            cut_inds: {
+                type: String, // akey
+                value: ''
+            },
             amplitudes: {
                 type: String,
                 value: "", // typed-array-manager id
@@ -1210,6 +1227,8 @@ var parse_clu_file = function(full_str, fkey){
             '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
         ],
         created: function(){
+            this._fkeys = {}; // set, tet, pos, cut
+            this._files = {}; // set, tet, pos, cut
             this._cut_from_fkey = new Map();
             this._set_from_fkey = new Map();
             this._pos_from_options = new Map(); // key=options object giving fkey and parse options; value= {header, xy, dir, speed}
@@ -1242,18 +1261,242 @@ var parse_clu_file = function(full_str, fkey){
 
             this._worker_io.send_ports(ports_for_io);
 
-        }, files_changed: function(old_files, new_files){
+        }, change_to_files: function(new_files){
+            var new_fkeys = {
+                set: this._fkey_from_file(new_files.set),
+                pos: this._fkey_from_file(new_files.pos),
+                cut: this._fkey_from_file(new_files.cut),
+                tet: this._fkey_from_file(new_files.tet)
+            }
 
-            // whatever has changed, we need to first set the parsed data to null,
-            // and only afterwards can we parse the data.
+            // nullify things that are chaning...
+            var changing = new Set('tet','cut','pos','set');
+            for(k in changing){
+                if(this._fkeys[k] && this._fkeys[k] === new_fkeys[k]){
+                    changing.delete(k);
+                } else {
+                    this._fkeys[k] = null;
+                    this._files[k] = new_files[k];
+                }
+            }
 
+            this.fire('start_nulling', changing);
+
+            if(changing.has('set')){
+                this.set('duration', null);
+            }
+            if(changing.has('pos')){
+                this.set('pos_xy', null);
+                this.set('pos_speed', null);
+                this.set('pos_dir', null);
+            }
+            if(changing.has('tet')){
+                this.set('spike_times', null);
+                this.set('amplitudes', null);
+                this.set('data_for_gl', null);
+            }
+            if(changing.has('cut')){
+                this.set('cut_inds', null);
+            }
+
+            this.fire('end_nulling');
+
+            // build request for io-worker, taking as much as possible from the main cache
+            var request = {};
+            var options = {};
+
+            if(changing.has('set')){
+                request['set'] = null;
+                if(new_fkeys.set && this._set_from_fkey.has(new_fkeys.set)){
+                    this._use_set(this._set_from_fkey[new_fkeys.set]);
+                } else {
+                    request['set'] = new_files.set;
+                }
+            }
+
+            if(changing.has('cut')){
+                request['cut'] = null;
+                if(new_fkeys.cut && this._cut_from_fkey.has(new_fkeys.cut)){
+                    this.set('cut_inds', this._cut_from_fkey[new_fkeys.cut]);
+                } else {
+                    request['cut'] = new_files.cut;
+                }
+            }
+
+            if(changing.has('pos')){
+                request['pos'] = null;
+                if(new_fkeys.pos){
+                    var in_cache = false;
+                    var pos_options = this._make_pos_options();
+                    pos_options.fkey = new_fkeys.pos;
+                    for(obj in this._pos_from_options){
+                        if(Utils.is_equal_simple(obj, pos_options)){
+                            this._use_pos(obj);
+                            in_cache = true;
+                            break;
+                        }
+                    }
+                    if(!in_cache){
+                        request['pos'] = new_files.pos;
+                        options['pos'] = this._make_pos_options();
+                    }
+                }
+            }
+
+            if(changing.has('tet')){
+                this._make_tet_request(new_fkeys.tet, new_files.tet, request, options);
+            }
+
+            this._worker_io.read_files(request, options); 
 
         }, _pos_options_changed: function(){
+            var options = this._make_pos_options();
+            this.io_worker.read_files({
+                pos: this._files.pos,
+            }, {
+                pos: options
+            });
+        }, got_pos: function(msg, arrays){
+            var am = window.typed_array_manager;
+            msg.options.fkey = msg.fkey;
+            var cache = Utils.simple_clone(msg.options);
+            cache.xy = am.store_array(arrays['xy']);
+            cache.dir = am.store_array(arrays['dir']);
+            cache.speed = am.store_array(arrays['speed']);
+            cache.header = msg.header;
+            this._pos_from_options.add(cache);
+            if(msg.delete_from_cache){
+                for(var obj in cache){
+                    if(Utils.is_equal_simple(obj, msg.delete_from_cache)){
+                        this._pos_from_options.delete(obj);
+                    }
+                }
+            }
 
+            var opts =  this._make_pos_options();
+            opts.fkey = this._fkeys.pos;
+            if(Utils.is_equal_simple(msg.options, opts)){
+                this._use_pos(cache);
+            }            
+        },
+        _use_pos: function(cache){
+            this.pos_xy = cache.xy;
+            this.pos_dir = cache.dir;
+            this.pos_speed = cache.speed;
+        },
+        _make_tet_request: function(fkey, file, request, options){
+            if(!fkey){
+                request['tet'] = null;
+                return;
+            }
+
+            var cached = this._tet_from_fkey[fkey] || {};
+            options['tet'] = {};
+            if(this.want_amplitudes){
+                if(cached.amps){
+                    this.set('amplitudes', cached.amps);
+                } else {
+                    request['tet'] = file;
+                    options['tet']['amps'] = 1;    
+                }
+            } 
+            if(this.want_spike_times){
+                if(cached.times){
+                    this.set('spike_times', cached.times);
+                } else {
+                    request['tet'] = file;
+                    options['tet']['times'] = 1;
+                }
+            }
+            if(this.want_data_for_gl){
+                if(cached.gl_data) {
+                    this.set('data_for_gl', cached.gl_data);
+                } else {
+                    request['tet'] = file;
+                    options['tet']['gl_data'] = 1;                            
+                }
+            }
 
         }, _tet_options_changed: function(){
-
-
+            var request = {}, options = {};
+            this._make_tet_request(this._fkeys.tet, this._files.tet request, options);
+            this._worker_io.read_files(request, options); 
+        }, cut_file_parsed: function(msg, arrays){
+            var am = window.typed_array_manager;
+            this._cut_from_fkey[msg.fkey] = am.store_array(arrays['cut']);
+            if(this._fkeys.cut === msg.fkey){
+                this.set('cut_inds', this._cut_from_fkey[msg.fkey]);
+            }
+            if(msg.delete_from_cache){
+                this._cut_from_fkey.delete(msg.delete_from_cache);
+            }
+        }, _fkey_from_file: function(file){
+            return file ? file.lastModifiedDate + " " + file.name : "";
+        }, _make_pos_options: function(){
+            return {
+                use_both_leds: this.use_n_leds,
+                need_to_subtract_mins: false,
+                swapping_thresh_cm: 1,
+                max_speed: this.pos_filter_mps,
+                smoothing_secs: this.pos_smoothing_s
+            }
+        }, got_gl_data: function(msg, arrays){
+            var am = window.typed_array_manager;
+            var cached = this._tet_from_fkey[msg.fkey];
+            if(!cached){
+                _tet_from_fkey[msg.fkey] = cached = {};
+            }
+            cached.gl_data = {
+                n: msg.n_spikes,
+                voltages: am.store_array(arrays.data)
+            };
+            if(msg.fkey === this._fkeys.tet){
+                this.set('data_for_gl', cached.gl_data);
+            }
+        }, got_amplitudes: function(msg, arrays){
+            var am = window.typed_array_manager;
+            var cached = this._tet_from_fkey[msg.fkey];
+            if(!cached){
+                _tet_from_fkey[msg.fkey] = cached = {};
+            }
+            cached.amps = {
+                n: msg.n_spikes,
+                amps: am.store_array(arrays.data)
+            };
+            if(msg.fkey === this._fkeys.tet){
+                this.set('amplitudes', cached.amps);
+            }
+        }, got_times: function(msg, arrays){
+            var am = window.typed_array_manager;
+            var cached = this._tet_from_fkey[msg.fkey];
+            if(!cached){
+                _tet_from_fkey[msg.fkey] = cached = {};
+            }
+            cached.times = {
+                n: msg.n_spikes,
+                times: am.store_array(arrays.data)
+            };
+            if(msg.fkey === this._fkeys.tet){
+                this.set('spike_times', cached.times);
+            }
+        }, got_tet_header: function(fkey, header){
+            var cached = this._tet_from_fkey[fkey];
+            if(!cached){
+                _tet_from_fkey[fkey] = cached = {};
+            }
+            cached.header = header;
+        }, delete_from_tet_cache: function(fkey){
+            this._tet_from_fkey.delete(fkey);
+        }, set_file_parsed: function(msg) {
+            if(this._fkeys.set === msg.fkey){
+                this._use_set(msg.header);
+            }
+            this._set_from_fkey[msg.fkey] = msg.header;
+            if(msg.delete_from_cache){
+                this._set_from_fkey.delete(msg.delete_from_cache);
+            }
+        } _use_set: function(header){
+            this.set('duration', parseInt(header.duration));
         }
 	});
 </script>
