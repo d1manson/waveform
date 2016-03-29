@@ -45,6 +45,19 @@ var get_base_for_cuts = function(files){
 
 
 <style>
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
 .trial{
 background: #f5f5f5;
 padding: 5px;
@@ -135,14 +148,14 @@ margin-left: 4px;
   </div>
   <iron-list items="[[trials]]" as="trial" id="trial_list">
     <template><div><div class='trial'>
-	    <div class='trial_top'>
+	    <div class='trial_top' on-mouseenter="_make_trial_captions">
 		    <div class='trial_title'>trial '[[trial.name]]'</div>
 		    <div class='trial_set' style$='display:[[_show(trial.set)]];' title$='[[trial.set_caption]]'>~.set</div>
 		    <div class='trial_pos' style$='display:[[_show(trial.pos)]];' title$='[[trial.pos_caption]]'>~.pos</div>
 		</div>
 		<div class='trial_bottom'>
 			<template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
-				<div class='trial_tet_block'>
+				<div class='trial_tet_block' on-mouseenter="_make_tet_captions">
 					<div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
 					<template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
 						<div class$='trial_cut [[cut.cut_type]]' title$='[[cut.caption]]'>[[cut.short_name]]</div>
@@ -159,9 +172,9 @@ margin-left: 4px;
 Polymer({
 	is: 'file-organiser',
 	properties: {
-		has_files: {
+		no_files: {
 			type: Boolean,
-			value: false,
+			value: true,
 			notify: true,
 			readOnly: true
 		},
@@ -194,7 +207,10 @@ Polymer({
 			value: function(){ return [];}
 		}
 	}, created: function(){
-		this._file_from_fkey = new Map();
+		this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
+		this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
+		this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
+		this._file_from_fkey = [undefined]; // fkeys are simple numerical indices, >0
 		this._trial_from_base = new Map();
 	    document.addEventListener("dragover", this._dragover.bind(this));
 	    document.addEventListener("drop", this._drop.bind(this));
@@ -218,7 +234,7 @@ Polymer({
     }, _drop: function(e){
 	  	e.stopPropagation();
         e.preventDefault();
-        this._setHas_files(true); // TODO: wait till we've actually processed the files
+        this._setNo_files(false); // TODO: wait till we've actually processed the files
         this._cancel_drag();
         var files = e.dataTransfer.files; // FileList object.
            
@@ -231,7 +247,6 @@ Polymer({
         // and also store a reference to all those files by fkey
         for(let ii=0; ii<files.length; ii++){
         	let ff = files[ii];
-        	let fkey = this._fkey_from_file(ff);
         	let fname = ff.name;
             let ext = regex_file_ext.exec(fname);
 			let base; // we will leave/set as undefined if we don't care about the file
@@ -264,11 +279,12 @@ Polymer({
 				}
 
 				// store permanent reference to the file
-				this._file_from_fkey[fkey] = files[ii];
+	        	let fkey = this._file_from_fkey.length;
+				this._file_from_fkey.push(files[ii]);
 				if(base){
 					// unless it was a cut, we now know the base ok...
 					let trial_files = files_for_base[base] = files_for_base[base] || new Set();
-					trial_files.add(files[ii]);
+					trial_files.add(fkey);
 				}
 			}
 		}
@@ -288,7 +304,9 @@ Polymer({
 				if(match){
 					match = match[0];
 					files_for_base[match] = files_for_base[match] || new Set();
-					files_for_base[match].add(ff);
+					let fkey = this._file_from_fkey.length;
+					this._file_from_fkey.push(ff);
+					files_for_base[match].add(fkey);
 				} else {
 					let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
 					if(ext === "cut"){
@@ -318,15 +336,13 @@ Polymer({
 				this._trial_from_base[base] = trial;
 				trials.push(trial);
 			}
-			for(let ff of trial_files){
-				let fkey = this._fkey_from_file(ff);
+			for(let fkey of trial_files){
+				let ff = this._file_from_fkey[fkey];
 	            let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
 	            if(ext === "set"){
 	            	trial.set = fkey;
-	            	trial.set_caption = this._caption_from_file(ff);
 	            } else if(ext === "pos"){
 	            	trial.pos = fkey;
-	            	trial.pos_caption = this._caption_from_file(ff);
 	            } else if (ext === "cut"){
 	            	// note we sort and de-dupe cuts at the end of the trial_files loop (TODO: that)
 	            	let num = ff.name.match(this._regex_cut_tet_num);
@@ -337,9 +353,7 @@ Polymer({
 						tet_obj.cuts.push({
 							cut: fkey,
 							cut_type: 'cut',
-							date: ff.lastModified,
-							short_name: ff.name.replace(base, '~'),
-							caption: this._caption_from_file(ff)
+							short_name: ff.name.replace(base, '~')
 						});
 					} 
 	            } else {
@@ -351,32 +365,15 @@ Polymer({
 	            		tet_obj.cuts.push({
 							cut: fkey,
 							cut_type: 'clu',
-							date: ff.lastModified,
-							short_name: ff.name.replace(base, '~'),
-							caption: this._caption_from_file(ff)
+							short_name: ff.name.replace(base, '~')
 						});
 	            	} else {
 	            		// tet file
-		            	tet_obj.tet = ff;
-		            	tet_obj.tet_caption = this._caption_from_file(ff);	            		
+		            	tet_obj.tet = fkey;
 	            	}
 	            }
 			}
-			// sort test for the trial, and then sort and de-dupe cuts for each tet
-			trial.tets = trial.tets.sort(function(a,b){
-				return a.tet_num > b.tet_num ? 1 : -1;
-			})
-			for(let ii =0; ii<trial.tets.length; ii++){
-				let tet_obj = trial.tets[ii];
-				tet_obj.cuts.sort(function(a,b){
-					return b.date - a.date;
-				});
-				for(let jj=0; jj<tet_obj.cuts.length; jj++){
-					if(jj && tet_obj.cuts[jj-1].cut === tet_obj.cuts[jj].cut){
-						tet_obj.cuts.splice(jj--, 1);
-					}
-				}
-			}
+			this._sort_trial_innards(trial); // sort tets and cuts
 		}
 
 
@@ -387,6 +384,35 @@ Polymer({
 		available_tets.sort(this._numeric_sort);
 		this._setAvailable_tets(available_tets);
 		this._reassign_trials_denovo();	// notify absolutely everything !!! 
+	}, _sort_trial_innards: function(trial){
+		// sort tets for the trial
+		trial.tets = trial.tets.sort(function(a,b){
+			return a.tet_num > b.tet_num ? 1 : -1;
+		})
+
+		// de-dupe cuts and sort by name and last-modified date
+		// TODO: deal with cut obj kind
+		for(let ii=0; ii<trial.tets.length; ii++){
+			let tet_obj = trial.tets[ii];
+			if(tet_obj.cuts.length > 1){
+				let name_and_time_strs = new Set()
+				for(let jj=0; jj<tet_obj.cuts.length; jj++)	{
+					if(!tet_obj.cuts[jj].date_name_str){
+						let ff = this._file_from_fkey[tet_obj.cuts[jj].cut];
+						let d = tet_obj.cuts[jj].date = ff.lastModified;
+						tet_obj.cuts[jj].date_name_str = d + " " + ff.name;
+					}
+					if(name_and_time_strs.has(tet_obj.cuts[jj].date_name_str)){
+						tet_obj.cuts.splice(jj--, 1); // i.e. remove this cut
+					} else {
+						name_and_time_strs.add(tet_obj.cuts[jj].date_name_str);
+					}
+				}
+				tet_obj.cuts.sort(function(a,b){
+					return b.date - a.date;
+				});
+			}
+		}
 	}, _get_tet_obj: function(trial, tet_num){
 		// adds it to trial.tets if it doesn't exist
     	for(tt=0; tt<trial.tets.length; tt++){
@@ -409,13 +435,30 @@ Polymer({
 		return v ? '' : 'none';
 	}, _scroll_shadow: function(v){
 		return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
-	}, _fkey_from_file: function(file){
-    	return file ? file.lastModified + " " + file.name : "";
+    }, _make_trial_captions: function(e){
+    	var model = e.model;
+    	if(!model.trial.set_caption && model.trial.set){
+    		model.set('trial.set_caption', this._caption_from_file(this._file_from_fkey[model.trial.set]));
+    	}
+    	if(!model.trial.pos_caption && model.trial.pos){
+    		model.set('trial.pos_caption', this._caption_from_file(this._file_from_fkey[model.trial.pos]));
+    	}
+    }, _make_tet_captions: function(e){
+    	var model = e.model;
+    	if(!model.tet_block.tet_caption && model.tet_block.tet){
+	    	model.set('tet_block.tet_caption', this._caption_from_file(this._file_from_fkey[model.tet_block.tet]));	
+    	}
+    	for(let ii=0; ii<model.tet_block.cuts.length; ii++){
+    		if(!model.tet_block.cuts[ii].caption){
+		    	model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(this._file_from_fkey[model.tet_block.cuts[ii].cut]));			
+    		}
+    	}
     }, _caption_from_file: function(file){
+    	 // Note that reading file.lastModified is slow, so we only call this func when needed
     	 var d = new Date(file.lastModified);
-    	 return file.name + " (" + Math.ceil(file.size/1204,0).toLocaleString() + 
-    	 		"KB)\nmodified at " + d.toLocaleTimeString({}, {hour: "numeric", minute: "numeric"})
-    	 		 + " on " + d.toLocaleDateString({}, {month:"short", day:"numeric", year: "numeric"});
+    	 return file.name + " (" + this._byte_formatter.format(file.size/1204) + 
+    	 		"KB)\nmodified at " + this._time_formatter.format(d)
+    	 		 + " on " + this._date_formatter.format(d);
     }, _numeric_sort: function(a,b){
     	return a-b; 
     }, _reassign_trials_denovo: function(){
@@ -427,9 +470,9 @@ Polymer({
 		}
     }, got_base_for_cuts: function(results){
     	// TODO: there is a lot of copy-paste from main drop function, should fix that really.
-
     	var trials = this.trials;
     	var available_tets = new Set(this.available_tets); // we want this as a set for use below...
+    	var modified_trials = new Set(); // we will sort the innards of these trials at the end
     	for(let ii=0; ii<results.length; ii++){
     		let base = results[ii].base;
     		let ff = results[ii].file;
@@ -446,16 +489,19 @@ Polymer({
 				num = parseInt(num[1]);
 				tet_obj = this._get_tet_obj(trial, num);
 				available_tets.add(num);
+				let fkey = this._file_from_fkey.length;
+				this._file_from_fkey.push(ff);
 				tet_obj.cuts.push({
-					cut: this._fkey_from_file(ff),
+					cut: fkey,
 					cut_type: 'cut',
-					date: ff.lastModified,
-					short_name: ff.name.replace(base, '~'),
-					caption: this._caption_from_file(ff)
+					short_name: ff.name.replace(base, '~')
 				});
 			} 
+	    	modified_trials.add(trial);
     	}
-
+    	for(let trial of modified_trials){
+    		this._sort_trial_innards(trial);
+    	}
 		trials.sort(function(a,b){
 			return a.name > b.name;
 		})

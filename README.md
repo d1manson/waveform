@@ -162,7 +162,7 @@ There are a bunch of things called "keys", used for refering to specific objects
 
 * ckey - this is similar to the akey, but is for canvases rather than arrays.  See canvas-manger. TODO: actually apply this nomenclature.
 
-* fkey - again, similar to akey, but is for files.  The fkey is the modified-date followed by the file name. This means that two files with the same name still have unique fkeys.
+* fkey - again, similar to akey, but is for files.  managed by file-organiser. a simple counter, starting at 1.
 
 
 
