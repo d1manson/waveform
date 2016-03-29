@@ -19,7 +19,7 @@ element can be _flexible_.
 Example:
 
     <div horizontal layout>
-      <div>left</div>
+      <div-iron-resize>left</div-iron-resize>
       <iron-splitter direction="left"></iron-splitter>
       <div flex>right</div>
     </div>
@@ -33,7 +33,7 @@ For horizontal splitter set `direction` to `up` or `down`.
 Example:
 
     <div vertical layout>
-      <div>top</div>
+      <div-iron-resize>top</div-iron-resize>
       <iron-splitter direction="up"></iron-splitter>
       <div flex>bottom</div>
     </div>
@@ -47,6 +47,16 @@ Example:
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-resizable-behavior/iron-resizable-behavior.html">
 <link rel="import" href="bower_components/iron-flex-layout/iron-flex-layout.html">
+
+<dom-module id="div-iron-resize">
+<template><content></content></template>
+<script>
+  Polymer({
+    is: 'div-iron-resize',
+    behaviors: [Polymer.IronResizableBehavior]
+  })
+</script>
+</dom-module>
 
 <dom-module id="iron-splitter">
   <style>
@@ -178,6 +188,7 @@ Example:
       //},
       sizeChanged: function(new_val){
           this.set('target.style' + ('.' + this.dimension), new_val);
+          this.target.notifyResize && this.target.notifyResize(); // TODO: this is super-hacky, I really don't get the iron-resize paradigm
           this.notifyResize();
       },
       setSizePc: function(new_val){

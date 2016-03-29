@@ -1,6 +1,12 @@
 <!--
 CUSTOM ELEMENT: file-organiser
 by: DM
+
+
+TODO: when encountering duplicate files, reuse original's fkey for duplicate...
+need to do this right at the start, i.e. never assign a novel fkey if we're going
+to use an old one.  Note that due to the cache in parsed-data you can never be quite
+sure what you'll get if you drop modify a file on disk after dropping it into the program.
 -->
 
 <link rel="import" href="bower_components/polymer/polymer.html">
@@ -67,6 +73,9 @@ display: block;
 margin: 2px;
 width: initial !important;
 }
+.trial.selected{
+background: #ffffe0;
+}
 .trial_top{
 margin-bottom: 4px;
 }
@@ -88,8 +97,8 @@ border: 1px #000 solid;
 padding: 1px 2px 1px 2px;
 margin-left: 1px;
 background: #ddd;
-cursor: default;
-font-size: 10px;
+line-height: 12px;
+vertical-align: bottom;
 }
 .trial_tet_block{
 display: inline-block;
@@ -103,11 +112,16 @@ background: #ddb550;
 border-color: #552510;
 color: #552510;
 border-width: 2px;
+font-size: 10px;
 }
 .trial_cut{
 background: #fbb;
 border-color: #500;
 color: #500;
+}
+.trial_cut.selected{
+background: #500;
+color: #fff;
 }
 .trial_cut.obj{
 background: #bbF;
@@ -133,21 +147,35 @@ border: 1px solid #ccc;
 cursor: pointer;
 font-size: 12px;
 }
+.tet_button.selected{
+background: #ffffe0;
+}
 .tet_switcher_title{
 font-size: 12px;
 display: inline-block;
 margin-left: 4px;
 }
+.trial_tet_block.selected .trial_cut,
+.trial_tet_block.selected .trial_tet{
+font-size: 10px;
+}
+/* TODO: on hover, we want a tooltip-style thing rather than causing an awkward reflow */;
+/*
+.trial_tet_block:hover .trial_cut,
+.trial_tet_block:hover .trial_tet{
+font-size: 10px;
+}
+*/
 </style>
 <template>
   <div class="tet_switcher" style$="[[_scroll_shadow(scrolled_down)]]">
   	<div class="tet_switcher_title">tetrode:</div>
   	<template is="dom-repeat" items="[[available_tets]]">
-  		<div class="tet_button">[[item]]</div>
+  		<div class$="tet_button [[_selected_equality(item, selected_tet_num)]]" on-click="_tet_button_click">[[item]]</div>
   	</template>
   </div>
-  <iron-list items="[[trials]]" as="trial" id="trial_list">
-    <template><div><div class='trial'>
+  <iron-list items="[[trials]]" as="trial" id="trial_list" selection-enabled>
+    <template><div><div class$='trial [[_selected(selected)]]'>
 	    <div class='trial_top' on-mouseenter="_make_trial_captions">
 		    <div class='trial_title'>trial '[[trial.name]]'</div>
 		    <div class='trial_set' style$='display:[[_show(trial.set)]];' title$='[[trial.set_caption]]'>~.set</div>
@@ -155,10 +183,10 @@ margin-left: 4px;
 		</div>
 		<div class='trial_bottom'>
 			<template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
-				<div class='trial_tet_block' on-mouseenter="_make_tet_captions">
+				<div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]' on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
 					<div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
 					<template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
-						<div class$='trial_cut [[cut.cut_type]]' title$='[[cut.caption]]'>[[cut.short_name]]</div>
+						<div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' on-click="_cut_click">[[cut.short_name]]</div>
 					</template>
 				</div>
 			</template>
@@ -171,6 +199,7 @@ margin-left: 4px;
 	
 Polymer({
 	is: 'file-organiser',
+	behaviors: [Polymer.IronResizableBehavior],
 	properties: {
 		no_files: {
 			type: Boolean,
@@ -202,6 +231,24 @@ Polymer({
 			notify: true,
 			readOnly: true
 		},
+		selected_trial: {
+			type: String,
+			value: "",
+			notify: true,
+			observer: '_update_trial'
+		},
+		selected_tet_num: {
+			type: Number,
+			value: -1,
+			notify: true,
+			observer: '_update_tet_num'
+		},
+		selected_cut: {
+			type: Number, //fkey
+			value: -1,
+			notify: true,
+			observer: '_update_cut'
+		},
 		trials: {
 			type: Array,
 			value: function(){ return [];}
@@ -212,14 +259,62 @@ Polymer({
 		this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
 		this._file_from_fkey = [undefined]; // fkeys are simple numerical indices, >0
 		this._trial_from_base = new Map();
-	    document.addEventListener("dragover", this._dragover.bind(this));
+		document.addEventListener("dragover", this._dragover.bind(this));
 	    document.addEventListener("drop", this._drop.bind(this));
     }, attached: function(){
     	var self = this;
     	this.$.trial_list.addEventListener('scroll', function(){
 	    	self._setScrolled_down(this.scrollTop > 0);
 	    });
-    },_dragover: function(e){
+	    this.$.trial_list.addEventListener('selected-item-changed', function(e){
+	    	self.debounce('update_trial_selection', self._update_trial_selection.bind(self));
+	    });
+    }, _update_trial_selection: function(){
+    	var new_sel = this.$.trial_list.selectedItem;
+    	var old_sel = this._trial_from_base[this.selected_trial];
+    	if(!new_sel && old_sel){
+    		this.$.trial_list.selectItem(old_sel);
+    	} else if(new_sel === old_sel){
+    		// nothing changed after all
+    	} else {
+    		this.set('selected_trial', new_sel.name);
+    	}
+    }, _update_tet_num: function(old_val, new_val){
+    	this._select_default_cut(); // note cut may be updated again before the debouncer fires
+    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+    }, _update_trial: function(old_val, new_val){
+    	this._select_default_cut(); // note cut may be updated again before the debouncer fires
+    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+    }, _update_cut: function(old_val, new_val){
+    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+    }, _tet_button_click: function(e){
+    	var model = e.model;
+    	this.set('selected_tet_num', model.item);
+    }, _tet_block_click: function(e){
+    	var model = e.model;
+    	this.set('selected_trial', model.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
+    	this.set('selected_tet_num', model.tet_block.tet_num);
+    	//e.stopPropagation();
+    }, _cut_click: function(e){
+    	var model = e.model;
+    	this.set('selected_trial', model.dataHost.dataHost.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
+    	this.set('selected_tet_num', model.dataHost.dataHost.tet_block.tet_num);
+    	this.set('selected_cut', model.cut.cut);
+    	//e.stopPropagation();
+    }, _select_default_cut: function(){
+		var trial = this._trial_from_base[this.selected_trial];
+    	if(trial){
+	    	var tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
+	    	if(tet_obj){
+		    	for(let ii=0;ii<tet_obj.cuts.length; ii++){
+		    		if(tet_obj.cuts[ii].cut === this.selected_cut){
+		    			return; // we already have a cut selected for the correct trial-tet
+		    		}
+		    	}
+	    	}
+	    }
+    	this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ? tet_obj.cuts[0].cut : "");	
+    }, _dragover: function(e){
 		if(this.is_dragging_out) return;
 		
         e.stopPropagation();
@@ -230,6 +325,21 @@ Polymer({
     	// drag over is fired every few ms, show dragging notification for at least 500ms 
         clearTimeout(this._drag_end_timer)
         this._drag_end_timer = setTimeout(this._cancel_drag.bind(this),500); 
+
+    }, _switched_selection: function(){
+    	// called via debounce when trial/tet/cut is changed
+
+    	var trial = this._trial_from_base[this.selected_trial];
+    	var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
+    	var cut = this.selected_cut;
+
+    	var files = {
+			set: trial && trial.set,
+			pos: trial && trial.pos,
+			tet: tet_obj && tet_obj.tet,
+			cut: cut
+		}
+		console.log(JSON.stringify(files));
 
     }, _drop: function(e){
 	  	e.stopPropagation();
@@ -329,10 +439,7 @@ Polymer({
 			let trial_files = files_for_base[base];
 			let trial = this._trial_from_base[base];
 			if(!trial){
-				trial = {
-					name: base,
-					tets: []
-				};
+				trial = this._new_trial(base);
 				this._trial_from_base[base] = trial;
 				trials.push(trial);
 			}
@@ -348,7 +455,7 @@ Polymer({
 	            	let num = ff.name.match(this._regex_cut_tet_num);
 					if(num){
 						num = parseInt(num[1]);
-						tet_obj = this._get_tet_obj(trial, num);
+						tet_obj = this._get_tet_obj(trial, num, true);
 						available_tets.add(num);
 						tet_obj.cuts.push({
 							cut: fkey,
@@ -358,7 +465,7 @@ Polymer({
 					} 
 	            } else {
 	            	let tet_num = parseInt(ext);
-	            	let tet_obj = this._get_tet_obj(trial, tet_num);
+	            	let tet_obj = this._get_tet_obj(trial, tet_num, true);
 	            	available_tets.add(tet_num);
 	            	if(ff.name.slice(-ext.length-".clu".length -1, -ext.length-1) === ".clu"){
 	            		// clu file
@@ -384,6 +491,15 @@ Polymer({
 		available_tets.sort(this._numeric_sort);
 		this._setAvailable_tets(available_tets);
 		this._reassign_trials_denovo();	// notify absolutely everything !!! 
+	}, _new_trial: function(base){
+		return {
+			name: base,
+			tets: [],
+			set: undefined,
+			set_caption: undefined,
+			pos: undefined,
+			pos_caption: undefined
+		};
 	}, _sort_trial_innards: function(trial){
 		// sort tets for the trial
 		trial.tets = trial.tets.sort(function(a,b){
@@ -413,18 +529,20 @@ Polymer({
 				});
 			}
 		}
-	}, _get_tet_obj: function(trial, tet_num){
+	}, _get_tet_obj: function(trial, tet_num, push_if_needed){
 		// adds it to trial.tets if it doesn't exist
     	for(tt=0; tt<trial.tets.length; tt++){
     		if(trial.tets[tt].tet_num === tet_num){
     			return trial.tets[tt];
     		}
     	}
-    	var obj = {
-			tet_num: tet_num,
-			cuts: []
-		};
-		trial.tets.push(obj);
+    	if(push_if_needed){
+	    	var obj = {
+				tet_num: tet_num,
+				cuts: []
+			};
+			trial.tets.push(obj);    		
+    	}
 		return obj;
 
 	}, _cancel_drag: function(){
@@ -435,7 +553,11 @@ Polymer({
 		return v ? '' : 'none';
 	}, _scroll_shadow: function(v){
 		return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
-    }, _make_trial_captions: function(e){
+    }, _selected: function(v){
+    	return v ? 'selected' : '';
+    }, _selected_equality: function(a, b){
+    	return a && a === b ? "selected" : "";
+    },_make_trial_captions: function(e){
     	var model = e.model;
     	if(!model.trial.set_caption && model.trial.set){
     		model.set('trial.set_caption', this._caption_from_file(this._file_from_fkey[model.trial.set]));
@@ -468,6 +590,7 @@ Polymer({
 		for(let ii=0; ii<this.trials.length; ii++){
 			this._trial_from_base[this.trials[ii].name] = this.trials[ii];
 		}
+		this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
     }, got_base_for_cuts: function(results){
     	// TODO: there is a lot of copy-paste from main drop function, should fix that really.
     	var trials = this.trials;
@@ -478,16 +601,13 @@ Polymer({
     		let ff = results[ii].file;
     		let trial = this._trial_from_base[base];
     		if(!trial){
-    			trial = {
-					name: base,
-					tets: []
-				};
+    			trial = this._new_trial(base);
 				trials.push(trial);
     		}
         	let num = ff.name.match(this._regex_cut_tet_num);
 			if(num){
 				num = parseInt(num[1]);
-				tet_obj = this._get_tet_obj(trial, num);
+				tet_obj = this._get_tet_obj(trial, num, true);
 				available_tets.add(num);
 				let fkey = this._file_from_fkey.length;
 				this._file_from_fkey.push(ff);
@@ -501,7 +621,7 @@ Polymer({
     	}
     	for(let trial of modified_trials){
     		this._sort_trial_innards(trial);
-    	}
+    	}	
 		trials.sort(function(a,b){
 			return a.name > b.name;
 		})
@@ -510,7 +630,7 @@ Polymer({
 		this._setAvailable_tets(available_tets);
     	this._reassign_trials_denovo();
     },
-    _regex_cut_tet_num: /(\d*)[a-zA-Z _]*\.cut$/
+    _regex_cut_tet_num: /(\d*)[a-zA-Z _]*\.cut$/,
 })
 
 </script>
