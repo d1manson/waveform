@@ -1,0 +1,132 @@
+<!---
+
+TODO: on window resize ensure that pane isn't off screen, and move on screen if needed.
+-->
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+<dom-module id="floating-pane">
+
+<style>
+.pane_title{
+background: #333;
+color: #fff;
+font-weight: bold;
+display: block;
+padding: 5px;
+}
+:host{
+position: fixed;
+top: 0px;
+left: 0px;
+transform: translate(400px,100px);
+-webkit-transform: translate(400px, 100px);
+min-width: 200px;
+max-width: 400px;
+background-color: rgba(255,255,255,0.8);
+display: none;
+z-index: 100;
+cursor: move;
+box-shadow: 3px 3px 7px #999;
+}
+.pane_body{
+padding: 5px;
+border: 1px solid #000;
+}
+.grabber{
+position: absolute;
+top: 0px;
+left: 0px;
+right: 0px;
+bottom: 0px;
+}
+.grabber:hover{
+border: 3px solid red;
+background: rgba(255,0,0,0.2);
+}
+::content > .nodrag{
+cursor: default;
+display: table; /* gives auto width, while still being display-block-like */
+}
+</style>
+<template>
+	<div class="pane_title"><content select=".pane_title"></content></div>
+	<div class="pane_body"><content></content></div>
+	<div class="grabber" id="grabber" style$="[[_show(space_is_down)]]"></div>
+</template>
+
+<script>
+
+(function(){
+
+var top_x_index = 100;
+var init_x = 100;
+
+Polymer({
+	is: 'floating-pane',
+	properties: {
+		space_is_down: {
+			type: Boolean,
+			value: false,
+			notfiy: true,
+			readOnly: true
+		}
+	}, created: function(){
+		// bind these methods so we can add/remove easily
+		this._on_drag_move_bound = this._on_drag_move.bind(this);
+		this._on_drag_end_bound = this._on_drag_end.bind(this);
+
+	}, attached: function(){
+		var self = this;
+		// I don't get Polymer's listener thing..or maybe I do, but this works fine..
+		this.$.grabber.addEventListener('mouseup', this._on_mouseup.bind(this));
+		this.addEventListener('mousedown', this._on_drag_start.bind(this));
+		document.addEventListener('keydown', function(e){
+			if(e.which === 32){
+				self._setSpace_is_down(true)
+			}
+		}, true);
+		document.addEventListener('keyup', function(e){
+			if(e.which === 32){
+				self._setSpace_is_down(false);
+			}
+		}, true);
+		init_x += 100;
+		this._translate(init_x, 100); // not sure this is that helpful, but hey
+	}, _show: function(v){
+		return v ? '' : 'display: none;'
+	}, _on_mouseup: function(e){
+		this.style.display = 'none';
+	}, _on_drag_start: function(e){
+		// if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
+		var el = e.target;
+		while(el !== e.currentTarget){
+			for(let c of el.classList){
+				if(c === 'nodrag'){
+					return;
+				}
+			}
+			el = el.parentNode;
+		}
+		var offset = this.getBoundingClientRect();
+	    e.preventDefault();
+		this.style.zIndex = ++top_x_index;
+		this._drag_off_left = e.clientX-offset.left;
+		this._drag_off_top = e.clientY-offset.top;
+	    document.addEventListener('mousemove', this._on_drag_move_bound, true);
+	    document.addEventListener('mouseup', this._on_drag_end_bound, true); 
+
+	}, _on_drag_move: function(e) {
+		this._translate(e.clientX - this._drag_off_left, e.clientY - this._drag_off_top);
+	}, _on_drag_end: function(e){
+	    document.removeEventListener('mousemove', this._on_drag_move_bound, true);
+	    document.removeEventListener('mouseup', this._on_drag_end_bound, true); 
+	}, _translate: function(x, y){
+		this.style.webkitTransform = 'translate(' + x + "px, " + y + "px)";
+	}
+});
+
+
+})();
+</script>
+</dom-module>

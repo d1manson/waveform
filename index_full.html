@@ -24,6 +24,7 @@
 <link rel="import" href="parsed-data.html">
 <link rel="import" href="file-organiser.html">
 <link rel="import" href="drop-zone.html">
+<link rel="import" href="floating-pane.html">
 </head>
 
 <body>
@@ -54,176 +55,153 @@
 					undo_stack_descriptions="{{cut_undo_stack}}"
 					redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-		<div class="floatinginfo tc_info" style="display: initial;">
-			<div class='floating_title'>Temporal auto correlation [t]</div>
-			<div class='floating_body'>
-				Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
-				<paper-slider class="nodrag" pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
-				The number of bins is fixed at 100.
-			</div>
-		</div>
-
-
 	<div class="hidden_clipboard"></div>
 
 	<div class="floating_layer">
 			
-		<div class="floatinginfo action_info" style="display:initial; top:30%;">
-			<div class='floating_title'>Action List [z]</div>
-			<div class='floating_body'>
+		<floating-pane id="action_info" style="display:initial;">
+			<div class='pane_title'>Action List [z]</div>
 			<undo-stack-view 
 					undo_stack="[[cut_undo_stack]]"
 					redo_stack="[[cut_redo_stack]]"></undo-stack-view>
-			</div>
-		</div>
+		</floating-pane>
 		
-		<div class="floatinginfo drift_info">
-			<div class='floating_title'>Drift [d]</div>
-			<div class='floating_body'>
-				Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
-				<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-				So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
-			</div>
-		</div>
+
+		<floating-pane id="tc_info" style="display: initial;">
+			<div class='pane_title'>Temporal auto correlation [t]</div>
+			<p class="nodrag">
+				Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
+				<paper-slider pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
+			</p><p>
+				The number of bins is fixed at 100.
+			</p>
+		</floating-pane>
+
+		<floating-pane id="drift_info">
+			<div class='pane_title'>Drift [d]</div>
+			Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
+			<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+			So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+		</floating-pane>
 		
-		<div class="floatinginfo help_info">
-			<div class='floating_title'>Help [?]</div>
-			<div class='floating_body'>
-				Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
-				You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-			</div>						
-		</div>
+		<floating-pane id="help_info">
+			<div class='pane_title'>Help [?]</div>
+			Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
+			You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
+		</floating-pane>
 			
-		<div class="floatinginfo shortcut_info">
-			<div class='floating_title'>Shortcuts [k]</div>
-			<div class='floating_body'>
-				Shorcuts applied to the "active" group, which is the one under the cursor:
-				<ul>
-				<li><b>e</b> set the cluster painting destination group to the active group.</li>
-				<li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-				<li><b>s</b> launch the swap dialog for the "active" group.</li>
-				<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-				</ul>
-				Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
-				<ul>
-				<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
-				<li><b>r</b> spatial ratemap</li>
-				<li><b>c</b> directional ratemap ("c" is for circle)</li>
-				<li><b>v</b> directional ratemap ("v" is for velocity)</li>
-				<li><b>t</b> temporal autocorrelogram</li>
-				</ul>
-				Other shortcuts:
-				<ul>
-				<li><b>d</b> toggle drift rendering on/off</li>
-				<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-				<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-				<li><b>enter</b> increment cluster painting destination group</li>
-				<li><b>esc</b> open/close the toolbar</li>
-				<li><b>p</b> toggle waveform palette</li>
-				<li><b>k</b> show this info ("k" is for keyboard)</li>
-				<li><b>h</b> show header info</li>
-				<li><b>?</b> open GitHub info in a new tab</li>
-				</ul>
-			</div>						
-		</div>
+		<floating-pane id="shortcut_info">
+			<div class='pane_title'>Shortcuts [k]</div>
+			Shorcuts applied to the "active" group, which is the one under the cursor:
+			<ul>
+			<li><b>e</b> set the cluster painting destination group to the active group.</li>
+			<li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+			<li><b>s</b> launch the swap dialog for the "active" group.</li>
+			<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+			</ul>
+			Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+			<ul>
+			<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
+			<li><b>r</b> spatial ratemap</li>
+			<li><b>c</b> directional ratemap ("c" is for circle)</li>
+			<li><b>v</b> directional ratemap ("v" is for velocity)</li>
+			<li><b>t</b> temporal autocorrelogram</li>
+			</ul>
+			Other shortcuts:
+			<ul>
+			<li><b>d</b> toggle drift rendering on/off</li>
+			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+			<li><b>enter</b> increment cluster painting destination group</li>
+			<li><b>esc</b> open/close the toolbar</li>
+			<li><b>p</b> toggle waveform palette</li>
+			<li><b>k</b> show this info ("k" is for keyboard)</li>
+			<li><b>h</b> show header info</li>
+			<li><b>?</b> open GitHub info in a new tab</li>
+			</ul>						
+		</floating-pane>
 		
-		<div class="floatinginfo speed_info">
-			<div class='floating_title'>Speed ratemap [v]</div>
-			<div class='floating_body'>
+		<floating-pane id="speed_info">
+			<div class='pane_title'>Speed ratemap [v]</div>
+			<p>
 				Bin size <span id='dir_binsize_val' class="slider_val">4 cm/s</span><br>
-				Upper limit <span id='dir_binsize_val' class="slider_val">45 cm/s</span><br><br>
-
-				Histogram shows slowest speed at the top, and upper limit speed at the bottom.<br><br>
-
+				Upper limit <span id='dir_binsize_val' class="slider_val">45 cm/s</span>
+			</p><p>
+				Histogram shows slowest speed at the top, and upper limit speed at the bottom.
+			</p><p>
 				WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
-				<!--<paper-slider class="nodrag" id="rm_binsize_slider" pin snaps min="0.5" max="10" step="0.5" value="2.5" style='width:300px'></paper-slider>
-				<br><br>
-				Smoothing kernel boxcar <span id='rm_smoothing_val' class="slider_val">(2x?+1) by (2x?+1) bins</span><br>
-				<paper-slider class="nodrag" id="rm_smoothing_slider" pin snaps min="0" max="5" step="1" value="2" style='width:300px;'></paper-slider><br>
-				-->
-			</div>
-		</div>
+			</p>
+		</floating-pane>
 
+		<floating-pane id="palette_info">
+			<div class='pane_title'>Toggle waveform palette [p]</div>
+			There are two palette modes. Click this button (or press [p]) to toggle between the two modes: 
+			<ul>
+			<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
+			<li>render each pixel based on how many waves cross that pixel.</li>
+			</ul>
+		</floating-pane>
 		
-
-		<div class="floatinginfo palette_info">
-			<div class='floating_title'>Toggle waveform palette [p]</div>
-			<div class='floating_body'>
-				There are two palette modes. Click this button (or press [p]) to toggle between the two modes: 
-				<ul>
-				<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
-				<li>render each pixel based on how many waves cross that pixel.</li>
-				</ul>
-			</div>						
-		</div>
-		
-		<div class="floatinginfo file_info">
+		<floating-pane id="file_info">
 			<!-- TODO: show filterable headers -->
-		</div>
-			
+		</floating-pane>
 
-		<div class="floatinginfo rm_info" style="display: initial;left:20%;">
-			<div class='floating_title'>Spatial ratemap [r]</div>
-			<div class='floating_body'>
+		<floating-pane id="rm_info" style="display: initial;">
+			<div class='pane_title'>Spatial ratemap [r]</div>
+			<p class="nodrag">
 				Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
 				<paper-slider class="nodrag" pin snaps min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style='width:300px'></paper-slider>
-				<br><br>
+			</p><p class="nodrag">
 				Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
-				<br><br>
+				<paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
+			</p><p class="nodrag">
 				Ratemap frequency values are <span class="slider_val">[[options.max_rate_spa]]</span><br>
 				<paper-slider class="nodrag" pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
-				
-				<br><br>
+			</p><p>
 				The true peak rate is shown as "spa max" when you move your cursor over a group.
-				<br>
-			</div>
-		</div>
+			</p>
+		</floating-pane>
 		
-		<div class="floatinginfo dir_info" style="display: initial;left:45%;">
-			<div class='floating_title'>Directional ratemap [c]</div>
-			<div class='floating_body'>
+		<floating-pane id="dir_info" style="display: initial;">
+			<div class='pane_title'>Directional ratemap [c]</div>
+			<p class="nodrag">
 				Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
 				<paper-slider class="nodrag" pin snaps min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style='width:300px'></paper-slider>
-				<br><br>
+			</p><p class="nodrag">
 				Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
 				<paper-slider class="nodrag" pin snaps min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style='width:300px'></paper-slider>
+			</p><p>
+				Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
+				 the direction of movement is used (this is sometimes refered to as "displacement direction").
+			</p>
+		</floating-pane>
 
-				<br><br>
-
-				Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode, the direction of movement is used (this is sometimes refered to as "displacement direction").
-				<br>
-
-			</div>
-		</div>
-
-		<div class="floatinginfo pos_info" style="display: initial;left:20%;top:35%">
-			<div class='floating_title'>
-				position post processing
-			</div>
-			<div class='floating_body'>
+		<floating-pane id="pos_info" style="display: initial;">
+			<div class='pane_title'>position post processing</div>
+			<p>
 				If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
-				the two spots have swapped. <br><br>
+				the two spots have swapped.
+			</p><p class="nodrag">
 				Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
 				<paper-slider class="nodrag" pin snaps min="1" max="2" step="1" value="{{options.use_n_leds}}" style='width:80px'></paper-slider>
-				<br>
-
-				The following filtering and smoothing is applied to the one/two data streams separately. If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.<br><br>
-
+			</p><p>
+				The following filtering and smoothing is applied to the one/two data streams separately.
+				If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
+			</p><p class="nodrag">
 				Max speed <span class="slider_val">[[options.speed_filter_mps]] m/s</span><br>
 				<paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
-				Where the speed appears to rise above this threshold the data is considered invalid.<br>
-				<br>
-				Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data), new values are created by linearly interpolated across the gaps.
-				<br><br>
-				
+			</p><p>
+				Where the speed appears to rise above this threshold the data is considered invalid.
+			</p><p>
+				Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
+				new values are created by linearly interpolated across the gaps.
+			</p><p class="nodrag">
 				Smoothing <span class="slider_val">[[options.pos_smoothing_s]] s</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider><br>
+				<paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
+			</p><p>
 				Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
-				
-				<br><br>
-			</div>
-		</div>
+			</p>
+		</floating-pane>
 
 	</div>
 
@@ -448,14 +426,15 @@ document.getElementById('the_app').initializeDefaultOptions = function(ev) {
 	};
 }
 
+document.addEventListener('contextmenu', function(e){e.preventDefault();});
 </script>
 
 
 <!-- public libraries and generic stuff for this app -->
-<script src="jquery.min.js"></script>  
+<!--<script src="jquery.min.js"></script>  -->
 <!--<script src="jquery.mousewheel.min.js"></script>-->
-<script src="keymaster.min.js"></script>  
-<script src="utils.js"></script>
+<!--<script src="keymaster.min.js"></script>  -->
+<!--<script src="utils.js"></script>-->
 <!--<script src="webgl-debug.js"></script> -->
 
 </body>
