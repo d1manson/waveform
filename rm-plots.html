@@ -52,8 +52,8 @@ var pos_xy;
 var pos_units_per_cm;
 var pos_dir;
 var pos_speed;
-var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = {}; 
+var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var key_to_rendered_options = new Map(); 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
@@ -62,6 +62,7 @@ var key_generation = 0;
 var cached_spike_pos_ind;
 var cached_xy_bins;
 var cached_xy_dwell;
+var cached_xy_no_dwell;
 var cached_dir_bins;
 var cached_dir_dwell;
 var cached_speed_bins;
@@ -111,7 +112,7 @@ var set_options = function(opts){
 var set_spike_times = function(timebase, arrays){
     clear_cache(['spikes_timebase', 'spike_times']);
     spikes_timebase = timebase;
-    spike_times = arrays.data; 
+    spike_times = arrays && arrays.data; 
     make_all_keys_pending();
     touch_timer();
 }
@@ -121,10 +122,11 @@ var set_pos_xy = function(timebase, units_per_cm, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_xy']);
     }
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
-    pos_xy = arrays.data;
-    // TODO: clear anything cached that related to pos_xy
+    pos_xy = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
@@ -134,9 +136,10 @@ var set_pos_dir = function(timebase, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_dir']);
     }
-    pos_dir = arrays.data;
-    // TODO: clear anything cached that related to pos_dir
+    pos_dir = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
@@ -146,16 +149,17 @@ var set_pos_speed = function(timebase, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_speed']);
     }
-    pos_speed = arrays.data;
-    // TODO: clear anything cached that related to pos_speed
+    pos_speed = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
 
 var make_all_keys_pending = function(){
     keys_pending_render = [];    
-    for(var key in key_to_array){
+    for(let key in key_to_array){
         keys_pending_render.push(key);
     }
 }
@@ -174,9 +178,9 @@ var update_keys = function(changes, arrays){
     // generation and that it's still wanted.
 
     var remove_keys = changes.remove || [];
-    for(var ii=0; ii<remove_keys.length; ii++){
-        delete key_to_array[remove_keys[ii]];
-        delete key_to_rendered_options[remove_keys[ii]];
+    for(let ii=0; ii<remove_keys.length; ii++){
+        key_to_array.delete(remove_keys[ii]);
+        key_to_rendered_options.delete(remove_keys[ii]);
     }
 
     if(changes.generation_add !== changes.generation_remove){
@@ -185,7 +189,7 @@ var update_keys = function(changes, arrays){
     }
 
     var add_keys = changes.add || [];
-    for(var ii=0; ii<add_keys.length; ii++){
+    for(let ii=0; ii<add_keys.length; ii++){
         key_to_array[add_keys[ii]] = arrays[add_keys[ii]];
         keys_pending_render.push(add_keys[ii]);
     }
@@ -270,7 +274,7 @@ var make_cached_spike_pos_ind = function(){
     cached_spike_pos_ind = new Uint32Array(spike_times.length);
     
     var factor = pos_timebase / spikes_timebase;
-    for(var i=0; i<cached_spike_pos_ind.length; i++)
+    for(let i=0; i<cached_spike_pos_ind.length; i++)
         cached_spike_pos_ind[i] = spike_times[i]*factor; //integer result, so implicitly the floor 
 
     return true;
@@ -285,8 +289,9 @@ var make_cached_xy_bins_and_dwell = function(){
 
     var factor = 1/pos_units_per_cm/render_options.cm_per_spa_bin;
     cached_xy_bins = new Uint8ClampedArray(pos_xy.length);
-    for(var i=0;i<pos_xy.length;i++)
+    for(let i=0;i<pos_xy.length;i++){
         cached_xy_bins[i] = pos_xy[i] * factor;           
+    }
     
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
@@ -314,8 +319,9 @@ var make_cached_dir_bins_and_dwell = function(){
 
     var factor = 180/pi/render_options.deg_per_dir_bin;
     cached_dir_bins = new Uint8ClampedArray(pos_dir.length);
-    for(var i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_dir.length;i++){
         cached_dir_bins[i] = pos_dir[i] * factor;
+    }
     
     cached_spike_dir_bins = pick(cached_dir_bins, cached_spike_pos_ind); 
 
@@ -340,7 +346,7 @@ var make_cached_speed_bins_and_dwell = function(){
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(var i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_dir.length;i++)
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
     
@@ -362,7 +368,7 @@ var get_group_xy_rm = function(key){
 
     var spike = get_smoothed(spike, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
     var ratemap = r_divide_float(spike, cached_xy_dwell);
-    useMask(ratemap, cached_xy_no_dwell);
+    use_mask(ratemap, cached_xy_no_dwell);
 
     var max_map = max(ratemap);
     var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
@@ -380,11 +386,11 @@ var to_image_data = function(map, max_map){
      //for binning, we want values on interval [1 P], so use eps (lazy solution):
     var eps = 0.0000001;
     if(max_map == 0){
-        for(var i=0; i<map.length; i++)
+        for(let i=0; i<map.length; i++)
             im[i] = cached_xy_no_dwell[i]? palette[0] : palette[1];
     }else{
         var factor = (palette.length-1)/(max_map*(1+eps));
-        for(var i=0;i<map.length;i++)
+        for(let i=0;i<map.length;i++)
             im[i] = cached_xy_no_dwell[i]? palette[0] : palette[Math.min(1+(0 | (map[i]*factor)), palette.length-1)];
     }
     return im;
@@ -405,10 +411,10 @@ var get_group_dir_rm = function(key){
     
     // scale ratemap to have max 1...(for easy plotting)
     var f = 1/max(ratemap);
-    for(var i=0;i<ratemap.length;i++)
+    for(let i=0;i<ratemap.length; i++)
         ratemap[i] *=f; 
     // replace nans with zero..TODO: this isn't right there are problems..!
-    for(var i=0; i<ratemap.length; i++)
+    for(let i=0; i<ratemap.length; i++)
         ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
         
     // TODO: send something to main somehow!
@@ -441,16 +447,18 @@ var plot_histogram = function(w, h, vals){
     var im = new Uint32Array(w*h);
 
     var f = w/max(vals);
-    for(var i=0, y=0;i<vals.length && y<h;i++,y++){
-        var h = f*vals[i];
-        for (var k=0;k<3;k++){
-            for(var x=0;x<h;x++)
+    for(let i=0, y=0;i<vals.length && y<h;i++,y++){
+        let h = f*vals[i];
+        for (let k=0;k<3;k++){
+            for(let x=0;x<h;x++){
                 im[y*w+w-1-x] = color_a;
+            }
             im[y*w+w-1] = color_ax;
             y++;
         }
-        for(var x=0;x<h;x++)
+        for(let x=0;x<h;x++){
             im[y*w+w-1-x] = color_b;
+        }
         im[y*w+w-1] = color_ax;
     }
     return im;
@@ -462,7 +470,7 @@ var hist_1 = function(inds, n_bins){
     var result = new Uint32Array(n_bins); 
     var n = inds.length;
     
-    for(var i=0;i<n;i++){
+    for(let i=0;i<n;i++){
         result[inds[i]]++;
     }
     return result;
@@ -472,7 +480,7 @@ var hist_2 = function(inds_xy, n_1, n_0){
     var result = new Uint32Array(n_0*n_1); 
     var n = inds_xy.length/2;
 
-    for(var i=0; i<n; i++){
+    for(let i=0; i<n; i++){
         result[inds_xy[i*2+1]*n_1 + inds_xy[i*2+0]]++;
     }
     return result;
@@ -480,7 +488,7 @@ var hist_2 = function(inds_xy, n_1, n_0){
 
 var is_zero = function(vector){
     var result = new Uint8ClampedArray(vector.length);
-    for(var i=0;i<vector.length;i++)
+    for(let i=0;i<vector.length;i++)
         result[i] = (vector[i]===0);
     return result;
 }
@@ -489,8 +497,8 @@ var get_smoothed_1d_periodic = function(x, w){
     // kernel is box-car of size 2w+1
     var n = x.length;
     var result = new Uint32Array(n);
-    for(var i=0; i<N; i++){
-        for(var k=-w;k<=w; k++){
+    for(let i=0; i<N; i++){
+        for(let k=-w;k<=w; k++){
             result[i] += x[(i+k) % n];
         }
     }
@@ -501,13 +509,13 @@ var get_smoothed = function(matrix, n_1, n_0, w){
     var result = new Uint32Array(matrix.length);
     // kernel is box-car of size 2w+1
 
-    for(var ky=-w; ky<=w; ky++)for(var kx=-w; kx<=w; kx++){//for each offset within the kernel square
-        var start_0 = ky<0? 0 : ky;
-        var start_1 = kx<0? 0 : kx;
-        var end_0 = ky>0? n_0 : n_0+ky;
-        var end_1 = kx>0? n_1 : n_1+kx;
+    for(let ky=-w; ky<=w; ky++)for(var kx=-w; kx<=w; kx++){//for each offset within the kernel square
+        let start_0 = ky<0? 0 : ky;
+        let start_1 = kx<0? 0 : kx;
+        let end_0 = ky>0? n_0 : n_0+ky;
+        let end_1 = kx>0? n_1 : n_1+kx;
 
-        for(var y=start_0; y<end_0; y++)for(var x=start_1; x<end_1; x++){
+        for(let y=start_0; y<end_0; y++)for(let x=start_1; x<end_1; x++){
             result[y*n_1 +x] += matrix[(y-ky)*n_1 +(x-kx)];
         }
     }   
@@ -516,7 +524,7 @@ var get_smoothed = function(matrix, n_1, n_0, w){
 
 var max = function(x){
     var m = x[0];
-    for(var i = 1;i< x.length; i++){
+    for(let i = 1;i< x.length; i++){
         (m < x[i]) && (m = x[i]);
     }
     return m; 
@@ -525,7 +533,7 @@ var max = function(x){
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
     var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-    for(var i=0;i<indices.length;i++){
+    for(let i=0;i<indices.length;i++){
         result[i] = from[indices[i]];
     }
     return result;
@@ -540,12 +548,12 @@ var is_equal_simple = function(a, b){
     if((a && !b) || (!a && b)){
         return false;
     }
-    for(var aa in a) if(a.hasOwnProperty(aa)){
+    for(let aa in a) if(a.hasOwnProperty(aa)){
         if(b[aa] !== a[aa]){
             return false;
         }
     }
-    for(var bb in b) if(b.hasOwnProperty(bb)){
+    for(let bb in b) if(b.hasOwnProperty(bb)){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -640,7 +648,7 @@ var is_equal_simple = function(a, b){
             var added_arrays = {};
             if (this.show !== 'nnn'){
                 // get clones of new arrays to send to worker
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     var key = keys_to_add[ii];
                     var akey = this.groups_collection.getItem(key).inds;
                     added_arrays[key] = am.get_array_clone(akey);
@@ -650,7 +658,7 @@ var is_equal_simple = function(a, b){
                 // if we are not showing the plots, we don't actually get 
                 // any arrays, but we need to remmeber that we never sent them
                 // to the worker.
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     this.key_is_on_worker[key] = false;
                 }
                 keys_to_add = [];
@@ -666,19 +674,19 @@ var is_equal_simple = function(a, b){
 
             // free canvases, it's our responsiblity to do this, whereas 
             // freeing the inds arrays was the responsibility of cut-obj.
-            for(var ii=0; ii<keys_to_remove.length; ii++){
-                var key = keys_to_remove[ii];
-                var c1 = this.key_to_spa_canvas[key];
+            for(let ii=0; ii<keys_to_remove.length; ii++){
+                let key = keys_to_remove[ii];
+                let c1 = this.key_to_spa_canvas[key];
                 if(c1){
                     cm.free_canvas(c1);
                     delete this.key_to_spa_canvas[key];
                 }
-                var c2 = this.key_to_dir_canvas[key];
+                let c2 = this.key_to_dir_canvas[key];
                 if(c2){
                     cm.free_canvas(c2);
                     delete this.key_to_dir_canvas[key];
                 }
-                var c3 = this.key_to_speed_canvas[key];
+                let c3 = this.key_to_speed_canvas[key];
                 if(c3){
                     cm.free_canvas(c3);
                     delete this.key_to_speed_canvas[key];

@@ -36,8 +36,8 @@ var render_options = {
 };
 var spike_times;
 var timebase;
-var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = {}; 
+var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var key_to_rendered_options = new Map(); 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
@@ -56,7 +56,7 @@ var set_options = function(opts){
     }
     keys_pending_render = [];    
     if(spike_times){
-        for(var key in key_to_array){
+        for(let key in key_to_array){
             keys_pending_render.push(key);
         }
     }
@@ -65,10 +65,10 @@ var set_options = function(opts){
 
 var set_spike_times = function(timebase_, arrays){
     timebase = timebase_;
-    spike_times = arrays.data; 
+    spike_times = arrays && arrays.data; 
     keys_pending_render = [];    
     if(spike_times){
-        for(var key in key_to_array){
+        for(let key in key_to_array){
             keys_pending_render.push(key);
         }
     }
@@ -89,8 +89,8 @@ var update_keys = function(changes, arrays){
 
     var remove_keys = changes.remove || [];
     for(var ii=0; ii<remove_keys.length; ii++){
-        delete key_to_array[remove_keys[ii]];
-        delete key_to_rendered_options[remove_keys[ii]];
+        key_to_array.delete(remove_keys[ii]);
+        key_to_rendered_options.delete(remove_keys[ii]);
     }
 
     if(changes.generation_add !== changes.generation_remove){
@@ -155,11 +155,11 @@ var get_group_hist_sub = function(ret, group_times, D, b){
     // For every pair of spikes separated in time by no more than time D, bin
     // up the time separation, with bin size b, and record it in hist, ret.
     for(var later_idx=1, earlier_idx=0; later_idx<group_times.length; later_idx++){
-        var laterTime = group_times[later_idx];
-        while (group_times[earlier_idx] < laterTime - D)
+        let later_time = group_times[later_idx];
+        while (group_times[earlier_idx] < later_time - D)
             earlier_idx++;
-        for(var i=earlier_idx; i<later_idx; i++)
-            ret[0 | ((laterTime - group_times[i])/b)]++;
+        for(let i=earlier_idx; i<later_idx; i++)
+            ret[0 | ((later_time - group_times[i])/b)]++;
     }
 }
 
@@ -168,7 +168,7 @@ var get_group_hist_sub = function(ret, group_times, D, b){
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
     var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-    for(var i=0;i<indices.length;i++)
+    for(let i=0;i<indices.length;i++)
         result[i] = from[indices[i]];
     return result;
 }
@@ -187,7 +187,7 @@ var is_equal_simple = function(a, b){
             return false;
         }
     }
-    for(var bb in b){
+    for(let bb in b){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -247,9 +247,9 @@ var is_equal_simple = function(a, b){
             var added_arrays = {};
             if (this.show === 'y'){
                 // get clones of new arrays to send to worker
-                for(var ii=0; ii<keys_to_add.length; ii++){
-                    var key = keys_to_add[ii];
-                    var akey = this.groups_collection.getItem(key).inds;
+                for(let ii=0; ii<keys_to_add.length; ii++){
+                    let key = keys_to_add[ii];
+                    let akey = this.groups_collection.getItem(key).inds;
                     added_arrays[key] = am.get_array_clone(akey);
                     this.key_is_on_worker[key] = true;
                 }
@@ -257,7 +257,7 @@ var is_equal_simple = function(a, b){
                 // if we are not showing the plot, we don't actually get 
                 // any arrays, but we need to remmeber that we never sent them
                 // to the worker.
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     this.key_is_on_worker[key] = false;
                 }
                 keys_to_add = [];
@@ -273,9 +273,9 @@ var is_equal_simple = function(a, b){
 
             // free canvases, it's our responsiblity to do this, whereas 
             // freeing the inds arrays was the responsibility of cut-obj.
-            for(var ii=0; ii<keys_to_remove.length; ii++){
-                var key = keys_to_remove[ii];
-                var canvas = this.key_to_canvas[key];
+            for(let ii=0; ii<keys_to_remove.length; ii++){
+                let key = keys_to_remove[ii];
+                let canvas = this.key_to_canvas[key];
                 if(canvas){
                     cm.free_canvas(canvas);
                 }

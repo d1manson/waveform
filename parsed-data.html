@@ -2,9 +2,8 @@
 CUSTOM ELEMENT: parsed-data
 bY: DM
 
-Files can be refered to by "fkey", which is constructed as follows:
-    file.lastModified + " " + file.name
-because the name comes second, you can still read the extension easily.
+Files can be refered to by "fkey", which is an integer provided by
+file-organiser.
 
 The current selection of files is held in the 'files' proeprty.
 When the user jumps somewhere in the file organiser, this 'files' object
@@ -16,6 +15,13 @@ On the io-worker thread we have a setImmediate "timer", which ensures that all p
 are seen between each file-read operation.  We don't have such a timer on the set/tet/pos/cut threads.
 
 Caching...
+
+Note that this was designed and written with the expectation that MessageChannels could transfer arraybuffers,
+just like worker-main thread communication can. However in Chrome (and we only care about Chrome) this turns
+out not to be the case.  https://bugs.chromium.org/p/chromium/issues/detail?id=334408.  The workaround in use here
+is that rather than send a pre-read buffer from io-worker to tet/set/pos etc. workers, the file (handle) is sent, 
+the read takes place on the tet/set/pos etc. worker, and then a reply is immediately sent back to the io-worker,
+saying to continue with the next read operation.
 
 Main thread issues requests to io-worker thread, which in turn issues requests to set/cut/tet/pos threads.
 There is a buffer cache on tet/pos threads, which is managed by (i.e. add/delete instructions issued by)
@@ -95,6 +101,7 @@ TODO: angle correction for dir from set file.
 var timer = 0;
 var ports = {};
 var pending_files = {};
+var pending_fkeys = {};
 var pending_options = {};
 var types = new Set(['tet', 'set', 'pos', 'cut']); // this is the priority order
 var parsers_cached_fkeys = {
@@ -102,23 +109,37 @@ var parsers_cached_fkeys = {
     pos: new Set() // same for pos
 }
 var max_cache_size = 4; // pretty arbitrary, especially as it's not type-specific
+var currently_reading;
 
 var got_ports = function(ports_){
     ports = ports_;
+    for(let t of types){
+        let t_local = t;
+        ports[t].onmessage = function(e){
+            if(e.data !== 'done reading'){
+                throw "bad message from " + t + " to io worker: " + JSON.String(data);
+            }
+            if (currently_reading === t_local){
+                currently_reading = undefined;
+                touch_timer();
+            }
+        }
+    }
 }
 
 var read_files = function(files, options){
-    for(var t in types){
+    for(let t of types){
         if(files[t] !== undefined){
             pending_files[t] = files[t];
             pending_options[t] = options[t];
+            pending_fkeys[t] = files[t+'_fkey'];
         }
     }
     touch_timer();
 }
 
 var touch_timer = function(){
-    for(var t in types){
+    for(let t of types){
         if(pending_files[t]){
             timer = timer || setImmediate(timer_tick);
             return;
@@ -128,37 +149,46 @@ var touch_timer = function(){
 }
 
 var timer_tick = function(){
+    timer = 0;
     // if there are any files already cached, then issue those requests immediately
-    for(var t in types){
+    for(let t of types){
         if(!pending_files[t] || !parsers_cached_fkeys[t]){
             continue;
         }
-        var file = pending_files[t];
-        var fkey = file.lastModified + " " + file.name;
-        var cache = parsers_cached_fkeys[t];
+        let file = pending_files[t];
+        let fkey = pending_fkeys[t];
+        let cache = parsers_cached_fkeys[t];
         if(cache.has(fkey)){
             // bump in FIFO
             cache.delete(fkey); 
             cache.add(fkey); 
             ports[t].postMessage({
-                fkey: pending_files[t],
-                options: pending_options[t]
+                fkey: fkey,
+                name: file.name,
+                file: null, // buffer is available at the reciever's end!!
+                options: pending_options[t],
+                delete_from_cache: null 
             });
             pending_files[t] = undefined;
+            pending_fkeys[t] = undefined;
             pending_options[t] = undefined;
         }
     }
 
+    if(currently_reading){
+        return; // and do not touch_timer, instead wait for the message from the current reader or from main thread
+    }
+
     // now, load zero or one files from disk and issue request to corresponding worker
     // crucially, we do this in the priority order defined by the types array
-    for(var t in types){
+    for(let t of types){
         if(!pending_files[t]){
             continue;
         }
-        var file = pending_files[t];
-        var fkey = file.lastModified + " " + file.name;
-        var cache = parsers_cached_fkeys[t];
-        var delete_from_cache;
+        let file = pending_files[t];
+        let fkey = pending_fkeys[t];
+        let cache = parsers_cached_fkeys[t];
+        let delete_from_cache;
         if(cache){
             // note that fkey can't have been in the cache already, because we tested for that in the above loop.
             cache.add(fkey);
@@ -167,16 +197,19 @@ var timer_tick = function(){
                 cache.delete(delete_from_cache);
             }
         }
-        var reader = new FileReaderSync();
-        var buf = reader.readAsArraybuffer(file);
+        currently_reading = t; // see note about Chrome bug at top of page
+        //let reader = new FileReaderSync();  
+        //let buf = reader.readAsArrayBuffer(file);
         ports[t].postMessage({
             fkey: fkey,
-            buffer: buf,
+            name: file.name,
+            file: file,
             options: pending_options[t],
             delete_from_cache: delete_from_cache
-        }, [buf]);
+        });
         pending_files[t] = undefined;
         pending_options[t] = undefined;
+        pending_fkeys[t] = undefined;
         break;
     }
 
@@ -190,17 +223,22 @@ var timer_tick = function(){
 "use strict";
 
 var fkey_to_buffer = new Map();
-
-var main_cached_options = new Set(); // set of objects each giving options and fkey
+var main_cached_opts = new Set(); // set of objects each giving options and fkey
 var max_cache_size = 4; // arbitrary
 
 var got_ports = function(ports){
     self.io_port = ports.pos;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
 
          // add/delete entries in buffer cache, based on instructions from io-worker
-        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
         fkey_to_buffer[fkey] = buffer;
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
@@ -209,25 +247,24 @@ var got_ports = function(ports){
         // check to see if main cache actually holds the requested data     
         var options = e.data.options;
         options.fkey = fkey;
-        for(var obj in main_cached_options){
-            if(is_equal_simple(obj, options)){
+        for(let cached_opts in main_cached_opts){
+            if(is_equal_simple(cached_opts, options)){
                 // bump in FIFO
-                main_cached_options.delete(obj);
-                main_cached_options.add(obj);
+                main_cached_opts.delete(cached_opts);
+                main_cached_opts.add(cached_opts);
                 return; // nothing to be done
             }
         }
         
         // pre-emptively add to the record of main cache and decide what, if anything, to remove
-        main_cached_options.add(options);
+        main_cached_opts.add(options);
         var delete_from_cache;
-        if(main_cached_options.size > max_cache_size){
-            delete_from_cache = main_cached_options.keys().next().value;
-            main_cached_options.delete(delete_from_cache);
+        if(main_cached_opts.size > max_cache_size){
+            delete_from_cache = main_cached_opts.keys().next().value;
+            main_cached_opts.delete(delete_from_cache);
         }
 
-        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
-        parse_pos_file(top_str, buffer, fkey, options, delete_from_cache);
+        parse_pos_file(buffer, fkey, options, delete_from_cache);
 
     }
 }
@@ -238,12 +275,12 @@ var is_equal_simple = function(a, b){
     if((a && !b) || (!a && b)){
         return false;
     }
-    for(var aa in a){
+    for(let aa in a){
         if(b[aa] !== a[aa]){
             return false;
         }
     }
-    for(var bb in b){
+    for(let bb in b){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -261,20 +298,20 @@ var take = function(data,offset,stride){
     var n = data.length/stride;
     var res = new data.constructor(n);
     
-    for(var i=0,j=offset;i<n;i++,j+=stride){
+    for(let i=0,j=offset;i<n;i++,j+=stride){
         res[i] = data[j];
     }
     return res;
 }
 
 var times_in_place = function(src, factor, skip_val){
-    for(var i=0;i<src.length;i++)if(src[i] != skip_val){
+    for(let i=0;i<src.length;i++)if(src[i] != skip_val){
         src[i] *= factor;
     }
 }
 
 var replace_val_in_place = function(src, find, replace){
-    for(var i=0;i<src.length;i++)if(src[i] == find){
+    for(let i=0;i<src.length;i++)if(src[i] == find){
         src[i] = replace;
     }
 }
@@ -291,7 +328,7 @@ var clone = function(a){
 
 var minus = function(a, b, c){
     // we subtract b and c from alternate elemetns of a, inplace, nan16 is skipped
-    for(var i=0;i<a.length;i++){
+    for(let i=0;i<a.length;i++){
         a[i] -= a[i] == nan16? 0 : b;
         i++;
         a[i] -= a[i] == nan16? 0 : c;
@@ -302,8 +339,10 @@ var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 var regex_header_b = /(\S*) ([\S ]*)/g
 
 var bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
+var nan16 = -32768; //custom nan value, equal to minimum int16 value    
 
-var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache){
+var parse_pos_file = function(buffer, fkey, options, delete_from_cache){
+    var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
     var match = regex_header_a.exec(top_str);
     if(!match){
         throw 'did not find end of header in pos file.';
@@ -312,32 +351,32 @@ var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache)
     var data_start = match.index + match[0].length;
     var header = {};
     var header_str = match[0];
-    while (match = regex_header_b.exec(header_str))
+    while (match = regex_header_b.exec(header_str)){
         header[match[1]] = match[2];
+    }
 
     if (header.pos_format !== "t,x1,y1,x2,y2,numpix1,numpix2"){
         throw "uncregonised pos format used in pos file";
     }
     
     // apply overrides
-    for (k in header_override){
+    for (let k in options.header_override){
         if(header[k] !== undefined){
             header[k+"_original"] = header[k];
         }
         header[k] = header_override[k];
     }
 
-    var data_len = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
-    buffer = buffer.subarray(data_start, data_start+data_len);
+    var data_len_bytes = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
 
     if(endian == 'L'){
-        var data = new Int16array(buffer);
-        for (var k=0; k<data.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
-            data[k] = swap_16(data[k]);
+        let data16 = new Int16Array(buffer, data_start, data_len_bytes/2);
+        for (let k=0; k<data16.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
+            data16[k] = swap_16(data16[k]);
         }
     }
 
-    var pos = post_process(buffer, header, options);
+    var pos = post_process(buffer, data_start, data_len_bytes, header, options);
     delete options.fkey;
 
     exec_main_b('got_pos',{
@@ -362,7 +401,7 @@ var interp_xy_sub = function(xy,x_a,y_a,x_b,y_b,i,n_nans){
     //interpolates from element i-1 back to i-n_nans, where element i is x_b,y_b and element i-n_nans-1 is x_a,x_b
     var dx = (x_b-x_a)/(n_nans+1);
     var dy = (y_b-y_a)/(n_nans+1);
-    for(var j=0;j<n_nans;j++){
+    for(let j=0;j<n_nans;j++){
         xy[(i-n_nans + j)*2+0] = x_a + (j+1)*dx;
         xy[(i-n_nans + j)*2+1] = y_a + (j+1)*dy; 
     }
@@ -378,8 +417,8 @@ var interp_xy = function(xy,n_pos){
 
     // Find first (x,y) that is non-nan
     for(var start=0; start<n_pos; start++){
-        var ix = start*2+0;
-        var iy = start*2+1;
+        let ix = start*2+0;
+        let iy = start*2+1;
         if(xy[ix] != nan16 && xy[iy] !=nan16)
             break;
     }
@@ -390,10 +429,10 @@ var interp_xy = function(xy,n_pos){
     var y_a = xy[iy];
     var n_nans = start; //this will cause first non-nan to be copied back through all previous nan values
     for(var i=start;i<n_pos;i++){
-        var ix = i*2+0;
-        var iy = i*2+1; 
-        var x_b = xy[ix];
-        var y_b = xy[iy];
+        let ix = i*2+0;
+        let iy = i*2+1; 
+        let x_b = xy[ix];
+        let y_b = xy[iy];
         if(x_b == nan16 || y_b == nan16){
             n_nans++;
         }else{
@@ -473,7 +512,7 @@ var smooth_1d_in_place = function(x, stride, k){
     
 }
 
-var jump_filter = function(xy, n_pos, pos_timebase){
+var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
     /*
         For a single stream of xy values, it finds the first non-nan point,
         and then checks the speed required to reach the next point, given the
@@ -483,15 +522,15 @@ var jump_filter = function(xy, n_pos, pos_timebase){
         The number of points skipped over is returned as an integer.
     */
 
-    if(!options.max_speed)
+    if(!max_speed)
         return 0;
 
-    var sqrMaxSampStep = sqr(options.max_speed*units_per_m /pos_timebase);
+    var sqr_max_samp_step = sqr(max_speed*units_per_m /pos_timebase);
 
     // Find first (x,y) that is non-nan
     for(var start=0; start<n_pos; start++){
-        var ix = start*2+0;
-        var iy = start*2+1;
+        let ix = start*2+0;
+        let iy = start*2+1;
         if(xy[ix] != nan16 && xy[iy] !=nan16)
             break;
     }
@@ -500,25 +539,25 @@ var jump_filter = function(xy, n_pos, pos_timebase){
     var iy = start*2+1;     
     var x_from = xy[ix];
     var y_from = xy[iy];
-    var jumpLen = 1;
+    var jump_len = 1;
 
     // Set big jump sections to nan
-    for(var i=start+1,nJumpy=0; i<n_pos; i++){
-        var ix = i*2+0;
-        var iy = i*2+1;
+    for(let i=start+1,nJumpy=0; i<n_pos; i++){
+        let ix = i*2+0;
+        let iy = i*2+1;
         // check if this pos is already nan
         // or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
         if(xy[ix] == nan16 || xy[iy] == nan16){
             xy[ix] = xy[iy] = nan16; //just in case only one or the other was nan
-            jumpLen++; // note we don't count njumpy here
-        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
+            jump_len++; // note we don't count njumpy here
+        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jump_len) > sqr_max_samp_step ){
             //sample is nan or speed is too large, so make this a jump
             xy[ix] = xy[iy] = nan16; 
             nJumpy++;
-            jumpLen++;
+            jump_len++;
         }else{
             //speed is sufficiently small, so this point is ok
-            jumpLen = 1;
+            jump_len = 1;
             x_from = xy[ix];
             y_from = xy[iy];
         }
@@ -529,8 +568,8 @@ var jump_filter = function(xy, n_pos, pos_timebase){
 
 var swap = function(a, b, do_swap){
     var n = 0;
-    for(var i=0;i<a.length;i++) if(do_swap[i]){
-        var tmp = a[i];
+    for(let i=0;i<a.length;i++) if(do_swap[i]){
+        let tmp = a[i];
         a[i] = b[i];
         b[i] = tmp;
         n++;
@@ -546,9 +585,9 @@ var nanmean_and_std_2 = function(x){
     var sum_1 = 0; var sum_2 = 0;
     var n1 = 0; var n2 = 0;
 
-    for(var i=0; i<x.length/2; i++){
-        var i1 = i*2+0;
-        var i2 = i*2+1;
+    for(let i=0; i<x.length/2; i++){
+        let i1 = i*2+0;
+        let i2 = i*2+1;
         if(x[i1] && x[i1] != nan16){
             n1++;
             sum_1 += x[i1];
@@ -562,9 +601,9 @@ var nanmean_and_std_2 = function(x){
 
     // now get sum(sqr(xy-mean_xy)) and use to calculate nanstd...
     sum_1 = 0; sum_2 = 0;  // NOTE: reusing sums vars!!!!
-    for (var i=0; i<x.length/2; i++){
-        var i1 = i*2+0;
-        var i2 = i*2+1;
+    for (let i=0; i<x.length/2; i++){
+        let i1 = i*2+0;
+        let i2 = i*2+1;
         if(x[i1] && x[i1] != nan16)
             sum_1 += sqr(x[i1] - mean_1);
         if(x[i2] && x[i2] != nan16)
@@ -584,9 +623,9 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
     var weight_1 = weight_1/weight_sum;
     var weight_2 = weight_2/weight_sum;
     var ret = new xy_1.constructor(xy_1.length);
-    for(var i=0;i<xy_1.length/2;i++){
-        var ix = 2*i+0;
-        var iy = 2*i+1;
+    for(let i=0;i<xy_1.length/2;i++){
+        let ix = 2*i+0;
+        let iy = 2*i+1;
         ret[ix] = xy_1[ix]*weight_1 + xy_1[ix]*weight_2;
         ret[iy] = xy_1[iy]*weight_1 + xy_1[iy]*weight_2;
     }
@@ -596,15 +635,15 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
 var get_dir = function(pos){
     // TODO: if n_led is 1
     var xy_1 = pos.xy_1;
-    var xy_2 = pox.xy_2;
+    var xy_2 = pos.xy_2;
 
-    var ret = new Float32array(xy_1.length/2);
+    var ret = new Float32Array(xy_1.length/2);
     var pi = 3.14159265;
-    for(var i=0;i<xy_1.length/2;i++){
-        var ix = 2*i+0;
-        var iy = 2*i+1;
-        var dy = xy_2[iy] - xy_1[iy];
-        var dx = xy_2[ix] - xy_1[ix];
+    for(let i=0;i<xy_1.length/2;i++){
+        let ix = 2*i+0;
+        let iy = 2*i+1;
+        let dy = xy_2[iy] - xy_1[iy];
+        let dx = xy_2[ix] - xy_1[ix];
         ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
     }
     return ret;
@@ -612,16 +651,17 @@ var get_dir = function(pos){
 
 var get_speed = function(pos){
     var xy = pos.xy;
-    var ret = new Float32array(xy.length/2);
-    for(var ii=0; ii<xy.length; ii+=2){
-         ret[ii>>1] = Math.hypot(xy[i+2]-xy[i+0], xy[i+3]-xy[i+1]);
+    var ret = new Float32Array(xy.length/2);
+    for(let ii=0; ii<xy.length; ii+=2){
+         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1]);
     }
     return ret;
 }
 
-var post_process = function(buffer, header, options){
+var post_process = function(buffer, offset_bytes, length_bytes, header, options){
+    var data = new Int16Array(buffer, offset_bytes, length_bytes/2);
+    var data32 = new Int32Array(buffer, offset_bytes, length_bytes/4);
 
-    var data = new Int16array(buffer);
     var elements_per_pos_sample = bytes_per_pos_sample/2;
     var n_pos = parseInt(header.num_pos_samples); 
     var end = n_pos * elements_per_pos_sample; 
@@ -629,16 +669,16 @@ var post_process = function(buffer, header, options){
     var pos_nan = 1023;
 
      // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-    var xy_1 = new Int16array(take(new Int32array(buffer), 1, bytes_per_pos_sample/4).buffer);
+    var xy_1 = new Int16Array(take(data32, 1, bytes_per_pos_sample/4).buffer);
     replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
     
     var n_led = 1;
     if (options.use_both_leds){
         // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
         // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-        var xy_pix = new Int16array(take(new Int32array(buffer), 3, bytes_per_pos_sample/4).buffer);
+        var xy_pix = new Int16Array(take(data32, 3, bytes_per_pos_sample/4).buffer);
         replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-        for(var i=0; i<n_pos; i++){
+        for(let i=0; i<n_pos; i++){
             if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
                 n_led = 2;
                 break;
@@ -650,7 +690,7 @@ var post_process = function(buffer, header, options){
     var xy_2;
     if(n_led == 2){
          // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
-        xy_2 = new Int16array(take(new Int32array(buffer), 2, bytes_per_pos_sample/4).buffer);
+        xy_2 = new Int16Array(take(data32, 2, bytes_per_pos_sample/4).buffer);
         replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
     
     }
@@ -666,12 +706,13 @@ var post_process = function(buffer, header, options){
     var ppm = parseInt(header.pixels_per_metre);
     var units_per_m = 10000;
     times_in_place(xy_1, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
-    if(n_led == 2)
+    if(n_led == 2){
         times_in_place(xy_2, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+    }
 
     if(n_led == 2){
         // check for and apply LED swaping...
-        var shrunk_and_switched = new Uint8array(n_pos);  
+        var shrunk_and_switched = new Uint8Array(n_pos);  
 
         var swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
 
@@ -685,12 +726,12 @@ var post_process = function(buffer, header, options){
         header.psot_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
 
         // use std and mean to get z score of pix1 to pix1 and pix2
-        for( var i=0; i< n_pos; i++){
-            var i1 = i*2+0;
-            var i2 = i*2+1;
+        for(let i=0; i< n_pos; i++){
+            let i1 = i*2+0;
+            let i2 = i*2+1;
             if(xy_pix[i1] && xy_pix[i2] && xy_pix[i1] != nan16 && xy_pix[i2] != nan16){
-                var z11 = (mean_1 - xy_pix[i1])/std_1;
-                var z12 = (xy_pix[i1] - mean_2)/std_2;
+                let z11 = (mean_1 - xy_pix[i1])/std_1;
+                let z12 = (xy_pix[i1] - mean_2)/std_2;
                 shrunk_and_switched[i] = z11 > z12;
             }
         }
@@ -703,18 +744,18 @@ var post_process = function(buffer, header, options){
 
         // Find first (x,y) that is non-nan on both xy and xy_2
         for(var start=0; start<n_pos; start++){
-            var ix = start*2+0;
-            var iy = start*2+1;
+            let ix = start*2+0;
+            let iy = start*2+1;
             if(xy_1[ix] != nan16 && xy_1[iy] !=nan16 && xy_2[ix] != nan16 && xy_2[iy] !=nan16)
                 break;
         }
 
-        for(var i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
+        for(let i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
             // we are going to do diffs with XY_i - XY_(i-1)
-            var ix = i*2+0;
-            var iy = i*2+1;
-            var i_1x = i*2-2;
-            var i_1y = i*2-1;
+            let ix = i*2+0;
+            let iy = i*2+1;
+            let i_1x = i*2-2;
+            let i_1y = i*2-1;
             if(xy_1[ix] == nan16 || xy_1[iy] == nan16 || xy_2[ix] == nan16 || xy_2[iy] == nan16){
                 shrunk_and_switched[i] = 0;
                 i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
@@ -722,28 +763,29 @@ var post_process = function(buffer, header, options){
                 continue; 
             }
 
-            var dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
-            var dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
-            var dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
-            var dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
+            let dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
+            let dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
+            let dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
+            let dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
 
             shrunk_and_switched[i] = (dist12 < dist11-swapping_thresh) && (dist21 < dist22 - swapping_thresh);
 
         }
 
         // Swap xy_1 with xy_2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit xy in one go)
-        header.post_n_swapped = swap(new Uint32array(xy_1.buffer), new Uint32array(xy_2.buffer), shrunk_and_switched);
+        header.post_n_swapped = swap(new Uint32Array(xy_1.buffer), new Uint32Array(xy_2.buffer), shrunk_and_switched);
     }
     
     var pos_timebase = parseInt(header.sample_rate);
     header.post_n_jumpy_led1 = jump_filter(xy_1, n_pos, options.max_speed, units_per_m, pos_timebase)
-    if(n_led == 2)
+    if(n_led == 2){
          header.post_n_jumpy_led2 = jump_filter(xy_2, n_pos, options.max_speed, units_per_m, pos_timebase);
-
+    }
     
     interp_xy(xy_1,n_pos);
-    if(n_led == 2)
+    if(n_led == 2){
         interp_xy(xy_2,n_pos);
+    }
 
     var k = Math.floor(pos_timebase*options.smoothing_secs/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired         
     smooth_1d_in_place(xy_1, 2, k);
@@ -777,37 +819,44 @@ var post_process = function(buffer, header, options){
 
 var fkey_to_buffer = new Map();
 
-var main_cached_options = new Set();
+var main_cached_opts = new Set();
 var max_cache_size = 4; //aribtrary
 
 var got_ports = function(ports){
     self.io_port = ports.tet;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
 
         // add/delete entries in buffer cache, based on instructions from io-worker
-        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
         fkey_to_buffer[fkey] = buffer;
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
 
-        // check to see if main cache actually holds any of the requested data        
+        // check to see if main cache actually holds any of the requested data 
+        var options = e.data.options;       
         options.fkey = fkey;
-        for(var cached_options in main_cached_options){
-            if(cached_options.fkey === fkey){
+        for(var cached_opts in main_cached_opts){
+            if(cached_opts.fkey === fkey){
                 // bump in FIFO
-                main_cached_options.delete(cached_options);
-                main_cached_options.add(cached_options);
-                fkey_in_cache = cached_options;
+                main_cached_opts.delete(cached_opts);
+                main_cached_opts.add(cached_opts);
+                fkey_in_cache = cached_opts;
                 // remove the things that are already in cache
-                if(cached_options.times){
+                if(cached_opts.times){
                     delete options.times;
                 }
-                if(cached_options.amps){
+                if(cached_opts.amps){
                     delete options.amps;
                 }
-                if(cached_options.gl_data){
+                if(cached_opts.gl_data){
                     delete options.gl_data;
                 }
                 if(options.times || options.amps || options.gl_data){
@@ -818,31 +867,30 @@ var got_ports = function(ports){
             }
         }   
 
-        if (!cached_options || cached_options.fkey !== fkey){
+        if (!cached_opts || cached_opts.fkey !== fkey){
             // create new entry in main cache record, and possibly delete something
-            cached_options = {fkey: fkey};
-            main_cached_options.add(cached_options);
-            if(main_cached_options.size > max_cache_size){
-                var delete_from_cache = main_cached_options.keys().next().value;
+            cached_opts = {fkey: fkey};
+            main_cached_opts.add(cached_opts);
+            if(main_cached_opts.size > max_cache_size){
+                var delete_from_cache = main_cached_opts.keys().next().value;
                 exec_main('delete_from_tet_cache', delete_from_cache);
-                main_cached_options.delete(delete_from_cache);
+                main_cached_opts.delete(delete_from_cache);
             }
         }
 
         // pre-emptively record what we are about to put in main cache
         if(options.times){
-            cached_options.times = 1;
+            cached_opts.times = 1;
         }
         if(options.gl_data){
-            cached_options.gl_data = 1;
+            cached_opts.gl_data = 1;
         }
         if(options.amps){
-            cached_options.amps = 1;
+            cached_opts.amps = 1;
         }
 
         // and actually do the work...
-        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
-        parse_tet_file(top_str, buffer, fkey, options);
+        parse_tet_file(buffer, fkey, options);
 
     }
 }
@@ -854,8 +902,9 @@ var n_c = 4;
 var n_w = 50;
 var bytes_per_spike = n_c*(4 + n_w);
 
-var parse_tet_file = function(top_str, buffer, fkey, options){
-
+var parse_tet_file = function(buffer, fkey, options){
+    var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
+        
     var match = regex_header_a.exec(top_str);
     if(!match){
         throw 'did not find end of header in tet file.';
@@ -878,11 +927,8 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
         header.num_spikes_claimed = header.num_spikes;
         header.num_spikes = 0;
     }
-    var n = header.num_spikes;
-    var data_len = parseInt(N)*bytes_per_spike;
-
-    //read the data section of the fkey as an array buffer
-    buffer = buffer.subarray(data_start, data_start+data_len);
+    var n = parseInt(header.num_spikes);
+    var data_len_bytes = n*bytes_per_spike;
 
     exec_main('got_tet_header', fkey, header);
 
@@ -894,7 +940,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     // data.
 
     if(options.gl_data){
-        var data =  build_gl_data(buffer, n);
+        var data =  build_gl_data(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_gl_data', {
             data: 'data', 
             fkey: fkey,
@@ -903,7 +949,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     }
 
     if(options.times){
-        var data =  get_times(buffer, n);
+        var data =  get_times(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_times', {
             data: 'data', 
             fkey: fkey,
@@ -912,7 +958,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     }
 
     if(options.amps){
-        var data = get_amplitudes(buffer, n);
+        var data = get_amplitudes(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_amplitudes', {
             data: 'data', 
             fkey: fkey,
@@ -930,11 +976,11 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
     // it probably won't help by more than 5-10% I would think.
 
     var q = -1;
-    var i, t, c, p;
+    var i, p;
     for(i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
-        for(c=0;c<n_c;c++){ //for each channel
+        for(let c=0;c<n_c;c++){ //for each channel
             q += 5;
-            for(t=0;t<n_w-1;t++){ //for each time point (except the last one)
+            for(let t=0;t<n_w-1;t++){ //for each time point (except the last one)
                 data_out_16[p] = data_in[q] | (data_in[++q] << 8); // TODO: deal properly with endianness of system 
                 // (Note that even though we are drawing a stand alone line segment from a to b, we still need to know how they match up to times t and t+1)
                 p += n_spikes;
@@ -944,60 +990,52 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
 }
 
 var i8_to_u8 = function(a){
-    // Takes an int8array, a, adds 128 to each element and views it as a uint8 array.
+    // Takes an int8Array, a, adds 128 to each element and views it as a uint8 array.
     // this is done inplace.
     // See http://en.wikipedia.org/wiki/Signed_number_representations for info.
     // We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
     // TODO: it may be possible to avoid this conversion, if the gl-shader code is modified
-    a = new Uint32array(a.buffer); 
-    for(var i=0;i<a.length;i++)
+    a = new Uint32Array(a.buffer); 
+    for(let i=0;i<a.length;i++)
         a[i] ^= 0x80808080;
-    return new Uint8array(a.buffer);
+    return new Uint8Array(a.buffer);
 }
 
-var build_gl_data = function(buffer, n_spikes){
-    var old_data = new Uint8array(buffer);
-    var newdData = new Uint16array(n_c*(n_w-1)*n_spikes);
+var build_gl_data = function(buffer, offset_bytes, length_bytes, n_spikes){
+    var old_data = new Uint8Array(buffer, offset_bytes, length_bytes);
+    var new_data = new Uint16Array(n_c*(n_w-1)*n_spikes);
     
     build_gl_data_sub(old_data, new_data, n_spikes);
-    return i8_to_u8(new Int8array(new_data.buffer));        
+    return i8_to_u8(new Int8Array(new_data.buffer));        
 }
 
-var swap_32_vector = function(x){
-    for(var i=0;i<x.length; i++){
-        var val = x[i];
-        x[i] = ((val & 0xFF) << 24)
-               | ((val & 0xFF00) << 8)
-               | ((val >> 8) & 0xFF00)
-               | ((val >> 24) & 0xFF);
+
+var get_times = function(buffer, offset_bytes, length_bytes, n_spikes){ //get spike times in milliseconds as a Uint32Array 
+    var times = new Uint32Array(n_spikes);
+    var data8 = new Uint8Array(buffer, offset_bytes, length_bytes); // can't make this int32 because it may not be sufficeintly alligned
+
+    if (endian === 'L') {
+        for(let i=0, p=0; i<times.length; i++, p+= bytes_per_spike){
+            times[i] = (data8[p+0] << 24)
+                     | (data8[p+1] << 16)   
+                     | (data8[p+2] << 8) 
+                     | (data8[p+3] << 0); 
+        }        
+    } else {
+        throw "need to implement for big endian"; // TODO: or maybe the version above is actually valid for bothered?
     }
-}
 
-var take_strided = function(ret, x, stride){
-    // Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
-    // n = ret.length
-    for(var i=0,p=0; i<ret.length; i++, p+= stride)
-        ret[i] = x[p]; 
-}
-
-var get_times = function(buffer, n_spikes){ //get spike times in milliseconds as a Uint32array 
-    var times = new Uint32array(n_spikes);
-    var data = new Int32array(buffer);
-    take_strided(times, data, bytes_per_spike/4);
-    if (endian === 'L') 
-        swap_32_vector(times);
     return times;
 }
 
 var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     n_sc = n_sc | 0; // int
     n_w = n_w | 0; // int
-    var min, max, t;
-    for(var i=0, p=0; i<n_sc; i++){
+    for(let i=0, p=0; i<n_sc; i++){
         p += 4; // skip timestamp 
-        min = 127;
-        max = -128;
-        for(t=0; t<n_w; t++,p++){
+        let min = 127;
+        let max = -128;
+        for(let t=0; t<n_w; t++,p++){
             (old_data[p] > max) && (max = old_data[p]);
             (old_data[p] < min) && (min = old_data[p]);
         }
@@ -1005,10 +1043,11 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     }
 }
 
-var get_amplitudes = function(buffer, n_spikes){
-    var old_data = new Int8array(buffer);
-    var amps = new Uint8array(n_spikes * n_c);
-    get_amplitude_sub(old_data, amps, n_spikes * n_c, n_w);
+var get_amplitudes = function(buffer, offset_bytes, length_bytes, n_spikes){
+    var old_data = new Int8Array(buffer, offset_bytes, length_bytes);
+    var amps = new Uint8Array(n_spikes * n_c);
+    get_amplitudes_sub(old_data, amps, n_spikes * n_c, n_w);
+    return amps;
 }
 
 </script>
@@ -1019,18 +1058,33 @@ var get_amplitudes = function(buffer, n_spikes){
 
 var max_cache_size = 4; // arbitrary
 var main_cached_fkeys = new Set();
+var fkey_to_buffer = new Map();
 
 var got_ports = function(ports){
     self.io_port = ports.set;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
+
+        // add/delete entries in buffer cache, based on instructions from io-worker
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
         if(main_cached_fkeys.has(fkey)){
             // bump in FIFO
             main_cached_fkeys.delete(fkey);
             main_cached_fkeys.add(fkey);
             return;
         }
-        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        var full_str = new TextDecoder('utf-8').decode(buffer);
         
         main_cached_fkeys.add(fkey);
         var delete_from_cache;
@@ -1050,7 +1104,7 @@ var got_ports = function(ports){
 
 var regex_header_b = /(\S*) ([\S ]*)/g
 
-var ParseSetFile = function(full_str, fkey){
+var parse_set_file = function(full_str, fkey){
     var header = {};
     var match;
     while (match = regex_header_b.exec(full_str))
@@ -1067,27 +1121,42 @@ var ParseSetFile = function(full_str, fkey){
 var max_cache_size = 4; // arbitrary
 var main_cached_fkeys = new Set();
 var regex_ext = /\.([0-9a-z]+)$/i;
+var fkey_to_buffer = new Map();
 
 var got_ports = function(ports){
     self.io_port = ports.cut;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
+
+        // add/delete entries in buffer cache, based on instructions from io-worker
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
         if(main_cached_fkeys.has(fkey)){
             // bump in FIFO
             main_cached_fkeys.delete(fkey);
             main_cached_fkeys.add(fkey);
             return; // main already has it, so no need to send it.
         }
-        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        var full_str = new TextDecoder('utf-8').decode(buffer);
 
         // TODO: clu/cut based on extension
-        var ext = fkey.match(regex_ext)[1]
+        var ext = e.data.name.match(regex_ext)[1]
         var msg;
-        if(ext === 'clu'){
-            msg = parse_clu_file(full_str, fkey);
-        } else if (ext === 'cut') {
+        if (ext === 'cut') {
             msg = parse_cut_file(full_str, fkey);
-        } else {
+        } else if(!isNaN(parseInt(ext))){
+            msg = parse_clu_file(full_str, fkey);
+        } else{
             throw "urecognised cut type";
         }
         
@@ -1124,8 +1193,8 @@ var parse_cut_file = function(full_str, fkey){
     cut_props.is_clu = false;
 
     var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
-    var cut = new Uint32array(cut_as_str.length);
-    for(var ii=0; ii<cut.length; ii++){
+    var cut = new Uint32Array(cut_as_str.length);
+    for(let ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii]);
     }
 
@@ -1137,14 +1206,14 @@ var parse_cut_file = function(full_str, fkey){
 }
 
 var parse_clu_file = function(full_str, fkey){
-    var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
+    var cut_as_str = full_str.match(regex_cut_c);
     var cut_props = {
         n_clusters: parseInt(cut_as_str[0]),  // TODO: check +/- 1
         n_spikes: cut_as_str.length-1,
         is_clu: true
     }
-    var cut = new Uint32array(cut_as_str.length-1);
-    for(var ii=0; ii<cut.length; ii++){
+    var cut = new Uint32Array(cut_as_str.length-1);
+    for(let ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii+1]);
     }
 
@@ -1164,6 +1233,16 @@ var parse_clu_file = function(full_str, fkey){
     Polymer({
     	is:'parsed-data',
     	properties: {
+            file_organiser_id: {
+                type: String,
+                value: ""
+            },
+            selected_files: {
+                type: Object,
+                value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
+                notify: true,
+                observer: '_change_to_files'
+            },
             use_n_leds: {
                 type: Number, //1 or 2
                 value: 2
@@ -1179,36 +1258,68 @@ var parse_clu_file = function(full_str, fkey){
             duration: {
                 type: Number, // seconds
                 value: 0,
-                notify: true
+                notify: true,
+                readOnly: true
             },
             spike_times: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
             },
             pos_xy: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase, and units_per_cm
+                value: function(){ return {};}, // data (akey), timebase,  and units_per_cm
+                readOnly: true,
+                notify: true 
             },
             pos_dir: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
             },
             pos_speed: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
+            },
+            pos_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
+            },
+            set_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
+            },
+            tet_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
             },
             cut_inds: {
                 type: String, // akey
-                value: ''
+                value: '',
+                readOnly: true,
+                notify: true
             },
             amplitudes: {
                 type: String,
                 value: "", // typed-array-manager id
-                notify: true
+                notify: true,
+                readOnly: true
             },
             data_for_gl: {
                 type: Object,
-                value: function(){return {};} // has n value and typed-array-manager id for gl voltages
+                value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
+                readOnly: true,
+                notify: true
             },
             want_spike_times: {
                 type: Boolean,
@@ -1229,8 +1340,10 @@ var parse_clu_file = function(full_str, fkey){
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
             '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
         ],
+        attached: function(){
+            this._file_org = document.getElementById(this.file_organiser_id);
+        },
         created: function(){
-            this._fkeys = {}; // set, tet, pos, cut
             this._files = {}; // set, tet, pos, cut
             this._cut_from_fkey = new Map();
             this._set_from_fkey = new Map();
@@ -1251,55 +1364,51 @@ var parse_clu_file = function(full_str, fkey){
             this._worker_set.send_ports({set: c.port2});
 
             c = new MessageChannel();
-            ports_for_io['tet'] = c.port1;;
+            ports_for_io['tet'] = c.port1;
             this._worker_tet.send_ports({tet: c.port2});
 
             c = new MessageChannel();
-            ports_for_io['pos'] = c.port1;;
+            ports_for_io['pos'] = c.port1;
             this._worker_pos.send_ports({pos: c.port2});
 
             c = new MessageChannel();
-            ports_for_io['cut'] = c.port1;;
+            ports_for_io['cut'] = c.port1;
             this._worker_cut.send_ports({cut: c.port2});
 
             this._worker_io.send_ports(ports_for_io);
 
-        }, change_to_files: function(new_files){
-            var new_fkeys = {
-                set: this._fkey_from_file(new_files.set),
-                pos: this._fkey_from_file(new_files.pos),
-                cut: this._fkey_from_file(new_files.cut),
-                tet: this._fkey_from_file(new_files.tet)
+        }, _change_to_files: function(new_fkeys, old_fkeys){
+            if(!this._file_org){
+                return;
             }
 
             // nullify things that are chaning...
-            var changing = new Set('tet','cut','pos','set');
-            for(k in changing){
-                if(this._fkeys[k] && this._fkeys[k] === new_fkeys[k]){
+            var changing = new Set(['tet','cut','pos','set']);
+            for(let k of changing){
+                if(old_fkeys[k] && old_fkeys[k] === new_fkeys[k]){
                     changing.delete(k);
                 } else {
-                    this._fkeys[k] = null;
-                    this._files[k] = new_files[k];
+                    this._files[k] = this._file_org.get_file(new_fkeys[k]) || null;
                 }
             }
 
             this.fire('start_nulling', changing);
 
             if(changing.has('set')){
-                this.set('duration', null);
+                this._setDuration(null);
             }
             if(changing.has('pos')){
-                this.set('pos_xy', null);
-                this.set('pos_speed', null);
-                this.set('pos_dir', null);
+                this._setPos_xy(null);
+                this._setPos_speed(null);
+                this._setPos_dir(null);
             }
             if(changing.has('tet')){
-                this.set('spike_times', null);
-                this.set('amplitudes', null);
-                this.set('data_for_gl', null);
+                this._setSpike_times(null);
+                this._setAmplitudes(null);
+                this._setData_for_gl(null);
             }
             if(changing.has('cut')){
-                this.set('cut_inds', null);
+                this._setCut_inds(null);
             }
 
             this.fire('end_nulling');
@@ -1313,16 +1422,18 @@ var parse_clu_file = function(full_str, fkey){
                 if(new_fkeys.set && this._set_from_fkey.has(new_fkeys.set)){
                     this._use_set(this._set_from_fkey[new_fkeys.set]);
                 } else {
-                    request['set'] = new_files.set;
+                    request['set'] = this._files.set;
+                    request['set_fkey'] = new_fkeys.set;
                 }
             }
 
             if(changing.has('cut')){
                 request['cut'] = null;
                 if(new_fkeys.cut && this._cut_from_fkey.has(new_fkeys.cut)){
-                    this.set('cut_inds', this._cut_from_fkey[new_fkeys.cut]);
+                    this._setCut_inds(this._cut_from_fkey[new_fkeys.cut]);
                 } else {
-                    request['cut'] = new_files.cut;
+                    request['cut'] = this._files.cut;
+                    request['cut_fkey'] = new_fkeys.cut;
                 }
             }
 
@@ -1332,22 +1443,23 @@ var parse_clu_file = function(full_str, fkey){
                     var in_cache = false;
                     var pos_options = this._make_pos_options();
                     pos_options.fkey = new_fkeys.pos;
-                    for(obj in this._pos_from_options){
-                        if(Utils.is_equal_simple(obj, pos_options)){
-                            this._use_pos(obj);
+                    for(let cached_opts in this._pos_from_options){
+                        if(Utils.is_equal_simple(cached_opts, pos_options)){
+                            this._use_pos(this._pos_from_options[cached_opts]);
                             in_cache = true;
                             break;
                         }
                     }
                     if(!in_cache){
-                        request['pos'] = new_files.pos;
+                        request['pos'] = this._files.pos;
                         options['pos'] = this._make_pos_options();
+                        request['pos_fkey'] = new_fkeys.pos;
                     }
                 }
             }
 
             if(changing.has('tet')){
-                this._make_tet_request(new_fkeys.tet, new_files.tet, request, options);
+                this._make_tet_request(new_fkeys.tet, this._files.tet, request, options);
             }
 
             this._worker_io.exec('read_files', request, options); 
@@ -1356,36 +1468,38 @@ var parse_clu_file = function(full_str, fkey){
             var options = this._make_pos_options();
             this._worker_io.exec('read_files', {
                 pos: this._files.pos,
+                pos_fkey: this.selected_files.pos
             }, {
                 pos: options
             });
         }, got_pos: function(msg, arrays){
             var am = window.typed_array_manager;
-            msg.options.fkey = msg.fkey;
-            var cache = Utils.simple_clone(msg.options);
-            cache.xy = am.store_array(arrays['xy']);
-            cache.dir = am.store_array(arrays['dir']);
-            cache.speed = am.store_array(arrays['speed']);
-            cache.header = msg.header;
-            this._pos_from_options.add(cache);
+            var result = {
+                xy: am.store_array(arrays['xy']),
+                dir: am.store_array(arrays['dir']),
+                speed: am.store_array(arrays['speed']),
+                header: msg.header
+            };
+            msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
+            this._pos_from_options[msg.options] = result
             if(msg.delete_from_cache){
-                for(var obj in cache){
-                    if(Utils.is_equal_simple(obj, msg.delete_from_cache)){
-                        this._pos_from_options.delete(obj);
+                for(let cached_opts in this._pos_from_options){
+                    if(Utils.is_equal_simple(cached_opts, msg.delete_from_cache)){
+                        this._pos_from_options.delete(cached_opts);
                     }
                 }
             }
-
             var opts =  this._make_pos_options();
-            opts.fkey = this._fkeys.pos;
+            opts.fkey = this.selected_files.pos;
             if(Utils.is_equal_simple(msg.options, opts)){
-                this._use_pos(cache);
+                this._use_pos(result);
             }            
         },
-        _use_pos: function(cache){
-            this.pos_xy = cache.xy;
-            this.pos_dir = cache.dir;
-            this.pos_speed = cache.speed;
+        _use_pos: function(result){
+            this._setPos_xy(result.xy);
+            this._setPos_dir(result.dir);
+            this._setPos_speed(result.speed);
+            this._setPos_header(result.header);
         },
         _make_tet_request: function(fkey, file, request, options){
             if(!fkey){
@@ -1397,44 +1511,48 @@ var parse_clu_file = function(full_str, fkey){
             options['tet'] = {};
             if(this.want_amplitudes){
                 if(cached.amps){
-                    this.set('amplitudes', cached.amps);
+                    this._setAmplitudes(cached.amps);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['amps'] = 1;    
                 }
             } 
             if(this.want_spike_times){
                 if(cached.times){
-                    this.set('spike_times', cached.times);
+                    this._setSpike_times(cached.times);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['times'] = 1;
                 }
             }
             if(this.want_data_for_gl){
                 if(cached.gl_data) {
-                    this.set('data_for_gl', cached.gl_data);
+                    this._setData_for_gl(cached.gl_data);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['gl_data'] = 1;                            
                 }
+            }
+            if(cached.header){
+                this._setTet_header(header);
             }
 
         }, _tet_options_changed: function(){
             var request = {}, options = {};
-            this._make_tet_request(this._fkeys.tet, this._files.tet, request, options);
+            this._make_tet_request(this.selected_files.tet, this._files.tet, request, options);
             this._worker_io.exec('read_files', request, options); 
         }, cut_file_parsed: function(msg, arrays){
             var am = window.typed_array_manager;
             this._cut_from_fkey[msg.fkey] = am.store_array(arrays['cut']);
-            if(this._fkeys.cut === msg.fkey){
-                this.set('cut_inds', this._cut_from_fkey[msg.fkey]);
+            if(this.selected_files.cut === msg.fkey){
+                this._setCut_inds(this._cut_from_fkey[msg.fkey]);
             }
             if(msg.delete_from_cache){
                 this._cut_from_fkey.delete(msg.delete_from_cache);
             }
-        }, _fkey_from_file: function(file){
-            return file ? file.lastModified + " " + file.name : "";
         }, _make_pos_options: function(){
             return {
                 use_both_leds: this.use_n_leds,
@@ -1447,51 +1565,54 @@ var parse_clu_file = function(full_str, fkey){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.gl_data = {
                 n: msg.n_spikes,
                 voltages: am.store_array(arrays.data)
             };
-            if(msg.fkey === this._fkeys.tet){
-                this.set('data_for_gl', cached.gl_data);
+            if(msg.fkey === this.selected_files.tet){
+                this._setData_for_gl(cached.gl_data);
             }
         }, got_amplitudes: function(msg, arrays){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.amps = {
                 n: msg.n_spikes,
                 amps: am.store_array(arrays.data)
             };
-            if(msg.fkey === this._fkeys.tet){
-                this.set('amplitudes', cached.amps);
+            if(msg.fkey === this.selected_files.tet){
+                this._setAmplitudes(cached.amps);
             }
         }, got_times: function(msg, arrays){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.times = {
                 n: msg.n_spikes,
                 times: am.store_array(arrays.data)
             };
-            if(msg.fkey === this._fkeys.tet){
-                this.set('spike_times', cached.times);
+            if(msg.fkey === this.selected_files.tet){
+                this._setSpike_times(cached.times);
             }
         }, got_tet_header: function(fkey, header){
             var cached = this._tet_from_fkey[fkey];
             if(!cached){
-                _tet_from_fkey[fkey] = cached = {};
+                this._tet_from_fkey[fkey] = cached = {};
             }
             cached.header = header;
+            if(fkey === this.selected_files.tet){
+                this._setTet_header(header);
+            }
         }, delete_from_tet_cache: function(fkey){
             this._tet_from_fkey.delete(fkey);
         }, set_file_parsed: function(msg) {
-            if(this._fkeys.set === msg.fkey){
+            if(this.selected_files.set === msg.fkey){
                 this._use_set(msg.header);
             }
             this._set_from_fkey[msg.fkey] = msg.header;
@@ -1499,7 +1620,8 @@ var parse_clu_file = function(full_str, fkey){
                 this._set_from_fkey.delete(msg.delete_from_cache);
             }
         }, _use_set: function(header){
-            this.set('duration', parseInt(header.duration));
+            this._setDuration(parseInt(header.duration));
+            this._setSet_header(header);
         }
 	});
 </script>

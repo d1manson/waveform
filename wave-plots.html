@@ -893,8 +893,8 @@ Polymer({
 	},
 	data_for_gl_changed: function(){
 		var am = window.typed_array_manager;
-		this._render.set_n(this.data_for_gl.n);
-		this._render.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
+		this._renderer.set_n(this.data_for_gl.n);
+		this._renderer.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
 	},
 	_show_chans_changed: function(){
 		// note that unlike in rm/tac-plots, we let the renderer deal
@@ -902,16 +902,16 @@ Polymer({
 		// sends it the full update lists.  That's because sending messages
 		// in this case does not invlove cloning and posting arrays.
 		if(this.show_chans === 'yyyy'){
-			this._render.show = 'y';
+			this._renderer.show = 'y';
 		} else if (this.show_chans === 'nnnn'){
-			this._render.show = 'n';
+			this._renderer.show = 'n';
 		} else {
 			this.set('show_chans', 'yyyy');
 			console.log("currently channels cannot be toggled individually");
 		}
 	},
 	_palette_mode_changed: function(){
-		this._render.set_mode(this._palette_mode);
+		this._renderer.set_mode(this._palette_mode);
 	},
 	_update_okeys: function(okeys_to_remove, okeys_to_add){
         var cm = window.canvas_manager;

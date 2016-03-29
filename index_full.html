@@ -41,21 +41,6 @@
 	        on-iron-localstorage-load-empty="initializeDefaultOptions"
 	        ></iron-localstorage>
 
-		<parsed-data 
-					use_n_leds="[[options.use_n_leds]]"
-					speed_filter_mps="[[options.speed_filter_mps]]"
-					pos_smoothing_s="[[options.pos_smoothing_s]]"
-		            duration="{{duration}}"
-					spike_times="{{spike_times}}"
-					pos_xy="{{pos_xy}}"
-					pos_dir="{{pos_dir}}"
-					pos_speed="{{pos_speed}}"
-					amplitudes="{{amplitudes}}"
-					voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
-		<cut-object groups="{{cut_groups}}"
-					undo_stack_descriptions="{{cut_undo_stack}}"
-					redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
-
 	<div class="hidden_clipboard"></div>
 
 	<div class="floating_layer">
@@ -303,9 +288,10 @@
 		
 		<div-iron-resize class="side_panel">
 
-			<file-organiser class="side_panel_row"
+			<file-organiser class="side_panel_row" id="the_file_organiser"
 				is_dragging_in="{{drop_in_progress}}"
 				no_files="{{no_files}}"
+				selected_files="{{selected_files}}"
 			></file-organiser>
 			
 			<iron-splitter direction="up"></iron-splitter>
@@ -392,6 +378,25 @@
 		v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
 		</div>
 	</drop-zone>
+
+
+	<parsed-data 
+			    file_organiser_id="the_file_organiser"
+				selected_files="[[selected_files]]"
+				use_n_leds="[[options.use_n_leds]]"
+				speed_filter_mps="[[options.speed_filter_mps]]"
+				pos_smoothing_s="[[options.pos_smoothing_s]]"
+	            duration="{{duration}}"
+				spike_times="{{spike_times}}"
+				pos_xy="{{pos_xy}}"
+				pos_dir="{{pos_dir}}"
+				pos_speed="{{pos_speed}}"
+				amplitudes="{{amplitudes}}"
+				voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
+	<cut-object groups="{{cut_groups}}"
+				undo_stack_descriptions="{{cut_undo_stack}}"
+				redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+
 
 </template>
 
