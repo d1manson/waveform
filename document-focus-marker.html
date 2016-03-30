@@ -27,7 +27,7 @@ Polymer({
 		is_focused: {
 			type: Boolean,
 			value: true,
-			notfiy: true,
+			notify: true,
 			readOnly: true
 		}
 	}, created: function(){
@@ -35,9 +35,11 @@ Polymer({
 	
 	}, attached: function(){
 		var self = this;
-		window.addEventListener('blur', function(){
-			self._setIs_focused(false);
-			self.style.opacity = '1';
+		window.addEventListener('blur', function(e){
+			if(e.target === window){
+				self._setIs_focused(false);
+				self.style.opacity = '1';				
+			}
 		}, true);
 		window.addEventListener('focus', function(){
 			self._setIs_focused(true);

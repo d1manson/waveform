@@ -1,26 +1,28 @@
-/* 
-* {
-    padding: 0;
-    margin: 0;
-}
-*/
-p,ul,ol{
+p, ul, ol{
 margin-top: 6px;
 margin-bottom: 6px;
 }
-ul,ol{image-rendering: pixelated;
+ul, ol{
 padding-left:10px;
 margin-left:10px;
 }
+canvas, img{
+image-rendering: pixelated;
+vertical-align:bottom;
+}
 body{
-    overflow:hidden;
+overflow:hidden;
 font-family: sans-serif;
 font-size: 0.8em;
 -webkit-user-select: none;
--khtml-user-select: none;
--moz-user-select: -moz-none;
--o-user-select: none;
 user-select: none;
+}
+td {
+font-size: 0.8em;
+}
+pre {
+font-size: 1.2em;
+margin-left: 15px;
 }
 #all_below_toolbar{
   position: relative;
@@ -28,22 +30,7 @@ user-select: none;
   display: flex;
   flex-direction: row;
 }
-.keyboard_focus_notifier.ease{
-  transition: border-color 0.3s ease-in-out;
-}
-.keyboard_focus_notifier{
-  position: absolute;
-  pointer-events: none;
-  top: 0px;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
-  border: 20px solid;
-  border-color: rgba(255,0,0,0);
-}
-.keyboard_focus_notifier.no_focus{
-  border-color: rgba(255,0,0,0.2);
-}
+
 .info_summary{
     position: absolute;
 	margin: 3px;
@@ -67,21 +54,11 @@ right: 0;
 -o-user-select: initial;
 user-select: initial;
 }
-.floating_layer{
-position: fixed;
-z-index:100;
-}
 .menu_toggle{
 position: fixed;
 top: 0px;
 right: 0px;
 background: #efefef;
-}
-td{
-font-size: 0.8em;
-}
-canvas, img{
-vertical-align:bottom;
 }
 .grabbable{
 position: relative;
@@ -94,12 +71,6 @@ left: 0;
 right: 0;
 min-height: 150px;
 image-rendering: pixelated;
-}
-.cluster_canv{
-image-rendering: pixelated;
-}
-.tilewall[tilemoving]{
-cursor: move;
 }
 .main_wrapper{
 position: fixed;
@@ -167,91 +138,27 @@ text-align: right;
 #works_with_chrome > img{
 vertical-align: text-top;
 }
-
-
 .pending{
 background: #FCC;
 }
 .pending:hover{
 background: #FAA;
 }
-
-
-.file_drop{
-position: fixed;
-left: 0px;
-right: 0px;
-top: 0px;
-bottom: 0px;
-padding: 5px;
-display: block;
-text-align: center;
-background: #FFFFFF;
-color: #888;
-z-index: 100;
-}
-.file_drop:before{
-position: fixed;
-margin: 40px;
-border: 10px dashed #999;
-right: 0px;
-left: 0px;
-content: '';
-bottom: 0px;
-top: 0px;
-background: -moz-radial-gradient(center, ellipse cover,  rgba(255,255,255,1) 32%, rgba(255,255,255,1) 37%, rgba(255,255,255,0) 55%, rgba(255,255,255,0) 62%);
-background: -webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(32%,rgba(255,255,255,1)), color-stop(37%,rgba(255,255,255,1)), color-stop(55%,rgba(255,255,255,0)), color-stop(62%,rgba(255,255,255,0)));
-background: -webkit-radial-gradient(center, ellipse cover,  rgba(255,255,255,1) 32%,rgba(255,255,255,1) 37%,rgba(255,255,255,0) 55%,rgba(255,255,255,0) 62%);
-background: -o-radial-gradient(center, ellipse cover,  rgba(255,255,255,1) 32%,rgba(255,255,255,1) 37%,rgba(255,255,255,0) 55%,rgba(255,255,255,0) 62%);
-background: -ms-radial-gradient(center, ellipse cover,  rgba(255,255,255,1) 32%,rgba(255,255,255,1) 37%,rgba(255,255,255,0) 55%,rgba(255,255,255,0) 62%);
-background: radial-gradient(ellipse at center,  rgba(255,255,255,1) 32%,rgba(255,255,255,1) 37%,rgba(255,255,255,0) 55%,rgba(255,255,255,0) 62%);
-filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#00ffffff',GradientType=1 );
-}
-.file_drop.alreadyUsed{
-    background: initial;
-}
-.file_drop.alreadyUsed:before{
-    border: 0px;
-}
-.drop_banner{
-    font-size: 4em;
-    position: absolute;
-    bottom: 430px;
-    text-align: center;
-    width: 100%;
-}
-.wibbly_wobbly{
-    -webkit-animation-name: 'spaceboots';
-    -webkit-animation-duration: 0.8s;
-	-webkit-transform-origin:50% 50%;
-	-webkit-animation-iteration-count: infinite;
-	-webkit-animation-timing-function: linear;    
-}
 .github_button_filedrop{
-    cursor: pointer;
-    margin: 20px 0px 0px 0px;
-    border: 1px solid #999;
-    display: inline-block;
-    padding: 4px 10px 4px 10px;
-    border-radius: 4px;
-    background: #eee;
+cursor: pointer;
+margin: 20px 0px 0px 0px;
+border: 1px solid #999;
+display: inline-block;
+padding: 4px 10px 4px 10px;
+border-radius: 4px;
+background: #eee;
 }
 .github_button_filedrop:hover{
-    background: #ddd;
-    border-color: #777;
+background: #ddd;
+border-color: #777;
 }
 #youtube_demo_img:hover {
-    content: url('img/demo_youtube_hover.png');
-}
-.file_drop_text,
-.tilewall_text{
-margin: auto;
-position: absolute;
-height: 400px;
-bottom: 0px;
-top: 0px;
-left: 0px;
-right: 0px;
+content: url('img/demo_youtube_hover.png');
 }
 .tilewall_text{
 text-align: center;
@@ -284,11 +191,6 @@ user-select: none;
 background: #500;
 color: #fff;
 }
-.collapsable_panel[state="closed"]{
-	height: 5px;
-	overflow-y: hidden;
-	overflow-x: hidden;
-}
 .toggle_panel{
 background: #000;
 width: 52px;
@@ -308,7 +210,7 @@ border: 2px solid #fff;
 margin-top:0;
 }
 .file_info{
-    width: 400px;
+width: 400px;
 }
 .file_info_title{
 margin-top: 5px;
@@ -326,9 +228,6 @@ padding: 5px;
 overflow-y:auto;
 overflow-x:hidden;
 -webkit-user-select: none;
--khtml-user-select: none;
--moz-user-select: -moz-none;
--o-user-select: none;
 user-select: none;
 cursor: default;
 position: relative;
@@ -410,65 +309,8 @@ background: #900;
 border-color: #000;
 }
 
-.file_group_title{
-font-weight: bold;
-}
-.tet_group{
-display: inline;
-}
-.file_brick{
-display: inline-block;
-border: 2px #000 solid;
-padding: 2px;
-margin: 2px;
-background: #ddd;
-cursor: default;
-}
-
-.cut_file_brick{
-background: #fbb;
-border-color: #500;
-color: #500;
-}
-.tet_file_brick{
-color: #000;
-}
-
-.file_group[active] > .tet_group[active] > .cut_file_brick:hover,
-.file_group[active] > .tet_group[active] > .cut_file_brick[active]{
-background: #500;
-color: #fff;
-}
-.pos_file_brick,
-.set_file_brick{
-background: #ddb550;
-border-color: #552510;
-color: #552510;
-}
-.new_cut_file_brick{
-background: #bbF;
-border-color: #005;
-color: #005;
-}
-.file_group[active] > .tet_group[active] > .new_cut_file_brick:hover,
-.file_group[active] > .tet_group[active] > .new_cut_file_brick[active]{
-background: #005;
-color: #fff;
-}
-
-#filestem_caption{
-text-align:left;
-}
-.tet_group:not([active]) > div:not(:hover){
-width: 2px;
-font-size:0;
-}
 input[type="text"]{
 padding: 3px 0px 3px 0px;
-}
-#header_search{
-float: right;
-font-size: 0.8em;
 }
 
 #cluster_panel{
@@ -482,49 +324,7 @@ font-size: 0.8em;
 margin: 2px;
 border: 1px solid #000;
 }
-.floatinginfo{
-position: fixed;
-top: 0px;
-left: 0px;
-transform: translate(400px,100px);
--webkit-transform: translate(400px, 100px);
-min-width: 200px;
-max-width: 400px;
-background-color: rgba(255,255,255,0.8);
-display:none;
-z-index:100;
-cursor: move;
-box-shadow: 3px 3px 7px #999;
-}
-.showing{
-display: block;
-}
-.floating_title{
-background:#333;
-color: #fff;
-font-weight:bold;
-display: block;
-padding:5px;
-}
-.floating_body{
-border: 1px solid #000;
-min-height: 60px;
-padding: 8px;
-}
-.grabbed_info{
-min-width: initial;
-max-width: initial;
-}
-html[dragging]>* {
-pointer-events: none;
-}
-html[dragging]{
-cursor:move;
-}
-pre{
-font-size: 1.2em;
-margin-left: 15px;
-}
+
 .tetrode_title{
 display: inline-block;
 padding-right: 5px;
@@ -533,8 +333,6 @@ padding-right: 5px;
 display: block;
 text-align: left;
 }
-
-
 .cluster-sticker{
 width: 20px;
 height: 17px;
@@ -560,27 +358,10 @@ text-align: right;
 min-height: 26px;
 }
 
-
 #eegspect{
 display:block;
 margin-top: 4px;
 }
 
-
-
-@-webkit-keyframes spaceboots {
-    /* Taken from http://www.cssreset.com/demos/css3/webkit-animation-shake-links/spaceboots.html */
-    0%   { -webkit-transform: translate(2px, 1px)   rotate(0deg); }
-	10%  { -webkit-transform: translate(-1px, -2px) rotate(-1deg); }
-	20%  { -webkit-transform: translate(-3px, 0px)  rotate(1deg); }
-	30%  { -webkit-transform: translate(0px, 2px)   rotate(0deg); }
-	40%  { -webkit-transform: translate(1px, -1px)  rotate(1deg); }
-	50%  { -webkit-transform: translate(-1px, 1px)  rotate(-1deg); }
-	60%  { -webkit-transform: translate(-3px, -2px)  rotate(0deg); }
-	70%  { -webkit-transform: translate(2px, 1px)   rotate(-1deg); }
-	80%  { -webkit-transform: translate(-1px, -2px) rotate(1deg); }
-	90%  { -webkit-transform: translate(2px, -1px)   rotate(0deg); }
-	100% { -webkit-transform: translate(1px, -2px)  rotate(-1deg); }
-}
 
 

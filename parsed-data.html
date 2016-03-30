@@ -230,7 +230,7 @@ var got_ports = function(ports){
     self.io_port = ports.pos;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var buffer = fkey_to_buffer[fkey];
+        var buffer = fkey_to_buffer.get(fkey);
         if(!buffer){
             // see note at top of page on Chrome bug
             let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
@@ -239,7 +239,7 @@ var got_ports = function(ports){
         io_port.postMessage('done reading');
 
          // add/delete entries in buffer cache, based on instructions from io-worker
-        fkey_to_buffer[fkey] = buffer;
+        fkey_to_buffer.set(fkey, buffer);
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
@@ -247,7 +247,7 @@ var got_ports = function(ports){
         // check to see if main cache actually holds the requested data     
         var options = e.data.options;
         options.fkey = fkey;
-        for(let cached_opts in main_cached_opts){
+        for(let cached_opts of main_cached_opts){
             if(is_equal_simple(cached_opts, options)){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
@@ -264,7 +264,7 @@ var got_ports = function(ports){
             main_cached_opts.delete(delete_from_cache);
         }
 
-        parse_pos_file(buffer, fkey, options, delete_from_cache);
+        parse_pos_file(buffer, fkey, options, e.data.name, delete_from_cache);
 
     }
 }
@@ -341,7 +341,7 @@ var regex_header_b = /(\S*) ([\S ]*)/g
 var bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
 var nan16 = -32768; //custom nan value, equal to minimum int16 value    
 
-var parse_pos_file = function(buffer, fkey, options, delete_from_cache){
+var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cache){
     var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
     var match = regex_header_a.exec(top_str);
     if(!match){
@@ -349,7 +349,9 @@ var parse_pos_file = function(buffer, fkey, options, delete_from_cache){
     }
 
     var data_start = match.index + match[0].length;
-    var header = {};
+    var header = {
+        file: file_name
+    };
     var header_str = match[0];
     while (match = regex_header_b.exec(header_str)){
         header[match[1]] = match[2];
@@ -826,7 +828,7 @@ var got_ports = function(ports){
     self.io_port = ports.tet;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var buffer = fkey_to_buffer[fkey];
+        var buffer = fkey_to_buffer.get(fkey);
         if(!buffer){
             // see note at top of page on Chrome bug
             let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
@@ -835,7 +837,7 @@ var got_ports = function(ports){
         io_port.postMessage('done reading');
 
         // add/delete entries in buffer cache, based on instructions from io-worker
-        fkey_to_buffer[fkey] = buffer;
+        fkey_to_buffer.set(fkey, buffer);
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
@@ -843,7 +845,7 @@ var got_ports = function(ports){
         // check to see if main cache actually holds any of the requested data 
         var options = e.data.options;       
         options.fkey = fkey;
-        for(var cached_opts in main_cached_opts){
+        for(var cached_opts of main_cached_opts){
             if(cached_opts.fkey === fkey){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
@@ -890,7 +892,7 @@ var got_ports = function(ports){
         }
 
         // and actually do the work...
-        parse_tet_file(buffer, fkey, options);
+        parse_tet_file(buffer, fkey, options, e.data.name);
 
     }
 }
@@ -902,7 +904,7 @@ var n_c = 4;
 var n_w = 50;
 var bytes_per_spike = n_c*(4 + n_w);
 
-var parse_tet_file = function(buffer, fkey, options){
+var parse_tet_file = function(buffer, fkey, options, file_name){
     var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
         
     var match = regex_header_a.exec(top_str);
@@ -911,7 +913,9 @@ var parse_tet_file = function(buffer, fkey, options){
     }
 
     var data_start = match.index + match[0].length;
-    var header = {};
+    var header = {
+        file: file_name
+    };
     var header_str = match[0];
     while (match = regex_header_b.exec(header_str)){
         header[match[1]] = match[2];
@@ -1064,7 +1068,7 @@ var got_ports = function(ports){
     self.io_port = ports.set;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var buffer = fkey_to_buffer[fkey];
+        var buffer = fkey_to_buffer.get(fkey);
         if(!buffer){
             // see note at top of page on Chrome bug
             let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
@@ -1073,7 +1077,7 @@ var got_ports = function(ports){
         io_port.postMessage('done reading');
 
         // add/delete entries in buffer cache, based on instructions from io-worker
-        fkey_to_buffer[fkey] = buffer;
+        fkey_to_buffer.set(fkey, buffer);
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
@@ -1094,6 +1098,7 @@ var got_ports = function(ports){
         }
 
         var header = parse_set_file(full_str, fkey);
+        header.file = e.data.name;
         exec_main('set_file_parsed', {
             fkey: fkey,
             header: header,
@@ -1127,7 +1132,7 @@ var got_ports = function(ports){
     self.io_port = ports.cut;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
-        var buffer = fkey_to_buffer[fkey];
+        var buffer = fkey_to_buffer.get(fkey);
         if(!buffer){
             // see note at top of page on Chrome bug
             let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
@@ -1136,7 +1141,7 @@ var got_ports = function(ports){
         io_port.postMessage('done reading');
 
         // add/delete entries in buffer cache, based on instructions from io-worker
-        fkey_to_buffer[fkey] = buffer;
+        fkey_to_buffer.set(fkey, buffer);
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
@@ -1163,6 +1168,7 @@ var got_ports = function(ports){
         var cut = msg.cut;
         msg.cut = "cut";
         msg.fkey = fkey;
+        msg.header.file = e.data.name;
         main_cached_fkeys.add(fkey);
         if(main_cached_fkeys.size > max_cache_size){
             msg.delete_from_cache = main_cached_fkeys.keys().next().value;
@@ -1303,6 +1309,12 @@ var parse_clu_file = function(full_str, fkey){
                 readOnly: true,
                 notify: true
             },
+            cut_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
+            },
             cut_inds: {
                 type: String, // akey
                 value: '',
@@ -1396,19 +1408,23 @@ var parse_clu_file = function(full_str, fkey){
 
             if(changing.has('set')){
                 this._setDuration(null);
+                this._setSet_header(null);
             }
             if(changing.has('pos')){
                 this._setPos_xy(null);
                 this._setPos_speed(null);
                 this._setPos_dir(null);
+                this._setPos_header(null);
             }
             if(changing.has('tet')){
                 this._setSpike_times(null);
                 this._setAmplitudes(null);
                 this._setData_for_gl(null);
+                this._setTet_header(null);
             }
             if(changing.has('cut')){
                 this._setCut_inds(null);
+                this._setCut_header(null);
             }
 
             this.fire('end_nulling');
@@ -1420,7 +1436,7 @@ var parse_clu_file = function(full_str, fkey){
             if(changing.has('set')){
                 request['set'] = null;
                 if(new_fkeys.set && this._set_from_fkey.has(new_fkeys.set)){
-                    this._use_set(this._set_from_fkey[new_fkeys.set]);
+                    this._use_set(this._set_from_fkey.get(new_fkeys.set));
                 } else {
                     request['set'] = this._files.set;
                     request['set_fkey'] = new_fkeys.set;
@@ -1430,7 +1446,8 @@ var parse_clu_file = function(full_str, fkey){
             if(changing.has('cut')){
                 request['cut'] = null;
                 if(new_fkeys.cut && this._cut_from_fkey.has(new_fkeys.cut)){
-                    this._setCut_inds(this._cut_from_fkey[new_fkeys.cut]);
+                    this._setCut_inds(this._cut_from_fkey.get(new_fkeys.cut));
+                    this._setCut_header(this._cut_from_fkey.get(new_fkeys.cut).header);
                 } else {
                     request['cut'] = this._files.cut;
                     request['cut_fkey'] = new_fkeys.cut;
@@ -1443,9 +1460,9 @@ var parse_clu_file = function(full_str, fkey){
                     var in_cache = false;
                     var pos_options = this._make_pos_options();
                     pos_options.fkey = new_fkeys.pos;
-                    for(let cached_opts in this._pos_from_options){
+                    for(let [cached_opts, data] of this._pos_from_options){
                         if(Utils.is_equal_simple(cached_opts, pos_options)){
-                            this._use_pos(this._pos_from_options[cached_opts]);
+                            this._use_pos(data);
                             in_cache = true;
                             break;
                         }
@@ -1481,9 +1498,9 @@ var parse_clu_file = function(full_str, fkey){
                 header: msg.header
             };
             msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
-            this._pos_from_options[msg.options] = result
+            this._pos_from_options.set(msg.options, result);
             if(msg.delete_from_cache){
-                for(let cached_opts in this._pos_from_options){
+                for(let [cached_opts, ignore] of this._pos_from_options){
                     if(Utils.is_equal_simple(cached_opts, msg.delete_from_cache)){
                         this._pos_from_options.delete(cached_opts);
                     }
@@ -1507,7 +1524,7 @@ var parse_clu_file = function(full_str, fkey){
                 return;
             }
 
-            var cached = this._tet_from_fkey[fkey] || {};
+            var cached = this._tet_from_fkey.get(fkey) || {};
             options['tet'] = {};
             if(this.want_amplitudes){
                 if(cached.amps){
@@ -1537,7 +1554,7 @@ var parse_clu_file = function(full_str, fkey){
                 }
             }
             if(cached.header){
-                this._setTet_header(header);
+                this._setTet_header(cached.header);
             }
 
         }, _tet_options_changed: function(){
@@ -1546,9 +1563,13 @@ var parse_clu_file = function(full_str, fkey){
             this._worker_io.exec('read_files', request, options); 
         }, cut_file_parsed: function(msg, arrays){
             var am = window.typed_array_manager;
-            this._cut_from_fkey[msg.fkey] = am.store_array(arrays['cut']);
+            this._cut_from_fkey.set(msg.fkey,{
+                header: msg.header,
+                cut: am.store_array(arrays['cut'])
+            });
             if(this.selected_files.cut === msg.fkey){
-                this._setCut_inds(this._cut_from_fkey[msg.fkey]);
+                this._setCut_inds(this._cut_from_fkey.get(msg.fkey).cut);
+                this._setCut_header(this._cut_from_fkey.get(msg.fkey).header)
             }
             if(msg.delete_from_cache){
                 this._cut_from_fkey.delete(msg.delete_from_cache);
@@ -1563,9 +1584,10 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, got_gl_data: function(msg, arrays){
             var am = window.typed_array_manager;
-            var cached = this._tet_from_fkey[msg.fkey];
+            var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
-                this._tet_from_fkey[msg.fkey] = cached = {};
+                cached = {};
+                this._tet_from_fkey.set(msg.fkey, cached);
             }
             cached.gl_data = {
                 n: msg.n_spikes,
@@ -1576,9 +1598,10 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, got_amplitudes: function(msg, arrays){
             var am = window.typed_array_manager;
-            var cached = this._tet_from_fkey[msg.fkey];
+            var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
-                this._tet_from_fkey[msg.fkey] = cached = {};
+                cached = {};
+                this._tet_from_fkey.set(msg.fkey, cached);
             }
             cached.amps = {
                 n: msg.n_spikes,
@@ -1589,9 +1612,10 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, got_times: function(msg, arrays){
             var am = window.typed_array_manager;
-            var cached = this._tet_from_fkey[msg.fkey];
+            var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
-                this._tet_from_fkey[msg.fkey] = cached = {};
+                cached = {};
+                this._tet_from_fkey.set(msg.fkey, cached);
             }
             cached.times = {
                 n: msg.n_spikes,
@@ -1601,9 +1625,10 @@ var parse_clu_file = function(full_str, fkey){
                 this._setSpike_times(cached.times);
             }
         }, got_tet_header: function(fkey, header){
-            var cached = this._tet_from_fkey[fkey];
+            var cached = this._tet_from_fkey.get(fkey);
             if(!cached){
-                this._tet_from_fkey[fkey] = cached = {};
+                cached = {};
+                this._tet_from_fkey.set(fkey, cached);
             }
             cached.header = header;
             if(fkey === this.selected_files.tet){
@@ -1615,7 +1640,7 @@ var parse_clu_file = function(full_str, fkey){
             if(this.selected_files.set === msg.fkey){
                 this._use_set(msg.header);
             }
-            this._set_from_fkey[msg.fkey] = msg.header;
+            this._set_from_fkey.set(msg.fkey, msg.header);
             if(msg.delete_from_cache){
                 this._set_from_fkey.delete(msg.delete_from_cache);
             }

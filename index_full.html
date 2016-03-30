@@ -14,7 +14,6 @@
 <link rel="import" href="iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
-<link rel="import" href="custom-toolbar.html">
 <link rel="import" href="bower_components/paper-slider/paper-slider.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="cross-hair.html">
@@ -26,13 +25,30 @@
 <link rel="import" href="drop-zone.html">
 <link rel="import" href="floating-pane.html">
 <link rel="import" href="document-focus-marker.html">
+<link rel="import" href="header-view.html">
+<link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
+
+<style is="custom-style">
+:root {
+	--paper-toolbar-height: 40px;
+	--paper-toolbar-background: #efefef;
+	--paper-toolbar-color: #000;
+}
+</style>
+
+<style>
+paper-toolbar{
+box-shadow: inset 0 0 2px 1px #ccc;
+}
+</style>
+
 </head>
 
 <body>
 <paper-iconset id="meta"></paper-iconset>
 
 <template is="dom-bind" id="the_app">
-	
+
 	<typed-array-manager></typed-array-manager>
 
  		<iron-localstorage
@@ -127,9 +143,16 @@
 			<li>render each pixel based on how many waves cross that pixel.</li>
 			</ul>
 		</floating-pane>
-		
-		<floating-pane id="file_info">
-			<!-- TODO: show filterable headers -->
+
+		<floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
+			<div class='pane_title'>File headers [h]</div>
+			<header-view 
+			set_header="[[set_header]]"
+			pos_header="[[pos_header]]"
+			tet_header="[[tet_header]]"
+			cut_header="[[cut_header]]"
+			header_filter="[[options.header_filter]]"
+			></header-view>
 		</floating-pane>
 
 		<floating-pane id="rm_info" style="display: initial;">
@@ -195,93 +218,93 @@
 
 	<div class="main_wrapper">
 		
-	<custom-toolbar class="main_toolbar">
+	<paper-toolbar class="main_toolbar">
 		<div>
-		<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
-		<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+			<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
+			<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
-		<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+			<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
+			<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
-		<paper-tooltip>undo [z]</paper-tooltip>
+			<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
+			<paper-tooltip>undo [z]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
-		<paper-tooltip>file headers [h]</paper-tooltip>
+			<paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
+			<paper-tooltip>file headers [h]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
-		<paper-tooltip>toggle drift [d]</paper-tooltip>
+			<paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
+			<paper-tooltip>toggle drift [d]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></paper-icon-button>
-		<paper-tooltip>toggle palette [p]</paper-tooltip>
+			<paper-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></paper-icon-button>
+			<paper-tooltip>toggle palette [p]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
-		<paper-tooltip>sort on group size [n]</paper-tooltip>
+			<paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
+			<paper-tooltip>sort on group size [n]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
-		<paper-tooltip>sort on channel amplitude</paper-tooltip>
+			<paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
+			<paper-tooltip>sort on channel amplitude</paper-tooltip>
 		</div>	
 
 		<div>
-		<paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
-		<paper-tooltip>position post processing settings</paper-tooltip>
+			<paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
+			<paper-tooltip>position post processing settings</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c1</div>
-		<paper-tooltip>channel 1 [1]</paper-tooltip>
+			<div class="button display_button">c1</div>
+			<paper-tooltip>channel 1 [1]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c2</div>
-		<paper-tooltip>channel 2 [2]</paper-tooltip>
+			<div class="button display_button">c2</div>
+			<paper-tooltip>channel 2 [2]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c3</div>
-		<paper-tooltip>channel 3 [3]</paper-tooltip>
+			<div class="button display_button">c3</div>
+			<paper-tooltip>channel 3 [3]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c4</div>
-		<paper-tooltip>channel 4 [4]</paper-tooltip>
+			<div class="button display_button">c4</div>
+			<paper-tooltip>channel 4 [4]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
-		<paper-tooltip>spatial ratemap [r]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
+			<paper-tooltip>spatial ratemap [r]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
-		<paper-tooltip>directional ratemap [c]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
+			<paper-tooltip>directional ratemap [c]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
-		<paper-tooltip>speed ratemap [v]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
+			<paper-tooltip>speed ratemap [v]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
-		<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
+			<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
 		</div>
 
-	</custom-toolbar>
+	</paper-toolbar>
 
 	<div id="all_below_toolbar">
 		<document-focus-marker></document-focus-marker>
@@ -392,7 +415,11 @@
 				pos_dir="{{pos_dir}}"
 				pos_speed="{{pos_speed}}"
 				amplitudes="{{amplitudes}}"
-				voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
+				voltages_for_gl="{{voltages_for_gl}}"
+				tet_header="{{tet_header}}"
+				cut_header="{{cut_header}}"
+				pos_header="{{pos_header}}"
+				set_header="{{set_header}}"></parsed-data>
 	<cut-object groups="{{cut_groups}}"
 				undo_stack_descriptions="{{cut_undo_stack}}"
 				redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
@@ -427,7 +454,8 @@ document.getElementById('the_app').initializeDefaultOptions = function(ev) {
 		waves_render_mode: 'density',
 		use_n_leds: 2,
 		speed_filter_mps: 4,
-		pos_smoothing_s: 0.2
+		pos_smoothing_s: 0.2,
+		header_filter: ''
 	};
 }
 

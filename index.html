@@ -29,6 +29,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <title>Cutting GUI</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 <script> window.Polymer = {dom: 'shadow'}</script>
+<style is="custom-style">
+:root {
+	--paper-toolbar-height: 40px;
+	--paper-toolbar-background: #efefef;
+	--paper-toolbar-color: #000;
+}
+</style>
+
+<style>
+paper-toolbar{
+box-shadow: inset 0 0 2px 1px #ccc;
+}
+</style>
+
 </head>
 
 <body><div hidden="" by-vulcanize=""><script>(function () {
@@ -8569,7 +8583,7 @@ var exec_main_b = function(/*arguments*/){
     log: function(){
         self.postMessage({
             foo:'console.log',
-            args:  Array.prototype.slice.call(arguments)
+            args: Array.prototype.slice.call(arguments, 0)
         });
     }
  };
@@ -8685,13 +8699,13 @@ var endian = function(){
         var foo = e.data.foo;
         try{
             this._listener[foo].apply(this._listener, e.data.args);
-        }catch(e){
+        }catch(err){
             if(foo === "console.log"){
                 console.log(e.data.args);
             } else if(foo === "set_array_on_main_window"){
                 window[e.data.args[1]] = new window[e.data.args[2]](e.data.args[0]);
             } else {
-                throw e;
+                throw err;
             }
         }
     }
@@ -8765,8 +8779,8 @@ var pos_xy;
 var pos_units_per_cm;
 var pos_dir;
 var pos_speed;
-var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = {}; 
+var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var key_to_rendered_options = new Map(); 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
@@ -8775,6 +8789,7 @@ var key_generation = 0;
 var cached_spike_pos_ind;
 var cached_xy_bins;
 var cached_xy_dwell;
+var cached_xy_no_dwell;
 var cached_dir_bins;
 var cached_dir_dwell;
 var cached_speed_bins;
@@ -8824,7 +8839,7 @@ var set_options = function(opts){
 var set_spike_times = function(timebase, arrays){
     clear_cache(['spikes_timebase', 'spike_times']);
     spikes_timebase = timebase;
-    spike_times = arrays.data; 
+    spike_times = arrays && arrays.data; 
     make_all_keys_pending();
     touch_timer();
 }
@@ -8834,10 +8849,11 @@ var set_pos_xy = function(timebase, units_per_cm, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_xy']);
     }
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
-    pos_xy = arrays.data;
-    // TODO: clear anything cached that related to pos_xy
+    pos_xy = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
@@ -8847,9 +8863,10 @@ var set_pos_dir = function(timebase, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_dir']);
     }
-    pos_dir = arrays.data;
-    // TODO: clear anything cached that related to pos_dir
+    pos_dir = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
@@ -8859,16 +8876,17 @@ var set_pos_speed = function(timebase, arrays){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
+    } else {
+        clear_cache(['pos_speed']);
     }
-    pos_speed = arrays.data;
-    // TODO: clear anything cached that related to pos_speed
+    pos_speed = arrays && arrays.data;
     make_all_keys_pending();
     touch_timer();
 }
 
 var make_all_keys_pending = function(){
     keys_pending_render = [];    
-    for(var key in key_to_array){
+    for(let key in key_to_array){
         keys_pending_render.push(key);
     }
 }
@@ -8887,9 +8905,9 @@ var update_keys = function(changes, arrays){
     // generation and that it's still wanted.
 
     var remove_keys = changes.remove || [];
-    for(var ii=0; ii<remove_keys.length; ii++){
-        delete key_to_array[remove_keys[ii]];
-        delete key_to_rendered_options[remove_keys[ii]];
+    for(let ii=0; ii<remove_keys.length; ii++){
+        key_to_array.delete(remove_keys[ii]);
+        key_to_rendered_options.delete(remove_keys[ii]);
     }
 
     if(changes.generation_add !== changes.generation_remove){
@@ -8898,7 +8916,7 @@ var update_keys = function(changes, arrays){
     }
 
     var add_keys = changes.add || [];
-    for(var ii=0; ii<add_keys.length; ii++){
+    for(let ii=0; ii<add_keys.length; ii++){
         key_to_array[add_keys[ii]] = arrays[add_keys[ii]];
         keys_pending_render.push(add_keys[ii]);
     }
@@ -8983,7 +9001,7 @@ var make_cached_spike_pos_ind = function(){
     cached_spike_pos_ind = new Uint32Array(spike_times.length);
     
     var factor = pos_timebase / spikes_timebase;
-    for(var i=0; i<cached_spike_pos_ind.length; i++)
+    for(let i=0; i<cached_spike_pos_ind.length; i++)
         cached_spike_pos_ind[i] = spike_times[i]*factor; //integer result, so implicitly the floor 
 
     return true;
@@ -8998,8 +9016,9 @@ var make_cached_xy_bins_and_dwell = function(){
 
     var factor = 1/pos_units_per_cm/render_options.cm_per_spa_bin;
     cached_xy_bins = new Uint8ClampedArray(pos_xy.length);
-    for(var i=0;i<pos_xy.length;i++)
+    for(let i=0;i<pos_xy.length;i++){
         cached_xy_bins[i] = pos_xy[i] * factor;           
+    }
     
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
@@ -9027,8 +9046,9 @@ var make_cached_dir_bins_and_dwell = function(){
 
     var factor = 180/pi/render_options.deg_per_dir_bin;
     cached_dir_bins = new Uint8ClampedArray(pos_dir.length);
-    for(var i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_dir.length;i++){
         cached_dir_bins[i] = pos_dir[i] * factor;
+    }
     
     cached_spike_dir_bins = pick(cached_dir_bins, cached_spike_pos_ind); 
 
@@ -9053,7 +9073,7 @@ var make_cached_speed_bins_and_dwell = function(){
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(var i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_dir.length;i++)
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
     
@@ -9075,7 +9095,7 @@ var get_group_xy_rm = function(key){
 
     var spike = get_smoothed(spike, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
     var ratemap = r_divide_float(spike, cached_xy_dwell);
-    useMask(ratemap, cached_xy_no_dwell);
+    use_mask(ratemap, cached_xy_no_dwell);
 
     var max_map = max(ratemap);
     var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
@@ -9093,11 +9113,11 @@ var to_image_data = function(map, max_map){
      //for binning, we want values on interval [1 P], so use eps (lazy solution):
     var eps = 0.0000001;
     if(max_map == 0){
-        for(var i=0; i<map.length; i++)
+        for(let i=0; i<map.length; i++)
             im[i] = cached_xy_no_dwell[i]? palette[0] : palette[1];
     }else{
         var factor = (palette.length-1)/(max_map*(1+eps));
-        for(var i=0;i<map.length;i++)
+        for(let i=0;i<map.length;i++)
             im[i] = cached_xy_no_dwell[i]? palette[0] : palette[Math.min(1+(0 | (map[i]*factor)), palette.length-1)];
     }
     return im;
@@ -9118,10 +9138,10 @@ var get_group_dir_rm = function(key){
     
     // scale ratemap to have max 1...(for easy plotting)
     var f = 1/max(ratemap);
-    for(var i=0;i<ratemap.length;i++)
+    for(let i=0;i<ratemap.length; i++)
         ratemap[i] *=f; 
     // replace nans with zero..TODO: this isn't right there are problems..!
-    for(var i=0; i<ratemap.length; i++)
+    for(let i=0; i<ratemap.length; i++)
         ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
         
     // TODO: send something to main somehow!
@@ -9154,16 +9174,18 @@ var plot_histogram = function(w, h, vals){
     var im = new Uint32Array(w*h);
 
     var f = w/max(vals);
-    for(var i=0, y=0;i<vals.length && y<h;i++,y++){
-        var h = f*vals[i];
-        for (var k=0;k<3;k++){
-            for(var x=0;x<h;x++)
+    for(let i=0, y=0;i<vals.length && y<h;i++,y++){
+        let h = f*vals[i];
+        for (let k=0;k<3;k++){
+            for(let x=0;x<h;x++){
                 im[y*w+w-1-x] = color_a;
+            }
             im[y*w+w-1] = color_ax;
             y++;
         }
-        for(var x=0;x<h;x++)
+        for(let x=0;x<h;x++){
             im[y*w+w-1-x] = color_b;
+        }
         im[y*w+w-1] = color_ax;
     }
     return im;
@@ -9175,7 +9197,7 @@ var hist_1 = function(inds, n_bins){
     var result = new Uint32Array(n_bins); 
     var n = inds.length;
     
-    for(var i=0;i<n;i++){
+    for(let i=0;i<n;i++){
         result[inds[i]]++;
     }
     return result;
@@ -9185,7 +9207,7 @@ var hist_2 = function(inds_xy, n_1, n_0){
     var result = new Uint32Array(n_0*n_1); 
     var n = inds_xy.length/2;
 
-    for(var i=0; i<n; i++){
+    for(let i=0; i<n; i++){
         result[inds_xy[i*2+1]*n_1 + inds_xy[i*2+0]]++;
     }
     return result;
@@ -9193,7 +9215,7 @@ var hist_2 = function(inds_xy, n_1, n_0){
 
 var is_zero = function(vector){
     var result = new Uint8ClampedArray(vector.length);
-    for(var i=0;i<vector.length;i++)
+    for(let i=0;i<vector.length;i++)
         result[i] = (vector[i]===0);
     return result;
 }
@@ -9202,8 +9224,8 @@ var get_smoothed_1d_periodic = function(x, w){
     // kernel is box-car of size 2w+1
     var n = x.length;
     var result = new Uint32Array(n);
-    for(var i=0; i<N; i++){
-        for(var k=-w;k<=w; k++){
+    for(let i=0; i<N; i++){
+        for(let k=-w;k<=w; k++){
             result[i] += x[(i+k) % n];
         }
     }
@@ -9214,13 +9236,13 @@ var get_smoothed = function(matrix, n_1, n_0, w){
     var result = new Uint32Array(matrix.length);
     // kernel is box-car of size 2w+1
 
-    for(var ky=-w; ky<=w; ky++)for(var kx=-w; kx<=w; kx++){//for each offset within the kernel square
-        var start_0 = ky<0? 0 : ky;
-        var start_1 = kx<0? 0 : kx;
-        var end_0 = ky>0? n_0 : n_0+ky;
-        var end_1 = kx>0? n_1 : n_1+kx;
+    for(let ky=-w; ky<=w; ky++)for(var kx=-w; kx<=w; kx++){//for each offset within the kernel square
+        let start_0 = ky<0? 0 : ky;
+        let start_1 = kx<0? 0 : kx;
+        let end_0 = ky>0? n_0 : n_0+ky;
+        let end_1 = kx>0? n_1 : n_1+kx;
 
-        for(var y=start_0; y<end_0; y++)for(var x=start_1; x<end_1; x++){
+        for(let y=start_0; y<end_0; y++)for(let x=start_1; x<end_1; x++){
             result[y*n_1 +x] += matrix[(y-ky)*n_1 +(x-kx)];
         }
     }   
@@ -9229,7 +9251,7 @@ var get_smoothed = function(matrix, n_1, n_0, w){
 
 var max = function(x){
     var m = x[0];
-    for(var i = 1;i< x.length; i++){
+    for(let i = 1;i< x.length; i++){
         (m < x[i]) && (m = x[i]);
     }
     return m; 
@@ -9238,7 +9260,7 @@ var max = function(x){
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
     var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-    for(var i=0;i<indices.length;i++){
+    for(let i=0;i<indices.length;i++){
         result[i] = from[indices[i]];
     }
     return result;
@@ -9253,12 +9275,12 @@ var is_equal_simple = function(a, b){
     if((a && !b) || (!a && b)){
         return false;
     }
-    for(var aa in a) if(a.hasOwnProperty(aa)){
+    for(let aa in a) if(a.hasOwnProperty(aa)){
         if(b[aa] !== a[aa]){
             return false;
         }
     }
-    for(var bb in b) if(b.hasOwnProperty(bb)){
+    for(let bb in b) if(b.hasOwnProperty(bb)){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -9353,7 +9375,7 @@ var is_equal_simple = function(a, b){
             var added_arrays = {};
             if (this.show !== 'nnn'){
                 // get clones of new arrays to send to worker
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     var key = keys_to_add[ii];
                     var akey = this.groups_collection.getItem(key).inds;
                     added_arrays[key] = am.get_array_clone(akey);
@@ -9363,7 +9385,7 @@ var is_equal_simple = function(a, b){
                 // if we are not showing the plots, we don't actually get 
                 // any arrays, but we need to remmeber that we never sent them
                 // to the worker.
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     this.key_is_on_worker[key] = false;
                 }
                 keys_to_add = [];
@@ -9379,19 +9401,19 @@ var is_equal_simple = function(a, b){
 
             // free canvases, it's our responsiblity to do this, whereas 
             // freeing the inds arrays was the responsibility of cut-obj.
-            for(var ii=0; ii<keys_to_remove.length; ii++){
-                var key = keys_to_remove[ii];
-                var c1 = this.key_to_spa_canvas[key];
+            for(let ii=0; ii<keys_to_remove.length; ii++){
+                let key = keys_to_remove[ii];
+                let c1 = this.key_to_spa_canvas[key];
                 if(c1){
                     cm.free_canvas(c1);
                     delete this.key_to_spa_canvas[key];
                 }
-                var c2 = this.key_to_dir_canvas[key];
+                let c2 = this.key_to_dir_canvas[key];
                 if(c2){
                     cm.free_canvas(c2);
                     delete this.key_to_dir_canvas[key];
                 }
-                var c3 = this.key_to_speed_canvas[key];
+                let c3 = this.key_to_speed_canvas[key];
                 if(c3){
                     cm.free_canvas(c3);
                     delete this.key_to_speed_canvas[key];
@@ -9654,8 +9676,8 @@ var render_options = {
 };
 var spike_times;
 var timebase;
-var key_to_array = {}; // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = {}; 
+var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var key_to_rendered_options = new Map(); 
 var keys_pending_render = [];
 var timer;
 var key_generation = 0;
@@ -9674,7 +9696,7 @@ var set_options = function(opts){
     }
     keys_pending_render = [];    
     if(spike_times){
-        for(var key in key_to_array){
+        for(let key in key_to_array){
             keys_pending_render.push(key);
         }
     }
@@ -9683,10 +9705,10 @@ var set_options = function(opts){
 
 var set_spike_times = function(timebase_, arrays){
     timebase = timebase_;
-    spike_times = arrays.data; 
+    spike_times = arrays && arrays.data; 
     keys_pending_render = [];    
     if(spike_times){
-        for(var key in key_to_array){
+        for(let key in key_to_array){
             keys_pending_render.push(key);
         }
     }
@@ -9707,8 +9729,8 @@ var update_keys = function(changes, arrays){
 
     var remove_keys = changes.remove || [];
     for(var ii=0; ii<remove_keys.length; ii++){
-        delete key_to_array[remove_keys[ii]];
-        delete key_to_rendered_options[remove_keys[ii]];
+        key_to_array.delete(remove_keys[ii]);
+        key_to_rendered_options.delete(remove_keys[ii]);
     }
 
     if(changes.generation_add !== changes.generation_remove){
@@ -9773,11 +9795,11 @@ var get_group_hist_sub = function(ret, group_times, D, b){
     // For every pair of spikes separated in time by no more than time D, bin
     // up the time separation, with bin size b, and record it in hist, ret.
     for(var later_idx=1, earlier_idx=0; later_idx<group_times.length; later_idx++){
-        var laterTime = group_times[later_idx];
-        while (group_times[earlier_idx] < laterTime - D)
+        let later_time = group_times[later_idx];
+        while (group_times[earlier_idx] < later_time - D)
             earlier_idx++;
-        for(var i=earlier_idx; i<later_idx; i++)
-            ret[0 | ((laterTime - group_times[i])/b)]++;
+        for(let i=earlier_idx; i<later_idx; i++)
+            ret[0 | ((later_time - group_times[i])/b)]++;
     }
 }
 
@@ -9786,7 +9808,7 @@ var get_group_hist_sub = function(ret, group_times, D, b){
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
     var result =  new from.constructor(indices.length); //make an array of the same type as the from array
-    for(var i=0;i<indices.length;i++)
+    for(let i=0;i<indices.length;i++)
         result[i] = from[indices[i]];
     return result;
 }
@@ -9805,7 +9827,7 @@ var is_equal_simple = function(a, b){
             return false;
         }
     }
-    for(var bb in b){
+    for(let bb in b){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -9865,9 +9887,9 @@ var is_equal_simple = function(a, b){
             var added_arrays = {};
             if (this.show === 'y'){
                 // get clones of new arrays to send to worker
-                for(var ii=0; ii<keys_to_add.length; ii++){
-                    var key = keys_to_add[ii];
-                    var akey = this.groups_collection.getItem(key).inds;
+                for(let ii=0; ii<keys_to_add.length; ii++){
+                    let key = keys_to_add[ii];
+                    let akey = this.groups_collection.getItem(key).inds;
                     added_arrays[key] = am.get_array_clone(akey);
                     this.key_is_on_worker[key] = true;
                 }
@@ -9875,7 +9897,7 @@ var is_equal_simple = function(a, b){
                 // if we are not showing the plot, we don't actually get 
                 // any arrays, but we need to remmeber that we never sent them
                 // to the worker.
-                for(var ii=0; ii<keys_to_add.length; ii++){
+                for(let ii=0; ii<keys_to_add.length; ii++){
                     this.key_is_on_worker[key] = false;
                 }
                 keys_to_add = [];
@@ -9891,9 +9913,9 @@ var is_equal_simple = function(a, b){
 
             // free canvases, it's our responsiblity to do this, whereas 
             // freeing the inds arrays was the responsibility of cut-obj.
-            for(var ii=0; ii<keys_to_remove.length; ii++){
-                var key = keys_to_remove[ii];
-                var canvas = this.key_to_canvas[key];
+            for(let ii=0; ii<keys_to_remove.length; ii++){
+                let key = keys_to_remove[ii];
+                let canvas = this.key_to_canvas[key];
                 if(canvas){
                     cm.free_canvas(canvas);
                 }
@@ -10885,8 +10907,8 @@ Polymer({
 	},
 	data_for_gl_changed: function(){
 		var am = window.typed_array_manager;
-		this._render.set_n(this.data_for_gl.n);
-		this._render.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
+		this._renderer.set_n(this.data_for_gl.n);
+		this._renderer.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
 	},
 	_show_chans_changed: function(){
 		// note that unlike in rm/tac-plots, we let the renderer deal
@@ -10894,16 +10916,16 @@ Polymer({
 		// sends it the full update lists.  That's because sending messages
 		// in this case does not invlove cloning and posting arrays.
 		if(this.show_chans === 'yyyy'){
-			this._render.show = 'y';
+			this._renderer.show = 'y';
 		} else if (this.show_chans === 'nnnn'){
-			this._render.show = 'n';
+			this._renderer.show = 'n';
 		} else {
 			this.set('show_chans', 'yyyy');
 			console.log("currently channels cannot be toggled individually");
 		}
 	},
 	_palette_mode_changed: function(){
-		this._render.set_mode(this._palette_mode);
+		this._renderer.set_mode(this._palette_mode);
 	},
 	_update_okeys: function(okeys_to_remove, okeys_to_add){
         var cm = window.canvas_manager;
@@ -14950,461 +14972,7 @@ Polymer({
     });
   </script>
 </dom-module>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic,500,500italic,700,700italic">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700">
-<style is="custom-style">
-
-  :root {
-
-    /* Shared Styles */
-    --paper-font-common-base: {
-      font-family: 'Roboto', 'Noto', sans-serif;
-      -webkit-font-smoothing: antialiased;
-    };
-
-    --paper-font-common-code: {
-      font-family: 'Roboto Mono', 'Consolas', 'Menlo', monospace;
-      -webkit-font-smoothing: antialiased;
-    };
-
-    --paper-font-common-expensive-kerning: {
-      text-rendering: optimizeLegibility;
-    };
-
-    --paper-font-common-nowrap: {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    };
-
-    /* Material Font Styles */
-
-    --paper-font-display4: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 112px;
-      font-weight: 300;
-      letter-spacing: -.044em;
-      line-height: 120px;
-    };
-
-    --paper-font-display3: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 56px;
-      font-weight: 400;
-      letter-spacing: -.026em;
-      line-height: 60px;
-    };
-
-    --paper-font-display2: {
-      @apply(--paper-font-common-base);
-
-      font-size: 45px;
-      font-weight: 400;
-      letter-spacing: -.018em;
-      line-height: 48px;
-    };
-
-    --paper-font-display1: {
-      @apply(--paper-font-common-base);
-
-      font-size: 34px;
-      font-weight: 400;
-      letter-spacing: -.01em;
-      line-height: 40px;
-    };
-
-    --paper-font-headline: {
-      @apply(--paper-font-common-base);
-
-      font-size: 24px;
-      font-weight: 400;
-      letter-spacing: -.012em;
-      line-height: 32px;
-    };
-
-    --paper-font-title: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 20px;
-      font-weight: 500;
-      line-height: 28px;
-    };
-
-    --paper-font-subhead: {
-      @apply(--paper-font-common-base);
-
-      font-size: 16px;
-      font-weight: 400;
-      line-height: 24px;
-    };
-
-    --paper-font-body2: {
-      @apply(--paper-font-common-base);
-
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 24px;
-    };
-
-    --paper-font-body1: {
-      @apply(--paper-font-common-base);
-
-      font-size: 14px;
-      font-weight: 400;
-      line-height: 20px;
-    };
-
-    --paper-font-caption: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 12px;
-      font-weight: 400;
-      letter-spacing: 0.011em;
-      line-height: 20px;
-    };
-
-    --paper-font-menu: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 24px;
-    };
-
-    --paper-font-button: {
-      @apply(--paper-font-common-base);
-      @apply(--paper-font-common-nowrap);
-
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 0.018em;
-      line-height: 24px;
-      text-transform: uppercase;
-    };
-
-    --paper-font-code2: {
-      @apply(--paper-font-common-code);
-
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 20px;
-    };
-
-    --paper-font-code1: {
-      @apply(--paper-font-common-code);
-
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 20px;
-    };
-
-  }
-
-</style>
-
-
-<dom-module id="paper-toolbar" assetpath="bower_components/paper-toolbar/">
-  <template>
-    <style>
-      :host {
-        /* technical */
-        display: block;
-        position: relative;
-        box-sizing: border-box;
-        -moz-box-sizing: border-box;
-
-        /* size */
-        height: var(--paper-toolbar-height, 64px);
-
-        background: var(--paper-toolbar-background, --primary-color);
-        color: var(--paper-toolbar-color, --dark-theme-text-color);
-
-        @apply(--paper-toolbar);
-      }
-
-      :host(.animate) {
-        /* transition */
-        transition: var(--paper-toolbar-transition, height 0.18s ease-in);
-      }
-
-      :host(.medium-tall) {
-        height: calc(var(--paper-toolbar-height, 64px) * 2);
-        @apply(--paper-toolbar-medium);
-      }
-
-      :host(.tall) {
-        height: calc(var(--paper-toolbar-height, 64px) * 3);
-        @apply(--paper-toolbar-tall);
-      }
-
-      .toolbar-tools {
-        position: relative;
-        height: var(--paper-toolbar-height, 64px);
-        padding: 0 16px;
-        pointer-events: none;
-        @apply(--layout-horizontal);
-        @apply(--layout-center);
-        @apply(--paper-toolbar-content);
-      }
-
-      /*
-       * TODO: Where should media query breakpoints live so they can be shared between elements?
-       */
-
-      @media (max-width: 600px) {
-        :host {
-          height: var(--paper-toolbar-sm-height, 56px);
-        }
-
-        :host(.medium-tall) {
-          height: calc(var(--paper-toolbar-sm-height, 56px) * 2);
-        }
-
-        :host(.tall) {
-          height: calc(var(--paper-toolbar-sm-height, 56px) * 3);
-        }
-
-        .toolbar-tools {
-          height: var(--paper-toolbar-sm-height, 56px);
-        }
-      }
-
-      #topBar {
-        position: relative;
-      }
-
-      /* middle bar */
-      #middleBar {
-        position: absolute;
-        top: 0;
-        right: 0;
-        left: 0;
-      }
-
-      :host(.tall) #middleBar,
-      :host(.medium-tall) #middleBar {
-        -webkit-transform: translateY(100%);
-        transform: translateY(100%);
-      }
-
-      /* bottom bar */
-      #bottomBar {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        left: 0;
-      }
-
-      /*
-       * make elements (e.g. buttons) respond to mouse/touch events
-       *
-       * `.toolbar-tools` disables touch events so multiple toolbars can stack and not
-       * absorb events. All children must have pointer events re-enabled to work as
-       * expected.
-       */
-      .toolbar-tools > ::content > *:not([disabled]) {
-        pointer-events: auto;
-      }
-
-      .toolbar-tools > ::content .title {
-        @apply(--paper-font-common-base);
-
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 20px;
-        font-weight: 400;
-        line-height: 1;
-        pointer-events: none;
-
-        @apply(--layout-flex);
-        @apply(--paper-toolbar-title);
-      }
-
-      /**
-       * TODO: Refactor these selectors
-       * Work in progress.
-       */
-      .toolbar-tools > ::content paper-icon-button[icon=menu] {
-        margin-right: 24px;
-      }
-
-      .toolbar-tools > ::content > .title,
-      .toolbar-tools > ::content[select=".middle"] > .title,
-      .toolbar-tools > ::content[select=".bottom"] > .title {
-        margin-left: 56px;
-      }
-
-      .toolbar-tools > ::content > paper-icon-button + .title,
-      .toolbar-tools > ::content[select=".middle"] paper-icon-button + .title,
-      .toolbar-tools > ::content[select=".bottom"] paper-icon-button + .title {
-        margin-left: 0;
-      }
-
-      .toolbar-tools > ::content > .fit {
-        position: absolute;
-        top: auto;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: auto;
-        margin: 0;
-      }
-
-      /* TODO(noms): Until we have a better solution for classes that don't use
-       * /deep/ create our own.
-       */
-      .start-justified {
-        @apply(--layout-start-justified);
-      }
-
-      .center-justified {
-        @apply(--layout-center-justified);
-      }
-
-      .end-justified {
-        @apply(--layout-end-justified);
-      }
-
-      .around-justified {
-        @apply(--layout-around-justified);
-      }
-
-      .justified {
-        @apply(--layout-justified);
-      }
-    </style>
-
-    <div id="topBar" class$="toolbar-tools [[_computeBarExtraClasses(justify)]]">
-      <content select=":not(.middle):not(.bottom)"></content>
-    </div>
-
-    <div id="middleBar" class$="toolbar-tools [[_computeBarExtraClasses(middleJustify)]]">
-      <content select=".middle"></content>
-    </div>
-
-    <div id="bottomBar" class$="toolbar-tools [[_computeBarExtraClasses(bottomJustify)]]">
-      <content select=".bottom"></content>
-    </div>
-  </template>
-
-  <script>
-    Polymer({
-      is: 'paper-toolbar',
-
-      hostAttributes: {
-        'role': 'toolbar'
-      },
-
-      properties: {
-        /**
-         * Controls how the items are aligned horizontally when they are placed
-         * at the bottom.
-         * Options are `start`, `center`, `end`, `justified` and `around`.
-         */
-        bottomJustify: {
-          type: String,
-          value: ''
-        },
-
-        /**
-         * Controls how the items are aligned horizontally.
-         * Options are `start`, `center`, `end`, `justified` and `around`.
-         */
-        justify: {
-          type: String,
-          value: ''
-        },
-
-        /**
-         * Controls how the items are aligned horizontally when they are placed
-         * in the middle.
-         * Options are `start`, `center`, `end`, `justified` and `around`.
-         */
-        middleJustify: {
-          type: String,
-          value: ''
-        }
-
-      },
-
-      attached: function() {
-        this._observer = this._observe(this);
-        this._updateAriaLabelledBy();
-      },
-
-      detached: function() {
-        if (this._observer) {
-          this._observer.disconnect();
-        }
-      },
-
-      _observe: function(node) {
-        var observer = new MutationObserver(function() {
-          this._updateAriaLabelledBy();
-        }.bind(this));
-        observer.observe(node, {
-          childList: true,
-          subtree: true
-        });
-        return observer;
-      },
-
-      _updateAriaLabelledBy: function() {
-        var labelledBy = [];
-        var contents = Polymer.dom(this.root).querySelectorAll('content');
-        for (var content, index = 0; content = contents[index]; index++) {
-          var nodes = Polymer.dom(content).getDistributedNodes();
-          for (var node, jndex = 0; node = nodes[jndex]; jndex++) {
-            if (node.classList && node.classList.contains('title')) {
-              if (node.id) {
-                labelledBy.push(node.id);
-              } else {
-                var id = 'paper-toolbar-label-' + Math.floor(Math.random() * 10000);
-                node.id = id;
-                labelledBy.push(id);
-              }
-            }
-          }
-        }
-        if (labelledBy.length > 0) {
-          this.setAttribute('aria-labelledby', labelledBy.join(' '));
-        }
-      },
-
-      _computeBarExtraClasses: function(barJustify) {
-        if (!barJustify) return '';
-
-        return barJustify + (barJustify === 'justified' ? '' : '-justified');
-      }
-    });
-  </script>
-</dom-module>
-<dom-module id="custom-toolbar" assetpath="/">
-	<template>
-	<style>
-	:host{
-		--paper-toolbar-height: 40px;
-		--paper-toolbar-background: #efefef;
-		--paper-toolbar-color: #000;
-		box-shadow: inset 0 0 2px 1px #ccc;
-	}
-	</style>	
-	<paper-toolbar>
-	<content></content>
-	</paper-toolbar>
-	</template>
 <script>
-Polymer({ is: 'custom-toolbar'});
- </script>
-</dom-module><script>
   /**
   Polymer.IronFormElementBehavior enables a custom element to be included
   in an `iron-form`.
@@ -16460,6 +16028,164 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     Polymer.PaperInputBehaviorImpl
   ];
 </script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,300,300italic,400italic,500,500italic,700,700italic">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700">
+<style is="custom-style">
+
+  :root {
+
+    /* Shared Styles */
+    --paper-font-common-base: {
+      font-family: 'Roboto', 'Noto', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    };
+
+    --paper-font-common-code: {
+      font-family: 'Roboto Mono', 'Consolas', 'Menlo', monospace;
+      -webkit-font-smoothing: antialiased;
+    };
+
+    --paper-font-common-expensive-kerning: {
+      text-rendering: optimizeLegibility;
+    };
+
+    --paper-font-common-nowrap: {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    };
+
+    /* Material Font Styles */
+
+    --paper-font-display4: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 112px;
+      font-weight: 300;
+      letter-spacing: -.044em;
+      line-height: 120px;
+    };
+
+    --paper-font-display3: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 56px;
+      font-weight: 400;
+      letter-spacing: -.026em;
+      line-height: 60px;
+    };
+
+    --paper-font-display2: {
+      @apply(--paper-font-common-base);
+
+      font-size: 45px;
+      font-weight: 400;
+      letter-spacing: -.018em;
+      line-height: 48px;
+    };
+
+    --paper-font-display1: {
+      @apply(--paper-font-common-base);
+
+      font-size: 34px;
+      font-weight: 400;
+      letter-spacing: -.01em;
+      line-height: 40px;
+    };
+
+    --paper-font-headline: {
+      @apply(--paper-font-common-base);
+
+      font-size: 24px;
+      font-weight: 400;
+      letter-spacing: -.012em;
+      line-height: 32px;
+    };
+
+    --paper-font-title: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 28px;
+    };
+
+    --paper-font-subhead: {
+      @apply(--paper-font-common-base);
+
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 24px;
+    };
+
+    --paper-font-body2: {
+      @apply(--paper-font-common-base);
+
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 24px;
+    };
+
+    --paper-font-body1: {
+      @apply(--paper-font-common-base);
+
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 20px;
+    };
+
+    --paper-font-caption: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.011em;
+      line-height: 20px;
+    };
+
+    --paper-font-menu: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 24px;
+    };
+
+    --paper-font-button: {
+      @apply(--paper-font-common-base);
+      @apply(--paper-font-common-nowrap);
+
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.018em;
+      line-height: 24px;
+      text-transform: uppercase;
+    };
+
+    --paper-font-code2: {
+      @apply(--paper-font-common-code);
+
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 20px;
+    };
+
+    --paper-font-code1: {
+      @apply(--paper-font-common-code);
+
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 20px;
+    };
+
+  }
+
+</style>
 <script>
 
   /**
@@ -18996,6 +18722,7 @@ color: #ccc;
 var timer = 0;
 var ports = {};
 var pending_files = {};
+var pending_fkeys = {};
 var pending_options = {};
 var types = new Set(['tet', 'set', 'pos', 'cut']); // this is the priority order
 var parsers_cached_fkeys = {
@@ -19003,23 +18730,37 @@ var parsers_cached_fkeys = {
     pos: new Set() // same for pos
 }
 var max_cache_size = 4; // pretty arbitrary, especially as it's not type-specific
+var currently_reading;
 
 var got_ports = function(ports_){
     ports = ports_;
+    for(let t of types){
+        let t_local = t;
+        ports[t].onmessage = function(e){
+            if(e.data !== 'done reading'){
+                throw "bad message from " + t + " to io worker: " + JSON.String(data);
+            }
+            if (currently_reading === t_local){
+                currently_reading = undefined;
+                touch_timer();
+            }
+        }
+    }
 }
 
 var read_files = function(files, options){
-    for(var t in types){
+    for(let t of types){
         if(files[t] !== undefined){
             pending_files[t] = files[t];
             pending_options[t] = options[t];
+            pending_fkeys[t] = files[t+'_fkey'];
         }
     }
     touch_timer();
 }
 
 var touch_timer = function(){
-    for(var t in types){
+    for(let t of types){
         if(pending_files[t]){
             timer = timer || setImmediate(timer_tick);
             return;
@@ -19029,37 +18770,46 @@ var touch_timer = function(){
 }
 
 var timer_tick = function(){
+    timer = 0;
     // if there are any files already cached, then issue those requests immediately
-    for(var t in types){
+    for(let t of types){
         if(!pending_files[t] || !parsers_cached_fkeys[t]){
             continue;
         }
-        var file = pending_files[t];
-        var fkey = file.lastModified + " " + file.name;
-        var cache = parsers_cached_fkeys[t];
+        let file = pending_files[t];
+        let fkey = pending_fkeys[t];
+        let cache = parsers_cached_fkeys[t];
         if(cache.has(fkey)){
             // bump in FIFO
             cache.delete(fkey); 
             cache.add(fkey); 
             ports[t].postMessage({
-                fkey: pending_files[t],
-                options: pending_options[t]
+                fkey: fkey,
+                name: file.name,
+                file: null, // buffer is available at the reciever's end!!
+                options: pending_options[t],
+                delete_from_cache: null 
             });
             pending_files[t] = undefined;
+            pending_fkeys[t] = undefined;
             pending_options[t] = undefined;
         }
     }
 
+    if(currently_reading){
+        return; // and do not touch_timer, instead wait for the message from the current reader or from main thread
+    }
+
     // now, load zero or one files from disk and issue request to corresponding worker
     // crucially, we do this in the priority order defined by the types array
-    for(var t in types){
+    for(let t of types){
         if(!pending_files[t]){
             continue;
         }
-        var file = pending_files[t];
-        var fkey = file.lastModified + " " + file.name;
-        var cache = parsers_cached_fkeys[t];
-        var delete_from_cache;
+        let file = pending_files[t];
+        let fkey = pending_fkeys[t];
+        let cache = parsers_cached_fkeys[t];
+        let delete_from_cache;
         if(cache){
             // note that fkey can't have been in the cache already, because we tested for that in the above loop.
             cache.add(fkey);
@@ -19068,16 +18818,19 @@ var timer_tick = function(){
                 cache.delete(delete_from_cache);
             }
         }
-        var reader = new FileReaderSync();
-        var buf = reader.readAsArraybuffer(file);
+        currently_reading = t; // see note about Chrome bug at top of page
+        //let reader = new FileReaderSync();  
+        //let buf = reader.readAsArrayBuffer(file);
         ports[t].postMessage({
             fkey: fkey,
-            buffer: buf,
+            name: file.name,
+            file: file,
             options: pending_options[t],
             delete_from_cache: delete_from_cache
-        }, [buf]);
+        });
         pending_files[t] = undefined;
         pending_options[t] = undefined;
+        pending_fkeys[t] = undefined;
         break;
     }
 
@@ -19091,17 +18844,22 @@ var timer_tick = function(){
 "use strict";
 
 var fkey_to_buffer = new Map();
-
-var main_cached_options = new Set(); // set of objects each giving options and fkey
+var main_cached_opts = new Set(); // set of objects each giving options and fkey
 var max_cache_size = 4; // arbitrary
 
 var got_ports = function(ports){
     self.io_port = ports.pos;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
 
          // add/delete entries in buffer cache, based on instructions from io-worker
-        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
         fkey_to_buffer[fkey] = buffer;
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
@@ -19110,25 +18868,24 @@ var got_ports = function(ports){
         // check to see if main cache actually holds the requested data     
         var options = e.data.options;
         options.fkey = fkey;
-        for(var obj in main_cached_options){
-            if(is_equal_simple(obj, options)){
+        for(let cached_opts in main_cached_opts){
+            if(is_equal_simple(cached_opts, options)){
                 // bump in FIFO
-                main_cached_options.delete(obj);
-                main_cached_options.add(obj);
+                main_cached_opts.delete(cached_opts);
+                main_cached_opts.add(cached_opts);
                 return; // nothing to be done
             }
         }
         
         // pre-emptively add to the record of main cache and decide what, if anything, to remove
-        main_cached_options.add(options);
+        main_cached_opts.add(options);
         var delete_from_cache;
-        if(main_cached_options.size > max_cache_size){
-            delete_from_cache = main_cached_options.keys().next().value;
-            main_cached_options.delete(delete_from_cache);
+        if(main_cached_opts.size > max_cache_size){
+            delete_from_cache = main_cached_opts.keys().next().value;
+            main_cached_opts.delete(delete_from_cache);
         }
 
-        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
-        parse_pos_file(top_str, buffer, fkey, options, delete_from_cache);
+        parse_pos_file(buffer, fkey, options, delete_from_cache);
 
     }
 }
@@ -19139,12 +18896,12 @@ var is_equal_simple = function(a, b){
     if((a && !b) || (!a && b)){
         return false;
     }
-    for(var aa in a){
+    for(let aa in a){
         if(b[aa] !== a[aa]){
             return false;
         }
     }
-    for(var bb in b){
+    for(let bb in b){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -19162,20 +18919,20 @@ var take = function(data,offset,stride){
     var n = data.length/stride;
     var res = new data.constructor(n);
     
-    for(var i=0,j=offset;i<n;i++,j+=stride){
+    for(let i=0,j=offset;i<n;i++,j+=stride){
         res[i] = data[j];
     }
     return res;
 }
 
 var times_in_place = function(src, factor, skip_val){
-    for(var i=0;i<src.length;i++)if(src[i] != skip_val){
+    for(let i=0;i<src.length;i++)if(src[i] != skip_val){
         src[i] *= factor;
     }
 }
 
 var replace_val_in_place = function(src, find, replace){
-    for(var i=0;i<src.length;i++)if(src[i] == find){
+    for(let i=0;i<src.length;i++)if(src[i] == find){
         src[i] = replace;
     }
 }
@@ -19192,7 +18949,7 @@ var clone = function(a){
 
 var minus = function(a, b, c){
     // we subtract b and c from alternate elemetns of a, inplace, nan16 is skipped
-    for(var i=0;i<a.length;i++){
+    for(let i=0;i<a.length;i++){
         a[i] -= a[i] == nan16? 0 : b;
         i++;
         a[i] -= a[i] == nan16? 0 : c;
@@ -19203,8 +18960,10 @@ var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
 var regex_header_b = /(\S*) ([\S ]*)/g
 
 var bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
+var nan16 = -32768; //custom nan value, equal to minimum int16 value    
 
-var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache){
+var parse_pos_file = function(buffer, fkey, options, delete_from_cache){
+    var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
     var match = regex_header_a.exec(top_str);
     if(!match){
         throw 'did not find end of header in pos file.';
@@ -19213,32 +18972,32 @@ var parse_pos_file = function(top_str, buffer, fkey, options, delete_from_cache)
     var data_start = match.index + match[0].length;
     var header = {};
     var header_str = match[0];
-    while (match = regex_header_b.exec(header_str))
+    while (match = regex_header_b.exec(header_str)){
         header[match[1]] = match[2];
+    }
 
     if (header.pos_format !== "t,x1,y1,x2,y2,numpix1,numpix2"){
         throw "uncregonised pos format used in pos file";
     }
     
     // apply overrides
-    for (k in header_override){
+    for (let k in options.header_override){
         if(header[k] !== undefined){
             header[k+"_original"] = header[k];
         }
         header[k] = header_override[k];
     }
 
-    var data_len = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
-    buffer = buffer.subarray(data_start, data_start+data_len);
+    var data_len_bytes = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
 
     if(endian == 'L'){
-        var data = new Int16array(buffer);
-        for (var k=0; k<data.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
-            data[k] = swap_16(data[k]);
+        let data16 = new Int16Array(buffer, data_start, data_len_bytes/2);
+        for (let k=0; k<data16.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
+            data16[k] = swap_16(data16[k]);
         }
     }
 
-    var pos = post_process(buffer, header, options);
+    var pos = post_process(buffer, data_start, data_len_bytes, header, options);
     delete options.fkey;
 
     exec_main_b('got_pos',{
@@ -19263,7 +19022,7 @@ var interp_xy_sub = function(xy,x_a,y_a,x_b,y_b,i,n_nans){
     //interpolates from element i-1 back to i-n_nans, where element i is x_b,y_b and element i-n_nans-1 is x_a,x_b
     var dx = (x_b-x_a)/(n_nans+1);
     var dy = (y_b-y_a)/(n_nans+1);
-    for(var j=0;j<n_nans;j++){
+    for(let j=0;j<n_nans;j++){
         xy[(i-n_nans + j)*2+0] = x_a + (j+1)*dx;
         xy[(i-n_nans + j)*2+1] = y_a + (j+1)*dy; 
     }
@@ -19279,8 +19038,8 @@ var interp_xy = function(xy,n_pos){
 
     // Find first (x,y) that is non-nan
     for(var start=0; start<n_pos; start++){
-        var ix = start*2+0;
-        var iy = start*2+1;
+        let ix = start*2+0;
+        let iy = start*2+1;
         if(xy[ix] != nan16 && xy[iy] !=nan16)
             break;
     }
@@ -19291,10 +19050,10 @@ var interp_xy = function(xy,n_pos){
     var y_a = xy[iy];
     var n_nans = start; //this will cause first non-nan to be copied back through all previous nan values
     for(var i=start;i<n_pos;i++){
-        var ix = i*2+0;
-        var iy = i*2+1; 
-        var x_b = xy[ix];
-        var y_b = xy[iy];
+        let ix = i*2+0;
+        let iy = i*2+1; 
+        let x_b = xy[ix];
+        let y_b = xy[iy];
         if(x_b == nan16 || y_b == nan16){
             n_nans++;
         }else{
@@ -19374,7 +19133,7 @@ var smooth_1d_in_place = function(x, stride, k){
     
 }
 
-var jump_filter = function(xy, n_pos, pos_timebase){
+var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
     /*
         For a single stream of xy values, it finds the first non-nan point,
         and then checks the speed required to reach the next point, given the
@@ -19384,15 +19143,15 @@ var jump_filter = function(xy, n_pos, pos_timebase){
         The number of points skipped over is returned as an integer.
     */
 
-    if(!options.max_speed)
+    if(!max_speed)
         return 0;
 
-    var sqrMaxSampStep = sqr(options.max_speed*units_per_m /pos_timebase);
+    var sqr_max_samp_step = sqr(max_speed*units_per_m /pos_timebase);
 
     // Find first (x,y) that is non-nan
     for(var start=0; start<n_pos; start++){
-        var ix = start*2+0;
-        var iy = start*2+1;
+        let ix = start*2+0;
+        let iy = start*2+1;
         if(xy[ix] != nan16 && xy[iy] !=nan16)
             break;
     }
@@ -19401,25 +19160,25 @@ var jump_filter = function(xy, n_pos, pos_timebase){
     var iy = start*2+1;     
     var x_from = xy[ix];
     var y_from = xy[iy];
-    var jumpLen = 1;
+    var jump_len = 1;
 
     // Set big jump sections to nan
-    for(var i=start+1,nJumpy=0; i<n_pos; i++){
-        var ix = i*2+0;
-        var iy = i*2+1;
+    for(let i=start+1,nJumpy=0; i<n_pos; i++){
+        let ix = i*2+0;
+        let iy = i*2+1;
         // check if this pos is already nan
         // or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
         if(xy[ix] == nan16 || xy[iy] == nan16){
             xy[ix] = xy[iy] = nan16; //just in case only one or the other was nan
-            jumpLen++; // note we don't count njumpy here
-        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jumpLen) > sqrMaxSampStep ){
+            jump_len++; // note we don't count njumpy here
+        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jump_len) > sqr_max_samp_step ){
             //sample is nan or speed is too large, so make this a jump
             xy[ix] = xy[iy] = nan16; 
             nJumpy++;
-            jumpLen++;
+            jump_len++;
         }else{
             //speed is sufficiently small, so this point is ok
-            jumpLen = 1;
+            jump_len = 1;
             x_from = xy[ix];
             y_from = xy[iy];
         }
@@ -19430,8 +19189,8 @@ var jump_filter = function(xy, n_pos, pos_timebase){
 
 var swap = function(a, b, do_swap){
     var n = 0;
-    for(var i=0;i<a.length;i++) if(do_swap[i]){
-        var tmp = a[i];
+    for(let i=0;i<a.length;i++) if(do_swap[i]){
+        let tmp = a[i];
         a[i] = b[i];
         b[i] = tmp;
         n++;
@@ -19447,9 +19206,9 @@ var nanmean_and_std_2 = function(x){
     var sum_1 = 0; var sum_2 = 0;
     var n1 = 0; var n2 = 0;
 
-    for(var i=0; i<x.length/2; i++){
-        var i1 = i*2+0;
-        var i2 = i*2+1;
+    for(let i=0; i<x.length/2; i++){
+        let i1 = i*2+0;
+        let i2 = i*2+1;
         if(x[i1] && x[i1] != nan16){
             n1++;
             sum_1 += x[i1];
@@ -19463,9 +19222,9 @@ var nanmean_and_std_2 = function(x){
 
     // now get sum(sqr(xy-mean_xy)) and use to calculate nanstd...
     sum_1 = 0; sum_2 = 0;  // NOTE: reusing sums vars!!!!
-    for (var i=0; i<x.length/2; i++){
-        var i1 = i*2+0;
-        var i2 = i*2+1;
+    for (let i=0; i<x.length/2; i++){
+        let i1 = i*2+0;
+        let i2 = i*2+1;
         if(x[i1] && x[i1] != nan16)
             sum_1 += sqr(x[i1] - mean_1);
         if(x[i2] && x[i2] != nan16)
@@ -19485,9 +19244,9 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
     var weight_1 = weight_1/weight_sum;
     var weight_2 = weight_2/weight_sum;
     var ret = new xy_1.constructor(xy_1.length);
-    for(var i=0;i<xy_1.length/2;i++){
-        var ix = 2*i+0;
-        var iy = 2*i+1;
+    for(let i=0;i<xy_1.length/2;i++){
+        let ix = 2*i+0;
+        let iy = 2*i+1;
         ret[ix] = xy_1[ix]*weight_1 + xy_1[ix]*weight_2;
         ret[iy] = xy_1[iy]*weight_1 + xy_1[iy]*weight_2;
     }
@@ -19497,15 +19256,15 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
 var get_dir = function(pos){
     // TODO: if n_led is 1
     var xy_1 = pos.xy_1;
-    var xy_2 = pox.xy_2;
+    var xy_2 = pos.xy_2;
 
-    var ret = new Float32array(xy_1.length/2);
+    var ret = new Float32Array(xy_1.length/2);
     var pi = 3.14159265;
-    for(var i=0;i<xy_1.length/2;i++){
-        var ix = 2*i+0;
-        var iy = 2*i+1;
-        var dy = xy_2[iy] - xy_1[iy];
-        var dx = xy_2[ix] - xy_1[ix];
+    for(let i=0;i<xy_1.length/2;i++){
+        let ix = 2*i+0;
+        let iy = 2*i+1;
+        let dy = xy_2[iy] - xy_1[iy];
+        let dx = xy_2[ix] - xy_1[ix];
         ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
     }
     return ret;
@@ -19513,16 +19272,17 @@ var get_dir = function(pos){
 
 var get_speed = function(pos){
     var xy = pos.xy;
-    var ret = new Float32array(xy.length/2);
-    for(var ii=0; ii<xy.length; ii+=2){
-         ret[ii>>1] = Math.hypot(xy[i+2]-xy[i+0], xy[i+3]-xy[i+1]);
+    var ret = new Float32Array(xy.length/2);
+    for(let ii=0; ii<xy.length; ii+=2){
+         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1]);
     }
     return ret;
 }
 
-var post_process = function(buffer, header, options){
+var post_process = function(buffer, offset_bytes, length_bytes, header, options){
+    var data = new Int16Array(buffer, offset_bytes, length_bytes/2);
+    var data32 = new Int32Array(buffer, offset_bytes, length_bytes/4);
 
-    var data = new Int16array(buffer);
     var elements_per_pos_sample = bytes_per_pos_sample/2;
     var n_pos = parseInt(header.num_pos_samples); 
     var end = n_pos * elements_per_pos_sample; 
@@ -19530,16 +19290,16 @@ var post_process = function(buffer, header, options){
     var pos_nan = 1023;
 
      // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-    var xy_1 = new Int16array(take(new Int32array(buffer), 1, bytes_per_pos_sample/4).buffer);
+    var xy_1 = new Int16Array(take(data32, 1, bytes_per_pos_sample/4).buffer);
     replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
     
     var n_led = 1;
     if (options.use_both_leds){
         // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
         // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-        var xy_pix = new Int16array(take(new Int32array(buffer), 3, bytes_per_pos_sample/4).buffer);
+        var xy_pix = new Int16Array(take(data32, 3, bytes_per_pos_sample/4).buffer);
         replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-        for(var i=0; i<n_pos; i++){
+        for(let i=0; i<n_pos; i++){
             if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
                 n_led = 2;
                 break;
@@ -19551,7 +19311,7 @@ var post_process = function(buffer, header, options){
     var xy_2;
     if(n_led == 2){
          // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
-        xy_2 = new Int16array(take(new Int32array(buffer), 2, bytes_per_pos_sample/4).buffer);
+        xy_2 = new Int16Array(take(data32, 2, bytes_per_pos_sample/4).buffer);
         replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
     
     }
@@ -19567,12 +19327,13 @@ var post_process = function(buffer, header, options){
     var ppm = parseInt(header.pixels_per_metre);
     var units_per_m = 10000;
     times_in_place(xy_1, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
-    if(n_led == 2)
+    if(n_led == 2){
         times_in_place(xy_2, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
+    }
 
     if(n_led == 2){
         // check for and apply LED swaping...
-        var shrunk_and_switched = new Uint8array(n_pos);  
+        var shrunk_and_switched = new Uint8Array(n_pos);  
 
         var swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
 
@@ -19586,12 +19347,12 @@ var post_process = function(buffer, header, options){
         header.psot_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
 
         // use std and mean to get z score of pix1 to pix1 and pix2
-        for( var i=0; i< n_pos; i++){
-            var i1 = i*2+0;
-            var i2 = i*2+1;
+        for(let i=0; i< n_pos; i++){
+            let i1 = i*2+0;
+            let i2 = i*2+1;
             if(xy_pix[i1] && xy_pix[i2] && xy_pix[i1] != nan16 && xy_pix[i2] != nan16){
-                var z11 = (mean_1 - xy_pix[i1])/std_1;
-                var z12 = (xy_pix[i1] - mean_2)/std_2;
+                let z11 = (mean_1 - xy_pix[i1])/std_1;
+                let z12 = (xy_pix[i1] - mean_2)/std_2;
                 shrunk_and_switched[i] = z11 > z12;
             }
         }
@@ -19604,18 +19365,18 @@ var post_process = function(buffer, header, options){
 
         // Find first (x,y) that is non-nan on both xy and xy_2
         for(var start=0; start<n_pos; start++){
-            var ix = start*2+0;
-            var iy = start*2+1;
+            let ix = start*2+0;
+            let iy = start*2+1;
             if(xy_1[ix] != nan16 && xy_1[iy] !=nan16 && xy_2[ix] != nan16 && xy_2[iy] !=nan16)
                 break;
         }
 
-        for(var i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
+        for(let i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
             // we are going to do diffs with XY_i - XY_(i-1)
-            var ix = i*2+0;
-            var iy = i*2+1;
-            var i_1x = i*2-2;
-            var i_1y = i*2-1;
+            let ix = i*2+0;
+            let iy = i*2+1;
+            let i_1x = i*2-2;
+            let i_1y = i*2-1;
             if(xy_1[ix] == nan16 || xy_1[iy] == nan16 || xy_2[ix] == nan16 || xy_2[iy] == nan16){
                 shrunk_and_switched[i] = 0;
                 i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
@@ -19623,28 +19384,29 @@ var post_process = function(buffer, header, options){
                 continue; 
             }
 
-            var dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
-            var dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
-            var dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
-            var dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
+            let dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
+            let dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
+            let dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
+            let dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
 
             shrunk_and_switched[i] = (dist12 < dist11-swapping_thresh) && (dist21 < dist22 - swapping_thresh);
 
         }
 
         // Swap xy_1 with xy_2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit xy in one go)
-        header.post_n_swapped = swap(new Uint32array(xy_1.buffer), new Uint32array(xy_2.buffer), shrunk_and_switched);
+        header.post_n_swapped = swap(new Uint32Array(xy_1.buffer), new Uint32Array(xy_2.buffer), shrunk_and_switched);
     }
     
     var pos_timebase = parseInt(header.sample_rate);
     header.post_n_jumpy_led1 = jump_filter(xy_1, n_pos, options.max_speed, units_per_m, pos_timebase)
-    if(n_led == 2)
+    if(n_led == 2){
          header.post_n_jumpy_led2 = jump_filter(xy_2, n_pos, options.max_speed, units_per_m, pos_timebase);
-
+    }
     
     interp_xy(xy_1,n_pos);
-    if(n_led == 2)
+    if(n_led == 2){
         interp_xy(xy_2,n_pos);
+    }
 
     var k = Math.floor(pos_timebase*options.smoothing_secs/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired         
     smooth_1d_in_place(xy_1, 2, k);
@@ -19678,37 +19440,44 @@ var post_process = function(buffer, header, options){
 
 var fkey_to_buffer = new Map();
 
-var main_cached_options = new Set();
+var main_cached_opts = new Set();
 var max_cache_size = 4; //aribtrary
 
 var got_ports = function(ports){
     self.io_port = ports.tet;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
 
         // add/delete entries in buffer cache, based on instructions from io-worker
-        var buffer = fkey_to_buffer[fkey] || e.data.buffer;
         fkey_to_buffer[fkey] = buffer;
         if(e.data.delete_from_cache){
             fkey_to_buffer.delete(e.data.delete_from_cache);
         }
 
-        // check to see if main cache actually holds any of the requested data        
+        // check to see if main cache actually holds any of the requested data 
+        var options = e.data.options;       
         options.fkey = fkey;
-        for(var cached_options in main_cached_options){
-            if(cached_options.fkey === fkey){
+        for(var cached_opts in main_cached_opts){
+            if(cached_opts.fkey === fkey){
                 // bump in FIFO
-                main_cached_options.delete(cached_options);
-                main_cached_options.add(cached_options);
-                fkey_in_cache = cached_options;
+                main_cached_opts.delete(cached_opts);
+                main_cached_opts.add(cached_opts);
+                fkey_in_cache = cached_opts;
                 // remove the things that are already in cache
-                if(cached_options.times){
+                if(cached_opts.times){
                     delete options.times;
                 }
-                if(cached_options.amps){
+                if(cached_opts.amps){
                     delete options.amps;
                 }
-                if(cached_options.gl_data){
+                if(cached_opts.gl_data){
                     delete options.gl_data;
                 }
                 if(options.times || options.amps || options.gl_data){
@@ -19719,31 +19488,30 @@ var got_ports = function(ports){
             }
         }   
 
-        if (!cached_options || cached_options.fkey !== fkey){
+        if (!cached_opts || cached_opts.fkey !== fkey){
             // create new entry in main cache record, and possibly delete something
-            cached_options = {fkey: fkey};
-            main_cached_options.add(cached_options);
-            if(main_cached_options.size > max_cache_size){
-                var delete_from_cache = main_cached_options.keys().next().value;
+            cached_opts = {fkey: fkey};
+            main_cached_opts.add(cached_opts);
+            if(main_cached_opts.size > max_cache_size){
+                var delete_from_cache = main_cached_opts.keys().next().value;
                 exec_main('delete_from_tet_cache', delete_from_cache);
-                main_cached_options.delete(delete_from_cache);
+                main_cached_opts.delete(delete_from_cache);
             }
         }
 
         // pre-emptively record what we are about to put in main cache
         if(options.times){
-            cached_options.times = 1;
+            cached_opts.times = 1;
         }
         if(options.gl_data){
-            cached_options.gl_data = 1;
+            cached_opts.gl_data = 1;
         }
         if(options.amps){
-            cached_options.amps = 1;
+            cached_opts.amps = 1;
         }
 
         // and actually do the work...
-        var top_str = new TextDecoder('utf-8').decode(buffer.subarray(0, 1204+1));
-        parse_tet_file(top_str, buffer, fkey, options);
+        parse_tet_file(buffer, fkey, options);
 
     }
 }
@@ -19755,8 +19523,9 @@ var n_c = 4;
 var n_w = 50;
 var bytes_per_spike = n_c*(4 + n_w);
 
-var parse_tet_file = function(top_str, buffer, fkey, options){
-
+var parse_tet_file = function(buffer, fkey, options){
+    var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
+        
     var match = regex_header_a.exec(top_str);
     if(!match){
         throw 'did not find end of header in tet file.';
@@ -19779,11 +19548,8 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
         header.num_spikes_claimed = header.num_spikes;
         header.num_spikes = 0;
     }
-    var n = header.num_spikes;
-    var data_len = parseInt(N)*bytes_per_spike;
-
-    //read the data section of the fkey as an array buffer
-    buffer = buffer.subarray(data_start, data_start+data_len);
+    var n = parseInt(header.num_spikes);
+    var data_len_bytes = n*bytes_per_spike;
 
     exec_main('got_tet_header', fkey, header);
 
@@ -19795,7 +19561,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     // data.
 
     if(options.gl_data){
-        var data =  build_gl_data(buffer, n);
+        var data =  build_gl_data(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_gl_data', {
             data: 'data', 
             fkey: fkey,
@@ -19804,7 +19570,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     }
 
     if(options.times){
-        var data =  get_times(buffer, n);
+        var data =  get_times(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_times', {
             data: 'data', 
             fkey: fkey,
@@ -19813,7 +19579,7 @@ var parse_tet_file = function(top_str, buffer, fkey, options){
     }
 
     if(options.amps){
-        var data = get_amplitudes(buffer, n);
+        var data = get_amplitudes(buffer, data_start, data_len_bytes, n);
         exec_main_b('got_amplitudes', {
             data: 'data', 
             fkey: fkey,
@@ -19831,11 +19597,11 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
     // it probably won't help by more than 5-10% I would think.
 
     var q = -1;
-    var i, t, c, p;
+    var i, p;
     for(i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
-        for(c=0;c<n_c;c++){ //for each channel
+        for(let c=0;c<n_c;c++){ //for each channel
             q += 5;
-            for(t=0;t<n_w-1;t++){ //for each time point (except the last one)
+            for(let t=0;t<n_w-1;t++){ //for each time point (except the last one)
                 data_out_16[p] = data_in[q] | (data_in[++q] << 8); // TODO: deal properly with endianness of system 
                 // (Note that even though we are drawing a stand alone line segment from a to b, we still need to know how they match up to times t and t+1)
                 p += n_spikes;
@@ -19845,60 +19611,52 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
 }
 
 var i8_to_u8 = function(a){
-    // Takes an int8array, a, adds 128 to each element and views it as a uint8 array.
+    // Takes an int8Array, a, adds 128 to each element and views it as a uint8 array.
     // this is done inplace.
     // See http://en.wikipedia.org/wiki/Signed_number_representations for info.
     // We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
     // TODO: it may be possible to avoid this conversion, if the gl-shader code is modified
-    a = new Uint32array(a.buffer); 
-    for(var i=0;i<a.length;i++)
+    a = new Uint32Array(a.buffer); 
+    for(let i=0;i<a.length;i++)
         a[i] ^= 0x80808080;
-    return new Uint8array(a.buffer);
+    return new Uint8Array(a.buffer);
 }
 
-var build_gl_data = function(buffer, n_spikes){
-    var old_data = new Uint8array(buffer);
-    var newdData = new Uint16array(n_c*(n_w-1)*n_spikes);
+var build_gl_data = function(buffer, offset_bytes, length_bytes, n_spikes){
+    var old_data = new Uint8Array(buffer, offset_bytes, length_bytes);
+    var new_data = new Uint16Array(n_c*(n_w-1)*n_spikes);
     
     build_gl_data_sub(old_data, new_data, n_spikes);
-    return i8_to_u8(new Int8array(new_data.buffer));        
+    return i8_to_u8(new Int8Array(new_data.buffer));        
 }
 
-var swap_32_vector = function(x){
-    for(var i=0;i<x.length; i++){
-        var val = x[i];
-        x[i] = ((val & 0xFF) << 24)
-               | ((val & 0xFF00) << 8)
-               | ((val >> 8) & 0xFF00)
-               | ((val >> 24) & 0xFF);
+
+var get_times = function(buffer, offset_bytes, length_bytes, n_spikes){ //get spike times in milliseconds as a Uint32Array 
+    var times = new Uint32Array(n_spikes);
+    var data8 = new Uint8Array(buffer, offset_bytes, length_bytes); // can't make this int32 because it may not be sufficeintly alligned
+
+    if (endian === 'L') {
+        for(let i=0, p=0; i<times.length; i++, p+= bytes_per_spike){
+            times[i] = (data8[p+0] << 24)
+                     | (data8[p+1] << 16)   
+                     | (data8[p+2] << 8) 
+                     | (data8[p+3] << 0); 
+        }        
+    } else {
+        throw "need to implement for big endian"; // TODO: or maybe the version above is actually valid for bothered?
     }
-}
 
-var take_strided = function(ret, x, stride){
-    // Takes the [0,2,3,...,n]*stride'th elements, and places in ret.
-    // n = ret.length
-    for(var i=0,p=0; i<ret.length; i++, p+= stride)
-        ret[i] = x[p]; 
-}
-
-var get_times = function(buffer, n_spikes){ //get spike times in milliseconds as a Uint32array 
-    var times = new Uint32array(n_spikes);
-    var data = new Int32array(buffer);
-    take_strided(times, data, bytes_per_spike/4);
-    if (endian === 'L') 
-        swap_32_vector(times);
     return times;
 }
 
 var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     n_sc = n_sc | 0; // int
     n_w = n_w | 0; // int
-    var min, max, t;
-    for(var i=0, p=0; i<n_sc; i++){
+    for(let i=0, p=0; i<n_sc; i++){
         p += 4; // skip timestamp 
-        min = 127;
-        max = -128;
-        for(t=0; t<n_w; t++,p++){
+        let min = 127;
+        let max = -128;
+        for(let t=0; t<n_w; t++,p++){
             (old_data[p] > max) && (max = old_data[p]);
             (old_data[p] < min) && (min = old_data[p]);
         }
@@ -19906,10 +19664,11 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     }
 }
 
-var get_amplitudes = function(buffer, n_spikes){
-    var old_data = new Int8array(buffer);
-    var amps = new Uint8array(n_spikes * n_c);
-    get_amplitude_sub(old_data, amps, n_spikes * n_c, n_w);
+var get_amplitudes = function(buffer, offset_bytes, length_bytes, n_spikes){
+    var old_data = new Int8Array(buffer, offset_bytes, length_bytes);
+    var amps = new Uint8Array(n_spikes * n_c);
+    get_amplitudes_sub(old_data, amps, n_spikes * n_c, n_w);
+    return amps;
 }
 
 </script>
@@ -19920,18 +19679,33 @@ var get_amplitudes = function(buffer, n_spikes){
 
 var max_cache_size = 4; // arbitrary
 var main_cached_fkeys = new Set();
+var fkey_to_buffer = new Map();
 
 var got_ports = function(ports){
     self.io_port = ports.set;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
+
+        // add/delete entries in buffer cache, based on instructions from io-worker
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
         if(main_cached_fkeys.has(fkey)){
             // bump in FIFO
             main_cached_fkeys.delete(fkey);
             main_cached_fkeys.add(fkey);
             return;
         }
-        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        var full_str = new TextDecoder('utf-8').decode(buffer);
         
         main_cached_fkeys.add(fkey);
         var delete_from_cache;
@@ -19951,7 +19725,7 @@ var got_ports = function(ports){
 
 var regex_header_b = /(\S*) ([\S ]*)/g
 
-var ParseSetFile = function(full_str, fkey){
+var parse_set_file = function(full_str, fkey){
     var header = {};
     var match;
     while (match = regex_header_b.exec(full_str))
@@ -19968,27 +19742,42 @@ var ParseSetFile = function(full_str, fkey){
 var max_cache_size = 4; // arbitrary
 var main_cached_fkeys = new Set();
 var regex_ext = /\.([0-9a-z]+)$/i;
+var fkey_to_buffer = new Map();
 
 var got_ports = function(ports){
     self.io_port = ports.cut;
     io_port.onmessage = function(e){
         var fkey = e.data.fkey;
+        var buffer = fkey_to_buffer[fkey];
+        if(!buffer){
+            // see note at top of page on Chrome bug
+            let reader =  new FileReaderSync();  // see note about Chrome bug at top of page
+            buffer = reader.readAsArrayBuffer(e.data.file);
+        }
+        io_port.postMessage('done reading');
+
+        // add/delete entries in buffer cache, based on instructions from io-worker
+        fkey_to_buffer[fkey] = buffer;
+        if(e.data.delete_from_cache){
+            fkey_to_buffer.delete(e.data.delete_from_cache);
+        }
+
         if(main_cached_fkeys.has(fkey)){
             // bump in FIFO
             main_cached_fkeys.delete(fkey);
             main_cached_fkeys.add(fkey);
             return; // main already has it, so no need to send it.
         }
-        var full_str = new TextDecoder('utf-8').decode(e.data.buffer);
+        var full_str = new TextDecoder('utf-8').decode(buffer);
 
         // TODO: clu/cut based on extension
-        var ext = fkey.match(regex_ext)[1]
+        var ext = e.data.name.match(regex_ext)[1]
         var msg;
-        if(ext === 'clu'){
-            msg = parse_clu_file(full_str, fkey);
-        } else if (ext === 'cut') {
+        if (ext === 'cut') {
             msg = parse_cut_file(full_str, fkey);
-        } else {
+        } else if(!isNaN(parseInt(ext))){
+            msg = parse_clu_file(full_str, fkey);
+        } else{
             throw "urecognised cut type";
         }
         
@@ -20025,8 +19814,8 @@ var parse_cut_file = function(full_str, fkey){
     cut_props.is_clu = false;
 
     var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
-    var cut = new Uint32array(cut_as_str.length);
-    for(var ii=0; ii<cut.length; ii++){
+    var cut = new Uint32Array(cut_as_str.length);
+    for(let ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii]);
     }
 
@@ -20038,14 +19827,14 @@ var parse_cut_file = function(full_str, fkey){
 }
 
 var parse_clu_file = function(full_str, fkey){
-    var cut_as_str = full_str.slice(cut_props.data_start).match(regex_cut_c);
+    var cut_as_str = full_str.match(regex_cut_c);
     var cut_props = {
         n_clusters: parseInt(cut_as_str[0]),  // TODO: check +/- 1
         n_spikes: cut_as_str.length-1,
         is_clu: true
     }
-    var cut = new Uint32array(cut_as_str.length-1);
-    for(var ii=0; ii<cut.length; ii++){
+    var cut = new Uint32Array(cut_as_str.length-1);
+    for(let ii=0; ii<cut.length; ii++){
         cut[ii] = parseInt(cut_as_str[ii+1]);
     }
 
@@ -20090,36 +19879,68 @@ var parse_clu_file = function(full_str, fkey){
             duration: {
                 type: Number, // seconds
                 value: 0,
-                notify: true
+                notify: true,
+                readOnly: true
             },
             spike_times: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
             },
             pos_xy: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase, and units_per_cm
+                value: function(){ return {};}, // data (akey), timebase,  and units_per_cm
+                readOnly: true,
+                notify: true 
             },
             pos_dir: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
             },
             pos_speed: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                readOnly: true,
+                notify: true
+            },
+            pos_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
+            },
+            set_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
+            },
+            tet_header: {
+                type: Object,
+                value: function(){ return {};},
+                readOnly: true,
+                notify: true
             },
             cut_inds: {
                 type: String, // akey
-                value: ''
+                value: '',
+                readOnly: true,
+                notify: true
             },
             amplitudes: {
                 type: String,
                 value: "", // typed-array-manager id
-                notify: true
+                notify: true,
+                readOnly: true
             },
             data_for_gl: {
                 type: Object,
-                value: function(){return {};} // has n value and typed-array-manager id for gl voltages
+                value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
+                readOnly: true,
+                notify: true
             },
             want_spike_times: {
                 type: Boolean,
@@ -20195,20 +20016,20 @@ var parse_clu_file = function(full_str, fkey){
             this.fire('start_nulling', changing);
 
             if(changing.has('set')){
-                this.set('duration', null);
+                this._setDuration(null);
             }
             if(changing.has('pos')){
-                this.set('pos_xy', null);
-                this.set('pos_speed', null);
-                this.set('pos_dir', null);
+                this._setPos_xy(null);
+                this._setPos_speed(null);
+                this._setPos_dir(null);
             }
             if(changing.has('tet')){
-                this.set('spike_times', null);
-                this.set('amplitudes', null);
-                this.set('data_for_gl', null);
+                this._setSpike_times(null);
+                this._setAmplitudes(null);
+                this._setData_for_gl(null);
             }
             if(changing.has('cut')){
-                this.set('cut_inds', null);
+                this._setCut_inds(null);
             }
 
             this.fire('end_nulling');
@@ -20223,15 +20044,17 @@ var parse_clu_file = function(full_str, fkey){
                     this._use_set(this._set_from_fkey[new_fkeys.set]);
                 } else {
                     request['set'] = this._files.set;
+                    request['set_fkey'] = new_fkeys.set;
                 }
             }
 
             if(changing.has('cut')){
                 request['cut'] = null;
                 if(new_fkeys.cut && this._cut_from_fkey.has(new_fkeys.cut)){
-                    this.set('cut_inds', this._cut_from_fkey[new_fkeys.cut]);
+                    this._setCut_inds(this._cut_from_fkey[new_fkeys.cut]);
                 } else {
                     request['cut'] = this._files.cut;
+                    request['cut_fkey'] = new_fkeys.cut;
                 }
             }
 
@@ -20241,9 +20064,9 @@ var parse_clu_file = function(full_str, fkey){
                     var in_cache = false;
                     var pos_options = this._make_pos_options();
                     pos_options.fkey = new_fkeys.pos;
-                    for(obj in this._pos_from_options){
-                        if(Utils.is_equal_simple(obj, pos_options)){
-                            this._use_pos(obj);
+                    for(let cached_opts in this._pos_from_options){
+                        if(Utils.is_equal_simple(cached_opts, pos_options)){
+                            this._use_pos(this._pos_from_options[cached_opts]);
                             in_cache = true;
                             break;
                         }
@@ -20251,12 +20074,13 @@ var parse_clu_file = function(full_str, fkey){
                     if(!in_cache){
                         request['pos'] = this._files.pos;
                         options['pos'] = this._make_pos_options();
+                        request['pos_fkey'] = new_fkeys.pos;
                     }
                 }
             }
 
             if(changing.has('tet')){
-                this._make_tet_request(this._files.tet, this._files.tet, request, options);
+                this._make_tet_request(new_fkeys.tet, this._files.tet, request, options);
             }
 
             this._worker_io.exec('read_files', request, options); 
@@ -20265,36 +20089,38 @@ var parse_clu_file = function(full_str, fkey){
             var options = this._make_pos_options();
             this._worker_io.exec('read_files', {
                 pos: this._files.pos,
+                pos_fkey: this.selected_files.pos
             }, {
                 pos: options
             });
         }, got_pos: function(msg, arrays){
             var am = window.typed_array_manager;
-            msg.options.fkey = msg.fkey;
-            var cache = Utils.simple_clone(msg.options);
-            cache.xy = am.store_array(arrays['xy']);
-            cache.dir = am.store_array(arrays['dir']);
-            cache.speed = am.store_array(arrays['speed']);
-            cache.header = msg.header;
-            this._pos_from_options.add(cache);
+            var result = {
+                xy: am.store_array(arrays['xy']),
+                dir: am.store_array(arrays['dir']),
+                speed: am.store_array(arrays['speed']),
+                header: msg.header
+            };
+            msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
+            this._pos_from_options[msg.options] = result
             if(msg.delete_from_cache){
-                for(var obj in cache){
-                    if(Utils.is_equal_simple(obj, msg.delete_from_cache)){
-                        this._pos_from_options.delete(obj);
+                for(let cached_opts in this._pos_from_options){
+                    if(Utils.is_equal_simple(cached_opts, msg.delete_from_cache)){
+                        this._pos_from_options.delete(cached_opts);
                     }
                 }
             }
-
             var opts =  this._make_pos_options();
             opts.fkey = this.selected_files.pos;
             if(Utils.is_equal_simple(msg.options, opts)){
-                this._use_pos(cache);
+                this._use_pos(result);
             }            
         },
-        _use_pos: function(cache){
-            this.pos_xy = cache.xy;
-            this.pos_dir = cache.dir;
-            this.pos_speed = cache.speed;
+        _use_pos: function(result){
+            this._setPos_xy(result.xy);
+            this._setPos_dir(result.dir);
+            this._setPos_speed(result.speed);
+            this._setPos_header(result.header);
         },
         _make_tet_request: function(fkey, file, request, options){
             if(!fkey){
@@ -20306,27 +20132,33 @@ var parse_clu_file = function(full_str, fkey){
             options['tet'] = {};
             if(this.want_amplitudes){
                 if(cached.amps){
-                    this.set('amplitudes', cached.amps);
+                    this._setAmplitudes(cached.amps);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['amps'] = 1;    
                 }
             } 
             if(this.want_spike_times){
                 if(cached.times){
-                    this.set('spike_times', cached.times);
+                    this._setSpike_times(cached.times);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['times'] = 1;
                 }
             }
             if(this.want_data_for_gl){
                 if(cached.gl_data) {
-                    this.set('data_for_gl', cached.gl_data);
+                    this._setData_for_gl(cached.gl_data);
                 } else {
                     request['tet'] = file;
+                    request['tet_fkey'] = fkey;
                     options['tet']['gl_data'] = 1;                            
                 }
+            }
+            if(cached.header){
+                this._setTet_header(header);
             }
 
         }, _tet_options_changed: function(){
@@ -20337,7 +20169,7 @@ var parse_clu_file = function(full_str, fkey){
             var am = window.typed_array_manager;
             this._cut_from_fkey[msg.fkey] = am.store_array(arrays['cut']);
             if(this.selected_files.cut === msg.fkey){
-                this.set('cut_inds', this._cut_from_fkey[msg.fkey]);
+                this._setCut_inds(this._cut_from_fkey[msg.fkey]);
             }
             if(msg.delete_from_cache){
                 this._cut_from_fkey.delete(msg.delete_from_cache);
@@ -20354,47 +20186,50 @@ var parse_clu_file = function(full_str, fkey){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.gl_data = {
                 n: msg.n_spikes,
                 voltages: am.store_array(arrays.data)
             };
             if(msg.fkey === this.selected_files.tet){
-                this.set('data_for_gl', cached.gl_data);
+                this._setData_for_gl(cached.gl_data);
             }
         }, got_amplitudes: function(msg, arrays){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.amps = {
                 n: msg.n_spikes,
                 amps: am.store_array(arrays.data)
             };
             if(msg.fkey === this.selected_files.tet){
-                this.set('amplitudes', cached.amps);
+                this._setAmplitudes(cached.amps);
             }
         }, got_times: function(msg, arrays){
             var am = window.typed_array_manager;
             var cached = this._tet_from_fkey[msg.fkey];
             if(!cached){
-                _tet_from_fkey[msg.fkey] = cached = {};
+                this._tet_from_fkey[msg.fkey] = cached = {};
             }
             cached.times = {
                 n: msg.n_spikes,
                 times: am.store_array(arrays.data)
             };
             if(msg.fkey === this.selected_files.tet){
-                this.set('spike_times', cached.times);
+                this._setSpike_times(cached.times);
             }
         }, got_tet_header: function(fkey, header){
             var cached = this._tet_from_fkey[fkey];
             if(!cached){
-                _tet_from_fkey[fkey] = cached = {};
+                this._tet_from_fkey[fkey] = cached = {};
             }
             cached.header = header;
+            if(fkey === this.selected_files.tet){
+                this._setTet_header(header);
+            }
         }, delete_from_tet_cache: function(fkey){
             this._tet_from_fkey.delete(fkey);
         }, set_file_parsed: function(msg) {
@@ -20406,7 +20241,8 @@ var parse_clu_file = function(full_str, fkey){
                 this._set_from_fkey.delete(msg.delete_from_cache);
             }
         }, _use_set: function(header){
-            this.set('duration', parseInt(header.duration));
+            this._setDuration(parseInt(header.duration));
+            this._setSet_header(header);
         }
 	});
 </script>
@@ -23018,11 +22854,314 @@ Polymer({
 
 
 </script>
-</dom-module></div>
+</dom-module><dom-module id="header-view" assetpath="/">
+
+<style>
+
+</style>
+<template></template>
+
+<script>
+
+
+Polymer({
+	is: 'header-view',
+	properties: {
+		
+	}, created: function(){
+		// bind these methods so we can add/remove easily
+	
+	}, attached: function(){
+		
+	}
+});
+
+
+</script>
+</dom-module>
+
+<dom-module id="paper-toolbar" assetpath="bower_components/paper-toolbar/">
+  <template>
+    <style>
+      :host {
+        /* technical */
+        display: block;
+        position: relative;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+
+        /* size */
+        height: var(--paper-toolbar-height, 64px);
+
+        background: var(--paper-toolbar-background, --primary-color);
+        color: var(--paper-toolbar-color, --dark-theme-text-color);
+
+        @apply(--paper-toolbar);
+      }
+
+      :host(.animate) {
+        /* transition */
+        transition: var(--paper-toolbar-transition, height 0.18s ease-in);
+      }
+
+      :host(.medium-tall) {
+        height: calc(var(--paper-toolbar-height, 64px) * 2);
+        @apply(--paper-toolbar-medium);
+      }
+
+      :host(.tall) {
+        height: calc(var(--paper-toolbar-height, 64px) * 3);
+        @apply(--paper-toolbar-tall);
+      }
+
+      .toolbar-tools {
+        position: relative;
+        height: var(--paper-toolbar-height, 64px);
+        padding: 0 16px;
+        pointer-events: none;
+        @apply(--layout-horizontal);
+        @apply(--layout-center);
+        @apply(--paper-toolbar-content);
+      }
+
+      /*
+       * TODO: Where should media query breakpoints live so they can be shared between elements?
+       */
+
+      @media (max-width: 600px) {
+        :host {
+          height: var(--paper-toolbar-sm-height, 56px);
+        }
+
+        :host(.medium-tall) {
+          height: calc(var(--paper-toolbar-sm-height, 56px) * 2);
+        }
+
+        :host(.tall) {
+          height: calc(var(--paper-toolbar-sm-height, 56px) * 3);
+        }
+
+        .toolbar-tools {
+          height: var(--paper-toolbar-sm-height, 56px);
+        }
+      }
+
+      #topBar {
+        position: relative;
+      }
+
+      /* middle bar */
+      #middleBar {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+      }
+
+      :host(.tall) #middleBar,
+      :host(.medium-tall) #middleBar {
+        -webkit-transform: translateY(100%);
+        transform: translateY(100%);
+      }
+
+      /* bottom bar */
+      #bottomBar {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+
+      /*
+       * make elements (e.g. buttons) respond to mouse/touch events
+       *
+       * `.toolbar-tools` disables touch events so multiple toolbars can stack and not
+       * absorb events. All children must have pointer events re-enabled to work as
+       * expected.
+       */
+      .toolbar-tools > ::content > *:not([disabled]) {
+        pointer-events: auto;
+      }
+
+      .toolbar-tools > ::content .title {
+        @apply(--paper-font-common-base);
+
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1;
+        pointer-events: none;
+
+        @apply(--layout-flex);
+        @apply(--paper-toolbar-title);
+      }
+
+      /**
+       * TODO: Refactor these selectors
+       * Work in progress.
+       */
+      .toolbar-tools > ::content paper-icon-button[icon=menu] {
+        margin-right: 24px;
+      }
+
+      .toolbar-tools > ::content > .title,
+      .toolbar-tools > ::content[select=".middle"] > .title,
+      .toolbar-tools > ::content[select=".bottom"] > .title {
+        margin-left: 56px;
+      }
+
+      .toolbar-tools > ::content > paper-icon-button + .title,
+      .toolbar-tools > ::content[select=".middle"] paper-icon-button + .title,
+      .toolbar-tools > ::content[select=".bottom"] paper-icon-button + .title {
+        margin-left: 0;
+      }
+
+      .toolbar-tools > ::content > .fit {
+        position: absolute;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: auto;
+        margin: 0;
+      }
+
+      /* TODO(noms): Until we have a better solution for classes that don't use
+       * /deep/ create our own.
+       */
+      .start-justified {
+        @apply(--layout-start-justified);
+      }
+
+      .center-justified {
+        @apply(--layout-center-justified);
+      }
+
+      .end-justified {
+        @apply(--layout-end-justified);
+      }
+
+      .around-justified {
+        @apply(--layout-around-justified);
+      }
+
+      .justified {
+        @apply(--layout-justified);
+      }
+    </style>
+
+    <div id="topBar" class$="toolbar-tools [[_computeBarExtraClasses(justify)]]">
+      <content select=":not(.middle):not(.bottom)"></content>
+    </div>
+
+    <div id="middleBar" class$="toolbar-tools [[_computeBarExtraClasses(middleJustify)]]">
+      <content select=".middle"></content>
+    </div>
+
+    <div id="bottomBar" class$="toolbar-tools [[_computeBarExtraClasses(bottomJustify)]]">
+      <content select=".bottom"></content>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-toolbar',
+
+      hostAttributes: {
+        'role': 'toolbar'
+      },
+
+      properties: {
+        /**
+         * Controls how the items are aligned horizontally when they are placed
+         * at the bottom.
+         * Options are `start`, `center`, `end`, `justified` and `around`.
+         */
+        bottomJustify: {
+          type: String,
+          value: ''
+        },
+
+        /**
+         * Controls how the items are aligned horizontally.
+         * Options are `start`, `center`, `end`, `justified` and `around`.
+         */
+        justify: {
+          type: String,
+          value: ''
+        },
+
+        /**
+         * Controls how the items are aligned horizontally when they are placed
+         * in the middle.
+         * Options are `start`, `center`, `end`, `justified` and `around`.
+         */
+        middleJustify: {
+          type: String,
+          value: ''
+        }
+
+      },
+
+      attached: function() {
+        this._observer = this._observe(this);
+        this._updateAriaLabelledBy();
+      },
+
+      detached: function() {
+        if (this._observer) {
+          this._observer.disconnect();
+        }
+      },
+
+      _observe: function(node) {
+        var observer = new MutationObserver(function() {
+          this._updateAriaLabelledBy();
+        }.bind(this));
+        observer.observe(node, {
+          childList: true,
+          subtree: true
+        });
+        return observer;
+      },
+
+      _updateAriaLabelledBy: function() {
+        var labelledBy = [];
+        var contents = Polymer.dom(this.root).querySelectorAll('content');
+        for (var content, index = 0; content = contents[index]; index++) {
+          var nodes = Polymer.dom(content).getDistributedNodes();
+          for (var node, jndex = 0; node = nodes[jndex]; jndex++) {
+            if (node.classList && node.classList.contains('title')) {
+              if (node.id) {
+                labelledBy.push(node.id);
+              } else {
+                var id = 'paper-toolbar-label-' + Math.floor(Math.random() * 10000);
+                node.id = id;
+                labelledBy.push(id);
+              }
+            }
+          }
+        }
+        if (labelledBy.length > 0) {
+          this.setAttribute('aria-labelledby', labelledBy.join(' '));
+        }
+      },
+
+      _computeBarExtraClasses: function(barJustify) {
+        if (!barJustify) return '';
+
+        return barJustify + (barJustify === 'justified' ? '' : '-justified');
+      }
+    });
+  </script>
+</dom-module>
+</div>
 <paper-iconset id="meta"></paper-iconset>
 
 <template is="dom-bind" id="the_app">
-	
+
 	<typed-array-manager></typed-array-manager>
 
  		<iron-localstorage name="waveform" value="{{options}}" on-iron-localstorage-load-empty="initializeDefaultOptions"></iron-localstorage>
@@ -23112,8 +23251,8 @@ Polymer({
 			</ul>
 		</floating-pane>
 		
-		<floating-pane id="file_info">
-			
+		<floating-pane id="file_info" style="display: initial;">
+			<header-view set_header="[[set_header]]" pos_header="[[pos_header]]" tet_header="[[tet_header]]"></header-view>
 		</floating-pane>
 
 		<floating-pane id="rm_info" style="display: initial;">
@@ -23179,93 +23318,93 @@ Polymer({
 
 	<div class="main_wrapper">
 		
-	<custom-toolbar class="main_toolbar">
+	<paper-toolbar class="main_toolbar">
 		<div>
-		<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name="help_info"></paper-icon-button>
-		<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+			<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name="help_info"></paper-icon-button>
+			<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name="shortcut_info"></paper-icon-button>
-		<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+			<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name="shortcut_info"></paper-icon-button>
+			<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name="action_info"></paper-icon-button>
-		<paper-tooltip>undo [z]</paper-tooltip>
+			<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name="action_info"></paper-icon-button>
+			<paper-tooltip>undo [z]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="info" id="file_headers_button" class="info_linked" data-info-name="file_info"></paper-icon-button>
-		<paper-tooltip>file headers [h]</paper-tooltip>
+			<paper-icon-button icon="info" id="file_headers_button" class="info_linked" data-info-name="file_info"></paper-icon-button>
+			<paper-tooltip>file headers [h]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="swap-horiz" id="drift_button" class="info_linked" data-info-name="drift_info"></paper-icon-button>
-		<paper-tooltip>toggle drift [d]</paper-tooltip>
+			<paper-icon-button icon="swap-horiz" id="drift_button" class="info_linked" data-info-name="drift_info"></paper-icon-button>
+			<paper-tooltip>toggle drift [d]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="invert-colors" id="toggle_palette" class="info_linked" data-info-name="palette_info"></paper-icon-button>
-		<paper-tooltip>toggle palette [p]</paper-tooltip>
+			<paper-icon-button icon="invert-colors" id="toggle_palette" class="info_linked" data-info-name="palette_info"></paper-icon-button>
+			<paper-tooltip>toggle palette [p]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="sort" id="reorder_n_button"></paper-icon-button>
-		<paper-tooltip>sort on group size [n]</paper-tooltip>
+			<paper-icon-button icon="sort" id="reorder_n_button"></paper-icon-button>
+			<paper-tooltip>sort on group size [n]</paper-tooltip>
 		</div>
 
 		<div>
-		<paper-icon-button icon="sort" id="reorder_A_button"></paper-icon-button>
-		<paper-tooltip>sort on channel amplitude</paper-tooltip>
+			<paper-icon-button icon="sort" id="reorder_A_button"></paper-icon-button>
+			<paper-tooltip>sort on channel amplitude</paper-tooltip>
 		</div>	
 
 		<div>
-		<paper-icon-button icon="settings-applications" id="pos_settings" class="info_linked" data-info-name="pos_info"></paper-icon-button>
-		<paper-tooltip>position post processing settings</paper-tooltip>
+			<paper-icon-button icon="settings-applications" id="pos_settings" class="info_linked" data-info-name="pos_info"></paper-icon-button>
+			<paper-tooltip>position post processing settings</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c1</div>
-		<paper-tooltip>channel 1 [1]</paper-tooltip>
+			<div class="button display_button">c1</div>
+			<paper-tooltip>channel 1 [1]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c2</div>
-		<paper-tooltip>channel 2 [2]</paper-tooltip>
+			<div class="button display_button">c2</div>
+			<paper-tooltip>channel 2 [2]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c3</div>
-		<paper-tooltip>channel 3 [3]</paper-tooltip>
+			<div class="button display_button">c3</div>
+			<paper-tooltip>channel 3 [3]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button">c4</div>
-		<paper-tooltip>channel 4 [4]</paper-tooltip>
+			<div class="button display_button">c4</div>
+			<paper-tooltip>channel 4 [4]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name="rm_info">rm</div>
-		<paper-tooltip>spatial ratemap [r]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name="rm_info">rm</div>
+			<paper-tooltip>spatial ratemap [r]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name="dir_info">dir</div>
-		<paper-tooltip>directional ratemap [c]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name="dir_info">dir</div>
+			<paper-tooltip>directional ratemap [c]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name="speed_info">spd</div>
-		<paper-tooltip>speed ratemap [v]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name="speed_info">spd</div>
+			<paper-tooltip>speed ratemap [v]</paper-tooltip>
 		</div>
 
 		<div>
-		<div class="button display_button info_linked" data-info-name="tc_info">tc</div>
-		<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+			<div class="button display_button info_linked" data-info-name="tc_info">tc</div>
+			<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
 		</div>
 
-	</custom-toolbar>
+	</paper-toolbar>
 
 	<div id="all_below_toolbar">
 		<document-focus-marker></document-focus-marker>
@@ -23350,7 +23489,7 @@ Polymer({
 	</drop-zone>
 
 
-	<parsed-data file_organiser_id="the_file_organiser" selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" voltages_for_gl="{{voltages_for_gl}}"></parsed-data>
+	<parsed-data file_organiser_id="the_file_organiser" selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" voltages_for_gl="{{voltages_for_gl}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}"></parsed-data>
 	<cut-object groups="{{cut_groups}}" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
 
