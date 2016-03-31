@@ -147,7 +147,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 			set_header="[[set_header]]"
 			pos_header="[[pos_header]]"
 			tet_header="[[tet_header]]"
-			cut_header="[[cut_header]]"
+			cut_header="[[_get_safe(cut_box,'header')]]"
 			header_filter="[[options.header_filter]]"
 			></header-view>
 		</floating-pane>
@@ -412,11 +412,12 @@ box-shadow: inset 0 0 2px 1px #ccc;
 				pos_speed="{{pos_speed}}"
 				amplitudes="{{amplitudes}}"
 				voltages_for_gl="{{voltages_for_gl}}"
+				cut_box="{{cut_box}}"
 				tet_header="{{tet_header}}"
-				cut_header="{{cut_header}}"
 				pos_header="{{pos_header}}"
 				set_header="{{set_header}}"></parsed-data>
 	<cut-object groups="{{cut_groups}}"
+				cut_box="[[cut_box]]"
 				undo_stack_descriptions="{{cut_undo_stack}}"
 				redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
@@ -435,7 +436,9 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 <script>
 "use strict";
-document.getElementById('the_app').initializeDefaultOptions = function(ev) {
+var the_app = document.getElementById('the_app')
+
+the_app.initializeDefaultOptions = function(ev) {
 	// TODO: bind to on-iron-localstorage-load and update missing/invalid properties
 	this.options = {
 		max_delta_t: 500,
@@ -453,6 +456,11 @@ document.getElementById('the_app').initializeDefaultOptions = function(ev) {
 		pos_smoothing_s: 0.2,
 		header_filter: ''
 	};
+}
+
+// see https://github.com/Polymer/polymer/issues/1877
+the_app._get_safe = function(a,b){
+	return a && a[b];
 }
 
 document.addEventListener('contextmenu', function(e){e.preventDefault();});

@@ -7,7 +7,7 @@ This doesn't have to be a singleton (I hope).
 The main property is the "groups" array.  You don't splice and dice it directly, instead you use one of the following:
     init_cut, swap_groups, merge_groups, split_groups, undo, redo
 
-Each element is an object, which contains an .inds property, which is a typed-array manager id for the array of
+Each element is an object, which contains an .akey property, which is a typed-array manager id for the array of
 indices that the object represents.  This id and the indices data never changes during the lifetime of the object.
 
 The rendering modules listen for changes to the groups array and provide/update properties with names
@@ -132,19 +132,99 @@ doesn't have a worker, but it uses a similar system.
     			value: function(){return [];},
     			notify: true
     		},
-            cut_file: {
-                type: String,
-                value: "",  //akey
-            },
-            n_spikes: {
-                type: Number,
-                value: 0
+            cut_box: {
+                type: Object,
+                value: function(){return {};},
+                notify: true,
+                observer: '_use_cut_box'
             }
-    	}, 
-        observers: [
-            'init_cut(cut_file, n_spikes)'
-        ],
-        swap_groups: function(a, b){
+    	},
+        _use_cut_box: function(){
+            var m = Utils.typed_array_manager;
+
+            if (this.cut_box && this.cut_box.is === "file"){
+                // construct from file
+                let akey = m.get_array(this.cut_box.akey);
+
+                // find out how many indices for each group
+                let group_n = bin_count(akey, 255);
+
+                // zero-initialize an array of the required length for each group
+                let groups = [];
+                for(let ii=0; ii<group_n.length; ii++) if(group_n[ii]>0){
+                        groups[ii] = new Uint32Array(group_n[ii]);
+                }
+
+                // store the indices for each group
+                group_n.fill(0); // we repurpose this as a counter during arg_splitting
+                arg_split(groups, akey, group_n);
+
+                // now we are ready to create the this.groups array of boxes               
+                let boxes = [];
+                for(let gg in groups){
+                    if(gg){
+                        boxes.push({
+                            akey: m.store_array(gg)
+                        });
+                    }else{
+                        boxes.push({});
+                    }
+                }
+                this.undo_stack = [{
+                    action: 'load'
+                }];
+
+                this.set('groups', boxes); 
+                this.set('undo_stack_descriptions', ['load from file']);
+                this.set('redo_stack_descriptions', []);
+                this.redo_stack = [];
+
+            } else if (this.cut_box && this.cut_box.is === "stack"){
+                // reinstate existing cut object
+                this.set('groups', this.cut_box.groups);
+                this.set('undo_stack_descriptions', this.cut_box.undo_stack_descriptions);
+                this.set('redo_stack_descriptions', this.cut_box.redo_stack_descriptions);
+                this.undo_stack = this.cut_box.undo_stack;
+                this.redo_stack = this.cut_box.redo_stack;
+
+            } else if(this.cut_box && this.cut_box.is === "n"){
+                // no cut_file, so just make a zero-group with inds 0:n 
+                this.undo_stack = [{
+                    action: 'create'
+                }];
+                this.set('undo_stack_descriptions', ['create blank cut']);
+                this.set('redo_stack_descriptions', []);
+                this.set('groups', [{
+                    akey: m.store_array(arange(this.cut_box.n_spikes))
+                }]);
+                this.undo_stack = [];
+                this.redo_stack = [];
+
+            } else {
+                // clear current state
+                this.set('groups', undefined);
+                this.set('undo_stack_descriptions', undefined);
+                this.set('redo_stack_descriptions', undefined);
+                this.undo_stack = [];
+                this.redo_stack = [];
+
+            }
+        },
+        _fork_if_needed: function(){
+            if(!this.cut_box.is_stack){
+                // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
+                // note that the new "cut box" will be applied to this element as its cut_box, but this will not
+                // cause any changes as all the values will be the same.
+                this.fire('fork', {
+                    is: "stack",
+                    undo_stack_descriptions: undo_stack_descriptions,
+                    redo_stack_descriptions: redo_stack_descriptions,
+                    groups: groups,
+                    undo_stack: undo_stack,
+                    redo_stack: redo_stack
+                });
+            }
+        }, swap_groups: function(a, b){
             if(a==b) return;
 
             // make life easier, fix b>a
@@ -155,13 +235,13 @@ doesn't have a worker, but it uses a similar system.
             }
             this._do_swap(a, b);
 
-            this.redo_stack = [];
+            this.redo_stack.splice(0, this.redo_stack.length); // clear     
             this.undo_stack.push({
                 action: 'swap',
                 a: a,
                 b: b
             });
-            this.set('redo_stack_descriptions', []);
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'swap groups ' + a + " and " + b);
         },
         _do_swap: function(a, b){
@@ -183,20 +263,21 @@ doesn't have a worker, but it uses a similar system.
         split_group: function(a, mask){
             var m = Utils.typed_array_manager;
 
-            var new_arrs = mask_split(m.get_array(this.groups[a].inds), mask);
-            m.free_array(this.groups[a].inds);
+            var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
+            m.free_array(this.groups[a].akey);
             this.splice('groups', a, 1, {
-                inds: m.store_array(new_arrs[0])
+                akey: m.store_array(new_arrs[0])
             }, {
-                inds: m.store_array(new_arrs[1])
+                akey: m.store_array(new_arrs[1])
             });
 
-            this.redo_stack = [];               
+            this.redo_stack.splice(0, this.redo_stack.length); // clear                   
             this.undo_stack.push({
                 action: 'split',
                 a: a
             });
-            this.set('redo_stack_descriptions', []);
+
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'split group ' + a + ' in two');
         },
         merge_groups: function(a, b){
@@ -210,25 +291,25 @@ doesn't have a worker, but it uses a similar system.
                 b = tmp;
             }
 
-            var packed = merge_sorted(m.get_array(this.groups[a].inds), 
-                                   m.get_array(this.groups[b].inds))
+            var packed = merge_sorted(m.get_array(this.groups[a].akey), 
+                                   m.get_array(this.groups[b].akey))
             var inds = packed[0], mask = packed[1];
 
-            m.free_array(this.groups[a].inds);
-            m.free_array(this.groups[b].inds);
+            m.free_array(this.groups[a].akey);
+            m.free_array(this.groups[b].akey);
             this.splice('groups', b, 1);
             this.splice('groups', a, 1, {
-                inds: m.store_array(inds)
+                akey: m.store_array(inds)
             });
 
-            this.redo_stack = [];
+            this.redo_stack.splice(0, this.redo_stack.length); // clear
             this.undo_stack.push({
                 action: 'merge',
                 a: a,
                 b: b,
                 mask: mask
             });
-            this.set('redo_stack_descriptions', []);
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'merge groups ' + a + ' and ' + b);
         },
         undo: function(){
@@ -238,13 +319,13 @@ doesn't have a worker, but it uses a similar system.
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].inds), delta.mask);
-                m.free_array(this.groups[delta.a].inds);
+                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
+                m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, {
-                    inds: m.store_array(new_arrs[0])
+                    akey: m.store_array(new_arrs[0])
                 });
                 this.splice('groups', delta.b, 0, {
-                    inds: m.store_array(new_arrs[1])
+                    akey: m.store_array(new_arrs[1])
                 });
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
@@ -252,13 +333,13 @@ doesn't have a worker, but it uses a similar system.
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].inds), 
-                                          m.get_array(this.groups[delta.a+1].inds))
+                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
+                                          m.get_array(this.groups[delta.a+1].akey))
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].inds);
-                m.free_array(this.groups[delta.a+1].inds);
+                m.free_array(this.groups[delta.a].akey);
+                m.free_array(this.groups[delta.a+1].akey);
                 this.splice('groups', delta.a, 2, {
-                    inds: m.store_array(inds)
+                    akey: m.store_array(inds)
                 });
                 delta.mask = packed[1];
                 success = true;
@@ -289,14 +370,14 @@ doesn't have a worker, but it uses a similar system.
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].inds), 
-                                          m.get_array(this.groups[delta.b].inds));
+                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
+                                          m.get_array(this.groups[delta.b].akey));
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].inds);
-                m.free_array(this.groups[delta.b].inds);
+                m.free_array(this.groups[delta.a].akey);
+                m.free_array(this.groups[delta.b].akey);
                 this.splice('groups', delta.b, 1);
                 this.splice('groups', delta.a, 1, {
-                    inds: m.store_array(inds)
+                    akey: m.store_array(inds)
                 });
                 delta.mask = packed[1];
                 success = true;
@@ -304,13 +385,13 @@ doesn't have a worker, but it uses a similar system.
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].inds), delta.mask);
+                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 delete delta['mask'];
-                m.free_array(this.groups[delta.a].inds);
+                m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, {
-                    inds: m.store_array(new_arrs[0])
+                    akey: m.store_array(new_arrs[0])
                 }, {
-                    inds: m.store_array(new_arrs[1])
+                    akey: m.store_array(new_arrs[1])
                 });
                 success = true;
                 break;
@@ -328,59 +409,8 @@ doesn't have a worker, but it uses a similar system.
                 this.undo_stack.push(this.redo_stack.pop())
                 this.push('undo_stack_descriptions', this.pop('redo_stack_descriptions'));
             }
-        },
-        init_cut: function(cut_file, n_spikes){
-            var m = Utils.typed_array_manager;
-            this.set('redo_stack_descriptions', []);
-            this.redo_stack = [];
-            this.set('n_spikes', n_spikes);
-
-            if(cut_file){
-                cut_file = m.get_array(cut_file);
-
-                // find out how many indices for each group
-                var group_n = bin_count(cut_file, 255);
-
-                // zero-initialize an array of the required length for each group
-                var groups = [];
-                for(var ii=0; ii<group_n.length; ii++)
-                    if(group_n[ii]>0)
-                        gorups[ii] = new Uint32Array(group_n[ii]);
-
-                // store the indices for each group
-                group_n.fill(0); // we repurpose this as a counter during arg_splitting
-                arg_split(groups, cut_file, group_n);
-
-                // now we are ready to create the this.groups array of boxes               
-                var boxes = [];
-                for(var ii=0; ii<groups.length; ii++){
-                    if(groups[ii]){
-                        boxes.push({
-                            inds: m.store_array(groups[ii])
-                        });
-                    }else{
-                        boxes.push({});
-                    }
-
-                }
-                this.undo_stack = [{
-                    action: 'load'
-                }];
-                this.set('undo_stack_descriptions', ['load from file']);
-                this.set('groups', boxes); 
-
-            } else {
-                // no cut_file, so just make a zero-group with inds 0:n 
-                this.undo_stack = [{
-                    action: 'create'
-                }];
-                this.set('undo_stack_descriptions', ['create blank cut']);
-                this.set('groups', [{
-                    inds: m.store_array(arange(n_spikes))
-                }]);
-            }
         }
-	});
+    });
 </script>
 
   

@@ -489,7 +489,7 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
 }
 
 var _prepare_render_metrics = function(okeys, from_t, to_t){
-	// okeys is an array of objs, each with .inds property that gives a akey.
+	// okeys is an array of objs, each with .akey property that gives a akey.
 
 	var okeys = Array.from(okeys); // if it was a set, then make it an array with well-defined order
 
@@ -536,7 +536,7 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
 }
 
 var _upload_okey_data = function(){
-	// okeys is an array of objs, each with .inds property that gives a akey.
+	// okeys is an array of objs, each with .akey property that gives a akey.
 	// if render mode is flag it must also provide a .group_num property.
 
 	// Convert easy pixel coords to the weird [-128, 127] x [-128, 127] coordinates.
@@ -561,7 +561,7 @@ var _upload_okey_data = function(){
 		data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
 		
 		for(var ii=0; ii<n_okeys; ii++){
-			var inds = m.get_array(okeys[ii].inds);
+			var inds = m.get_array(okeys[ii].akey);
 			var xy = xy_offset_gl_i16[ii];
 			for(var jj=0; jj<inds.length; jj++){
 				data_i16[(inds[jj]<<2) +0] = xy;
@@ -578,7 +578,7 @@ var _upload_okey_data = function(){
 		data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
 
 		for(var ii=0; ii<n_okeys; ii++){
-			var inds = m.get_array(okeys[ii].inds);
+			var inds = m.get_array(okeys[ii].akey);
 			var xy = xy_offset_gl_i16[ii];
 			// TODO: check if bits are correct
 			var gx = okeys[ii].okey_num |  (xy & 0xff); 
@@ -937,7 +937,7 @@ Polymer({
     },
     _groups_set: function(new_val, old_val){
         this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
-        this._update_okeys(old_val || [], new_val, []);
+        this._update_okeys(old_val || [], new_val || [], []);
     },
     _groups_spliced: function(splices){
     	if(!splices) return;

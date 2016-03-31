@@ -162,7 +162,7 @@ Utils.typed_array_manager = (function(){
 
 Utils.file_manager = (function(){
 	// This is a thin wrapper around an array, note that you can never remove files once added
-    var store = [];
+    var store = [undefined];
     
     return {
         store_file: function(file){

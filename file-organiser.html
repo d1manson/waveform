@@ -617,6 +617,7 @@ Polymer({
     		if(!trial){
     			trial = this._new_trial(base);
 				trials.push(trial);
+				this._trial_from_base.set(base, trial);
     		}
         	let num = ff.name.match(this._regex_cut_tet_num);
 			if(num){
