@@ -29,9 +29,13 @@
 
 <style is="custom-style">
 :root {
-	--paper-toolbar-height: 40px;
-	--paper-toolbar-background: #efefef;
-	--paper-toolbar-color: #000;
+--paper-toolbar-height: 40px;
+--paper-toolbar-background: #efefef;
+--paper-toolbar-color: #000;
+--paper-icon-button: {
+    width: 38px;
+    height: 38px;
+};
 }
 </style>
 
@@ -132,9 +136,9 @@ box-shadow: inset 0 0 2px 1px #ccc;
 			</p>
 		</floating-pane>
 
-		<floating-pane id="palette_info">
-			<div class='pane_title'>Toggle waveform palette [p]</div>
-			There are two palette modes. Click this button (or press [p]) to toggle between the two modes: 
+		<floating-pane id="waves_info" style="display:initial;">
+			<div class='pane_title'>Waves [w]</div>
+			There are two palette modes. TODO: make a button to toggle modes here: 
 			<ul>
 			<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
 			<li>render each pixel based on how many waves cross that pixel.</li>
@@ -242,11 +246,6 @@ box-shadow: inset 0 0 2px 1px #ccc;
 		</div>
 
 		<div>
-			<paper-icon-button icon="invert-colors" id='toggle_palette' class="info_linked" data-info-name='palette_info' ></paper-icon-button>
-			<paper-tooltip>toggle palette [p]</paper-tooltip>
-		</div>
-
-		<div>
 			<paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
 			<paper-tooltip>sort on group size [n]</paper-tooltip>
 		</div>
@@ -262,23 +261,8 @@ box-shadow: inset 0 0 2px 1px #ccc;
 		</div>
 
 		<div>
-			<div class="button display_button">c1</div>
-			<paper-tooltip>channel 1 [1]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button">c2</div>
-			<paper-tooltip>channel 2 [2]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button">c3</div>
-			<paper-tooltip>channel 3 [3]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button">c4</div>
-			<paper-tooltip>channel 4 [4]</paper-tooltip>
+			<div class="button display_button">wav</div>
+			<paper-tooltip>waves [w]</paper-tooltip>
 		</div>
 
 		<div>
@@ -363,7 +347,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 					pos_xy="[[pos_xy]]"
 					pos_dir="[[pos_dir]]"
 					pos_speed="[[pos_speed]]"
-					voltages_for_gl="[[voltages_for_gl]]"
+					data_for_gl="[[data_for_gl]]"
 					options="[[options]]"></tile-wall>
 
 	</div>
@@ -411,7 +395,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 				pos_dir="{{pos_dir}}"
 				pos_speed="{{pos_speed}}"
 				amplitudes="{{amplitudes}}"
-				voltages_for_gl="{{voltages_for_gl}}"
+				data_for_gl="{{data_for_gl}}"
 				cut_box="{{cut_box}}"
 				tet_header="{{tet_header}}"
 				pos_header="{{pos_header}}"
@@ -464,6 +448,8 @@ the_app._get_safe = function(a,b){
 }
 
 document.addEventListener('contextmenu', function(e){e.preventDefault();});
+
+//the_app.set('options.waves_render_mode','flag'); //debug
 </script>
 
 

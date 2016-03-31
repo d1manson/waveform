@@ -280,6 +280,11 @@ Polymer({
             els[ii].addEventListener('fork', this._cut_forked.bind(this));
         }
     }, _cut_forked: function(e){
+        var cut_box = e.detail;
+        // TODO: need to insert the cut_box as a new cut on (the current??!!) tet_obj
+        // then set the current cut to being that cut_box
+        // Do a plit on the console...
+        // m = new Uint8Array(1993); for(let i=0;i<m.length;i++)m[i]= Math.random() > 0.2? 1 : 0
         console.dir(e);
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;

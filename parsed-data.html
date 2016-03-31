@@ -993,24 +993,12 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
     }
 }
 
-var i8_to_u8 = function(a){
-    // Takes an int8Array, a, adds 128 to each element and views it as a uint8 array.
-    // this is done inplace.
-    // See http://en.wikipedia.org/wiki/Signed_number_representations for info.
-    // We are ORing each byte with 128, which in hex is 0x80...here we do it with 4 bytes at a time.
-    // TODO: it may be possible to avoid this conversion, if the gl-shader code is modified
-    a = new Uint32Array(a.buffer); 
-    for(let i=0;i<a.length;i++)
-        a[i] ^= 0x80808080;
-    return new Uint8Array(a.buffer);
-}
-
 var build_gl_data = function(buffer, offset_bytes, length_bytes, n_spikes){
     var old_data = new Uint8Array(buffer, offset_bytes, length_bytes);
     var new_data = new Uint16Array(n_c*(n_w-1)*n_spikes);
     
     build_gl_data_sub(old_data, new_data, n_spikes);
-    return i8_to_u8(new Int8Array(new_data.buffer));        
+    return new_data;        
 }
 
 

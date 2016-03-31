@@ -83,7 +83,7 @@ Polymer({
         var old = Polymer.dom(this.root).firstChild;
         if(old)
             Polymer.dom(this.root).removeChild(old);
-        if(window.canvas_manager && this.canv_id !== "")
+        if(Utils.canvas_manager && this.canv_id !== "")
             Polymer.dom(this.root).appendChild(Utils.canvas_manager.get_canvas(this.canv_id));
     }
 });

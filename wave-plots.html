@@ -50,7 +50,7 @@ data if you wanted to observe the limitations of the 32bit precision.
 <link rel="import" href="palettes.html">
 <link rel="import" href="managed-canvas.html">
 <link rel="import" href="utils.html">
-
+<link rel="import" href="webgl-debug.html">
 
 
 <dom-module id="wave-plots">
@@ -78,9 +78,12 @@ var n_w = 50; // number of t points per channel
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
 var off_canv_h = 512;  // full height
-var off_canv_wave_h = 256; // height of a wave
-var off_canv_dt = 2; //distance from t to t+1 on the wave
-var off_canv_wave_gap = 2; //horizontal gap between waves
+var off_canv_wave_h = 164; // height of a wave
+var off_canv_dt = 4; //distance from t to t+1 on the wave
+var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
+
+var on_canv_width = n_c*n_w*2;
+var on_canv_height = 128;
 
 
 
@@ -89,12 +92,12 @@ var shader_strs = (function(){
 // rather than accepting a .format(dict) like in python, anyway....
 
 var delta_t_x_offset = (off_canv_dt/off_canv_w*2).toPrecision(3);
-var y_factor =  (2/(off_canv_h/off_canv_wave_h)).toPrecision(3);
+var y_factor =  (1/(off_canv_h/off_canv_wave_h)).toPrecision(3);
 
 return {
 
     vertex_flag: `
-        attribute float is_t_plus_one; // 0 1 0 1 0 1 0 1 ... 1 
+        attribute lowp float is_t_plus_one; // 0 1 0 1 0 1 0 1 ... 1 
         attribute float voltage; // v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)  values are on the interval [0 1]
         attribute vec2 wave_xy_offset; // x_1 y_1  #  x_1 y_1  #  x_2 y_2  #  x_2 y_2  #  ... x_n y_n  #  x_n y_n  #
         attribute float wave_color_tex; //  #   #  c_1  #   #  c_1  #   #  c_2  #   #  c_2 ...  #   #  c_n  #   #  c_n
@@ -128,7 +131,7 @@ return {
 
 
     vertex_density_1: `
-        attribute float is_t_plus_one; // 0 1 0 1 0 1 0 1 ... 1 
+        attribute lowp float is_t_plus_one; // 0 1 0 1 0 1 0 1 ... 1 
         attribute float voltage; // v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)  values are on the interval [0 1]
         attribute vec2 wave_xy_offset; // x_1 y_1  x_1 y_1  x_2 y_2  x_2 y_2  ... x_n y_n x_n y_n 
         uniform mediump float t_x_offset;   // canavas x-coordiantes from the leftmost point of the wave to point t
@@ -245,8 +248,10 @@ var upload_palette = function(gl, register_ind, data){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 }
 
-var WavesRenderer = function(debug){
+var WavesRenderer = function(callback, debug){
     
+    this._callback = callback; // we send it a map from okey to canvas every time we finish a bunch of rendering
+
     // create the off_canv
     this.el_off_canv = document.createElement('canvas');
     this.el_off_canv.width = off_canv_w;
@@ -312,14 +317,14 @@ var WavesRenderer = function(debug){
     this._locs_density_2.a_position = gl.getUniformLocation(this._prog_density_2, "a_position");
     this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._prog_density_2, "a_tex_coord");
     this._locs_density_2.u_src = gl.getUniformLocation(this._prog_density_2, "u_src");
-    this._locs_density_2.oneTex = gl.getUniformLocation(this._prog_density_2, "oneTex");
-    this._locs_density_2.normalising_factor = gl.getAttribLocation(this._prog_density_2, "normalising_factor");
+    this._locs_density_2.normalising_factor = gl.getUniformLocation(this._prog_density_2, "normalising_factor");
 
     // create all the neccessarry buffers (no space is actually allocated at this stage for data)
     this._buf_wave = gl.createBuffer();
-    this._bufs_voltage = Array((n_w-1)*n_c);
-    for(var i=0;i<this._bufs_voltage.length;i++)
-        this._bufs_voltage[i] = gl.createBuffer();
+    this._bufs_voltage = [];
+    for(let ii=0; ii<(n_w-1)*n_c; ii++){
+        this._bufs_voltage.push(gl.createBuffer());
+    }
     this._buf_is_t_plus_one = gl.createBuffer();
     
     // well, these two buffers are small and simple... (used only in the density_2 program)
@@ -342,14 +347,16 @@ var WavesRenderer = function(debug){
 
     this._okey_to_part_rendered = new Map(); // this holds {mode, group_num, n_t, and canvas}. items here are pending
     this._n_t_to_okeys = []; // a list of sets. Items in _okey_to_part_rendered, appear in the set at index item.n_t
-    for(var ii=0; ii<n_c*(n_w-1); ii++)
+    for(let ii=0; ii<n_c*(n_w-1); ii++){
         this._n_t_to_okeys.push(new Set()); // slightly wasteful, but probably not terrible in the grand scheme of things
-    this._okey_to_rendered_options = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
+    }
+    this._okey_to_rendered = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
     this.show = 'y'; // currently you cannot toggle individual channels.
     this._timer = 0;
 }
 
 WavesRenderer.prototype._switch_to_flag_prog = function(){
+    var gl = this.gl;
     this._active_sub_prog = 'flag';
     this.gl.useProgram(this._prog_flag);
 
@@ -365,11 +372,12 @@ WavesRenderer.prototype._switch_to_flag_prog = function(){
     gl.vertexAttribPointer(this._locs_flag.is_t_plus_one, 1, gl.UNSIGNED_BYTE, true, 1, 0);     
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
     gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
-    gl.vertexAttribPointer(this._locs_density_1.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
+    gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
 
 }
 
 WavesRenderer.prototype._switch_to_density_1_prog = function(){
+    var gl = this.gl;
     this._active_sub_prog = 'density_1';
     gl.useProgram(this._prog_density_1);
 
@@ -385,7 +393,7 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, off_canv_w, off_canv_h, 0, gl.RGBA,  gl.FLOAT, null);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._off_fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + float_texture_register_ind, gl.TEXTURE_2D, this._off_texture, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
         throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
@@ -403,6 +411,7 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
 
 
 WavesRenderer.prototype._switch_to_density_2_prog = function(){
+    var gl = this.gl;
     this._active_sub_prog = 'density_2';
     gl.useProgram(this._prog_density_2);
     
@@ -417,29 +426,31 @@ WavesRenderer.prototype._switch_to_density_2_prog = function(){
     gl.activeTexture(gl.TEXTURE0 + float_texture_register_ind);
     gl.bindTexture(gl.TEXTURE_2D, this._off_texture); 
 
-    gl.uniform4fv(this._locs_density_2.normalising_factor, 1/this._n); 
+    gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n); 
     
-    gl.uniform1f(this._locs_density_2.oneTex,1/off_canv_w); 
     gl.disable(gl.BLEND); 
 }
 
 
 
 WavesRenderer.prototype._run_density_2_prog = function(){
+    var gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 WavesRenderer.prototype.set_n = function(n){
+    var gl = this.gl;
     this._n = n;
     if(this._active_sub_prog === 'density_2'){
-        gl.uniform4fv(this._locs_density_2.normalising_factor, 1/this._n); 
+        gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n); 
     } 
 
     // uploads an 2n-length vector to the gpu, the vector is of the form 0 1 0 1 ... 0 1
     var data = new Uint8Array(n*2);
-    for(var i=1;i<data.length;i+=2)
+    for(var i=1;i<data.length;i+=2){
         data[i] = 255;
+    }
 
     // upload to the gpu
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
@@ -453,42 +464,41 @@ WavesRenderer.prototype.set_mode = function(mode){
     }
 
     this._mode = mode;
-    if(this.current_prog === "flag"){
+    if(this._mode === "flag"){
         this._switch_to_flag_prog();
-    }else if(this.current_prog === "density"){
+    }else if(this._mode === "density"){
         this._switch_to_density_1_prog();
     } else {
         throw "unrecognised mode";
     }
 
     // update all the pending logic...
-    _deal_with_modified_okeys(this._okey_to_part_rendered.keys());
-    _deal_with_modified_okeys(this._okey_to_rendered_options.keys());
+    this._deal_with_modified_okeys(this._okey_to_part_rendered.keys());
+    this._deal_with_modified_okeys(this._okey_to_rendered.keys());
     this._render_metrics = undefined;
 }
 
 WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
+    var gl = this.gl;
     // the voltage data is pre-prepared exactly the way we wanted by the parse-data module.
     
     // The prepared_voltage data is really a concatenated list of many separate arrays,
     // where each array contains the data for all spikes at a specific channel-time, and is of
     // the form: v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)
     // note there are 1 fewer such arrays then time points on the wave, n_w.
-
-    for(var c=0; c<n_c; c++){ //for each channel
-        for(var t=0;t<n_w-1;t++){ //for each time point (except the last one)
-            //upload the current buffer to the gpu.  
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[(n_w-1)*c + t]);
-            gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data[(n_w-1)*c+t], gl.STATIC_DRAW); 
+    prepared_voltage_data = prepared_voltage_data ? new Int8Array(prepared_voltage_data.buffer) : new Uint8Array(0); // note we force it to be u8
+    for(let ii=0; ii<this._bufs_voltage.length; ii++){
+        //upload the current buffer to the gpu.  
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[ii]);
+        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data.subarray(ii *this._n*2, (ii+1) *this._n*2), gl.STATIC_DRAW); 
                                 //It is more static than the waves buffer, but it does change when we switch tets.
-        }
     }
 
     // note we don't set vertexAttribPointer here, because we do it multiple times
     // during the render
 }
 
-var _prepare_render_metrics = function(okeys, from_t, to_t){
+WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     // okeys is an array of objs, each with .akey property that gives a akey.
 
     var okeys = Array.from(okeys); // if it was a set, then make it an array with well-defined order
@@ -499,10 +509,10 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
     // the question is, how big is that something?
 
     var n_okeys = okeys.length;
-    var n_rows = Math.floor(off_canv_h/off_canv_wave_h); // TODO: we should really have a vertical gap between waves
+    var n_rows = Math.floor(off_canv_h/(off_canv_wave_h+off_canv_wave_gap)); // TODO: we should really have a vertical gap between waves
 
     var success = false;
-    for(var batch_t=from_t-to_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
+    for(var batch_t=to_t-from_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
         var n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
         if(n_okeys <= n_cols * n_rows){
             success = true;
@@ -518,10 +528,10 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
     var x_offset = new Uint16Array(n_rows*n_cols);
     var y_offset = new Uint16Array(n_rows*n_cols);
     
-    for(var row=0, p=0; row<n_rows; row++){
-        for(var col=0; col<n_cols; col++, p++){
-            x_offset[p] = col*(n_t*off_canv_dt + off_canv_wave_gap);
-            y_offset[p] = row*off_canv_wave_h;
+    for(let row=0, p=0; row<n_rows; row++){
+        for(let col=0; col<n_cols; col++, p++){
+            x_offset[p] = col*(batch_t*off_canv_dt + off_canv_wave_gap) + off_canv_wave_gap; // dunno why the +gap at the end, but it helps the first column
+            y_offset[p] = row*(off_canv_wave_h + off_canv_wave_gap);
         }
     }
 
@@ -535,20 +545,22 @@ var _prepare_render_metrics = function(okeys, from_t, to_t){
     }
 }
 
-var _upload_okey_data = function(){
+WavesRenderer.prototype._upload_okey_data = function(){
+    var gl = this.gl;
     // okeys is an array of objs, each with .akey property that gives a akey.
     // if render mode is flag it must also provide a .group_num property.
 
     // Convert easy pixel coords to the weird [-128, 127] x [-128, 127] coordinates.
     // we will be assigning two elements at a time, so lets use 16bit view
-    var okeys = this._render_metrics.okeys;
+    var render_metrics = this._render_metrics;
+    var okeys = render_metrics.okeys;
 
     var xy_offset_gl_i8 = new Int8Array(render_metrics.x_offset.length*2);
-    var xy_offset_gl_i16 = new Int8Array(xy_offset_gl_i8.buffer);  
+    var xy_offset_gl_i16 = new Int16Array(xy_offset_gl_i8.buffer);  
 
     for(var p=0; p<render_metrics.x_offset.length; p++){
-        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 255 - 128;
-        yy_offset_gl_i8[p*2+1] = 127 - render_metrics.y_offset[p]/off_canv_h * 255;
+        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256 - 128;
+        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256 - 128;
     }
 
     var m = Utils.typed_array_manager;
@@ -560,10 +572,10 @@ var _upload_okey_data = function(){
         var data_i16 = new Int16Array(data_i8.buffer);
         data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
         
-        for(var ii=0; ii<n_okeys; ii++){
-            var inds = m.get_array(okeys[ii].akey);
-            var xy = xy_offset_gl_i16[ii];
-            for(var jj=0; jj<inds.length; jj++){
+        for(let ii=0; ii<okeys.length; ii++){
+            let inds = m.get_array(okeys[ii].akey);
+            let xy = xy_offset_gl_i16[ii];
+            for(let jj=0; jj<inds.length; jj++){
                 data_i16[(inds[jj]<<2) +0] = xy;
                 data_i16[(inds[jj]<<2) +1] = xy;
             }
@@ -577,12 +589,12 @@ var _upload_okey_data = function(){
         var data_i16 = new Int16Array(data_i8.buffer);
         data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
 
-        for(var ii=0; ii<n_okeys; ii++){
-            var inds = m.get_array(okeys[ii].akey);
-            var xy = xy_offset_gl_i16[ii];
+        for(let ii=0; ii<okeys.length; ii++){
+            let inds = m.get_array(okeys[ii].akey);
+            let xy = xy_offset_gl_i16[ii];
             // TODO: check if bits are correct
-            var gx = okeys[ii].okey_num |  (xy & 0xff); 
-            var yg = (xy >> 8) | (okeys[ii].group_num << 8);
+            let gx = okeys[ii].group_num |  (xy << 8); 
+            let yg = ((0xff00 & xy) >>> 8) | (okeys[ii].group_num << 8);
             for(var jj=0; jj<inds.length; jj++){
                 data_i16[inds[jj]*3 +0] = xy;
                 data_i16[inds[jj]*3 +1] = gx;
@@ -600,7 +612,7 @@ var _upload_okey_data = function(){
         gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0);        
     }else{
         gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
-        gl.vertexAttribPointer(this._locs_density_1.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
+        gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
     }
 
 }
@@ -619,31 +631,33 @@ WavesRenderer.prototype._options_match = function(a, group_num){
 
 
 WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
+    // TODO: the plan has changed a bit. We must now send back any pre-existing
+    // valid canvases when we get a request for them.
     for(var ii=0; ii<okeys_modified.length; ii++){
         var okey = okeys_modified[ii];
-        if(this._options_match(this._okey_to_rendered_options[okey]),
+        if(this._options_match(this._okey_to_rendered.get(okey)),
             okey.group_num){
             // this matches the last canvas we sent, so abandon any partial render (if there was one)
             if(this._okey_to_part_rendered.has(okey)){
-                this._n_t_to_okeys[this._okey_to_part_rendered[okey].n_t].delete(okey);
+                this._n_t_to_okeys[this._okey_to_part_rendered.get(okey).n_t].delete(okey);
                 this._okey_to_part_rendered.delete(okey);
             }
         } if (!this._okey_to_part_rendered.has(okey)){
             // this is different to the last thing we renderd, and we weren't
             // previously planning on rendering it. So need to render from scratch
-            this._okey_to_part_rendered.add({
+            this._okey_to_part_rendered.set(okey, {
                 n_t: 0
             })
             this._n_t_to_okeys[0].add(okey);
-        } else if (this._options_match(this._okey_to_part_rendered[okey], 
+        } else if (this._options_match(this._okey_to_part_rendered.get(okey), 
             okey.group_num)){
             // this matches what we are already in the middle of trying to render,
             // so don't change anything
 
         } else {
             // we were trying to render this, but we now need to start again with new options
-            this._n_t_to_okeys[this._okey_to_part_rendered[okey].n_t].delete(okey);
-            this._okey_to_part_rendered[okey].n_t = 0;
+            this._n_t_to_okeys[this._okey_to_part_rendered.get(okey).n_t].delete(okey);
+            this._okey_to_part_rendered.get(okey).n_t = 0;
             this._n_t_to_okeys[0].add(okey);
         }
 
@@ -652,26 +666,23 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
 
 WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, okeys_modified){
     // okeys_modified is used when group_num changes for an existing okey
-    // note how _okey_to_rendered_options is a map defining both the pending okeys, 
+    // note how _okey_to_rendered is a map defining both the pending okeys, 
     // and their current state of render. When we are done rendering the canvas
-    // is sent to the polymer-element, and the settings are stored in _okey_to_rendered_options.
+    // is sent to the polymer-element, and the settings are stored in _okey_to_rendered.
 
-
-    for(var ii=0; ii<okeys_to_remove.length; ii++){
-        var okey = okeys_to_remove[ii];
-        this._okey_to_rendered_options.delete(okey);
-        var part = this._okey_to_part_rendered[okey];
+    for(let okey of okeys_to_remove){
+        this._okey_to_rendered.delete(okey);
+        let part = this._okey_to_part_rendered.get(okey);
         if(part){
             this._n_t_to_okeys[part.n_t].delete(okey);
             this._okey_to_part_rendered.delete(okey);
         }
     }
 
-    for(var ii=0; ii<okeys_to_add.length; ii++){
-        var okey = okeys_to_add[ii];
-        this._okey_to_part_rendered[okey] = {
+    for(let okey of okeys_to_add){
+        this._okey_to_part_rendered.set(okey, {
             n_t: 0
-        };
+        });
         this._n_t_to_okeys[0].add(okey);
     }
 
@@ -700,6 +711,7 @@ WavesRenderer.prototype._touch_timer = function(){
 
 WavesRenderer.prototype._timer_tick = function(){
     // This is the where the main render takes place.
+    this._timer = 0;
 
     // TODO: we really don't need this mode-switching stuff here, 
     // though it's not a big deal I suppose.
@@ -714,14 +726,15 @@ WavesRenderer.prototype._timer_tick = function(){
     }
 
     if(!this._render_metrics){
+        let from_t, to_t;
         // okeys were modified since the last tick, so find the
         // first set of okeys to render, and prepare their render metrics...
-        for(var from_t=0; from_t<n_c*(n_w-1); from_t++){
+        for(from_t=0; from_t<n_c*(n_w-1); from_t++){
             if(this._n_t_to_okeys[from_t].size){
                 break;
             }
         }
-        for(var to_t=from_t+1; to_t<n_c*(n_w-1); to_t++){
+        for(to_t=from_t+1; to_t<n_c*(n_w-1); to_t++){
             if(this._n_t_to_okeys[to_t].size){
                 break;
             }
@@ -745,38 +758,44 @@ WavesRenderer.prototype._timer_tick = function(){
     var width = (end_t - from_t) * off_canv_dt;
     var x_offsets = this._render_metrics.x_offset;
     var y_offsets = this._render_metrics.y_offset;  
-    for(var ii=0; ii<okeys.length; ii++){
-        var okey = okeys[ii];
-        var part = this._okey_to_part_rendered[okey];
+    for(let ii=0; ii<okeys.length; ii++){
+        let okey = okeys[ii];
+        let part = this._okey_to_part_rendered.get(okey);
         if(!part.el_canv){
             part.el_canv = document.createElement('canvas');
             part.el_canv.width = off_canv_dt*n_c*(n_w-1);
             part.el_canv.height = off_canv_wave_h;
+            part.el_canv.style.width = on_canv_width + 'px';
+            part.el_canv.style.height = on_canv_height + 'px';
             part.ctx = part.el_canv.getContext('2d');
         }
-        part.ctx.drawImage(this.el_off_canv, x_offsets[ii], y_offsets[ii]-off_canv_wave_h,
+        part.ctx.drawImage(this.el_off_canv, x_offsets[ii], y_offsets[ii],
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
     }
 
     // record that the okeys have now increaed their n_t
     if(end_t < n_c*(n_w-1)){
         // more work to do still...
-        for(var ii=0; ii<okeys.length; ii++){
-            var okey = okeys[ii];
-            this._okey_to_part_rendered[okey].n_t = end_t;
+        for(let okey of okeys){
+            this._okey_to_part_rendered.get(okey).n_t = end_t;
             this._n_t_to_okeys[end_t].add(okey);
         }   
     } else {
-        // finished rendering (everything)...
-        for(var ii=0; ii<okeys.length; ii++){
-            var okey = okeys[ii];
-            this._okey_to_part_rendered.delete(okey);
-            this._okey_to_rendered_options[okey] = {
+        // finished rendering (everything). Note that the results should be absolutely up to date
+        // because we're on the same thread as main and get notifications about changes to groups etc..
+        let results = new Map();
+        for(let okey of okeys){
+            let item =  {
                 mode: this.mode,
-                group_num: okey.group_num
+                group_num: okey.group_num,
+                el_canv: this._okey_to_part_rendered.get(okey).el_canv
             };
-            // TODO: send finished canvas to main
+            this._okey_to_rendered.set(okey, item);
+            this._okey_to_part_rendered.delete(okey);
+            results.set(okey, item.el_canv);
         }
+        this._callback(results)
+
     }
     this._n_t_to_okeys[this._render_metrics.from_t].clear();
 
@@ -808,34 +827,35 @@ WavesRenderer.prototype._timer_tick = function(){
         this._render_metrics.from_t += this._render_metrics.batch_t;
     }
 
+    //return; //debug
     this._touch_timer(); // and so it continues...
 }
 
 WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
-    var gl = this._gl;
+    var gl = this.gl;
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
 
-    for(var t=from_t; t<end_t; t++){
-        gl.uniform1f(this._locs_flag.t_x_offset, off_canv_dt*t/off_canv_w*2); 
+    for(let t=from_t; t<end_t; t++){
+        gl.uniform1f(this._locs_flag.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffs.voltage[t]);
-        gl.vertexAttribPointer(this._locs_flag.voltage, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
+        gl.vertexAttribPointer(this._locs_flag.voltage, 1, gl.BYTE, true, 1, 0); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 }
 
 WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
     this._switch_to_density_1_prog();
-    var gl = this._gl;
+    var gl = this.gl;
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
 
-    for(var t=from_t; t<end_t; t++){
-        gl.uniform1f(this._locs_density_1.t_x_offset, off_canv_dt*t/off_canv_w*2); 
+    for(let t=from_t; t<end_t; t++){
+        gl.uniform1f(this._locs_density_1.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffs.voltage[t]);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, 0); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 
@@ -844,9 +864,13 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
 }
 
 WavesRenderer.prototype.debug_show_off_canv = function(){
-    this.el_off_canv.style.position = 'absolute';
-    this.el_off_canv.style.left = "800px";
+    this.el_off_canv.style.position = 'fixed';
+    this.el_off_canv.style.right = "0px";
+    this.el_off_canv.style.bottom = "0px";
     this.el_off_canv.style.background = "#fff";
+    this.el_off_canv.style.border = "1px solid #f00";
+    this.el_off_canv.style.transform = 'scale(0.5)';
+    this.el_off_canv.style.transformOrigin = 'bottom right';
     document.body.appendChild(this.el_off_canv);
 }
 
@@ -861,7 +885,8 @@ Polymer({
     properties: {
         palette_mode: {
             type: String,
-            value: "density"
+            value: "density",
+            notify: true
         },
         show_chans: {
             type: String,
@@ -871,36 +896,33 @@ Polymer({
         groups: {
             type: Array,
             value: function(){return [];},
-            notify: true
+            notify: true,
+            observer: '_groups_set'
         },
         data_for_gl: {
             type: Object,
-            value: function(){return {};} // has n value and typed-array-manager id for gl voltages
+            value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
+            notify: true
         },
     },
     observers: [
-        '_groups_set(groups)',
         '_groups_spliced(groups.splices)',
-        '_palette_mode_changed(mode)',
+        '_palette_mode_changed(palette_mode)',
         '_show_chans_changed(show_chans)',
         '_data_for_gl_changed(data_for_gl)'
-        // TODO: send modified okeys when group_num changes on existing okey
-    ],
-    created: function(){
-        this.okey_to_canvas = new Map(); // this is not weak, because we need to free canvas-manger id's
-        this.okey_to_rendered_options = {};
+        // TODO: send modified okeys when group_num changes on existing okey ...or work it out from splice notifcations
+    ], created: function(){
+        this._okey_to_ckey = new Map(); // this is not weak, because we need to free canvas-manger id's
         try{
-            this._renderer = new WavesRenderer();
+            this._renderer = new WavesRenderer(this._okey_rendered.bind(this));
         } catch (e){
             console.log("failed to create renderer....\n" + e);
         }
-    },
-    data_for_gl_changed: function(){
+    }, _data_for_gl_changed: function(){
         var am = Utils.typed_array_manager;
-        this._renderer.set_n(this.data_for_gl.n);
-        this._renderer.set_voltage_data(am.get_array(this.data_for_gl.voltages));   
-    },
-    _show_chans_changed: function(){
+        this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
+        this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
+    }, _show_chans_changed: function(){
         // note that unlike in rm/tac-plots, we let the renderer deal
         // with the complexities of show/hide, i.e. _update_okeys always
         // sends it the full update lists.  That's because sending messages
@@ -913,44 +935,59 @@ Polymer({
             this.set('show_chans', 'yyyy');
             console.log("currently channels cannot be toggled individually");
         }
-    },
-    _palette_mode_changed: function(){
-        this._renderer.set_mode(this._palette_mode);
-    },
-    _update_okeys: function(okeys_to_remove, okeys_to_add){
+    }, _palette_mode_changed: function(){
+        this._renderer.set_mode(this.palette_mode);
+    }, _update_okeys: function(okeys_to_remove, okeys_to_add){
         var cm = Utils.canvas_manager;
 
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
-        for(var ii=0; ii<okeys_to_remove.length; ii++){
-            var key = okeys_to_remove[ii];
-            var canvas = this.okey_to_canvas[key];
-            if(canvas){
-                cm.free_canvas(canvas);
+        for(let okey of okeys_to_remove){
+            let ckey = this._okey_to_ckey.get(okey);
+            if(ckey){
+                cm.free_canvas(ckey);
             }
-            delete this.okey_to_canvas[key];
-            delete this.okey_to_rendered_options[key];
+            this._okey_to_ckey.delete(okey);
         }
-
+        okeys_to_add = okeys_to_add.filter(function(okey){
+            return okey ? 1 : 0;
+        });
         this._renderer.update_okeys(okeys_to_remove, okeys_to_add, []); 
 
-    },
-    _groups_set: function(new_val, old_val){
+    }, _groups_set: function(new_val, old_val){
         this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
         this._update_okeys(old_val || [], new_val || [], []);
-    },
-    _groups_spliced: function(splices){
+    }, _groups_spliced: function(splices){
         if(!splices) return;
         var dedupes = Utils.dedupe(splices.keySplices);
         var removed = [];
         var added = [];
-        for(var ii=0; ii>dedupes.removed.length; ii++){
-            removed.push(this.groups_collection.getItem(dedupes.removed[ii]));
+        for(let key of dedupes.removed){
+            removed.push(this.groups_collection.getItem(key));
         }
-        for(var ii=0; ii>dedupes.added.length; ii++){
-            added.push(this.groups_collection.getItem(dedupes.added[ii]));
+        for(let key of dedupes.added){
+            added.push(this.groups_collection.getItem(key));
         }
-        this._update_keys(removed, added);
+        this._update_okeys(removed, added);
+    }, _okey_rendered: function(results){
+        // results is a map from okey to canvas.
+        var cm = Utils.canvas_manager;
+        for(let [okey, el_canvas] of results){
+            let key = this.groups_collection.getKey(okey);
+            if(!key){
+                throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
+            }
+            let ckey_old = this._okey_to_ckey.get(okey);
+            let ckey;
+            if(ckey_old && cm.get_canvas(ckey_old) === el_canvas){
+                ckey = ckey_old; // renderer was able to reuse a previously rendered canvas
+            } else {
+                ckey_old && cm.free_canvas(ckey_old);  // if there was an old canvas, free it, because there's a new one now
+                ckey = cm.store_canvas(el_canvas);
+                this._okey_to_ckey.set(okey, ckey);
+            }
+            this.set('groups.' + key + '.waves', ckey);            
+        }
     }
 });
 

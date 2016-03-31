@@ -65,13 +65,14 @@ groups is an array of objects with the following properties:
                 spike_times="[[spike_times]]"
                 show="[[options.show_tac]]"></tac-plots> 
     <wave-plots groups="{{groups}}" 
-                voltages_for_gl="[[voltages_for_gl]]"
+                data_for_gl="[[data_for_gl]]"
                 palette_mode="[[options.waves_render_mode]]"
                 show_chans="[[options.show_waves]]"></wave-plots> 
     
 
     <template is="dom-repeat" items="[[groups]]">
         <tile-element 
+            style$="[[_show(item)]]"
             group_num="[[index]]"
             group_n="[[item.n_spikes]]"
             group_spa_max="[[item.spa_max]]"
@@ -82,7 +83,6 @@ groups is an array of objects with the following properties:
             waves="[[item.waves]]"
             ></tile-element>        
     </template>
-
 </template>
 
 
@@ -134,6 +134,8 @@ groups is an array of objects with the following properties:
         ],
         groups_modified: function(change){
             console.log("tile-wall detected groups change")
+        }, _show: function(v){
+            return v ? '' : 'display: none;';
         }
     });
 </script>

@@ -169,8 +169,13 @@ var make_all_keys_pending = function(){
 
 var update_keys = function(changes, arrays){
 
-    if(changes.generation_remove !== key_generation)
-        throw "key generation mismatch";
+    if(changes.generation_remove !== key_generation){
+        changes.remove_keys = [];
+        key_to_array.clear();
+        key_to_rendered_options.clear();
+        keys_pending_render = [];
+        console.log("rm-plots worker: key generation mismatch");
+    }
 
     // note we don't both to remove keys from the pending list
     // unless we change key generation, in which case we drop 
@@ -631,17 +636,17 @@ var is_equal_simple = function(a, b){
         ],
         created: function(){
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
-            this.worker = worker_builder.create_for(this);
-            this.key_to_spa_canvas = {};
-            this.key_to_dir_canvas = {};
-            this.key_to_speed_canvas = {};
-            this.key_to_rendered_options = {};
-            this.key_is_on_worker = {};
-            this.key_generation = 0;
-            this.times_is_on_worker = false;
-            this.pos_xy_is_on_worker = false;
-            this.pos_dir_is_on_worker = false;
-            this.pos_speed_is_on_worker = false;
+            this._worker = worker_builder.create_for(this);
+            this._key_to_spa_canvas = new Map();
+            this._key_to_dir_canvas = new Map();
+            this._key_to_speed_canvas = new Map();
+            this._key_to_rendered_options = new Map();
+            this._key_is_on_worker = new Map();
+            this._key_generation = 0;
+            this._times_is_on_worker = false;
+            this._pos_xy_is_on_worker = false;
+            this._pos_dir_is_on_worker = false;
+            this._pos_speed_is_on_worker = false;
         },
         _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
@@ -650,24 +655,25 @@ var is_equal_simple = function(a, b){
             var added_arrays = {};
             if (this.show !== 'nnn'){
                 // get clones of new arrays to send to worker
-                for(let ii=0; ii<keys_to_add.length; ii++){
-                    var key = keys_to_add[ii];
-                    var akey = this.groups_collection.getItem(key).inds;
-                    added_arrays[key] = am.get_array_clone(akey);
-                    this.key_is_on_worker[key] = true;
+                for(let key of keys_to_add){
+                    let box = this.groups_collection.getItem(key);
+                    if(box){
+                        added_arrays[key] = am.get_array_clone(box.akey);
+                        this._key_is_on_worker.set(key, true);
+                    }
                 }
             } else {
                 // if we are not showing the plots, we don't actually get 
                 // any arrays, but we need to remmeber that we never sent them
                 // to the worker.
-                for(let ii=0; ii<keys_to_add.length; ii++){
-                    this.key_is_on_worker[key] = false;
+                for(let key of keys_to_add){
+                    this._key_is_on_worker.set(key, false);
                 }
                 keys_to_add = [];
             }
 
             // inform worker of the new/deleted arrays
-            this.worker.exec_b('update_keys', {
+            this._worker.exec_b('update_keys', {
                 add: keys_to_add,
                 remove: keys_to_remove,
                 generation_remove: generation_remove,
@@ -678,27 +684,27 @@ var is_equal_simple = function(a, b){
             // freeing the inds arrays was the responsibility of cut-obj.
             for(let ii=0; ii<keys_to_remove.length; ii++){
                 let key = keys_to_remove[ii];
-                let c1 = this.key_to_spa_canvas[key];
+                let c1 = this._key_to_spa_canvas.get(key);
                 if(c1){
                     cm.free_canvas(c1);
-                    delete this.key_to_spa_canvas[key];
+                    this._key_to_spa_canvas.delete(key);
                 }
-                let c2 = this.key_to_dir_canvas[key];
+                let c2 = this._key_to_dir_canvas.get(key);
                 if(c2){
                     cm.free_canvas(c2);
-                    delete this.key_to_dir_canvas[key];
+                    this._key_to_dir_canvas.delete(key);
                 }
-                let c3 = this.key_to_speed_canvas[key];
+                let c3 = this._key_to_speed_canvas.get(key);
                 if(c3){
                     cm.free_canvas(c3);
-                    delete this.key_to_speed_canvas[key];
+                    this._key_to_speed_canvas.delete(key);
                 }
-                delete this.key_to_rendered_options[key];
-                delete this.key_is_on_worker[key]; // we can also forget this
+                this._key_to_rendered_options.delete(key);
+                this._key_is_on_worker.delete(key); // we can also forget this
             }
         },
         _options_modified: function(){
-            this.worker.exec('set_options', {
+            this._worker.exec('set_options', {
                 cm_per_spa_bin: this.cm_per_spa_bin,
                 smoothing_spa_bins: this.smoothing_spa_bins,
                 max_rate_spa: this.max_rate_spa,
@@ -712,29 +718,30 @@ var is_equal_simple = function(a, b){
             this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
             var added = this.groups_collection ? 
                             this.groups_collection.getKeys() : []; 
-            this._update_keys(removed, added, this.key_generation, ++this.key_generation); // added keys are for a new generation
+            this._update_keys(removed, added, this._key_generation, ++this._key_generation); // added keys are for a new generation
         },
         _groups_spliced: function(splices){
             if(!splices) return;
             var dedupes = Utils.dedupe(splices.keySplices);
-            this._update_keys(dedupes.removed, dedupes.added, this.key_generation, this.key_generation);
+            this._update_keys(dedupes.removed, dedupes.added, this._key_generation, this._key_generation);
         },
         _show_changed: function(){
             if(this.show !== 'nnn'){    
-                var added = Object.keys(this.key_is_on_worker).filter(function(k){
-                    return !this.key_is_on_worker[k];
-                }, this);
-                this._update_keys([], added, this.key_generation, this.key_generation);
-                if(!this.times_is_on_worker){
+                var added = [];
+                for(let [k, v] of this._key_is_on_worker) if(!v){
+                    added.push(k);
+                }
+                this._update_keys([], added, this._key_generation, this._key_generation);
+                if(!this._times_is_on_worker){
                     this._times_modified();
                 }
-                if(this.show[0] === 'y' && !this.pos_xy_is_on_worker){
+                if(this.show[0] === 'y' && !this._pos_xy_is_on_worker){
                     this._pos_xy_modified();
                 }
-                if(this.show[1] === 'y' && !this.pos_dir_is_on_worker){
+                if(this.show[1] === 'y' && !this._pos_dir_is_on_worker){
                     this._pos_dir_modified();
                 }
-                if(this.show[2] === 'y' && !this.pos_speed_is_on_worker){
+                if(this.show[2] === 'y' && !this._pos_speed_is_on_worker){
                     this._pos_speed_modified();
                 }
             } else if (!this.show.match(/^[yn]{3}$/)){
@@ -742,76 +749,76 @@ var is_equal_simple = function(a, b){
             } else {
                 throw "invalid value for show";
             }
-            if(this.worker){
-                this.worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
+            if(this._worker){
+                this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
             }
         },
         _pos_xy_modified: function(){
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     var arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.data);
-                    this.worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
+                    this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
                 } else {
-                    if(!this.worker) return;
-                    this.worker.exec('set_pos_xy', {});
+                    if(!this._worker) return;
+                    this._worker.exec('set_pos_xy', {});
                 }
-                this.pos_xy_is_on_worker = true;
+                this._pos_xy_is_on_worker = true;
             } else {
-                if(!this.pos_xy && this.pos_xy_is_on_worker){
-                    this.worker.exec('set_pos_xy', {});
+                if(!this.pos_xy && this._pos_xy_is_on_worker){
+                    this._worker.exec('set_pos_xy', {});
                 }
-                this.pos_xy_is_on_worker = false;
+                this._pos_xy_is_on_worker = false;
             }
         },
         _pos_dir_modified: function(){
             if(this.show && this.show[1] === 'y'){
                 if(this.pos_dir){
                     var arr = Utils.typed_array_manager.get_array_clone(this.pos_dir.data);
-                    this.worker.exec_b('set_pos_dir', this.pos_dir.timebase, {data: arr});
+                    this._worker.exec_b('set_pos_dir', this.pos_dir.timebase, {data: arr});
                 } else {
-                    if(!this.worker) return;
-                    this.worker.exec('set_pos_dir', {});
+                    if(!this._worker) return;
+                    this._worker.exec('set_pos_dir', {});
                 }
-                this.pos_dir_is_on_worker = true;
+                this._pos_dir_is_on_worker = true;
             } else {
-                if(!this.pos_dir && this.pos_dir_is_on_worker){
-                    this.worker.exec('set_pos_dir', {});
+                if(!this.pos_dir && this._pos_dir_is_on_worker){
+                    this._worker.exec('set_pos_dir', {});
                 }
-                this.pos_dir_is_on_worker = false;
+                this._pos_dir_is_on_worker = false;
             }
         },
         _pos_speed_modified: function(){
             if(this.show && this.show[2] === 'y'){
                 if(this.pos_speed){
                     var arr = Utils.typed_array_manager.get_array_clone(this.pos_speed.data);
-                    this.worker.exec_b('set_pos_speed', this.pos_speed.timebase, {data: arr});
+                    this._worker.exec_b('set_pos_speed', this.pos_speed.timebase, {data: arr});
                 } else {
-                    if(!this.worker) return;
-                    this.worker.exec('set_pos_speed', {});
+                    if(!this._worker) return;
+                    this._worker.exec('set_pos_speed', {});
                 }
-                this.pos_speed_is_on_worker = true;
+                this._pos_speed_is_on_worker = true;
             } else {
-                if(!this.pos_speed && this.pos_speed_is_on_worker){
-                    this.worker.exec('set_pos_speed', {});
+                if(!this.pos_speed && this._pos_speed_is_on_worker){
+                    this._worker.exec('set_pos_speed', {});
                 }
-                this.pos_speed_is_on_worker = false;
+                this._pos_speed_is_on_worker = false;
             }
         },
          _times_modified: function(){
             if(this.show !== 'nnn'){
                 if(this.spike_times){
                     var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.data);
-                    this.worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
+                    this._worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
                 } else {
-                    if(!this.worker) return;
-                    this.worker.exec('set_spike_times', {});
+                    if(!this._worker) return;
+                    this._worker.exec('set_spike_times', {});
                 }
-                this.times_is_on_worker = true;
+                this._times_is_on_worker = true;
             } else {
-                if(!this.spike_times && this.times_is_on_worker){
-                    this.worker.exec('set_spike_times', {});
+                if(!this.spike_times && this._times_is_on_worker){
+                    this._worker.exec('set_spike_times', {});
                 }
-                this.times_is_on_worker = false;
+                this._times_is_on_worker = false;
             }
         }
     });

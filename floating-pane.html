@@ -129,7 +129,7 @@ Polymer({
             }
         }, true);
         init_x += 100;
-        this._translate(init_x, 100); // not sure this is that helpful, but hey
+        this._translate(init_x, 400); // not sure this is that helpful, but hey
     }, _on_mouseup: function(e){
         this.style.display = 'none';
     }, _on_drag_start: function(e){
@@ -157,7 +157,7 @@ Polymer({
         document.removeEventListener('mousemove', this._on_drag_move_bound, true);
         document.removeEventListener('mouseup', this._on_drag_end_bound, true); 
     }, _translate: function(x, y){
-        this.style.webkitTransform = 'translate(' + x + "px, " + y + "px)";
+        this.transform('translate(' + x + "px, " + y + "px)");
     }, _wide: function(v){
         return v ? "wide" : "";
     }

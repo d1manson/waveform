@@ -211,6 +211,10 @@ Utils.canvas_manager = (function(){
             store.set(++last_ckey, el);
             return last_ckey + suffix;
         },
+        store_canvas: function(c){
+            store.set(++last_ckey, c);
+            return last_ckey + suffix;
+        },
         get_canvas: function(id){
             return validate_id(id) && store.get(parseInt(id));
         },
