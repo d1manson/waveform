@@ -103,7 +103,7 @@ var ports = {};
 var pending_files = {};
 var pending_fkeys = {};
 var pending_options = {};
-var types = new Set(['tet', 'set', 'pos', 'cut']); // this is the priority order
+var types = ['tet', 'set', 'pos', 'cut']; // this is the priority order
 var parsers_cached_fkeys = {
     tet: new Set(), // tracks which fkeys tet worker currently holds in its cache buffers
     pos: new Set() // same for pos
@@ -1239,10 +1239,6 @@ var parse_clu_file = function(full_str, fkey){
     Polymer({
     	is:'parsed-data',
     	properties: {
-            file_organiser_id: {
-                type: String,
-                value: ""
-            },
             selected_files: {
                 type: Object,
                 value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
@@ -1351,11 +1347,7 @@ var parse_clu_file = function(full_str, fkey){
     	}, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
             '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
-        ],
-        attached: function(){
-            this._file_org = document.getElementById(this.file_organiser_id);
-        },
-        created: function(){
+        ], created: function(){
             this._files = {}; // set, tet, pos, cut
             this._cut_from_fkey = new Map();
             this._set_from_fkey = new Map();
@@ -1390,17 +1382,14 @@ var parse_clu_file = function(full_str, fkey){
             this._worker_io.send_ports(ports_for_io);
 
         }, _change_to_files: function(new_fkeys, old_fkeys){
-            if(!this._file_org){
-                return;
-            }
-
             // nullify things that are chaning...
+            old_fkeys = old_fkeys || {};
             var changing = new Set(['tet','cut','pos','set']);
             for(let k of changing){
                 if(old_fkeys[k] && old_fkeys[k] === new_fkeys[k]){
                     changing.delete(k);
                 } else {
-                    this._files[k] = this._file_org.get_file(new_fkeys[k]) || null;
+                    this._files[k] = Utils.file_manager.get_file(new_fkeys[k]) || null;
                 }
             }
 
@@ -1490,7 +1479,7 @@ var parse_clu_file = function(full_str, fkey){
                 pos: options
             });
         }, got_pos: function(msg, arrays){
-            var am = window.typed_array_manager;
+            var am = Utils.typed_array_manager;
             var result = {
                 xy: am.store_array(arrays['xy']),
                 dir: am.store_array(arrays['dir']),
@@ -1562,7 +1551,7 @@ var parse_clu_file = function(full_str, fkey){
             this._make_tet_request(this.selected_files.tet, this._files.tet, request, options);
             this._worker_io.exec('read_files', request, options); 
         }, cut_file_parsed: function(msg, arrays){
-            var am = window.typed_array_manager;
+            var am = Utils.typed_array_manager;
             this._cut_from_fkey.set(msg.fkey,{
                 header: msg.header,
                 cut: am.store_array(arrays['cut'])
@@ -1583,7 +1572,7 @@ var parse_clu_file = function(full_str, fkey){
                 smoothing_secs: this.pos_smoothing_s
             }
         }, got_gl_data: function(msg, arrays){
-            var am = window.typed_array_manager;
+            var am = Utils.typed_array_manager;
             var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
                 cached = {};
@@ -1597,7 +1586,7 @@ var parse_clu_file = function(full_str, fkey){
                 this._setData_for_gl(cached.gl_data);
             }
         }, got_amplitudes: function(msg, arrays){
-            var am = window.typed_array_manager;
+            var am = Utils.typed_array_manager;
             var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
                 cached = {};
@@ -1611,7 +1600,7 @@ var parse_clu_file = function(full_str, fkey){
                 this._setAmplitudes(cached.amps);
             }
         }, got_times: function(msg, arrays){
-            var am = window.typed_array_manager;
+            var am = Utils.typed_array_manager;
             var cached = this._tet_from_fkey.get(msg.fkey);
             if(!cached){
                 cached = {};

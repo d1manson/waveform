@@ -58,6 +58,8 @@ TODO: it may possibly be worth using an object pool, free list type thing.
       similar things at heart, they just store different data, and the canavas-manger offers
       some extra helper methods on top of the basic storage (ie. create canvas stuff).
 
+TODO: update comments
+
 -->
 
 
@@ -82,74 +84,9 @@ Polymer({
         if(old)
             Polymer.dom(this.root).removeChild(old);
         if(window.canvas_manager && this.canv_id !== "")
-            Polymer.dom(this.root).appendChild(window.canvas_manager.get_canvas(this.canv_id));
+            Polymer.dom(this.root).appendChild(Utils.canvas_manager.get_canvas(this.canv_id));
     }
 });
 
 </script>
-</dom-module>
-
-<dom-module id="canvas-manager">
-<template>
-</template>
-<script>
-
-"use strict";
-
-(function(){
-
-    var canv_els = {};
-    var last_id = 0;
-    var suffix = " (canvas-manager)"; // can drop suffix using parseInt
-    var validate_id = function(id){
-        if((id + "").indexOf(suffix) === -1)
-            throw "canvas-manager was passed invalid id";
-        return true;
-    }
-
-    Polymer({
-        is:'canvas-manager',
-        properties: {},
-        observers: [],
-        created: function() {
-            if (!window.canvas_manager)
-                window.canvas_manager = this;
-            // note that we don't use "this" anywhere else, because all the state is kept 
-            // using the closure, not using the polymer element.  This means we have a singleton.
-        },
-        create_from_buffer: function(buffer, dims){
-            var el = document.createElement("canvas");
-            el.width = dims[0];
-            el.height = dims[1];
-            var ctx = el.getContext('2d');
-
-            var im_data = ctx.createImageData(dims[0], dims[1]);
-            im_data.data.set(new Uint8ClampedArray(buffer));
-            ctx.putImageData(im_data, 0, 0);
-            canv_els[++last_id] = el;
-            return last_id + suffix;
-        },
-        create_from_dims: function(dims){
-            var el = document.createElement("canvas");
-            el.width = dims[0];
-            el.height = dims[1];
-            canv_els[++last_id] = el;
-            return last_id + suffix;
-        },
-        get_canvas: function(id){
-            return validate_id(id) && canv_els[parseInt(id)];
-        },
-        get_2d_ctx: function(id){
-            return validate_id(id) && canv_els[parseInt(id)].getContext('2d');
-        },
-        free_canvas: function(id){
-            validate_id(id);
-            delete canv_els[parseInt(id)];
-        }
-    });
-
-})();
-</script>
-
-  
 </dom-module>

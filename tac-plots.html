@@ -24,6 +24,7 @@ thought it had already delivered.
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="worker-builder.html">
 <link rel="import" href="utils.html">
+<link rel="import" href="managed-canvas.html">
 
 <dom-module id="tac-plots">
 
@@ -241,8 +242,8 @@ var is_equal_simple = function(a, b){
             this.times_is_on_worker = false;
         },
         _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
-            var am = window.typed_array_manager;
-            var cm = window.canvas_manager;
+            var am = Utils.typed_array_manager;
+            var cm = Utils.canvas_manager;
 
             var added_arrays = {};
             if (this.show === 'y'){
@@ -305,7 +306,7 @@ var is_equal_simple = function(a, b){
         _times_modified: function(){
             if(this.show === 'y'){
                 if(this.spike_times){
-                    var arr = window.typed_array_manager.get_array_clone(this.spike_times.data);
+                    var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.data);
                     this.worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
                 } else {
                     if(!this.worker) return;

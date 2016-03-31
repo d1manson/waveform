@@ -48,6 +48,10 @@ data if you wanted to observe the limitations of the 32bit precision.
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="palettes.html">
+<link rel="import" href="managed-canvas.html">
+<link rel="import" href="utils.html">
+
+
 
 <dom-module id="wave-plots">
 
@@ -547,7 +551,7 @@ var _upload_okey_data = function(){
 		yy_offset_gl_i8[p*2+1] = 127 - render_metrics.y_offset[p]/off_canv_h * 255;
 	}
 
-	var m = window.typed_array_manager;
+	var m = Utils.typed_array_manager;
 
 	if(this._mode === 'density'){
 		// just need to provide x and y
@@ -892,7 +896,7 @@ Polymer({
 		}
 	},
 	data_for_gl_changed: function(){
-		var am = window.typed_array_manager;
+		var am = Utils.typed_array_manager;
 		this._renderer.set_n(this.data_for_gl.n);
 		this._renderer.set_voltage_data(am.get_array(this.data_for_gl.voltages));	
 	},
@@ -914,7 +918,7 @@ Polymer({
 		this._renderer.set_mode(this._palette_mode);
 	},
 	_update_okeys: function(okeys_to_remove, okeys_to_add){
-        var cm = window.canvas_manager;
+        var cm = Utils.canvas_manager;
 
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.

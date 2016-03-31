@@ -263,7 +263,6 @@ Polymer({
 		this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
 		this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
 		this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
-		this._file_from_fkey = [undefined]; // fkeys are simple numerical indices, >0
 		this._trial_from_base = new Map();
 		document.addEventListener("dragover", this._dragover.bind(this));
 	    document.addEventListener("drop", this._drop.bind(this));
@@ -277,7 +276,7 @@ Polymer({
 	    });
     }, _update_trial_selection: function(){
     	var new_sel = this.$.trial_list.selectedItem;
-    	var old_sel = this._trial_from_base[this.selected_trial];
+    	var old_sel = this._trial_from_base.get(this.selected_trial);
     	if(!new_sel && old_sel){
     		this.$.trial_list.selectItem(old_sel);
     	} else if(new_sel === old_sel){
@@ -308,7 +307,7 @@ Polymer({
     	this.set('selected_cut', model.cut.cut);
     	//e.stopPropagation();
     }, _select_default_cut: function(){
-		var trial = this._trial_from_base[this.selected_trial];
+		var trial = this._trial_from_base.get(this.selected_trial);
     	if(trial){
 	    	var tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
 	    	if(tet_obj){
@@ -335,7 +334,7 @@ Polymer({
     }, _switched_selection: function(){
     	// called via debounce when trial/tet/cut is changed
 
-    	var trial = this._trial_from_base[this.selected_trial];
+    	var trial = this._trial_from_base.get(this.selected_trial);
     	var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
     	var cut = this.selected_cut;
     	var title = this.selected_trial + " [Wavform]" || "Waveform";
@@ -343,6 +342,7 @@ Polymer({
     	url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
     	url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
     	window.history.pushState("", title,  url);
+    	document.title = title;
     	this._setSelected_files({
 			set: trial && trial.set ? trial.set : 0,
 			pos: trial && trial.pos ? trial.pos : 0,
@@ -363,7 +363,7 @@ Polymer({
 
         // get lists of pos,set,tet files for each trial, and a single list of all cut files
         // and also store a reference to all those files by fkey
-        for(let ii=0; ii<files.length; ii++){
+        for(let ii=0; ii< files.length; ii++){
         	let ff = files[ii];
         	let fname = ff.name;
             let ext = regex_file_ext.exec(fname);
@@ -397,11 +397,14 @@ Polymer({
 				}
 
 				// store permanent reference to the file
-	        	let fkey = this._file_from_fkey.length;
-				this._file_from_fkey.push(files[ii]);
+	        	let fkey = Utils.file_manager.store_file(files[ii]);
 				if(base){
 					// unless it was a cut, we now know the base ok...
-					let trial_files = files_for_base[base] = files_for_base[base] || new Set();
+					let trial_files = files_for_base.get(base);
+					if(!trial_files){
+						trial_files = new Set();
+						files_for_base.set(base, trial_files);
+					}
 					trial_files.add(fkey);
 				}
 			}
@@ -409,10 +412,12 @@ Polymer({
 		
 		// try and assign cuts based on available trial bases (from this and previous drops)
 		var all_bases = new Set();
-		for(let b in this._trial_from_base)
+		for(let [b, ignore] of this._trial_from_base){
 			all_bases.add(b);
-		for(let b in files_for_base)
+		}
+		for(let [b, ignore] of files_for_base){
 			all_bases.add(b);
+		}
 		var re = Utils.regex_from_list(Array.from(all_bases));
 		var difficult_cut_files = [];
 		if(re){
@@ -421,10 +426,13 @@ Polymer({
 				match = re.exec(ff.name);
 				if(match){
 					match = match[0];
-					files_for_base[match] = files_for_base[match] || new Set();
-					let fkey = this._file_from_fkey.length;
-					this._file_from_fkey.push(ff);
-					files_for_base[match].add(fkey);
+					let trial_files = files_for_base.get(match);
+					if(!trial_files){
+						trial_files = new Set();
+						files_for_base.set(match, trial_files);
+					}
+					let fkey = Utils.file_manager.store_file(ff);
+					trial_files.add(fkey);
 				} else {
 					let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
 					if(ext === "cut"){
@@ -443,16 +451,15 @@ Polymer({
 
 		var trials = this.trials; // we are going to make a lot of changes to this, so we do a hack-ed notify-all at the end
 		var available_tets = new Set(this.available_tets); // we want this as a set for use bellow...
-		for(let base in files_for_base){
-			let trial_files = files_for_base[base];
-			let trial = this._trial_from_base[base];
+		for(let [base, trial_files] of files_for_base){
+			let trial = this._trial_from_base.get(base);
 			if(!trial){
 				trial = this._new_trial(base);
-				this._trial_from_base[base] = trial;
+				this._trial_from_base.set(base, trial);
 				trials.push(trial);
 			}
 			for(let fkey of trial_files){
-				let ff = this._file_from_fkey[fkey];
+				let ff = Utils.file_manager.get_file(fkey);
 	            let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
 	            if(ext === "set"){
 	            	trial.set = fkey;
@@ -516,13 +523,12 @@ Polymer({
 
 		// de-dupe cuts and sort by name and last-modified date
 		// TODO: deal with cut obj kind
-		for(let ii=0; ii<trial.tets.length; ii++){
-			let tet_obj = trial.tets[ii];
+		for(let tet_obj of trial.tets){
 			if(tet_obj.cuts.length > 1){
 				let name_and_time_strs = new Set()
 				for(let jj=0; jj<tet_obj.cuts.length; jj++)	{
 					if(!tet_obj.cuts[jj].date_name_str){
-						let ff = this._file_from_fkey[tet_obj.cuts[jj].cut];
+						let ff = Utils.file_manager.get_file(tet_obj.cuts[jj].cut);
 						let d = tet_obj.cuts[jj].date = ff.lastModified;
 						tet_obj.cuts[jj].date_name_str = d + " " + ff.name;
 					}
@@ -539,19 +545,19 @@ Polymer({
 		}
 	}, _get_tet_obj: function(trial, tet_num, push_if_needed){
 		// adds it to trial.tets if it doesn't exist
-    	for(tt=0; tt<trial.tets.length; tt++){
-    		if(trial.tets[tt].tet_num === tet_num){
-    			return trial.tets[tt];
+    	for(let tet_obj of trial.tets){
+    		if(tet_obj.tet_num === tet_num){
+    			return tet_obj;
     		}
     	}
     	if(push_if_needed){
-	    	var obj = {
+	    	var tet_obj = {
 				tet_num: tet_num,
 				cuts: []
 			};
-			trial.tets.push(obj);    		
+			trial.tets.push(tet_obj);
     	}
-		return obj;
+		return tet_obj;
 
 	}, _cancel_drag: function(){
 		clearTimeout(this._drag_end_timer);
@@ -568,19 +574,19 @@ Polymer({
     },_make_trial_captions: function(e){
     	var model = e.model;
     	if(!model.trial.set_caption && model.trial.set){
-    		model.set('trial.set_caption', this._caption_from_file(this._file_from_fkey[model.trial.set]));
+    		model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
     	}
     	if(!model.trial.pos_caption && model.trial.pos){
-    		model.set('trial.pos_caption', this._caption_from_file(this._file_from_fkey[model.trial.pos]));
+    		model.set('trial.pos_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.pos)));
     	}
     }, _make_tet_captions: function(e){
     	var model = e.model;
     	if(!model.tet_block.tet_caption && model.tet_block.tet){
-	    	model.set('tet_block.tet_caption', this._caption_from_file(this._file_from_fkey[model.tet_block.tet]));	
+	    	model.set('tet_block.tet_caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.tet)));	
     	}
     	for(let ii=0; ii<model.tet_block.cuts.length; ii++){
     		if(!model.tet_block.cuts[ii].caption){
-		    	model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(this._file_from_fkey[model.tet_block.cuts[ii].cut]));			
+		    	model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.cuts[ii].cut)));			
     		}
     	}
     }, _caption_from_file: function(file){
@@ -595,8 +601,8 @@ Polymer({
 		// TODO: see https://github.com/Polymer/polymer/issues/2279
 		this.set('trials', JSON.parse(JSON.stringify(this.trials)));
 		this._trial_from_base.clear();
-		for(let ii=0; ii<this.trials.length; ii++){
-			this._trial_from_base[this.trials[ii].name] = this.trials[ii];
+		for(let trial of this.trials){
+			this._trial_from_base.set(trial.name, trial);
 		}
 		this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
     }, got_base_for_cuts: function(results){
@@ -604,10 +610,10 @@ Polymer({
     	var trials = this.trials;
     	var available_tets = new Set(this.available_tets); // we want this as a set for use below...
     	var modified_trials = new Set(); // we will sort the innards of these trials at the end
-    	for(let ii=0; ii<results.length; ii++){
-    		let base = results[ii].base;
-    		let ff = results[ii].file;
-    		let trial = this._trial_from_base[base];
+    	for(let result of results){
+    		let base = result.base;
+    		let ff = result.file;
+    		let trial = this._trial_from_base.get(base);
     		if(!trial){
     			trial = this._new_trial(base);
 				trials.push(trial);
@@ -617,8 +623,7 @@ Polymer({
 				num = parseInt(num[1]);
 				tet_obj = this._get_tet_obj(trial, num, true);
 				available_tets.add(num);
-				let fkey = this._file_from_fkey.length;
-				this._file_from_fkey.push(ff);
+				let fkey = Utils.file_manager.store_file(ff);
 				tet_obj.cuts.push({
 					cut: fkey,
 					cut_type: 'cut',
@@ -639,9 +644,6 @@ Polymer({
     	this._reassign_trials_denovo();    	
     },
      _regex_cut_tet_num: /(\d*)[a-zA-Z _]*\.cut$/
-    , get_file: function(fkey){
-    	return this._file_from_fkey[fkey];
-    }
 })
 
 </script>

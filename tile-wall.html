@@ -17,11 +17,11 @@ groups is an array of objects with the following properties:
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
-<link rel="import" href="canvas-manager.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="rm-plots.html">
 <link rel="import" href="tac-plots.html">
 <link rel="import" href="wave-plots.html">
+<link rel="import" href="utils.html">
 
 <dom-module id="tile-wall">
 
@@ -35,8 +35,10 @@ groups is an array of objects with the following properties:
 	where "????" is an id produced by the canvas-manager.
 	Note that canavas-manager is a singleton, avaialble at
 	window.canvas_manager.
+
+	TODO: update this notes
 	-->
-	<canvas-manager></canvas-manager> 
+
 
 	<!--
 	The following elements listen for changes in the groups array.

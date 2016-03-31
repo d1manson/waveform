@@ -41,6 +41,7 @@ doesn't have a worker, but it uses a similar system.
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="utils.html">
 
 
 <dom-module id="cut-object">
@@ -180,7 +181,7 @@ doesn't have a worker, but it uses a similar system.
             ]); 
         },
         split_group: function(a, mask){
-            var m = window.typed_array_manager;
+            var m = Utils.typed_array_manager;
 
             var new_arrs = mask_split(m.get_array(this.groups[a].inds), mask);
             m.free_array(this.groups[a].inds);
@@ -200,7 +201,7 @@ doesn't have a worker, but it uses a similar system.
         },
         merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
-            var m = window.typed_array_manager;
+            var m = Utils.typed_array_manager;
 
             // make life easier, fix b>a
             if(a>b){
@@ -329,11 +330,11 @@ doesn't have a worker, but it uses a similar system.
             }
         },
         init_cut: function(cut_file, n_spikes){
-            var m = window.typed_array_manager;
+            var m = Utils.typed_array_manager;
             this.set('redo_stack_descriptions', []);
             this.redo_stack = [];
             this.set('n_spikes', n_spikes);
-            
+
             if(cut_file){
                 cut_file = m.get_array(cut_file);
 

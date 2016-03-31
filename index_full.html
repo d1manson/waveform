@@ -9,7 +9,6 @@
 <script> window.Polymer = {dom: 'shadow'}</script>
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-localstorage/iron-localstorage.html">
-<link rel="import" href="typed-array-manager.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
@@ -49,13 +48,11 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 <template is="dom-bind" id="the_app">
 
-	<typed-array-manager></typed-array-manager>
-
- 		<iron-localstorage
-	        name="waveform"
-	        value="{{options}}"
-	        on-iron-localstorage-load-empty="initializeDefaultOptions"
-	        ></iron-localstorage>
+	<iron-localstorage
+		name="waveform"
+		value="{{options}}"
+		on-iron-localstorage-load-empty="initializeDefaultOptions"
+		></iron-localstorage>
 
 	<div class="hidden_clipboard"></div>
 
@@ -404,7 +401,6 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 
 	<parsed-data 
-			    file_organiser_id="the_file_organiser"
 				selected_files="[[selected_files]]"
 				use_n_leds="[[options.use_n_leds]]"
 				speed_filter_mps="[[options.speed_filter_mps]]"
