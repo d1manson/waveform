@@ -2,6 +2,7 @@
 CUSTOM ELEMENT: file-organiser
 by: DM
 
+This should be a singleton, although we dont't actually check/enforce it.
 
 TODO: when encountering duplicate files, reuse original's fkey for duplicate...
 need to do this right at the start, i.e. never assign a novel fkey if we're going
@@ -21,30 +22,30 @@ sure what you'll get if you drop modify a file on disk after dropping it into th
 "use strict";
 
 var get_base_for_cuts = function(files){
-	// we don't bother with anything complicated here in terms of ticks/caching etc.
-	// just iterate over every single file we recieve and read its experiment name
+    // we don't bother with anything complicated here in terms of ticks/caching etc.
+    // just iterate over every single file we recieve and read its experiment name
     var reader = new FileReaderSync();
     var batch_bytes = 10*1024;
     var regex_exact_cut = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
     var results = [];
-	for (let ii=0; ii<files.length; ii++){
-		let ff = files[ii];
-		let header = "";
-		for(let p=0; p<ff.size; p+= batch_bytes){
-			// should only take one iteration
-			header += reader.readAsBinaryString(ff.slice(p, p+batch_bytes));
-			let match = regex_exact_cut.exec(header);
-			if(match){
-				results.push({
-					file: ff,
-					base: match[1]
-				});
-				break;
-			}
-		}
-		// if something is wrong we end up reading the whole file and fail to find a match
-	}
-	exec_main('got_base_for_cuts', results);
+    for (let ii=0; ii<files.length; ii++){
+        let ff = files[ii];
+        let header = "";
+        for(let p=0; p<ff.size; p+= batch_bytes){
+            // should only take one iteration
+            header += reader.readAsBinaryString(ff.slice(p, p+batch_bytes));
+            let match = regex_exact_cut.exec(header);
+            if(match){
+                results.push({
+                    file: ff,
+                    base: match[1]
+                });
+                break;
+            }
+        }
+        // if something is wrong we end up reading the whole file and fail to find a match
+    }
+    exec_main('got_base_for_cuts', results);
 }
 
 </script>
@@ -169,480 +170,486 @@ font-size: 10px;
 </style>
 <template>
   <div class="tet_switcher" style$="[[_scroll_shadow(scrolled_down)]]">
-  	<div class="tet_switcher_title">tetrode:</div>
-  	<template is="dom-repeat" items="[[available_tets]]">
-  		<div class$="tet_button [[_selected_equality(item, selected_tet_num)]]" on-click="_tet_button_click">[[item]]</div>
-  	</template>
+    <div class="tet_switcher_title">tetrode:</div>
+    <template is="dom-repeat" items="[[available_tets]]">
+        <div class$="tet_button [[_selected_equality(item, selected_tet_num)]]" on-click="_tet_button_click">[[item]]</div>
+    </template>
   </div>
   <iron-list items="[[trials]]" as="trial" id="trial_list" selection-enabled>
     <template><div><div class$='trial [[_selected(selected)]]'>
-	    <div class='trial_top' on-mouseenter="_make_trial_captions">
-		    <div class='trial_title'>trial '[[trial.name]]'</div>
-		    <div class='trial_set' style$='display:[[_show(trial.set)]];' title$='[[trial.set_caption]]'>~.set</div>
-		    <div class='trial_pos' style$='display:[[_show(trial.pos)]];' title$='[[trial.pos_caption]]'>~.pos</div>
-		</div>
-		<div class='trial_bottom'>
-			<template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
-				<div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]' on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
-					<div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
-					<template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
-						<div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' on-click="_cut_click">[[cut.short_name]]</div>
-					</template>
-				</div>
-			</template>
-		</div>
+        <div class='trial_top' on-mouseenter="_make_trial_captions">
+            <div class='trial_title'>trial '[[trial.name]]'</div>
+            <div class='trial_set' style$='display:[[_show(trial.set)]];' title$='[[trial.set_caption]]'>~.set</div>
+            <div class='trial_pos' style$='display:[[_show(trial.pos)]];' title$='[[trial.pos_caption]]'>~.pos</div>
+        </div>
+        <div class='trial_bottom'>
+            <template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
+                <div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]' on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
+                    <div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
+                    <template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
+                        <div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' on-click="_cut_click">[[cut.short_name]]</div>
+                    </template>
+                </div>
+            </template>
+        </div>
     </div></div></template>
   </iron-list>
 </template>
 
 <script>
-	
+    
 Polymer({
-	is: 'file-organiser',
-	behaviors: [Polymer.IronResizableBehavior],
-	properties: {
-		no_files: {
-			type: Boolean,
-			value: true,
-			notify: true,
-			readOnly: true
-		},
-		selected_files: {
-			type: Object,
-			value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
-			readOnly: true,
-			notify: true
-		},
-		is_dragging_out: {
-			type: Boolean,
-			value: false,
-			notify: true,
-			readOnly: true
-		},
-		is_dragging_in: {
-			type: Boolean,
-			value: false,
-			notify: true,
-			readOnly: true
-		},
-		scrolled_down: {
-			type: Boolean,
-			value: false,
-			notify: true,
-			readOnly: true
-		},
-		available_tets: {
-			type: Array,
-			value: function(){return [];},
-			notify: true,
-			readOnly: true
-		},
-		selected_trial: {
-			type: String,
-			value: "",
-			notify: true,
-			observer: '_update_trial'
-		},
-		selected_tet_num: {
-			type: Number,
-			value: -1,
-			notify: true,
-			observer: '_update_tet_num'
-		},
-		selected_cut: {
-			type: Number, //fkey
-			value: -1,
-			notify: true,
-			observer: '_update_cut'
-		},
-		trials: {
-			type: Array,
-			value: function(){ return [];}
-		}
-	}, created: function(){
-		this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
-		this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
-		this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
-		this._trial_from_base = new Map();
-		document.addEventListener("dragover", this._dragover.bind(this));
-	    document.addEventListener("drop", this._drop.bind(this));
+    is: 'file-organiser',
+    behaviors: [Polymer.IronResizableBehavior],
+    properties: {
+        no_files: {
+            type: Boolean,
+            value: true,
+            notify: true,
+            readOnly: true
+        },
+        selected_files: {
+            type: Object,
+            value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
+            readOnly: true,
+            notify: true
+        },
+        is_dragging_out: {
+            type: Boolean,
+            value: false,
+            notify: true,
+            readOnly: true
+        },
+        is_dragging_in: {
+            type: Boolean,
+            value: false,
+            notify: true,
+            readOnly: true
+        },
+        scrolled_down: {
+            type: Boolean,
+            value: false,
+            notify: true,
+            readOnly: true
+        },
+        available_tets: {
+            type: Array,
+            value: function(){return [];},
+            notify: true,
+            readOnly: true
+        },
+        selected_trial: {
+            type: String,
+            value: "",
+            notify: true,
+            observer: '_update_trial'
+        },
+        selected_tet_num: {
+            type: Number,
+            value: -1,
+            notify: true,
+            observer: '_update_tet_num'
+        },
+        selected_cut: {
+            type: Number, //fkey
+            value: -1,
+            notify: true,
+            observer: '_update_cut'
+        },
+        trials: {
+            type: Array,
+            value: function(){ return [];}
+        }
+    }, created: function(){
+        this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
+        this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
+        this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
+        this._trial_from_base = new Map();
+        document.addEventListener("dragover", this._dragover.bind(this));
+        document.addEventListener("drop", this._drop.bind(this));
     }, attached: function(){
-    	var self = this;
-    	this.$.trial_list.addEventListener('scroll', function(){
-	    	self._setScrolled_down(this.scrollTop > 0);
-	    });
-	    this.$.trial_list.addEventListener('selected-item-changed', function(e){
-	    	self.debounce('update_trial_selection', self._update_trial_selection.bind(self));
-	    });
+        var self = this;
+        this.$.trial_list.addEventListener('scroll', function(){
+            self._setScrolled_down(this.scrollTop > 0);
+        });
+        this.$.trial_list.addEventListener('selected-item-changed', function(e){
+            self.debounce('update_trial_selection', self._update_trial_selection.bind(self));
+        });
+        var els = document.getElementsByTagName('cut-object');
+        for(let ii=0; ii<els.length; ii++){
+            els[ii].addEventListener('fork', this._cut_forked.bind(this));
+        }
+    }, _cut_forked: function(e){
+        console.dir(e);
     }, _update_trial_selection: function(){
-    	var new_sel = this.$.trial_list.selectedItem;
-    	var old_sel = this._trial_from_base.get(this.selected_trial);
-    	if(!new_sel && old_sel){
-    		this.$.trial_list.selectItem(old_sel);
-    	} else if(new_sel === old_sel){
-    		// nothing changed after all
-    	} else {
-    		this.set('selected_trial', new_sel.name);
-    	}
+        var new_sel = this.$.trial_list.selectedItem;
+        var old_sel = this._trial_from_base.get(this.selected_trial);
+        if(!new_sel && old_sel){
+            this.$.trial_list.selectItem(old_sel);
+        } else if(new_sel === old_sel){
+            // nothing changed after all
+        } else {
+            this.set('selected_trial', new_sel.name);
+        }
     }, _update_tet_num: function(old_val, new_val){
-    	this._select_default_cut(); // note cut may be updated again before the debouncer fires
-    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+        this._select_default_cut(); // note cut may be updated again before the debouncer fires
+        this.debounce('_switched_selection', this._switched_selection.bind(this));
     }, _update_trial: function(old_val, new_val){
-    	this._select_default_cut(); // note cut may be updated again before the debouncer fires
-    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+        this._select_default_cut(); // note cut may be updated again before the debouncer fires
+        this.debounce('_switched_selection', this._switched_selection.bind(this));
     }, _update_cut: function(old_val, new_val){
-    	this.debounce('_switched_selection', this._switched_selection.bind(this));
+        this.debounce('_switched_selection', this._switched_selection.bind(this));
     }, _tet_button_click: function(e){
-    	var model = e.model;
-    	this.set('selected_tet_num', model.item);
+        var model = e.model;
+        this.set('selected_tet_num', model.item);
     }, _tet_block_click: function(e){
-    	var model = e.model;
-    	this.set('selected_trial', model.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
-    	this.set('selected_tet_num', model.tet_block.tet_num);
-    	//e.stopPropagation();
+        var model = e.model;
+        this.set('selected_trial', model.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
+        this.set('selected_tet_num', model.tet_block.tet_num);
+        //e.stopPropagation();
     }, _cut_click: function(e){
-    	var model = e.model;
-    	this.set('selected_trial', model.dataHost.dataHost.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
-    	this.set('selected_tet_num', model.dataHost.dataHost.tet_block.tet_num);
-    	this.set('selected_cut', model.cut.cut);
-    	//e.stopPropagation();
+        var model = e.model;
+        this.set('selected_trial', model.dataHost.dataHost.dataHost.dataHost.trial.name); // https://github.com/Polymer/polymer/issues/1919
+        this.set('selected_tet_num', model.dataHost.dataHost.tet_block.tet_num);
+        this.set('selected_cut', model.cut.cut);
+        //e.stopPropagation();
     }, _select_default_cut: function(){
-		var trial = this._trial_from_base.get(this.selected_trial);
-    	if(trial){
-	    	var tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
-	    	if(tet_obj){
-		    	for(let ii=0;ii<tet_obj.cuts.length; ii++){
-		    		if(tet_obj.cuts[ii].cut === this.selected_cut){
-		    			return; // we already have a cut selected for the correct trial-tet
-		    		}
-		    	}
-	    	}
-	    }
-    	this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ? tet_obj.cuts[0].cut : "");	
+        var trial = this._trial_from_base.get(this.selected_trial);
+        if(trial){
+            var tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
+            if(tet_obj){
+                for(let ii=0;ii<tet_obj.cuts.length; ii++){
+                    if(tet_obj.cuts[ii].cut === this.selected_cut){
+                        return; // we already have a cut selected for the correct trial-tet
+                    }
+                }
+            }
+        }
+        this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ? tet_obj.cuts[0].cut : "");   
     }, _dragover: function(e){
-		if(this.is_dragging_out) return;
-		
+        if(this.is_dragging_out) return;
+        
         e.stopPropagation();
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
         this._setIs_dragging_in(true);
-      	// TODO: use all the drag events correctly
-    	// drag over is fired every few ms, show dragging notification for at least 500ms 
+        // TODO: use all the drag events correctly
+        // drag over is fired every few ms, show dragging notification for at least 500ms 
         clearTimeout(this._drag_end_timer)
         this._drag_end_timer = setTimeout(this._cancel_drag.bind(this),500); 
 
     }, _switched_selection: function(){
-    	// called via debounce when trial/tet/cut is changed
+        // called via debounce when trial/tet/cut is changed
 
-    	var trial = this._trial_from_base.get(this.selected_trial);
-    	var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
-    	var cut = this.selected_cut;
-    	var title = this.selected_trial + " [Wavform]" || "Waveform";
-    	var url = location.pathname + "?";
-    	url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
-    	url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
-    	window.history.pushState("", title,  url);
-    	document.title = title;
-    	this._setSelected_files({
-			set: trial && trial.set ? trial.set : 0,
-			pos: trial && trial.pos ? trial.pos : 0,
-			tet: tet_obj && tet_obj.tet ? tet_obj.tet : 0,
-			cut: cut ? cut : 0
-		});
+        var trial = this._trial_from_base.get(this.selected_trial);
+        var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
+        var cut = this.selected_cut;
+        var title = this.selected_trial + " [Wavform]" || "Waveform";
+        var url = location.pathname + "?";
+        url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
+        url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
+        window.history.pushState("", title,  url);
+        document.title = title;
+        this._setSelected_files({
+            set: trial && trial.set ? trial.set : 0,
+            pos: trial && trial.pos ? trial.pos : 0,
+            tet: tet_obj && tet_obj.tet ? tet_obj.tet : 0,
+            cut: cut ? cut : 0
+        });
     }, _drop: function(e){
-	  	e.stopPropagation();
+        e.stopPropagation();
         e.preventDefault();
         this._setNo_files(false); // TODO: wait till we've actually processed the files
         this._cancel_drag();
         var files = e.dataTransfer.files; // FileList object.
            
-    	var regex_file_ext = /\.([0-9a-z]+)$/i;
-    	var ignore_exts = new Set(['eeg', 'egf', 'eeg2', 'egf2', 'inp']); 
-    	var files_for_base = new Map();
-    	var pending_cut_files = [];
+        var regex_file_ext = /\.([0-9a-z]+)$/i;
+        var ignore_exts = new Set(['eeg', 'egf', 'eeg2', 'egf2', 'inp']); 
+        var files_for_base = new Map();
+        var pending_cut_files = [];
 
         // get lists of pos,set,tet files for each trial, and a single list of all cut files
         // and also store a reference to all those files by fkey
         for(let ii=0; ii< files.length; ii++){
-        	let ff = files[ii];
-        	let fname = ff.name;
+            let ff = files[ii];
+            let fname = ff.name;
             let ext = regex_file_ext.exec(fname);
-			let base; // we will leave/set as undefined if we don't care about the file
-			
-			if (ext){
-			    ext = ext[1].toLowerCase();
-				base = fname.slice(0, fname.length-ext.length-1);
+            let base; // we will leave/set as undefined if we don't care about the file
+            
+            if (ext){
+                ext = ext[1].toLowerCase();
+                base = fname.slice(0, fname.length-ext.length-1);
 
-				if(ext === "pos" || ext === "set"){
-					// good
-				} else if(ignore_exts.has(ext)){
-					continue;
-				} else if(ext === "cut"){
-					pending_cut_files.push(files[ii]);
-					base = undefined;
-				} else if(!isNaN(parseInt(ext))){
-					if(base.slice(-4) === ".clu"){
-						if(base.slice(-9) === ".temp.clu"){
-							continue;
-						} else {
-							pending_cut_files.push(files[ii]);
-							base = undefined;
-						}
-					} else if(base.slice(-4) === ".fet" ||
-							  base.slice(-4) === ".klg" ){
-						continue;
-					} // else a tet file
-				} else {
-					continue; // entirely unknown file type
-				}
+                if(ext === "pos" || ext === "set"){
+                    // good
+                } else if(ignore_exts.has(ext)){
+                    continue;
+                } else if(ext === "cut"){
+                    pending_cut_files.push(files[ii]);
+                    base = undefined;
+                } else if(!isNaN(parseInt(ext))){
+                    if(base.slice(-4) === ".clu"){
+                        if(base.slice(-9) === ".temp.clu"){
+                            continue;
+                        } else {
+                            pending_cut_files.push(files[ii]);
+                            base = undefined;
+                        }
+                    } else if(base.slice(-4) === ".fet" ||
+                              base.slice(-4) === ".klg" ){
+                        continue;
+                    } // else a tet file
+                } else {
+                    continue; // entirely unknown file type
+                }
 
-				// store permanent reference to the file
-	        	let fkey = Utils.file_manager.store_file(files[ii]);
-				if(base){
-					// unless it was a cut, we now know the base ok...
-					let trial_files = files_for_base.get(base);
-					if(!trial_files){
-						trial_files = new Set();
-						files_for_base.set(base, trial_files);
-					}
-					trial_files.add(fkey);
-				}
-			}
-		}
-		
-		// try and assign cuts based on available trial bases (from this and previous drops)
-		var all_bases = new Set();
-		for(let [b, ignore] of this._trial_from_base){
-			all_bases.add(b);
-		}
-		for(let [b, ignore] of files_for_base){
-			all_bases.add(b);
-		}
-		var re = Utils.regex_from_list(Array.from(all_bases));
-		var difficult_cut_files = [];
-		if(re){
-			while(pending_cut_files.length){
-				let ff = pending_cut_files.pop();
-				match = re.exec(ff.name);
-				if(match){
-					match = match[0];
-					let trial_files = files_for_base.get(match);
-					if(!trial_files){
-						trial_files = new Set();
-						files_for_base.set(match, trial_files);
-					}
-					let fkey = Utils.file_manager.store_file(ff);
-					trial_files.add(fkey);
-				} else {
-					let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
-					if(ext === "cut"){
-						difficult_cut_files.push(ff);
-					} // if it's a clu file we're stuffed
-				}
-			}		
-		} else {
-			difficult_cut_files = pending_cut_files;
-		}
+                // store permanent reference to the file
+                let fkey = Utils.file_manager.store_file(files[ii]);
+                if(base){
+                    // unless it was a cut, we now know the base ok...
+                    let trial_files = files_for_base.get(base);
+                    if(!trial_files){
+                        trial_files = new Set();
+                        files_for_base.set(base, trial_files);
+                    }
+                    trial_files.add(fkey);
+                }
+            }
+        }
+        
+        // try and assign cuts based on available trial bases (from this and previous drops)
+        var all_bases = new Set();
+        for(let [b, ignore] of this._trial_from_base){
+            all_bases.add(b);
+        }
+        for(let [b, ignore] of files_for_base){
+            all_bases.add(b);
+        }
+        var re = Utils.regex_from_list(Array.from(all_bases));
+        var difficult_cut_files = [];
+        if(re){
+            while(pending_cut_files.length){
+                let ff = pending_cut_files.pop();
+                match = re.exec(ff.name);
+                if(match){
+                    match = match[0];
+                    let trial_files = files_for_base.get(match);
+                    if(!trial_files){
+                        trial_files = new Set();
+                        files_for_base.set(match, trial_files);
+                    }
+                    let fkey = Utils.file_manager.store_file(ff);
+                    trial_files.add(fkey);
+                } else {
+                    let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
+                    if(ext === "cut"){
+                        difficult_cut_files.push(ff);
+                    } // if it's a clu file we're stuffed
+                }
+            }       
+        } else {
+            difficult_cut_files = pending_cut_files;
+        }
 
-		if(difficult_cut_files.length){
-			this._worker = this._worker || Polymer.DomModule.import('file-organiser', '#cut_reader').create_for(this);
-			this._worker.exec('get_base_for_cuts', difficult_cut_files);
-		}
+        if(difficult_cut_files.length){
+            this._worker = this._worker || Polymer.DomModule.import('file-organiser', '#cut_reader').create_for(this);
+            this._worker.exec('get_base_for_cuts', difficult_cut_files);
+        }
 
-		var trials = this.trials; // we are going to make a lot of changes to this, so we do a hack-ed notify-all at the end
-		var available_tets = new Set(this.available_tets); // we want this as a set for use bellow...
-		for(let [base, trial_files] of files_for_base){
-			let trial = this._trial_from_base.get(base);
-			if(!trial){
-				trial = this._new_trial(base);
-				this._trial_from_base.set(base, trial);
-				trials.push(trial);
-			}
-			for(let fkey of trial_files){
-				let ff = Utils.file_manager.get_file(fkey);
-	            let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
-	            if(ext === "set"){
-	            	trial.set = fkey;
-	            } else if(ext === "pos"){
-	            	trial.pos = fkey;
-	            } else if (ext === "cut"){
-	            	// note we sort and de-dupe cuts at the end of the trial_files loop (TODO: that)
-	            	let num = ff.name.match(this._regex_cut_tet_num);
-					if(num){
-						num = parseInt(num[1]);
-						tet_obj = this._get_tet_obj(trial, num, true);
-						available_tets.add(num);
-						tet_obj.cuts.push({
-							cut: fkey,
-							cut_type: 'cut',
-							short_name: ff.name.replace(base, '~')
-						});
-					} 
-	            } else {
-	            	let tet_num = parseInt(ext);
-	            	let tet_obj = this._get_tet_obj(trial, tet_num, true);
-	            	available_tets.add(tet_num);
-	            	if(ff.name.slice(-ext.length-".clu".length -1, -ext.length-1) === ".clu"){
-	            		// clu file
-	            		tet_obj.cuts.push({
-							cut: fkey,
-							cut_type: 'clu',
-							short_name: ff.name.replace(base, '~')
-						});
-	            	} else {
-	            		// tet file
-		            	tet_obj.tet = fkey;
-	            	}
-	            }
-			}
-			this._sort_trial_innards(trial); // sort tets and cuts
-		}
+        var trials = this.trials; // we are going to make a lot of changes to this, so we do a hack-ed notify-all at the end
+        var available_tets = new Set(this.available_tets); // we want this as a set for use bellow...
+        for(let [base, trial_files] of files_for_base){
+            let trial = this._trial_from_base.get(base);
+            if(!trial){
+                trial = this._new_trial(base);
+                this._trial_from_base.set(base, trial);
+                trials.push(trial);
+            }
+            for(let fkey of trial_files){
+                let ff = Utils.file_manager.get_file(fkey);
+                let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
+                if(ext === "set"){
+                    trial.set = fkey;
+                } else if(ext === "pos"){
+                    trial.pos = fkey;
+                } else if (ext === "cut"){
+                    // note we sort and de-dupe cuts at the end of the trial_files loop (TODO: that)
+                    let num = ff.name.match(this._regex_cut_tet_num);
+                    if(num){
+                        num = parseInt(num[1]);
+                        tet_obj = this._get_tet_obj(trial, num, true);
+                        available_tets.add(num);
+                        tet_obj.cuts.push({
+                            cut: fkey,
+                            cut_type: 'cut',
+                            short_name: ff.name.replace(base, '~')
+                        });
+                    } 
+                } else {
+                    let tet_num = parseInt(ext);
+                    let tet_obj = this._get_tet_obj(trial, tet_num, true);
+                    available_tets.add(tet_num);
+                    if(ff.name.slice(-ext.length-".clu".length -1, -ext.length-1) === ".clu"){
+                        // clu file
+                        tet_obj.cuts.push({
+                            cut: fkey,
+                            cut_type: 'clu',
+                            short_name: ff.name.replace(base, '~')
+                        });
+                    } else {
+                        // tet file
+                        tet_obj.tet = fkey;
+                    }
+                }
+            }
+            this._sort_trial_innards(trial); // sort tets and cuts
+        }
 
 
-		trials.sort(function(a,b){
-			return a.name > b.name;
-		})
-		available_tets = Array.from(available_tets);
-		available_tets.sort(this._numeric_sort);
-		this._setAvailable_tets(available_tets);
-		this._reassign_trials_denovo();	// notify absolutely everything !!! 
-	}, _new_trial: function(base){
-		return {
-			name: base,
-			tets: [],
-			set: undefined,
-			set_caption: undefined,
-			pos: undefined,
-			pos_caption: undefined
-		};
-	}, _sort_trial_innards: function(trial){
-		// sort tets for the trial
-		trial.tets = trial.tets.sort(function(a,b){
-			return a.tet_num > b.tet_num ? 1 : -1;
-		})
+        trials.sort(function(a,b){
+            return a.name > b.name;
+        })
+        available_tets = Array.from(available_tets);
+        available_tets.sort(this._numeric_sort);
+        this._setAvailable_tets(available_tets);
+        this._reassign_trials_denovo(); // notify absolutely everything !!! 
+    }, _new_trial: function(base){
+        return {
+            name: base,
+            tets: [],
+            set: undefined,
+            set_caption: undefined,
+            pos: undefined,
+            pos_caption: undefined
+        };
+    }, _sort_trial_innards: function(trial){
+        // sort tets for the trial
+        trial.tets = trial.tets.sort(function(a,b){
+            return a.tet_num > b.tet_num ? 1 : -1;
+        })
 
-		// de-dupe cuts and sort by name and last-modified date
-		// TODO: deal with cut obj kind
-		for(let tet_obj of trial.tets){
-			if(tet_obj.cuts.length > 1){
-				let name_and_time_strs = new Set()
-				for(let jj=0; jj<tet_obj.cuts.length; jj++)	{
-					if(!tet_obj.cuts[jj].date_name_str){
-						let ff = Utils.file_manager.get_file(tet_obj.cuts[jj].cut);
-						let d = tet_obj.cuts[jj].date = ff.lastModified;
-						tet_obj.cuts[jj].date_name_str = d + " " + ff.name;
-					}
-					if(name_and_time_strs.has(tet_obj.cuts[jj].date_name_str)){
-						tet_obj.cuts.splice(jj--, 1); // i.e. remove this cut
-					} else {
-						name_and_time_strs.add(tet_obj.cuts[jj].date_name_str);
-					}
-				}
-				tet_obj.cuts.sort(function(a,b){
-					return b.date - a.date;
-				});
-			}
-		}
-	}, _get_tet_obj: function(trial, tet_num, push_if_needed){
-		// adds it to trial.tets if it doesn't exist
-    	for(let tet_obj of trial.tets){
-    		if(tet_obj.tet_num === tet_num){
-    			return tet_obj;
-    		}
-    	}
-    	if(push_if_needed){
-	    	var tet_obj = {
-				tet_num: tet_num,
-				cuts: []
-			};
-			trial.tets.push(tet_obj);
-    	}
-		return tet_obj;
+        // de-dupe cuts and sort by name and last-modified date
+        // TODO: deal with cut obj kind
+        for(let tet_obj of trial.tets){
+            if(tet_obj.cuts.length > 1){
+                let name_and_time_strs = new Set()
+                for(let jj=0; jj<tet_obj.cuts.length; jj++) {
+                    if(!tet_obj.cuts[jj].date_name_str){
+                        let ff = Utils.file_manager.get_file(tet_obj.cuts[jj].cut);
+                        let d = tet_obj.cuts[jj].date = ff.lastModified;
+                        tet_obj.cuts[jj].date_name_str = d + " " + ff.name;
+                    }
+                    if(name_and_time_strs.has(tet_obj.cuts[jj].date_name_str)){
+                        tet_obj.cuts.splice(jj--, 1); // i.e. remove this cut
+                    } else {
+                        name_and_time_strs.add(tet_obj.cuts[jj].date_name_str);
+                    }
+                }
+                tet_obj.cuts.sort(function(a,b){
+                    return b.date - a.date;
+                });
+            }
+        }
+    }, _get_tet_obj: function(trial, tet_num, push_if_needed){
+        // adds it to trial.tets if it doesn't exist
+        for(let tet_obj of trial.tets){
+            if(tet_obj.tet_num === tet_num){
+                return tet_obj;
+            }
+        }
+        if(push_if_needed){
+            var tet_obj = {
+                tet_num: tet_num,
+                cuts: []
+            };
+            trial.tets.push(tet_obj);
+        }
+        return tet_obj;
 
-	}, _cancel_drag: function(){
-		clearTimeout(this._drag_end_timer);
-		this._drag_end_timer = 0;
-		this._setIs_dragging_in(false);
-	}, _show: function(v){
-		return v ? '' : 'none';
-	}, _scroll_shadow: function(v){
-		return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
+    }, _cancel_drag: function(){
+        clearTimeout(this._drag_end_timer);
+        this._drag_end_timer = 0;
+        this._setIs_dragging_in(false);
+    }, _show: function(v){
+        return v ? '' : 'none';
+    }, _scroll_shadow: function(v){
+        return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
     }, _selected: function(v){
-    	return v ? 'selected' : '';
+        return v ? 'selected' : '';
     }, _selected_equality: function(a, b){
-    	return a && a === b ? "selected" : "";
+        return a && a === b ? "selected" : "";
     },_make_trial_captions: function(e){
-    	var model = e.model;
-    	if(!model.trial.set_caption && model.trial.set){
-    		model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
-    	}
-    	if(!model.trial.pos_caption && model.trial.pos){
-    		model.set('trial.pos_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.pos)));
-    	}
+        var model = e.model;
+        if(!model.trial.set_caption && model.trial.set){
+            model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
+        }
+        if(!model.trial.pos_caption && model.trial.pos){
+            model.set('trial.pos_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.pos)));
+        }
     }, _make_tet_captions: function(e){
-    	var model = e.model;
-    	if(!model.tet_block.tet_caption && model.tet_block.tet){
-	    	model.set('tet_block.tet_caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.tet)));	
-    	}
-    	for(let ii=0; ii<model.tet_block.cuts.length; ii++){
-    		if(!model.tet_block.cuts[ii].caption){
-		    	model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.cuts[ii].cut)));			
-    		}
-    	}
+        var model = e.model;
+        if(!model.tet_block.tet_caption && model.tet_block.tet){
+            model.set('tet_block.tet_caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.tet)));  
+        }
+        for(let ii=0; ii<model.tet_block.cuts.length; ii++){
+            if(!model.tet_block.cuts[ii].caption){
+                model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.cuts[ii].cut)));         
+            }
+        }
     }, _caption_from_file: function(file){
-    	 // Note that reading file.lastModified is slow, so we only call this func when needed
-    	 var d = new Date(file.lastModified);
-    	 return file.name + " (" + this._byte_formatter.format(file.size/1204) + 
-    	 		"KB)\nmodified at " + this._time_formatter.format(d)
-    	 		 + " on " + this._date_formatter.format(d);
+         // Note that reading file.lastModified is slow, so we only call this func when needed
+         var d = new Date(file.lastModified);
+         return file.name + " (" + this._byte_formatter.format(file.size/1204) + 
+                "KB)\nmodified at " + this._time_formatter.format(d)
+                 + " on " + this._date_formatter.format(d);
     }, _numeric_sort: function(a,b){
-    	return a-b; 
+        return a-b; 
     }, _reassign_trials_denovo: function(){
-		// TODO: see https://github.com/Polymer/polymer/issues/2279
-		this.set('trials', JSON.parse(JSON.stringify(this.trials)));
-		this._trial_from_base.clear();
-		for(let trial of this.trials){
-			this._trial_from_base.set(trial.name, trial);
-		}
-		this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
+        // TODO: see https://github.com/Polymer/polymer/issues/2279
+        this.set('trials', JSON.parse(JSON.stringify(this.trials)));
+        this._trial_from_base.clear();
+        for(let trial of this.trials){
+            this._trial_from_base.set(trial.name, trial);
+        }
+        this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
     }, got_base_for_cuts: function(results){
-    	// TODO: there is a lot of copy-paste from main drop function, should fix that really.
-    	var trials = this.trials;
-    	var available_tets = new Set(this.available_tets); // we want this as a set for use below...
-    	var modified_trials = new Set(); // we will sort the innards of these trials at the end
-    	for(let result of results){
-    		let base = result.base;
-    		let ff = result.file;
-    		let trial = this._trial_from_base.get(base);
-    		if(!trial){
-    			trial = this._new_trial(base);
-				trials.push(trial);
-				this._trial_from_base.set(base, trial);
-    		}
-        	let num = ff.name.match(this._regex_cut_tet_num);
-			if(num){
-				num = parseInt(num[1]);
-				tet_obj = this._get_tet_obj(trial, num, true);
-				available_tets.add(num);
-				let fkey = Utils.file_manager.store_file(ff);
-				tet_obj.cuts.push({
-					cut: fkey,
-					cut_type: 'cut',
-					short_name: ff.name.replace(base, '~')
-				});
-			} 
-	    	modified_trials.add(trial);
-    	}
-    	for(let trial of modified_trials){
-    		this._sort_trial_innards(trial);
-    	}	
-		trials.sort(function(a,b){
-			return a.name > b.name;
-		})
-		available_tets = Array.from(available_tets);
-		available_tets.sort(this._numeric_sort);
-		this._setAvailable_tets(available_tets);
-    	this._reassign_trials_denovo();    	
+        // TODO: there is a lot of copy-paste from main drop function, should fix that really.
+        var trials = this.trials;
+        var available_tets = new Set(this.available_tets); // we want this as a set for use below...
+        var modified_trials = new Set(); // we will sort the innards of these trials at the end
+        for(let result of results){
+            let base = result.base;
+            let ff = result.file;
+            let trial = this._trial_from_base.get(base);
+            if(!trial){
+                trial = this._new_trial(base);
+                trials.push(trial);
+                this._trial_from_base.set(base, trial);
+            }
+            let num = ff.name.match(this._regex_cut_tet_num);
+            if(num){
+                num = parseInt(num[1]);
+                tet_obj = this._get_tet_obj(trial, num, true);
+                available_tets.add(num);
+                let fkey = Utils.file_manager.store_file(ff);
+                tet_obj.cuts.push({
+                    cut: fkey,
+                    cut_type: 'cut',
+                    short_name: ff.name.replace(base, '~')
+                });
+            } 
+            modified_trials.add(trial);
+        }
+        for(let trial of modified_trials){
+            this._sort_trial_innards(trial);
+        }   
+        trials.sort(function(a,b){
+            return a.name > b.name;
+        })
+        available_tets = Array.from(available_tets);
+        available_tets.sort(this._numeric_sort);
+        this._setAvailable_tets(available_tets);
+        this._reassign_trials_denovo();     
     },
      _regex_cut_tet_num: /(\d*)[a-zA-Z _]*\.cut$/
 })

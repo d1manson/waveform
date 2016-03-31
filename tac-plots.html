@@ -201,16 +201,16 @@ var is_equal_simple = function(a, b){
 
 
 <script>
-	"use strict";
+    "use strict";
 
 
     Polymer({
-    	is:'tac-plots',
-    	properties: {
-			max_delta_t: {
-				type: Number,
-				value: 2
-			},
+        is:'tac-plots',
+        properties: {
+            max_delta_t: {
+                type: Number,
+                value: 2
+            },
             spike_times: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};}
@@ -219,19 +219,19 @@ var is_equal_simple = function(a, b){
                 type: String, // "y" or "n" (to match other modules which have multiple toggle-able things)
                 value: "y"
             },
-			groups: {
-    			type: Array,
-    			value: function(){return [];},
-    			notify: true
-    		}
-    	},
-    	observers: [
-    		'_groups_set(groups)',
+            groups: {
+                type: Array,
+                value: function(){return [];},
+                notify: true
+            }
+        },
+        observers: [
+            '_groups_set(groups)',
             '_groups_spliced(groups.splices)', 
             '_options_modified(max_delta_t)',
             '_times_modified(spike_times)',
             '_show_changed(show)'
-    	],
+        ],
         created: function(){
             var worker_builder = Polymer.DomModule.import('tac-plots','#worker');
             this.worker = worker_builder.create_for(this);
@@ -348,7 +348,7 @@ var is_equal_simple = function(a, b){
             console.dir(arrays[data.hist_name]);
         }
 
-	});
+    });
 </script>
 
   

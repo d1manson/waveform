@@ -1235,10 +1235,10 @@ var parse_clu_file = function(full_str, fkey){
 
 
 <script>
-	"use strict";
+    "use strict";
     Polymer({
-    	is:'parsed-data',
-    	properties: {
+        is:'parsed-data',
+        properties: {
             selected_files: {
                 type: Object,
                 value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
@@ -1341,7 +1341,7 @@ var parse_clu_file = function(full_str, fkey){
                 value: true,
                 notify: true
             }
-    	}, observers: [
+        }, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
             '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
         ], created: function(){
@@ -1664,7 +1664,7 @@ var parse_clu_file = function(full_str, fkey){
             this._setDuration(parseInt(header.duration));
             this._setSet_header(header);
         }
-	});
+    });
 </script>
 
   

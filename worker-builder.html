@@ -218,7 +218,7 @@ var endian = function(){
 
 
 <script>
-	"use strict";
+    "use strict";
     var worker_extra =  document.currentScript.previousElementSibling.textContent; //  note polyfilled as _currentScript in webcomponents
 
     var BuiltWorker = function(url, title, listener){
@@ -303,9 +303,9 @@ var endian = function(){
     }
 
     Polymer({
-    	is:'worker-builder',
+        is:'worker-builder',
         extends: 'script',
-    	properties: { 
+        properties: { 
             title: {
                 type: String,
                 value: "Untitled"
@@ -328,7 +328,7 @@ var endian = function(){
         create_for: function(that){
             return new BuiltWorker(this.url, this.title, that);
         },
-	});
+    });
 
 </script>
 

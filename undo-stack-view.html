@@ -35,23 +35,23 @@ color: #ccc;
 
 
 <script>
-	"use strict";
+    "use strict";
     // TODO: probably should sort undo in reverse order
     Polymer({
-    	is:'undo-stack-view',
-    	properties: {
-			undo_stack: {
-				type: Array,
-				value: function(){return [];},
+        is:'undo-stack-view',
+        properties: {
+            undo_stack: {
+                type: Array,
+                value: function(){return [];},
                 notify: true
-    		},
+            },
             redo_stack: {
                 type: Array,
                 value: function(){return [];},
                 notify: true
             }
-    	}
-	});
+        }
+    });
 </script>
 
   

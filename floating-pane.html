@@ -65,13 +65,13 @@ display: inline-block;
 }
 </style>
 <template>
-	<div class$="pane_title [[_wide(has_search)]]">
-		<content select=".pane_title"></content>
-		<div class="flexer"></div>
-		<input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}" placeholder="[[search_placeholder]]">
-	</div>
-	<div class="pane_body"><content></content></div>
-	<div class="grabber" id="grabber" hidden$="{{!space_is_down}}"></div>
+    <div class$="pane_title [[_wide(has_search)]]">
+        <content select=".pane_title"></content>
+        <div class="flexer"></div>
+        <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}" placeholder="[[search_placeholder]]">
+    </div>
+    <div class="pane_body"><content></content></div>
+    <div class="grabber" id="grabber" hidden$="{{!space_is_down}}"></div>
 </template>
 
 <script>
@@ -82,85 +82,85 @@ var top_x_index = 100;
 var init_x = 100;
 
 Polymer({
-	is: 'floating-pane',
-	properties: {
-		space_is_down: {
-			type: Boolean,
-			value: false,
-			notify: true,
-			readOnly: true
-		},
-		has_search: {
-			type: Boolean,
-			value: false,
-			notify: true
-		},
-		search_text: {
-			type: String,
-			value: "",
-			notify: true
-		},
-		search_placeholder: {
-			type: String,
-			value: "search",
-			notify: true,	
-		}
-	}, created: function(){
-		// bind these methods so we can add/remove easily
-		this._on_drag_move_bound = this._on_drag_move.bind(this);
-		this._on_drag_end_bound = this._on_drag_end.bind(this);
+    is: 'floating-pane',
+    properties: {
+        space_is_down: {
+            type: Boolean,
+            value: false,
+            notify: true,
+            readOnly: true
+        },
+        has_search: {
+            type: Boolean,
+            value: false,
+            notify: true
+        },
+        search_text: {
+            type: String,
+            value: "",
+            notify: true
+        },
+        search_placeholder: {
+            type: String,
+            value: "search",
+            notify: true,   
+        }
+    }, created: function(){
+        // bind these methods so we can add/remove easily
+        this._on_drag_move_bound = this._on_drag_move.bind(this);
+        this._on_drag_end_bound = this._on_drag_end.bind(this);
 
-	}, attached: function(){
-		var self = this;
-		// I don't get Polymer's listener thing..or maybe I do, but this works fine..
-		this.$.grabber.addEventListener('mouseup', this._on_mouseup.bind(this));
-		this.addEventListener('mousedown', this._on_drag_start.bind(this));
-		this.$.search_input.addEventListener('mousedown', function(e){
-		 e.stopPropagation(); // if it propagates out of the shadow dom, then it will appear to be a mousedown on the pane itself, which would lead to a drag_start
-		});
-		document.addEventListener('keydown', function(e){
-			if(e.which === 32){
-				self._setSpace_is_down(true)
-			}
-		}, true);
-		document.addEventListener('keyup', function(e){
-			if(e.which === 32){
-				self._setSpace_is_down(false);
-			}
-		}, true);
-		init_x += 100;
-		this._translate(init_x, 100); // not sure this is that helpful, but hey
-	}, _on_mouseup: function(e){
-		this.style.display = 'none';
-	}, _on_drag_start: function(e){
-		// if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
-		var el = e.target;
-		while(el !== e.currentTarget){
-			for(let c of el.classList){
-				if(c === 'nodrag'){
-					return;
-				}
-			}
-			el = el.parentNode;
-		}
-		var offset = this.getBoundingClientRect();
-	    e.preventDefault();
-		this.style.zIndex = ++top_x_index;
-		this._drag_off_left = e.clientX-offset.left;
-		this._drag_off_top = e.clientY-offset.top;
-	    document.addEventListener('mousemove', this._on_drag_move_bound, true);
-	    document.addEventListener('mouseup', this._on_drag_end_bound, true); 
+    }, attached: function(){
+        var self = this;
+        // I don't get Polymer's listener thing..or maybe I do, but this works fine..
+        this.$.grabber.addEventListener('mouseup', this._on_mouseup.bind(this));
+        this.addEventListener('mousedown', this._on_drag_start.bind(this));
+        this.$.search_input.addEventListener('mousedown', function(e){
+         e.stopPropagation(); // if it propagates out of the shadow dom, then it will appear to be a mousedown on the pane itself, which would lead to a drag_start
+        });
+        document.addEventListener('keydown', function(e){
+            if(e.which === 32){
+                self._setSpace_is_down(true)
+            }
+        }, true);
+        document.addEventListener('keyup', function(e){
+            if(e.which === 32){
+                self._setSpace_is_down(false);
+            }
+        }, true);
+        init_x += 100;
+        this._translate(init_x, 100); // not sure this is that helpful, but hey
+    }, _on_mouseup: function(e){
+        this.style.display = 'none';
+    }, _on_drag_start: function(e){
+        // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
+        var el = e.target;
+        while(el !== e.currentTarget){
+            for(let c of el.classList){
+                if(c === 'nodrag'){
+                    return;
+                }
+            }
+            el = el.parentNode;
+        }
+        var offset = this.getBoundingClientRect();
+        e.preventDefault();
+        this.style.zIndex = ++top_x_index;
+        this._drag_off_left = e.clientX-offset.left;
+        this._drag_off_top = e.clientY-offset.top;
+        document.addEventListener('mousemove', this._on_drag_move_bound, true);
+        document.addEventListener('mouseup', this._on_drag_end_bound, true); 
 
-	}, _on_drag_move: function(e) {
-		this._translate(e.clientX - this._drag_off_left, e.clientY - this._drag_off_top);
-	}, _on_drag_end: function(e){
-	    document.removeEventListener('mousemove', this._on_drag_move_bound, true);
-	    document.removeEventListener('mouseup', this._on_drag_end_bound, true); 
-	}, _translate: function(x, y){
-		this.style.webkitTransform = 'translate(' + x + "px, " + y + "px)";
-	}, _wide: function(v){
-		return v ? "wide" : "";
-	}
+    }, _on_drag_move: function(e) {
+        this._translate(e.clientX - this._drag_off_left, e.clientY - this._drag_off_top);
+    }, _on_drag_end: function(e){
+        document.removeEventListener('mousemove', this._on_drag_move_bound, true);
+        document.removeEventListener('mouseup', this._on_drag_end_bound, true); 
+    }, _translate: function(x, y){
+        this.style.webkitTransform = 'translate(' + x + "px, " + y + "px)";
+    }, _wide: function(v){
+        return v ? "wide" : "";
+    }
 });
 
 

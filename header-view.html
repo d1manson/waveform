@@ -1,7 +1,7 @@
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-list/iron-list.html">
 
-<dom-module id="header-view">	
+<dom-module id="header-view">   
 
 <style>
 .header_item{
@@ -29,7 +29,7 @@ width: 40%;
 background: rgba(106, 119, 130, 0.18);
 }
 .item_value{
-background: rgba(106, 119, 130, 0.08);	
+background: rgba(106, 119, 130, 0.08);  
 width: 60%;
 }
 iron-list {
@@ -54,32 +54,32 @@ width: 100%;
 }
 </style>
 <template>
-	<iron-list items="{{_build_array(set_header, pos_header, tet_header, cut_header, header_filter)}}" as="item">
-		<template><div class="row">
-		 	<div class$="[[item.class_a]]">
-		 		[[item.name]]
-		 		<div class="file_name">[[item.value]]</div>
-		 	</div>
-		 	<div class$="[[item.class_b]]">
-			 	<div class="item_key" title="[[item.name]]">[[item.name]]</div>
-			 	<div class="item_value" title="[[item.value]]">[[item.value]]&nbsp;</div>
-			</div>
-	 	</div></template>
-	</iron-list>
+    <iron-list items="{{_build_array(set_header, pos_header, tet_header, cut_header, header_filter)}}" as="item">
+        <template><div class="row">
+            <div class$="[[item.class_a]]">
+                [[item.name]]
+                <div class="file_name">[[item.value]]</div>
+            </div>
+            <div class$="[[item.class_b]]">
+                <div class="item_key" title="[[item.name]]">[[item.name]]</div>
+                <div class="item_value" title="[[item.value]]">[[item.value]]&nbsp;</div>
+            </div>
+        </div></template>
+    </iron-list>
 </template>
 
 <script>
 
 
 Polymer({
-	is: 'header-view',
-	properties: {
-		header_filter: {
-			type: String,
-			value: "",
-			notify: true
-		},
-	 	pos_header: {
+    is: 'header-view',
+    properties: {
+        header_filter: {
+            type: String,
+            value: "",
+            notify: true
+        },
+        pos_header: {
             type: Object,
             value: function(){ return {};},
             notify: true,
@@ -103,56 +103,56 @@ Polymer({
             notify: true,
             observer: '_clear_cache_cut'
         }
-	}, created: function(){
-		this._cache = {};
-	}, _clear_cache_pos: function(){
-		this._cache['pos'] = undefined;
-	}, _clear_cache_set: function(){
-		this._cache['set'] = undefined;
-	}, _clear_cache_tet: function(){
-		this._cache['tet'] = undefined;
-	}, _clear_cache_cut: function(){
-		this._cache['cut'] = undefined;
-	}, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter) {
-			var a = [];			
-			for(let t of new Set(['tet', 'cut', 'pos', 'set'])){
-				let header = this[t + '_header'];
-				if(!header || !Object.keys(header).length){
-					continue;
-				}
-				if (this._cache[t]){
-					a = a.concat(this._cache[t]);
-					continue;
-				} 
-				let arr = Object.keys(header).map(function(key){
-					return {
-						is: 'item',
-						class_a: 'not_showing',
-						class_b: 'entry_item',
-						name: key + "",
-						value: header[key] + ""
-					};
-				}).sort(function(a,b){
-					return a.name > b.name ? 1 : -1;
-				});
-				arr.splice(0, 0, {
-					is: 'header',
-					class_a: 'header_item',
-					class_b: 'not_showing',
-					name: "." + t,
-					value: header.file
-				});
-				this._cache[t] = arr;
-				a = a.concat(arr);
+    }, created: function(){
+        this._cache = {};
+    }, _clear_cache_pos: function(){
+        this._cache['pos'] = undefined;
+    }, _clear_cache_set: function(){
+        this._cache['set'] = undefined;
+    }, _clear_cache_tet: function(){
+        this._cache['tet'] = undefined;
+    }, _clear_cache_cut: function(){
+        this._cache['cut'] = undefined;
+    }, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter) {
+            var a = [];         
+            for(let t of new Set(['tet', 'cut', 'pos', 'set'])){
+                let header = this[t + '_header'];
+                if(!header || !Object.keys(header).length){
+                    continue;
+                }
+                if (this._cache[t]){
+                    a = a.concat(this._cache[t]);
+                    continue;
+                } 
+                let arr = Object.keys(header).map(function(key){
+                    return {
+                        is: 'item',
+                        class_a: 'not_showing',
+                        class_b: 'entry_item',
+                        name: key + "",
+                        value: header[key] + ""
+                    };
+                }).sort(function(a,b){
+                    return a.name > b.name ? 1 : -1;
+                });
+                arr.splice(0, 0, {
+                    is: 'header',
+                    class_a: 'header_item',
+                    class_b: 'not_showing',
+                    name: "." + t,
+                    value: header.file
+                });
+                this._cache[t] = arr;
+                a = a.concat(arr);
 
-			}
-			if(header_filter){
-				header_filter = header_filter.toLowerCase();
-				a = a.filter(function(item){
-					return item.is==='header' || item.name.toLowerCase().indexOf(header_filter) !== -1 || item.value.toLowerCase().indexOf(header_filter) !== -1;
-				});			
-			}
-			return a;
+            }
+            if(header_filter){
+                header_filter = header_filter.toLowerCase();
+                a = a.filter(function(item){
+                    return item.is==='header' || item.name.toLowerCase().indexOf(header_filter) !== -1 || item.value.toLowerCase().indexOf(header_filter) !== -1;
+                });         
+            }
+            return a;
         }
 });
 

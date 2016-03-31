@@ -571,8 +571,8 @@ var is_equal_simple = function(a, b){
     "use strict";
 
     Polymer({
-    	is:'rm-plots',
-    	properties: {
+        is:'rm-plots',
+        properties: {
             pos_xy: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};}
@@ -589,38 +589,38 @@ var is_equal_simple = function(a, b){
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};}
             },
-			cm_per_spa_bin: {
-				type: Number,
-				value: 2
-			},
-			smoothing_spa_bins: {
-				type: Number,
-				value: 2
-			},
-			max_rate_spa: {
-				type: Number,
-				value: -1
-			},
-			deg_per_dir_bin: {
-				type: Number,
-				value: 6
-			},
-			smoothing_dir_bins: {
-				type: Number,
-				value: 2
-			},
+            cm_per_spa_bin: {
+                type: Number,
+                value: 2
+            },
+            smoothing_spa_bins: {
+                type: Number,
+                value: 2
+            },
+            max_rate_spa: {
+                type: Number,
+                value: -1
+            },
+            deg_per_dir_bin: {
+                type: Number,
+                value: 6
+            },
+            smoothing_dir_bins: {
+                type: Number,
+                value: 2
+            },
             show: {
                 type: String,
                 value: 'yyy'
             },
-    		groups: {
-    			type: Array,
-    			value: function(){return [];},
-    			notify: true
-    		}
-    	},
-    	observers: [
-    		'_groups_set(groups)',
+            groups: {
+                type: Array,
+                value: function(){return [];},
+                notify: true
+            }
+        },
+        observers: [
+            '_groups_set(groups)',
             '_groups_spliced(groups.splices)',
             '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
             '_show_changed(show)',
@@ -628,7 +628,7 @@ var is_equal_simple = function(a, b){
             '_pos_dir_modified(pos_dir)',
             '_pos_speed_modified(pos_speed)',
             '_times_modified(spike_times)'
-    	],
+        ],
         created: function(){
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
             this.worker = worker_builder.create_for(this);
@@ -814,7 +814,7 @@ var is_equal_simple = function(a, b){
                 this.times_is_on_worker = false;
             }
         }
-	});
+    });
 </script>
 
   

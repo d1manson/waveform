@@ -50,7 +50,7 @@ doesn't have a worker, but it uses a similar system.
 
 
 <script>
-	"use strict";
+    "use strict";
 
     var bin_count = function(group_idx, max_len){
         var ret = new Uint32Array(max_len);
@@ -115,30 +115,30 @@ doesn't have a worker, but it uses a similar system.
     }
 
     Polymer({
-    	is:'cut-object',
-    	properties: {
-			undo_stack_descriptions: {
-				type: Array,
-				value: function(){return [];},
+        is:'cut-object',
+        properties: {
+            undo_stack_descriptions: {
+                type: Array,
+                value: function(){return [];},
                 notify: true
-    		},
+            },
             redo_stack_descriptions: {
                 type: Array,
                 value: function(){return [];},
                 notify: true
             },
-			groups: {
-    			type: Array,
-    			value: function(){return [];},
-    			notify: true
-    		},
+            groups: {
+                type: Array,
+                value: function(){return [];},
+                notify: true
+            },
             cut_box: {
                 type: Object,
                 value: function(){return {};},
                 notify: true,
                 observer: '_use_cut_box'
             }
-    	},
+        },
         _use_cut_box: function(){
             var m = Utils.typed_array_manager;
 
@@ -152,7 +152,7 @@ doesn't have a worker, but it uses a similar system.
                 // zero-initialize an array of the required length for each group
                 let groups = [];
                 for(let ii=0; ii<group_n.length; ii++) if(group_n[ii]>0){
-                        groups[ii] = new Uint32Array(group_n[ii]);
+                    groups[ii] = new Uint32Array(group_n[ii]);
                 }
 
                 // store the indices for each group
@@ -164,7 +164,8 @@ doesn't have a worker, but it uses a similar system.
                 for(let gg in groups){
                     if(gg){
                         boxes.push({
-                            akey: m.store_array(gg)
+                            akey: m.store_array(gg),
+                            n_spikes: gg.length
                         });
                     }else{
                         boxes.push({});
@@ -195,7 +196,8 @@ doesn't have a worker, but it uses a similar system.
                 this.set('undo_stack_descriptions', ['create blank cut']);
                 this.set('redo_stack_descriptions', []);
                 this.set('groups', [{
-                    akey: m.store_array(arange(this.cut_box.n_spikes))
+                    akey: m.store_array(arange(this.cut_box.n_spikes)),
+                    n_spikes: this.cut_box.n_spikes
                 }]);
                 this.undo_stack = [];
                 this.redo_stack = [];
@@ -226,6 +228,7 @@ doesn't have a worker, but it uses a similar system.
             }
         }, swap_groups: function(a, b){
             if(a==b) return;
+            this._fork_if_needed();
 
             // make life easier, fix b>a
             if(a>b){
@@ -261,14 +264,17 @@ doesn't have a worker, but it uses a similar system.
             ]); 
         },
         split_group: function(a, mask){
+            this._fork_if_needed();
             var m = Utils.typed_array_manager;
 
             var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
             m.free_array(this.groups[a].akey);
             this.splice('groups', a, 1, {
-                akey: m.store_array(new_arrs[0])
+                akey: m.store_array(new_arrs[0]),
+                n_spikes: new_arrs[0].length
             }, {
-                akey: m.store_array(new_arrs[1])
+                akey: m.store_array(new_arrs[1]),
+                n_spikes: new_arrs[1].length
             });
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear                   
@@ -282,6 +288,7 @@ doesn't have a worker, but it uses a similar system.
         },
         merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
+            this._fork_if_needed();
             var m = Utils.typed_array_manager;
 
             // make life easier, fix b>a
@@ -299,7 +306,8 @@ doesn't have a worker, but it uses a similar system.
             m.free_array(this.groups[b].akey);
             this.splice('groups', b, 1);
             this.splice('groups', a, 1, {
-                akey: m.store_array(inds)
+                akey: m.store_array(inds),
+                n_spikes: inds.length
             });
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear
@@ -322,10 +330,12 @@ doesn't have a worker, but it uses a similar system.
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, {
-                    akey: m.store_array(new_arrs[0])
+                    akey: m.store_array(new_arrs[0]),
+                    n_spikes: new_arrs[0].length
                 });
                 this.splice('groups', delta.b, 0, {
-                    akey: m.store_array(new_arrs[1])
+                    akey: m.store_array(new_arrs[1]),
+                    n_spikes: new_arrs[1].length
                 });
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
@@ -339,7 +349,8 @@ doesn't have a worker, but it uses a similar system.
                 m.free_array(this.groups[delta.a].akey);
                 m.free_array(this.groups[delta.a+1].akey);
                 this.splice('groups', delta.a, 2, {
-                    akey: m.store_array(inds)
+                    akey: m.store_array(inds),
+                    n_spikes: inds.length
                 });
                 delta.mask = packed[1];
                 success = true;
@@ -377,7 +388,8 @@ doesn't have a worker, but it uses a similar system.
                 m.free_array(this.groups[delta.b].akey);
                 this.splice('groups', delta.b, 1);
                 this.splice('groups', delta.a, 1, {
-                    akey: m.store_array(inds)
+                    akey: m.store_array(inds),
+                    n_spikes: inds.length
                 });
                 delta.mask = packed[1];
                 success = true;
@@ -389,9 +401,11 @@ doesn't have a worker, but it uses a similar system.
                 delete delta['mask'];
                 m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, {
-                    akey: m.store_array(new_arrs[0])
+                    akey: m.store_array(new_arrs[0]),
+                    n_spikes: new_arrs[0].length
                 }, {
-                    akey: m.store_array(new_arrs[1])
+                    akey: m.store_array(new_arrs[1]),
+                    n_spikes: new_arrs[1].length
                 });
                 success = true;
                 break;

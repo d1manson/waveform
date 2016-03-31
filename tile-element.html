@@ -6,28 +6,28 @@ The tile element is designed for use within the tilewall. The idea is to encapsu
 alow the main program to do all the more interesting interactivity...it's a bit of a blurred line unfortunately.
 
 Tiles have the following attibutes:
-	group_num - a number
-	group_color_1, group_color_2 - colors used for the group's sticker
-	group_n - number of spikes in group
-	proximate/active/moving/disabled - true/false. Changes the state as described below.
-	placeholder - a div element that should be the same size as the tile (TODO: update the placeholder when tile changes size).  You are free to insert this div into the DOM. 
-								(Set it to a falsy value to garbage collect and reset it.)
-	
+    group_num - a number
+    group_color_1, group_color_2 - colors used for the group's sticker
+    group_n - number of spikes in group
+    proximate/active/moving/disabled - true/false. Changes the state as described below.
+    placeholder - a div element that should be the same size as the tile (TODO: update the placeholder when tile changes size).  You are free to insert this div into the DOM. 
+                                (Set it to a falsy value to garbage collect and reset it.)
+    
 And the following methods:
-	updateCanvas -		the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
-	updateCrossHair - 	specify canvasnumber and canvas (x,y) coordiantes (in css pixels not canvas pixels) or null to remove the crosshair.
-	shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
-						in the main index.html...perhaps there is a better way of doing this?
-	getCanvInfo - 		provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
-						coordinates within the canvas or null if it's outside the canvas.  TODO: actually only the more pageX/Y implementation has be written.
-	getCopyOfCanvs - 	provides a div containing images that are the same as the canvases.  Confusingly, when you use this for copying to the clipboard, you will get different results
-						depenedning on where you paste.  In gmail, you will get the ratemaps stretched to the size they appear in the GUI, but in google docs, it ignores the width/height 
-						attributes if only one of the two is provided, though it does honour them when both are provided. This means that the ratemaps end up not being stretched in 
-						google docs - the size of the image is dictated by the number of bins. (The waveforms have both height and width specified so they are the expected size).  That's helpful in a way
-						but rather consfusing to say the least.
+    updateCanvas -      the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
+    updateCrossHair -   specify canvasnumber and canvas (x,y) coordiantes (in css pixels not canvas pixels) or null to remove the crosshair.
+    shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
+                        in the main index.html...perhaps there is a better way of doing this?
+    getCanvInfo -       provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
+                        coordinates within the canvas or null if it's outside the canvas.  TODO: actually only the more pageX/Y implementation has be written.
+    getCopyOfCanvs -    provides a div containing images that are the same as the canvases.  Confusingly, when you use this for copying to the clipboard, you will get different results
+                        depenedning on where you paste.  In gmail, you will get the ratemaps stretched to the size they appear in the GUI, but in google docs, it ignores the width/height 
+                        attributes if only one of the two is provided, though it does honour them when both are provided. This means that the ratemaps end up not being stretched in 
+                        google docs - the size of the image is dictated by the number of bins. (The waveforms have both height and width specified so they are the expected size).  That's helpful in a way
+                        but rather consfusing to say the least.
 
 There are several boolean flags that control the tile's state:
-	active,moving,proximate,disabled
+    active,moving,proximate,disabled
 There are rules about how they can be combined, and more.  When all flags are false, the tile
 is in null state. When another tile is moving, it cannot be active instead it is hover.
 -->
@@ -36,455 +36,446 @@ is in null state. When another tile is moving, it cannot be active instead it is
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="cross-hair.html">
 <link rel="import" href="managed-canvas.html">
+<link rel="import" href="palettes.html">
 
 <dom-module id="tile-element">
 
 <template>
-	<style>
-	:host {
-	display: inline-block;
-	position: relative;
-	transform: rotateY(0);
-	-webkit-transform: rotateY(0);
-	min-width: 98px;
-	min-height: 128px;
-	left: 0px;
-	top: 0px;
-	overflow: hidden;
-	border: 1px solid #CCC;
-	line-height: 0px;
+    <style>
+    :host {
+    display: inline-block;
+    position: relative;
+    transform: rotateY(0);
+    -webkit-transform: rotateY(0);
+    min-width: 98px;
+    min-height: 128px;
+    left: 0px;
+    top: 0px;
+    overflow: hidden;
+    border: 1px solid #CCC;
+    line-height: 0px;
     }
-	.tile-over{
-	display: none;
-	position: absolute;
-	top: 0px;
-	left: 0px;
-	right: 0px;
-	bottom: 0px;
-	}
-	.tile-caption{
-	padding-top: 2px;
-	line-height: 12px;
-	text-align: center;
-	background-color:rgba(255,255,255,0.85);
-	box-shadow: -3px 0px 6px #ddc;
-	}
-	:host-context(.shake){
-	-webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
-	-webkit-animation-duration: 1s;
-		-moz-animation-duration: 1s;
-		-ms-animation-duration: 1s;
-		-o-animation-duration: 1s;
-		animation-duration: 1s;
-	}
+    .tile-over{
+    display: none;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    right: 0px;
+    bottom: 0px;
+    }
+    .tile-caption{
+    padding-top: 2px;
+    line-height: 12px;
+    text-align: center;
+    background-color:rgba(255,255,255,0.85);
+    box-shadow: -3px 0px 6px #ddc;
+    }
+    :host-context(.shake){
+    -webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
+    -webkit-animation-duration: 1s;
+        -moz-animation-duration: 1s;
+        -ms-animation-duration: 1s;
+        -o-animation-duration: 1s;
+        animation-duration: 1s;
+    }
 
-	.tile-sticker{
-	line-height: 12px;
-	width: 20px;
-	height: 17px;
-	border: 1px solid #000;
-	text-align: center;
-	font-size: 0.8em;
-	padding-top: 3px;
-	position: absolute;
-	right: 2px;
-	top: 2px;
-	z-index: 10;
-	}
-	.tile-side{
-	position: absolute;
-	right: 0px;
-	top: 0px;
-	bottom: 0px;
-	width: 60px;
-	}
-	.blind{
-	position: absolute;
-	left: 0px;
-	right: 0px;
-	top: 0px;
-	bottom: 0px;
-	z-index: 100;
-	background: rgba(0,0,0,0.5);
-	display: none;
-	}
-	canvas{
-	image-rendering: pixelated;
-	}
-	.dir-rm{
-	height:78px;
-	}
-	.speed-rm{
-	}
-	.tc{
-	height:50px;
-	}
-	.caption-inner{
-	border-top: 1px solid #000;
-	padding-top: 2px;
-	}
-	.caption-inner:nth-of-type(1){
-	border-top: 0px;	
-	}
-	.caption-inner-label{
-	font-weight: bold;
-	font-size: 0.8em;
-	}
-	/*
-	.grabbed_info .tile-buttons{
-	display: none;
-	}
+    .tile-sticker{
+    line-height: 12px;
+    width: 20px;
+    height: 17px;
+    border: 1px solid #000;
+    text-align: center;
+    font-size: 0.8em;
+    padding-top: 3px;
+    position: absolute;
+    right: 2px;
+    top: 2px;
+    z-index: 10;
+    }
+    .tile-side{
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+    width: 60px;
+    }
+    .blind{
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+    z-index: 100;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    }
+    canvas{
+    image-rendering: pixelated;
+    }
+    .dir-rm{
+    height:78px;
+    }
+    .speed-rm{
+    }
+    .tc{
+    height:50px;
+    }
+    .caption-inner{
+    border-top: 1px solid #000;
+    padding-top: 2px;
+    }
+    .caption-inner:nth-of-type(1){
+    border-top: 0px;    
+    }
+    .caption-inner-label{
+    font-weight: bold;
+    font-size: 0.8em;
+    }
+    /*
+    .grabbed_info .tile-buttons{
+    display: none;
+    }
 
-	*/
-	.canvas_part_1{
-	display: inline-block;
-	}
-	.canvas_part_2{
-	display: inline-block;
-	flex-direction: column;
-	}
-	.tile-side{
-	display: flex;
-	flex-direction: column;	
-	}
-	.flex{
-	flex:2;
-	}
-	@-webkit-keyframes fadeout{
-	0%     { opacity: 1;  }
-	33%   { opacity: 1;   }
-	50%   { opacity: 0;   }
-	83%   { opacity: 0;   }
-	100%   { opacity: 1;   }
-	}
-	</style>
-	<div class="canvas_part_1">
-		<canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
-		<managed-canvas canv_id="[[waves]]"></managed-canvas>
-		<managed-canvas canv_id="[[spa_rm]]"></managed-canvas>
-	</div>
-	<div class="canvas_part_2">
-		<div>
-			<managed-canvas canv_id="[[dir_rm]]"></managed-canvas>
-			<managed-canvas canv_id="[[speed_rm]]"></managed-canvas>
-		</div>
-		<managed-canvas canv_id="[[tac]]"></managed-canvas>
-	</div>
-	<div id='sticker' class='tile-sticker' style$="background-color:[[group_color_1]];color:[[group_color_2]];">[[group_num]]</div>
-	<div id='over' class='tile-over hidden_grabbed'>
-		<div class='tile-side'>
-			<div class="flex"></div>
-			<div class='tile-caption'>
-				<div style$='display:[[_show(group_spa_max)]]' class="caption-inner">[[group_spa_max]]Hz
-					<div class="caption-inner-label">spa max</div>
-				</div>
-				<div class="caption-inner">[[group_n]]
-					<div class="caption-inner-label">n spikes</div>
-				</div>
-			</div>
-		</div>
-	</div>
-	<div id='blind' class='blind'>
+    */
+    .canvas_part_1{
+    display: inline-block;
+    }
+    .canvas_part_2{
+    display: inline-block;
+    flex-direction: column;
+    }
+    .tile-side{
+    display: flex;
+    flex-direction: column; 
+    }
+    .flex{
+    flex:2;
+    }
+    @-webkit-keyframes fadeout{
+    0%     { opacity: 1;  }
+    33%   { opacity: 1;   }
+    50%   { opacity: 0;   }
+    83%   { opacity: 0;   }
+    100%   { opacity: 1;   }
+    }
+    </style>
+    <div class="canvas_part_1">
+        <canvas width='0' height='0' style='width:0px;height:128px;'></canvas> 
+        <managed-canvas canv_id="[[waves]]"></managed-canvas>
+        <managed-canvas canv_id="[[spa_rm]]"></managed-canvas>
+    </div>
+    <div class="canvas_part_2">
+        <div>
+            <managed-canvas canv_id="[[dir_rm]]"></managed-canvas>
+            <managed-canvas canv_id="[[speed_rm]]"></managed-canvas>
+        </div>
+        <managed-canvas canv_id="[[tac]]"></managed-canvas>
+    </div>
+    <div id='sticker' class='tile-sticker' style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
+    <div id='over' class='tile-over hidden_grabbed'>
+        <div class='tile-side'>
+            <div class="flex"></div>
+            <div class='tile-caption'>
+                <div style$='display:[[_show(group_spa_max)]]' class="caption-inner">[[group_spa_max]]Hz
+                    <div class="caption-inner-label">spa max</div>
+                </div>
+                <div class="caption-inner">[[group_n]]
+                    <div class="caption-inner-label">n spikes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id='blind' class='blind'>
 </template>
 
 
 <script>
-	"use strict";
-	
-	var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
-	
-	var ResetStyle = function(el){
-		var display = el.style.display;
-		el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
-		el.$.over.style.cssText = '';
-		el.$.sticker.style.right = '';
-		el.$.sticker.style.webkitAnimation = '';
-		el.$.blind.style.cssText = '';
-		var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
-		for(var ii=0; ii<canvases.length; ii++)
-			canvases[ii].style.webkitAnimation = '';
-		Polymer.dom.flush();
-	}
-	
-	var StyleActive = function(el){
-		ResetStyle(el);
-		el.style.boxShadow = '0px 0px 5px 3px #fc0';
-		el.style.backgroundColor = '#eee';
-		el.$.over.style.display = 'block';			
-	}
-	
-	var StyleHover = function(el){
-		ResetStyle(el);
-	}
+    "use strict";
+    
+    var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
+    
+    var ResetStyle = function(el){
+        var display = el.style.display;
+        el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
+        el.$.over.style.cssText = '';
+        el.$.sticker.style.right = '';
+        el.$.sticker.style.webkitAnimation = '';
+        el.$.blind.style.cssText = '';
+        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        for(var ii=0; ii<canvases.length; ii++)
+            canvases[ii].style.webkitAnimation = '';
+        Polymer.dom.flush();
+    }
+    
+    var StyleActive = function(el){
+        ResetStyle(el);
+        el.style.boxShadow = '0px 0px 5px 3px #fc0';
+        el.style.backgroundColor = '#eee';
+        el.$.over.style.display = 'block';          
+    }
+    
+    var StyleHover = function(el){
+        ResetStyle(el);
+    }
 
-	var StyleProxiamte = function(el){
-		StyleMoving(el);
-		el.style.backgroundColor = '';
-		//TODO: need to deal with animation prefixing
-		el.style.opacity = '1';
-		el.$.sticker.style.right = '26px';
-		el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-		var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
-		for(var ii=0; ii<canvases.length; ii++)
-			canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
-		Polymer.dom.flush();
-	}
-	
-	var StyleMoving = function(el){
-		ResetStyle(el);
-		el.style.opacity = '0.5';
-		el.style.borderWidth = '10px';
-		el.style.borderColor = '#000';
-		el.style.backgroundColor = '#888';
-		el.style.pointerEvents = 'none';
-		el.style.zIndex = '100';
-		el.style.position = 'absolute';
-	}
-	
-	var StyleDisabled = function(el){
-		ResetStyle(el);
-		el.$.blind.style.display = 'block';
-		el.style.pointerEvents = 'none';
-	}
-			
+    var StyleProxiamte = function(el){
+        StyleMoving(el);
+        el.style.backgroundColor = '';
+        //TODO: need to deal with animation prefixing
+        el.style.opacity = '1';
+        el.$.sticker.style.right = '26px';
+        el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
+        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        for(var ii=0; ii<canvases.length; ii++)
+            canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
+        Polymer.dom.flush();
+    }
+    
+    var StyleMoving = function(el){
+        ResetStyle(el);
+        el.style.opacity = '0.5';
+        el.style.borderWidth = '10px';
+        el.style.borderColor = '#000';
+        el.style.backgroundColor = '#888';
+        el.style.pointerEvents = 'none';
+        el.style.zIndex = '100';
+        el.style.position = 'absolute';
+    }
+    
+    var StyleDisabled = function(el){
+        ResetStyle(el);
+        el.$.blind.style.display = 'block';
+        el.style.pointerEvents = 'none';
+    }
+            
     Polymer({
-    	is:'tile-element',
-    	properties: {
-			group_num: {
-				type: Number,
-				notify: true,
-				value: -1,
-				reflectToAttribute: true
-			},
-			group_color_1: {
-				type: String,
-				notify: true,
-				value: '#666',
-				reflectToAttribute: true
-			},
-			group_color_2: {
-				type: String,
-				notify: true,
-				value: '#f00',
-				reflectToAttribute: true
-			},
-			group_n: {
-				type: String,
-				notify: true,
-				value: '???',
-				reflectToAttribute: true
-			},
-			dir_rm: {
-				type: String, //canvas-manger id
-				value: ""
-			},
-			spa_rm: {
-				type: String, //canvas-manger id
-				value: ""
-			},
-			speed_rm: {
-				type: String, //canvas-manger id
-				value: ""
-			},
-			waves: {
-				type: String, //canvas-manger id
-				value: ""
-			},
-			tac: {
-				type: String, //canvas-manger id
-				value: ""
-			},
-			group_spa_max: {
-				type: String,
-				notify: true,
-				value: null,
-				reflectToAttribute: true
-			},
-			state: {
-				notify: true,
-				value: null,
-				readOnly: true
-			},
-			moving: {
-				type: Boolean,
-				value: false,
-				notify: true
-			},
-			active: {
-				type: Boolean,
-				value: false,
-				notify: true
-			},
-			proximate: {
-				type: Boolean,
-				value: false,
-				notify: true
-			},
-			disabled: {
-				type: Boolean,
-				value: false,
-				notify: true
-			},
-			borderWidth: {
-				type: Number,
-				value: 1,
-				computed: 'compute_border_width(moving)'
-			}
-    	},
-    	observers: [
-    		'_update_state(active, moving, proximate, disabled)'
-    	],
-    	_show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
-    		return val ? '' : 'none';
-    	},
-		updateCanvas: function(newCanv, canvasNum){
-			return;
-			var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-			for(var i=0;i <oldCanv.classList.length; i++)
-				newCanv.classList.add(oldCanv.classList[i]);
-			Polymer.dom(oldCanv.parentNode).insertBefore(newCanv, oldCanv);
-			Polymer.dom(oldCanv.parentNode).removeChild(oldCanv);  
-		},
-		updateCrossHair: function(canvasNum,x,y){
-			/* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
-				if x is null/undefined, any existing crosshair will be removed. 	*/
-			var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-			var xh = canv.nextElementSibling
-			xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
-			
-			if (xh && !(x==0 || x>0)){
-				xh.remove();
-			}else{
-				if(!xh){
-					xh = document.createElement('cross-hair');
-					xh.w = parseInt(getComputedStyle(canv).width);
-					xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
-					Polymer.dom(canv.parentNode).insertBefore(xh, canv.nextElementSibling)//insert after the canvas
-				}
-				xh.setXY(x,y);
-			}
-		},
-		getCanvInfo: function(canvasNum,pageX,pageY){
-			//TODO: if no pageX and pageY then life should be more simple...
-			var canv =  Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-			var totalOffsetX = 0;
-			var totalOffsetY = 0;
-			var el = canv;
-			do{
-				totalOffsetX += el.offsetLeft - el.scrollLeft;
-				totalOffsetY += el.offsetTop - el.scrollTop;
-			}while(el = el.offsetParent)
-			
-			var canvX = pageX - totalOffsetX;
-			var canvY = pageY - totalOffsetY;
-			
-			var canvProps = getComputedStyle(canv); //TODO: we don't need to do this because we can track any changes since we (largely) have control over the canvases.
-			var w = parseInt(canvProps.width), h = parseInt(canvProps.height);
-			if(canvX < 0 || canvY < 0 || canvX > w|| canvY > h)
-				return null;
-			else
-				return {x:canvX, y:canvY, 
-						w:w,
-						h:h,
-						top:canv.offsetTop,
-						left:canv.offsetLeft,
-						el: canv}
-		},
+        is:'tile-element',
+        properties: {
+            group_num: {
+                type: Number,
+                notify: true,
+                value: -1
+            },
+            group_color_1: {
+                type: String,
+                notify: true,
+                value: '#666'
+            },
+            group_color_2: {
+                type: String,
+                notify: true,
+                value: '#f00'
+            },
+            group_n: {
+                type: String,
+                notify: true,
+                value: '???'
+            },
+            dir_rm: {
+                type: String, //canvas-manger id
+                value: ""
+            },
+            spa_rm: {
+                type: String, //canvas-manger id
+                value: ""
+            },
+            speed_rm: {
+                type: String, //canvas-manger id
+                value: ""
+            },
+            waves: {
+                type: String, //canvas-manger id
+                value: ""
+            },
+            tac: {
+                type: String, //canvas-manger id
+                value: ""
+            },
+            group_spa_max: {
+                type: String,
+                notify: true,
+                value: null
+            },
+            state: {
+                notify: true,
+                value: null,
+                readOnly: true
+            },
+            moving: {
+                type: Boolean,
+                value: false,
+                notify: true
+            },
+            active: {
+                type: Boolean,
+                value: false,
+                notify: true
+            },
+            proximate: {
+                type: Boolean,
+                value: false,
+                notify: true
+            },
+            disabled: {
+                type: Boolean,
+                value: false,
+                notify: true
+            },
+            borderWidth: {
+                type: Number,
+                value: 1,
+                computed: 'compute_border_width(moving)'
+            }
+        },
+        observers: [
+            '_update_state(active, moving, proximate, disabled)'
+        ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
+            return val ? '' : 'none';
+        }, updateCanvas: function(newCanv, canvasNum){
+            return;
+            var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
+            for(var i=0;i <oldCanv.classList.length; i++)
+                newCanv.classList.add(oldCanv.classList[i]);
+            Polymer.dom(oldCanv.parentNode).insertBefore(newCanv, oldCanv);
+            Polymer.dom(oldCanv.parentNode).removeChild(oldCanv);  
+        }, updateCrossHair: function(canvasNum,x,y){
+            /* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
+                if x is null/undefined, any existing crosshair will be removed.     */
+            var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
+            var xh = canv.nextElementSibling
+            xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
+            
+            if (xh && !(x==0 || x>0)){
+                xh.remove();
+            }else{
+                if(!xh){
+                    xh = document.createElement('cross-hair');
+                    xh.w = parseInt(getComputedStyle(canv).width);
+                    xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
+                    Polymer.dom(canv.parentNode).insertBefore(xh, canv.nextElementSibling)//insert after the canvas
+                }
+                xh.setXY(x,y);
+            }
+        },
+        getCanvInfo: function(canvasNum,pageX,pageY){
+            //TODO: if no pageX and pageY then life should be more simple...
+            var canv =  Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
+            var totalOffsetX = 0;
+            var totalOffsetY = 0;
+            var el = canv;
+            do{
+                totalOffsetX += el.offsetLeft - el.scrollLeft;
+                totalOffsetY += el.offsetTop - el.scrollTop;
+            }while(el = el.offsetParent)
+            
+            var canvX = pageX - totalOffsetX;
+            var canvY = pageY - totalOffsetY;
+            
+            var canvProps = getComputedStyle(canv); //TODO: we don't need to do this because we can track any changes since we (largely) have control over the canvases.
+            var w = parseInt(canvProps.width), h = parseInt(canvProps.height);
+            if(canvX < 0 || canvY < 0 || canvX > w|| canvY > h)
+                return null;
+            else
+                return {x:canvX, y:canvY, 
+                        w:w,
+                        h:h,
+                        top:canv.offsetTop,
+                        left:canv.offsetLeft,
+                        el: canv}
+        }, compute_border_width: function(moving){
+            return moving ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
+        }, _sticker_style: function(group_num){
+            return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
+        }, _update_state: function(active, moving, proximate, disabled){
+            // This was preciously expressed in a much more complicated way
 
-		compute_border_width: function(moving){
-			return moving ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
-		},
+            if(movingTile === this && !moving)
+                movingTile = null; // no longer moving
 
-		_update_state: function(active, moving, proximate, disabled){
-			// This was preciously expressed in a much more complicated way
+            if(disabled){
+                if(moving)
+                    throw "cannot disable tile while moving";
+                this.set('active', false); // may have been true
+                StyleDisabled(this);
+            } else if(moving){
+                if(movingTile === null){
+                    movingTile = this;
+                    StyleMoving(this);
+                } else if(movingTile === this){
+                    if(proximate){
+                        StyleProxiamte(this);
+                    }else{
+                        StyleMoving(this);
+                    }
+                } else {
+                    throw "cannot set this tile to moving while another tile is still moving.";
+                }
+            } else if(active){
+                if(movingTile === null){
+                    StyleActive(this);
+                } else {
+                    // here active actually means hover
+                    StyleHover(this);
+                }
+            } else {
+                ResetStyle(this);
+            }
 
-			if(movingTile === this && !moving)
-				movingTile = null; // no longer moving
+            if(proximate && !moving)
+                console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
+        },
 
-			if(disabled){
-				if(moving)
-					throw "cannot disable tile while moving";
-				this.set('active', false); // may have been true
-				StyleDisabled(this);
-			} else if(moving){
-				if(movingTile === null){
-					movingTile = this;
-					StyleMoving(this);
-				} else if(movingTile === this){
-					if(proximate){
-						StyleProxiamte(this);
-					}else{
-						StyleMoving(this);
-					}
-				} else {
-					throw "cannot set this tile to moving while another tile is still moving.";
-				}
-			} else if(active){
-				if(movingTile === null){
-					StyleActive(this);
-				} else {
-					// here active actually means hover
-					StyleHover(this);
-				}
-			} else {
-				ResetStyle(this);
-			}
-
-			if(proximate && !moving)
-				console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
-		},
-
-		get placeholder(){
-			if(!this.placeholder_){
-				var p = document.createElement('div');
-				p.style.backgroundColor = '#8F8';
-				var s = getComputedStyle(this);
-				p.style.width = s.width;
-				p.style.height = s.height;
-				p.style.border = s.border;
-				p.style.display = s.display;
-				this.placeholder_ = p; //we store this here on the offchance one day we need to respond to changes in the tile's properties durign the moving.
-			}
-			return this.placeholder_;	
-		},
-		set placeholder(val){
-			if(val)
-				throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
-			this.placeholder_ = null;
-		},
-		shake: function(){
-			this.classList.add('shake');
-		},
-		clearShake: function(){
-			this.classList.remove('shake');
-		},
-		StopProp: function(e){console.log('so, what?');e.stopPropagation();},
-		getCopyOfCanvs: function(withSticker){
-			var div = document.createElement('div');
-			var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
-			for(var i = 0;i<oldCanvs.length;i++){
-				var img = document.createElement('img');
-				if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
-					continue;
-				img.setAttribute('width',oldCanvs[i].style.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
-				img.setAttribute('height',oldCanvs[i].style.height); 
-				img.src = oldCanvs[i].toDataURL();
-				img.style.imageRendering = 'pixelated';
-				div.appendChild(img);
-			}
-			if(withSticker){
-				var sticker = this.$.sticker.cloneNode(true);
-				sticker.style.cssText =  "width: 20px;height: 17px;border: 1px solid;text-align: center;padding-top: 3px;position: absolute;right: 0px;top: 0px;font-size:0.8em;" 
-										+ sticker.style.cssText; //this is a bit lame, but doing it properly would be a big complicated job I think
-				div.appendChild(sticker);
-			}
-			div.style.position = 'relative';
-			return div;
-		},
-		getCanv: function(canvNum){
-			return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
-		}
-	});
+        get placeholder(){
+            if(!this.placeholder_){
+                var p = document.createElement('div');
+                p.style.backgroundColor = '#8F8';
+                var s = getComputedStyle(this);
+                p.style.width = s.width;
+                p.style.height = s.height;
+                p.style.border = s.border;
+                p.style.display = s.display;
+                this.placeholder_ = p; //we store this here on the offchance one day we need to respond to changes in the tile's properties durign the moving.
+            }
+            return this.placeholder_;   
+        },
+        set placeholder(val){
+            if(val)
+                throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
+            this.placeholder_ = null;
+        },
+        shake: function(){
+            this.classList.add('shake');
+        },
+        clearShake: function(){
+            this.classList.remove('shake');
+        },
+        StopProp: function(e){console.log('so, what?');e.stopPropagation();},
+        getCopyOfCanvs: function(withSticker){
+            var div = document.createElement('div');
+            var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
+            for(var i = 0;i<oldCanvs.length;i++){
+                var img = document.createElement('img');
+                if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
+                    continue;
+                img.setAttribute('width',oldCanvs[i].style.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
+                img.setAttribute('height',oldCanvs[i].style.height); 
+                img.src = oldCanvs[i].toDataURL();
+                img.style.imageRendering = 'pixelated';
+                div.appendChild(img);
+            }
+            if(withSticker){
+                var sticker = this.$.sticker.cloneNode(true);
+                sticker.style.cssText =  "width: 20px;height: 17px;border: 1px solid;text-align: center;padding-top: 3px;position: absolute;right: 0px;top: 0px;font-size:0.8em;" 
+                                        + sticker.style.cssText; //this is a bit lame, but doing it properly would be a big complicated job I think
+                div.appendChild(sticker);
+            }
+            div.style.position = 'relative';
+            return div;
+        },
+        getCanv: function(canvNum){
+            return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
+        }
+    });
 </script>
 
   
