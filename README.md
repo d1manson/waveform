@@ -1,5 +1,7 @@
 # <a name="wiki"/> Waveform
 
+**THE APPLICATION IS IN THE PROCESS OF BEING ENTIERLY REWRITTEN** and this time it's for real..already about 70% of the way there, and the code is looking a helluva lot healthier.  It should be finished by the end of the first week of April 2016 at the latest.   
+
 Daniel decided that browsers are good for rapid design of user-friendly interfaces. This is very much a work in progress.  Note that only Chrome is actively supported. Firefox seems to work okay, but other browsers less so.
 
 **To use the application** do one of the following:
