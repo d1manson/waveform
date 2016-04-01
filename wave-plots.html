@@ -82,6 +82,7 @@ var off_canv_wave_h = 164; // height of a wave
 var off_canv_dt = 4; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
 
+// These two are applied in css..the actual width used matches the pixels on the off_canv
 var on_canv_width = n_c*n_w*2;
 var on_canv_height = 128;
 
@@ -912,7 +913,6 @@ Polymer({
         '_data_for_gl_changed(data_for_gl)'
         // TODO: send modified okeys when group_num changes on existing okey ...or work it out from splice notifcations
     ], created: function(){
-        this._okey_to_ckey = new Map(); // this is not weak, because we need to free canvas-manger id's
         try{
             this._renderer = new WavesRenderer(this._okey_rendered.bind(this));
         } catch (e){
@@ -942,12 +942,9 @@ Polymer({
 
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
-        for(let okey of okeys_to_remove){
-            let ckey = this._okey_to_ckey.get(okey);
-            if(ckey){
-                cm.free_canvas(ckey);
-            }
-            this._okey_to_ckey.delete(okey);
+        for(let okey of okeys_to_remove) if(okey && okey.waves){
+            cm.free_canvas(okey.waves);
+            okey.waves = null; // Note we don't both to use the Polymer .set machienery, because the okey is being (at least temporarily) discarded
         }
         okeys_to_add = okeys_to_add.filter(function(okey){
             return okey ? 1 : 0;
@@ -977,14 +974,13 @@ Polymer({
             if(!key){
                 throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
             }
-            let ckey_old = this._okey_to_ckey.get(okey);
+            let ckey_old = okey.waves;
             let ckey;
             if(ckey_old && cm.get_canvas(ckey_old) === el_canvas){
                 ckey = ckey_old; // renderer was able to reuse a previously rendered canvas
             } else {
                 ckey_old && cm.free_canvas(ckey_old);  // if there was an old canvas, free it, because there's a new one now
                 ckey = cm.store_canvas(el_canvas);
-                this._okey_to_ckey.set(okey, ckey);
             }
             this.set('groups.' + key + '.waves', ckey);            
         }

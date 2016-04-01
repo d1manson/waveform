@@ -52,6 +52,10 @@ var get_base_for_cuts = function(files){
 
 
 <style>
+:host{
+user-drag: none;
+-webkit-user-drag: none;
+}
 ::-webkit-scrollbar {
 width: 10px;
 height: 10px;
@@ -124,10 +128,16 @@ color: #500;
 background: #500;
 color: #fff;
 }
-.trial_cut.obj{
+.trial_cut.stack{
 background: #bbF;
 border-color: #005;
 color: #005;
+user-drag: element;
+-webkit-user-drag: element;
+}
+.trial_cut.stack.selected{
+background: #005;
+color: #fff;
 }
 iron-list{
 flex: 2;
@@ -187,7 +197,8 @@ font-size: 10px;
                 <div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]' on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
                     <div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
                     <template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
-                        <div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' on-click="_cut_click">[[cut.short_name]]</div>
+                        <div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' 
+                                on-click="_cut_click" on-dragstart="_cut_dragstart"  on-dragend="_cut_dragend">[[cut.short_name]]</div>
                     </template>
                 </div>
             </template>
@@ -258,7 +269,9 @@ Polymer({
         },
         trials: {
             type: Array,
-            value: function(){ return [];}
+            value: function(){ return [];},
+            notify: true,
+            readOnly: true
         }
     }, created: function(){
         this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
@@ -280,12 +293,27 @@ Polymer({
             els[ii].addEventListener('fork', this._cut_forked.bind(this));
         }
     }, _cut_forked: function(e){
-        var cut_box = e.detail;
-        // TODO: need to insert the cut_box as a new cut on (the current??!!) tet_obj
-        // then set the current cut to being that cut_box
-        // Do a plit on the console...
-        // m = new Uint8Array(1993); for(let i=0;i<m.length;i++)m[i]= Math.random() > 0.2? 1 : 0
-        console.dir(e);
+        let new_cut = e.detail
+
+        let trial = this._trial_from_base.get(this.selected_trial);
+        let tet_obj = this._get_tet_obj(trial, this.selected_tet_num);
+        let suffix = 'a'.charCodeAt(0);
+        for(let cc of tet_obj.cuts)if(cc.cut_type === 'stack'){
+            suffix += 1;
+        }
+
+        // I wish there was a nicer way to do this...
+        this.unshift('trials.' + Utils.get_key(this.trials, trial)  +
+                  '.tets.' + Utils.get_key(trial.tets, tet_obj) + '.cuts',{
+                    cut: new_cut,
+                    cut_type: 'stack',
+                    caption: this.selected_trial + '_' + tet_obj.tet_num + ".cut" + " (modified cut)", //note no suffix when saved as file
+                    date: Date.now(), // note that this doesn't update when you modify the cut further
+                    date_name_str: Date.now() + ' ' + suffix, // this is neccessary for the deduping-machinery
+                    short_name: '~' + String.fromCharCode(suffix) + '_' + tet_obj.tet_num + ".cut"
+                });
+        
+        this.set('selected_cut', new_cut);
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;
         var old_sel = this._trial_from_base.get(this.selected_trial);
@@ -611,7 +639,7 @@ Polymer({
         return a-b; 
     }, _reassign_trials_denovo: function(){
         // TODO: see https://github.com/Polymer/polymer/issues/2279
-        this.set('trials', JSON.parse(JSON.stringify(this.trials)));
+        this._setTrials(JSON.parse(JSON.stringify(this.trials)));
         this._trial_from_base.clear();
         for(let trial of this.trials){
             this._trial_from_base.set(trial.name, trial);
@@ -657,6 +685,21 @@ Polymer({
         this._reassign_trials_denovo();     
     },
      _regex_cut_tet_num: /(\d*)[a-zA-Z _]*\.cut$/
+    , _cut_dragstart: function(e){
+        // this is enabled in css only for stack-type cuts
+        let model = e.model;
+        let trial_base = model.dataHost.dataHost.dataHost.dataHost.trial.name; // https://github.com/Polymer/polymer/issues/1919
+        let tet_num = model.dataHost.dataHost.tet_block.tet_num;
+        let cut = Utils.file_manager.get_file(model.cut.cut);
+        let filename = trial_base + "_" + tet_num + ".cut";
+        let blob_url = cut.get_blob_url(trial_base);
+
+        e.dataTransfer.setData("DownloadURL", 'application/octet-stream:' + filename +':' + blob_url);
+        this._setIs_dragging_out(true);
+        return true;
+     }, _cut_dragend: function(e){
+        this._setIs_dragging_out(false);
+     }
 })
 
 </script>

@@ -52,6 +52,9 @@ doesn't have a worker, but it uses a similar system.
 <script>
     "use strict";
 
+(function(){
+
+
     var bin_count = function(group_idx, max_len){
         var ret = new Uint32Array(max_len);
         for(var ii=0; ii<group_idx.length; ii++)
@@ -114,6 +117,61 @@ doesn't have a worker, but it uses a similar system.
         return ret;
     }
 
+    var CutStackState = function(that){
+        this.is = "stack";
+        this.undo_stack_descriptions = that.undo_stack_descriptions;
+        this.redo_stack_descriptions = that.redo_stack_descriptions;
+        this.groups = that.groups;
+        this.undo_stack = that.undo_stack;
+        this.redo_stack = that.redo_stack;
+        return this;
+    }
+
+    CutStackState.prototype.get_blob_url = function(experiment_name){
+        // This methods is called by file-organiser when dragging starts
+
+        var am = Utils.typed_array_manager;
+
+        // build the 1d array that gives the group number for each spike...
+
+        // I'm not sure if total n_spikes is already avialble somehwere, but hey...
+        var n_spikes = 0;
+        for(let gg of this.groups){
+            n_spikes += gg && gg.n_spikes;
+        }
+
+        var the_cut = new Uint8Array(n_spikes);
+        for(let ii=0; ii<this.groups.length; ii++){
+            let gg = this.groups[ii];
+            if(!gg){
+                continue;
+            }
+            let inds = am.get_array(gg.akey);
+            for(let jj=0; jj<inds.length; jj++){
+                the_cut[inds[jj]] = ii;
+            }
+        }
+
+        // and now construct the string
+        let str = ['n_clusters: ' + this.groups.length,
+                   'n_channels: 4',
+                   'n_params: 0',
+                   'times_used_in_Vt: 0 0 0 0'];
+
+        for(let ii=0; ii<this.groups.length; ii++){
+            str.push(' cluster: ' + ii + ' center: 0 0 0 0 0 0 0 0');
+            str.push(' min:   0 0 0 0 0 0 0 0');
+            str.push(' max:   0 0 0 0 0 0 0 99');
+        }
+        str.push('');
+        str.push('Exact_cut_for: '+ experiment_name +' spikes: ' + n_spikes);
+        str.push('');
+        str = str.join('\n') + Array.prototype.join.call(the_cut, ' ');
+
+        var b = new Blob([str], {type: 'text/plain'}); 
+        return window.URL.createObjectURL(b);
+    }
+
     Polymer({
         is:'cut-object',
         properties: {
@@ -141,6 +199,7 @@ doesn't have a worker, but it uses a similar system.
         },
         _make_box: function(inds){
             return {
+                group_num: 3, // TODO: update this properly
                 akey: Utils.typed_array_manager.store_array(inds),
                 n_spikes: inds.length,
                 spa_max: -1,
@@ -148,7 +207,7 @@ doesn't have a worker, but it uses a similar system.
                 spa_rm: "",
                 speed_rm: "",
                 tac: "",
-                waves: ""                
+                waves: ""
             };
         },
         _use_cut_box: function(){
@@ -223,14 +282,10 @@ doesn't have a worker, but it uses a similar system.
                 // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
                 // note that the new "cut box" will be applied to this element as its cut_box, but this will not
                 // cause any changes as all the values will be the same.
-                this.fire('fork', {
-                    is: "stack",
-                    undo_stack_descriptions: this.undo_stack_descriptions,
-                    redo_stack_descriptions: this.redo_stack_descriptions,
-                    groups: this.groups,
-                    undo_stack: this.undo_stack,
-                    redo_stack: this.redo_stack
-                });
+
+                // we could hold the reference directly, but it complciates matters when doing bulk updates of trials
+                let new_cut = Utils.file_manager.store_file(new CutStackState(this)); 
+                this.fire('fork', new_cut);
             }
         }, swap_groups: function(a, b){
             if(a==b) return;
@@ -406,6 +461,8 @@ doesn't have a worker, but it uses a similar system.
             }
         }
     });
+
+})();
 </script>
 
   

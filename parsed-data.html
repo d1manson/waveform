@@ -1208,7 +1208,7 @@ var parse_clu_file = function(full_str, fkey){
     }
     var cut = new Uint32Array(cut_as_str.length-1);
     for(let ii=0; ii<cut.length; ii++){
-        cut[ii] = parseInt(cut_as_str[ii+1]);
+        cut[ii] = parseInt(cut_as_str[ii+1]) -1;
     }
 
     return {
@@ -1334,6 +1334,7 @@ var parse_clu_file = function(full_str, fkey){
             '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
         ], created: function(){
             this._files = {}; // set, tet, pos, cut
+            this._fkeys = {}; // set, tet, pos, cut
             this._cut_from_fkey = new Map();
             this._set_from_fkey = new Map();
             this._pos_from_options = new Map(); // key=options object giving fkey and parse options; value= {header, xy, dir, speed}
@@ -1366,20 +1367,34 @@ var parse_clu_file = function(full_str, fkey){
 
             this._worker_io.send_ports(ports_for_io);
 
-        }, _change_to_files: function(new_vals, old_vals){
-            // nullify things that are changing...
-            old_vals = old_vals || {};
+        }, attached: function(){
+            var els = document.getElementsByTagName('cut-object');
+            for(let ii=0; ii<els.length; ii++){
+                els[ii].addEventListener('fork', this._cut_forked.bind(this));
+            }
+        }, _cut_forked: function(e){
+            // We catch this signal from the cut-obj directly, in addition to the file-organiser catching it.
+            // By doing this, when the file-organiser changes its file_selection, we will not treat the forked cut
+            // as being new..which is great.  Note that setting the cut_box here will send it to the cut obj, but the
+            // cut object will find that each inidvidual property is the same as before, so will not actually do anything.
+            // Another thing to note is that file_selection is updated from within a debounce in file-organiser, which ensures
+            // that this event handler is called before the file-organiser notifies us of the change.
+            this._fkeys.cut = e.detail;
+            this._files.cut = Utils.file_manager.get_file(this._fkeys.cut);
+            this._setCut_box(this._files.cut);
+        }, _change_to_files: function(new_fkeys){
+            // nullify things that are changing... (note we this._fkeys rather than 2nd argument, old_fkeys due to _cut_forked)
             var changing = new Set();
             for(let k of ['tet','cut','pos','set']){
-                if(!old_vals[k] || old_vals[k] !== new_vals[k]){
+                if(!this._fkeys[k] || this._fkeys[k] !== new_fkeys[k]){
                     changing.add(k);
-                    this._files[k] = Utils.file_manager.get_file(new_vals[k]) || null;
+                    this._files[k] = Utils.file_manager.get_file(new_fkeys[k]) || null;
                 }
             }
-            if(changing.has('tet') && old_vals.cut && old_vals.cut.is === "n"){
+            if(changing.has('tet') && this._fkeys.cut && this._fkeys.cut.is === "n"){
                 changing.add('cut');
             }
-
+            this._fkeys = Utils.simple_clone(new_fkeys);
             this.fire('start_nulling', changing);
 
             if(changing.has('set')){
@@ -1410,44 +1425,45 @@ var parse_clu_file = function(full_str, fkey){
 
             if(changing.has('set')){
                 request['set'] = null;
-                if(new_vals.set && this._set_from_fkey.has(new_vals.set)){
-                    this._use_set(this._set_from_fkey.get(new_vals.set));
+                if(new_fkeys.set && this._set_from_fkey.has(new_fkeys.set)){
+                    this._use_set(this._set_from_fkey.get(new_fkeys.set));
                 } else {
                     request['set'] = this._files.set;
-                    request['set_fkey'] = new_vals.set;
+                    request['set_fkey'] = new_fkeys.set;
                 }
             }
 
             if(changing.has('cut')){
                 this._make_cut_from_n = false;
                 request['cut'] = null;
-                if(!new_vals.cut){
+                if(!new_fkeys.cut){
                     this._make_cut_from_n = true; // we have already guaranteed that changing has 'tet'
                                                   // though if there's no tet file we will never get to make the cut
-                } else if(new_vals.cut && new_vals.cut.is === "stack"){
-                    this._setCut_box(new_vals.cut); //easy
+                } else if(this._files.cut.is === "stack"){
+                    // new_values.cut is an fkey for a "fake" file, which is actually a cut "stack" object
+                    this._setCut_box(this._files.cut); //easy
                 } else {
-                    // new_vals.cut is an fkey
-                    if(this._cut_from_fkey.has(new_vals.cut)){
+                    // new_fkeys.cut is an fkey for a proper file
+                    if(this._cut_from_fkey.has(new_fkeys.cut)){
                         // create box from cached inds and header
                         this._setCut_box({
                             is: 'file',
-                            akey: this._cut_from_fkey.get(new_vals.cut).cut,
-                            header: this._cut_from_fkey.get(new_vals.cut).header
+                            akey: this._cut_from_fkey.get(new_fkeys.cut).cut,
+                            header: this._cut_from_fkey.get(new_fkeys.cut).header
                         });
                     } else {
                         request['cut'] = this._files.cut;
-                        request['cut_fkey'] = new_vals.cut;
+                        request['cut_fkey'] = new_fkeys.cut;
                     }
                 }
             }
 
             if(changing.has('pos')){
                 request['pos'] = null;
-                if(new_vals.pos){
+                if(new_fkeys.pos){
                     var in_cache = false;
                     var pos_options = this._make_pos_options();
-                    pos_options.fkey = new_vals.pos;
+                    pos_options.fkey = new_fkeys.pos;
                     for(let [cached_opts, data] of this._pos_from_options){
                         if(Utils.is_equal_simple(cached_opts, pos_options)){
                             this._use_pos(data);
@@ -1458,13 +1474,13 @@ var parse_clu_file = function(full_str, fkey){
                     if(!in_cache){
                         request['pos'] = this._files.pos;
                         options['pos'] = this._make_pos_options();
-                        request['pos_fkey'] = new_vals.pos;
+                        request['pos_fkey'] = new_fkeys.pos;
                     }
                 }
             }
 
             if(changing.has('tet')){
-                this._make_tet_request(new_vals.tet, this._files.tet, request, options);
+                this._make_tet_request(new_fkeys.tet, this._files.tet, request, options);
             }
 
             this._worker_io.exec('read_files', request, options); 

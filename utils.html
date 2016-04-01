@@ -12,11 +12,11 @@ Utils.dedupe = function(splices){
 
      Taken/adapted from dom-repeat._applySplicesUserSort.
     */
-    if (splices.length === 1){
+    if(!splices || splices.length === 0){
+        return {added: [], removed: []}; // TODO: check why this can happen
+    } else if (splices.length === 1){
         // assume that if there's only one element in the array then it's already properly de-deduped
         return splices[0]; 
-    } else if(splices.length === 0){
-        return {added: [], removed: []}; // TODO: check if this can happen
     }
 
     var key_map = {}; // -1: removed; +1: added; 0: neither added nor removed
@@ -50,6 +50,7 @@ Utils.dedupe = function(splices){
     
 };
 
+// simplel clone is for when there's nothing complicated to think about
 Utils.simple_clone = function(a){
     var b = {};
     for(aa in a){
@@ -57,6 +58,12 @@ Utils.simple_clone = function(a){
     }
     return b;
 };
+
+
+Utils.get_key = function(arr, item){
+    // don't use this in a tight loop..lift the get(arr) out of the loop.
+    return Polymer.Collection.get(arr).getKey(item); 
+}
 
 Utils.is_equal_simple = function(a, b){
     // very simple....
@@ -162,6 +169,7 @@ Utils.typed_array_manager = (function(){
 
 Utils.file_manager = (function(){
     // This is a thin wrapper around an array, note that you can never remove files once added
+    // Note also that we actually store more than just files in the array, we also store cut "stack" objects
     var store = [undefined];
     
     return {

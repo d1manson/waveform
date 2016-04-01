@@ -222,11 +222,11 @@ var is_equal_simple = function(a, b){
             groups: {
                 type: Array,
                 value: function(){return [];},
-                notify: true
+                notify: true,
+                observer: '_groups_set'
             }
         },
         observers: [
-            '_groups_set(groups)',
             '_groups_spliced(groups.splices)', 
             '_options_modified(max_delta_t)',
             '_times_modified(spike_times)',
