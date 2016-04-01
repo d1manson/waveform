@@ -32,8 +32,9 @@ thought it had already delivered.
 "use strict";
 
 var render_options = {
-    max_delta_t: undefined,
-    n_bins: 100
+    max_delta_t: undefined, // miliseconds
+    n_bins: 100,
+    height: 50 //px, width matches n_bins exactly
 };
 var spike_times;
 var timebase;
@@ -89,9 +90,9 @@ var update_keys = function(changes, arrays){
     // generation and that it's still wanted.
 
     var remove_keys = changes.remove || [];
-    for(var ii=0; ii<remove_keys.length; ii++){
-        key_to_array.delete(remove_keys[ii]);
-        key_to_rendered_options.delete(remove_keys[ii]);
+    for(let key of remove_keys){
+        key_to_array.delete(key);
+        key_to_rendered_options.delete(key);
     }
 
     if(changes.generation_add !== changes.generation_remove){
@@ -100,9 +101,9 @@ var update_keys = function(changes, arrays){
     }
 
     var add_keys = changes.add || [];
-    for(var ii=0; ii<add_keys.length; ii++){
-        key_to_array[add_keys[ii]] = arrays[add_keys[ii]];
-        keys_pending_render.push(add_keys[ii]);
+    for(let key of add_keys){
+        key_to_array.set(key, arrays[key]);
+        keys_pending_render.push(key);
     }
 
     touch_timer();        
@@ -125,7 +126,7 @@ var timer_tick = function(){
     // find one valid thing to render...
     while(keys_pending_render.length > 0){
         var key = keys_pending_render.pop();
-        if(key && key_to_array[key] && !is_equal_simple(key_to_rendered_options[key], render_options)){
+        if(key && key_to_array.get(key) && !is_equal_simple(key_to_rendered_options.get(key), render_options)){
             get_group_hist(key);
             break;
         }
@@ -136,20 +137,22 @@ var timer_tick = function(){
 
 var get_group_hist = function(key){
     // note desired_max_delta_t and spike_times should both be in the same units
-    var group_times = pick(spike_times, key_to_array[key]);
+    var group_times = pick(spike_times, key_to_array.get(key));
 
     // build pairwise-diff histogram
-    var ret = new Uint32Array(render_options.n_bins+1);
-    get_group_hist_sub(ret, group_times, render_options.max_delta_t*timebase, 
-                        render_options.max_delta_t*timebase/render_options.n_bins);
- 
-    key_to_rendered_options[key] = clone_simple(render_options);
+    var hist = new Uint32Array(render_options.n_bins+1);
+    get_group_hist_sub(hist, group_times, render_options.max_delta_t/1000*timebase, 
+                        render_options.max_delta_t/1000*timebase/render_options.n_bins);
+    
+    hist = plot_histogram(hist, render_options.height);
+    key_to_rendered_options.set(key, clone_simple(render_options));
     exec_main_b('plot_hist', {
         key: key,
         generation: key_generation,
         hist_name: 'hist',
-        render_options: key_to_rendered_options[key]
-    }, {hist: ret});
+        dims: [render_options.n_bins, render_options.height],
+        render_options: key_to_rendered_options.get(key)
+    }, {hist: hist});
 }
 
 var get_group_hist_sub = function(ret, group_times, D, b){
@@ -165,6 +168,28 @@ var get_group_hist_sub = function(ret, group_times, D, b){
 }
 
 // TODO: come with a better method than copy-pasting utility functions ....
+
+var plot_histogram = function(vals, h){
+    let w = vals.length-1;
+    let max = 0;
+    for(let ii=0; ii<w; ii++){
+        (vals[ii] > max) && (max = vals[ii]);
+    }
+    let factor = h/max;
+    let color_a = 0xff0000ff;
+    let im = new Uint32Array(w*h);
+    for(let x=0, y=vals[0]; x<w; x++){
+        let target_y = 0 | (vals[x]*factor);
+        for(; y<target_y; y++){
+            im[w*(h-y) + x] = color_a;
+        }
+        for(; y>target_y; y--){
+            im[w*(h-y) + x] = color_a;
+        }
+        im[w*(h-y) + x] = color_a;
+    }
+    return im;
+}
 
 var pick = function(from, indices){
     // Take elements specified by indicies from the 1d array "from".
@@ -208,16 +233,19 @@ var is_equal_simple = function(a, b){
         is:'tac-plots',
         properties: {
             max_delta_t: {
-                type: Number,
-                value: 2
+                type: Number, // in miliseconds
+                value: 2,
+                notify: true
             },
             spike_times: {
-                type: Object, // array akey "data" and timebase Number in same units as max_delta_t
-                value: function(){ return {};}
+                type: Object, // array akey "data" and timebase Number in Hz (ie per second not per milisecond)
+                value: function(){ return {};},
+                notify: true
             },
             show: {
                 type: String, // "y" or "n" (to match other modules which have multiple toggle-able things)
-                value: "y"
+                value: "y",
+                notify: true
             },
             groups: {
                 type: Array,
@@ -280,6 +308,8 @@ var is_equal_simple = function(a, b){
                 if(canvas){
                     cm.free_canvas(canvas);
                 }
+                // TODO: the next line doesn't work because the item has already been removed from the collection at this point
+                //this.groups_collection.getItem(key).tac = null; // note we don't use Polymer set as this okey is  being (temporarily) discarded
                 this._key_to_canvas.delete(key);
                 this._key_to_rendered_options.delete(key);
                 this._key_is_on_worker.delete(key); // we can also forget this
@@ -306,7 +336,7 @@ var is_equal_simple = function(a, b){
         _times_modified: function(){
             if(this.show === 'y'){
                 if(this.spike_times){
-                    var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.data);
+                    var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.times);
                     this._worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
                 } else {
                     if(!this._worker) return;
@@ -342,11 +372,12 @@ var is_equal_simple = function(a, b){
         plot_hist: function(data, arrays) {
             if(data.generation !== this._key_generation)
                 return; // pft! get with the times, dude.
-            var group = this.groups_collection.getItem(data.key);
-            // TODO: actually make the histogram, store it and settings locally and set on group
-            //group.tac =  m.create_from_dims([128,30]);
-            console.log("plot_hist for: " + data.key + "   " + JSON.stringify(data.render_options));
-            console.dir(arrays[data.hist_name]);
+            let group = this.groups_collection.getItem(data.key);
+            let cm = Utils.canvas_manager;
+            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
+            this.set('groups.' + data.key + '.tac', ckey);
+            this._key_to_canvas.set(data.key, ckey);
+            this._key_to_rendered_options.set(data.key, data.render_options);
         }
 
     });

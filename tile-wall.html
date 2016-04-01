@@ -91,10 +91,6 @@ groups is an array of objects with the following properties:
     Polymer({
         is:'tile-wall',
         properties: {
-            spike_times: {
-                type: String, // typed-array-manager id
-                value: ""
-            },
             groups: {
                 type: Array,
                 value: function(){return [];},
@@ -102,27 +98,33 @@ groups is an array of objects with the following properties:
             },
             duration: {
                 type: Number, // seconds
-                value: 0
+                value: 0,
+                notify: true
             },
             spike_times: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                notify: true
             },
             pos_xy: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase, and units_per_cm
+                value: function(){ return {};}, // data (akey), timebase, and units_per_cm
+                notify: true
             },
             pos_dir: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                notify: true
             },
             pos_speed: {
                 type: Object,
-                value: function(){ return {};} // data (akey), timebase
+                value: function(){ return {};}, // data (akey), timebase
+                notify: true
             },
             data_for_gl: {
                 type: Object,
-                value: function(){return {};} // has n value and typed-array-manager id for gl voltages
+                value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
+                notify: true
             },
             options: {
                 type: Object,

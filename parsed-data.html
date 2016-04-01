@@ -957,7 +957,8 @@ var parse_tet_file = function(buffer, fkey, options, file_name){
         exec_main_b('got_times', {
             data: 'data', 
             fkey: fkey,
-            n_spikes: n
+            n_spikes: n,
+            timebase: parseInt(header.timebase),
         }, {data: data});
     }
 
@@ -1633,6 +1634,7 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.times = {
                 n: msg.n_spikes,
+                timebase: msg.timebase,
                 times: am.store_array(arrays.data)
             };
             if(msg.fkey === this.selected_files.tet){
