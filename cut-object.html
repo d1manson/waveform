@@ -200,14 +200,26 @@ doesn't have a worker, but it uses a similar system.
         _make_box: function(inds){
             return {
                 group_num: 1, // TODO: update this properly
+                
+                // The indices are immutable for the lifetime of this object
                 akey: Utils.typed_array_manager.store_array(inds),
+
+                // Theses properties are visualized by the tile element
                 n_spikes: inds.length,
                 spa_max: -1,
                 dir_rm: "",
                 spa_rm: "",
                 speed_rm: "",
                 tac: "",
-                waves: ""
+                waves: "",
+
+                // private properties for use by tac module, never notified
+                _tac_other: null,
+                _tac_other_options: null,
+                _tac_is_on_worker: false,
+
+                // property set by Polymer.Collection
+                _pkey: null 
             };
         },
         _use_cut_box: function(){

@@ -1,0 +1,46 @@
+<script>
+
+/*
+ Overwrite the Collection.add and .initMap methods.
+
+ Here we provide the option of using "intrusive" keys
+ for objects..although it's not fully intrusive, because
+ the non-intrusive version still exists and is used by 
+ the Collection class itself.
+ 
+ Objects with a ._pkey=null property will have it set to the
+ key when inserted into the collection, and when the 
+ collection is initialized.
+
+ Note that if the object is in multiple collections only the
+ first insertion will set the pkey, because after that the
+ value will no longer be null.  It is up to the user to be
+ aware of this and use it appropriately.
+
+*/
+Polymer.Collection.prototype.add = function(item) {
+  var key = this.store.push(item) - 1;
+  if (item && typeof item == 'object') {
+    this.omap.set(item, key);
+    item._pkey === null && (item._pkey = '#' + key); // << this is extra
+  } else {
+    this.pmap[item] = key;
+  }
+  return '#' + key;
+}
+
+Polymer.Collection.prototype.initMap = function() {
+  var omap = this.omap = new WeakMap();
+  var pmap = this.pmap = {};
+  var s = this.store;
+  for (var i=0; i<s.length; i++) {
+    var item = s[i];
+    if (item && typeof item == 'object') {
+      omap.set(item, i);
+      item._pkey === null && (item._pkey = '#' + i); // << this is extra
+    } else {
+      pmap[item] = i;
+    }
+  }
+}
+</script>

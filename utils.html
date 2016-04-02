@@ -1,6 +1,87 @@
+<link rel="import" href="patch_polymer.html">
+
 <script>
 
 var Utils = {}
+
+Utils.parse_splices = function(splices, give_moved){
+    // I really don't understand what you get from an array.splices observer.
+    // Here we takes the "splices" object provided, and guarantee to return
+    // an object with two arrays of items called added and removed.
+    // if give_moodified is truthy, then we provide a third array, modified
+    // giving an array of objects which had their index changed
+
+    var added, removed, moved;
+
+    // Firstly, get the list of added and removed *keys*
+    if(!splices || splices.keySplices.length === 0){
+        // nothing
+        added = [];
+        removed = [];
+    } else if (splices.keySplices.length === 1){
+        // assume that if there's only one element in the array then it's already properly de-deduped
+        added = splices.keySplices[0].added;
+        removed = splices.keySplices[0].removed;
+    } else {
+        // multiple splices..I'm not sure how to interpret the indexSplices,
+        // but the keySplices is easier.
+        let keys_added = new Set(), keys_removed = new Set();
+        for (let s of splices.keySplices) {
+            for (let key of s.removed) {
+                if(keys_added.has(key)){
+                    keys_added.delete(key);
+                } else {
+                    keys_removed.add(key);
+                }
+            }
+            for (let key of s.added) {
+                if(keys_removed.has(key)){
+                    keys_removed.delete(key);
+                } else {
+                    keys_added.add(key);
+                }
+            }
+        }
+        removed = Array.from(keys_removed);
+        added = Array.from(keys_added);
+    }
+
+   
+    // Now convert the keys to objects...
+    if(added.length){
+        let coll = Polymer.Collection.get(splices.indexSplices[0].object);
+        for(let [ii, key] of added.entries()){
+            added[ii] = coll.getItem(key);
+        }
+    }
+    if(removed.length){
+        // we can't use getItem for removed items, because they're no longer in the
+        // collection.
+
+        // note that this bit depends on the polymer patch which sets _pkey
+        let discarded_items = new Map();
+        for(let s of splices.indexSplices){
+            for(let item of s.removed){
+                discarded_items.set(item._pkey, item);  
+            }
+        }
+        for(let [ii, key] of removed.entries()){
+            removed[ii] = discarded_items.get(key);
+        }
+    }
+
+    if(give_moved){
+        throw "not implemented yet.";
+    }
+
+    return {
+        added: added,
+        removed: removed,
+        moved: moved
+    };
+
+
+}
 
 Utils.dedupe = function(splices){
     /* takes an array the form: 
@@ -70,12 +151,12 @@ Utils.is_equal_simple = function(a, b){
     if((a && !b) || (!a && b)){
         return false;
     }
-    for(var aa in a){
+    for(let aa in a){
         if(b[aa] !== a[aa]){
             return false;
         }
     }
-    for(var bb in b){
+    for(let bb in b){
         if(b[bb] !== a[bb]){
             return false;
         }
@@ -230,7 +311,7 @@ Utils.canvas_manager = (function(){
             return validate_id(id) && store.get(parseInt(id)).getContext('2d');
         },
         free_canvas: function(id){
-            validate_id(id);
+            id && validate_id(id);
             store.delete(parseInt(id));
         }
     };

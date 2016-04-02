@@ -9,9 +9,9 @@ be notified and can update ratemaps acordingly, with the tilewall be notified of
 See cut-obj for a fairly detailed introduction to how the groups array works, and how keys are used here for
 main-worker thread communication and more.  Both threads maintain a pair of maps, on the worker thread 
 these maps are called:
-    key_to_rendered_options and key_to_array
+    pkey_to_rendered_options and pkey_to_array
 and on the main thread they are called:
-    key_to_rendered_options and key_to_canvas
+    pkey_to_rendered_options and key_to_canvas
 
 The worker thread independently decides which arrays need to be rendered, as new arrays arrive and settings
 are changed etc.  The main thread must keep the most recently rendered version for each array (and a record
@@ -32,22 +32,23 @@ thought it had already delivered.
 "use strict";
 
 var render_options = {
-    max_delta_t: undefined, // miliseconds
+    max_delta_t: 500, // miliseconds
     n_bins: 100,
     height: 50 //px, width matches n_bins exactly
 };
+
 var spike_times;
 var timebase;
-var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = new Map(); 
-var keys_pending_render = [];
+var pkey_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var pkey_to_rendered_options = new Map(); 
+var pkeys_pending_render = [];
 var timer;
-var key_generation = 0;
+var pkey_generation = 0;
 var show;
 
 var set_show = function(v){
     show = v;
-    // note that we don't meddle with the keys_pending_render list here
+    // note that we don't meddle with the pkeys_pending_render list here
     // instead we use the timer to decide whether or not to bother doing any rendering
     touch_timer();
 }
@@ -56,10 +57,10 @@ var set_options = function(opts){
     for(var k in render_options){
         render_options[k] = opts[k] === undefined ? render_options[k] : opts[k];
     }
-    keys_pending_render = [];    
+    pkeys_pending_render = [];    
     if(spike_times){
-        for(let key in key_to_array){
-            keys_pending_render.push(key);
+        for(let [pkey, ignore] of pkey_to_array){
+            pkeys_pending_render.push(pkey);
         }
     }
     touch_timer();
@@ -68,10 +69,10 @@ var set_options = function(opts){
 var set_spike_times = function(timebase_, arrays){
     timebase = timebase_;
     spike_times = arrays && arrays.data; 
-    keys_pending_render = [];    
+    pkeys_pending_render = [];    
     if(spike_times){
-        for(let key in key_to_array){
-            keys_pending_render.push(key);
+        for(let [pkey, ignore] of pkey_to_array){
+            pkeys_pending_render.push(pkey);
         }
     }
     touch_timer();
@@ -79,7 +80,7 @@ var set_spike_times = function(timebase_, arrays){
 
 var update_keys = function(changes, arrays){
 
-    if(changes.generation_remove !== key_generation)
+    if(changes.generation_remove !== pkey_generation)
         throw "key generation mismatch";
 
     // note we don't both to remove keys from the pending list
@@ -89,21 +90,21 @@ var update_keys = function(changes, arrays){
     // array for the given key we know it's for the relevant 
     // generation and that it's still wanted.
 
-    var remove_keys = changes.remove || [];
-    for(let key of remove_keys){
-        key_to_array.delete(key);
-        key_to_rendered_options.delete(key);
+    var remove_pkeys = changes.remove || [];
+    for(let pkey of remove_pkeys){
+        pkey_to_array.delete(pkey);
+        pkey_to_rendered_options.delete(pkey);
     }
 
     if(changes.generation_add !== changes.generation_remove){
-        keys_pending_render = [];
-        key_generation = changes.generation_add;
+        pkeys_pending_render = [];
+        pkey_generation = changes.generation_add;
     }
 
-    var add_keys = changes.add || [];
-    for(let key of add_keys){
-        key_to_array.set(key, arrays[key]);
-        keys_pending_render.push(key);
+    var add_pkeys = changes.add || [];
+    for(let pkey of add_pkeys){
+        pkey_to_array.set(pkey, arrays[pkey]);
+        pkeys_pending_render.push(pkey);
     }
 
     touch_timer();        
@@ -114,7 +115,7 @@ var touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && keys_pending_render.length && show === 'y')
+    if(spike_times && pkeys_pending_render.length && show === 'y')
         timer = timer || setImmediate(timer_tick);
     else
         clearImmediate(timer);
@@ -124,10 +125,10 @@ var timer_tick = function(){
     timer = 0;
 
     // find one valid thing to render...
-    while(keys_pending_render.length > 0){
-        var key = keys_pending_render.pop();
-        if(key && key_to_array.get(key) && !is_equal_simple(key_to_rendered_options.get(key), render_options)){
-            get_group_hist(key);
+    while(pkeys_pending_render.length > 0){
+        let pkey = pkeys_pending_render.pop();
+        if(pkey && pkey_to_array.get(pkey) && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
+            get_group_hist(pkey);
             break;
         }
     }
@@ -135,23 +136,24 @@ var timer_tick = function(){
     touch_timer();
 }
 
-var get_group_hist = function(key){
+var get_group_hist = function(pkey){
     // note desired_max_delta_t and spike_times should both be in the same units
-    var group_times = pick(spike_times, key_to_array.get(key));
+    let group_times = pick(spike_times, pkey_to_array.get(pkey));
 
     // build pairwise-diff histogram
-    var hist = new Uint32Array(render_options.n_bins+1);
+    let hist = new Uint32Array(render_options.n_bins+1);
     get_group_hist_sub(hist, group_times, render_options.max_delta_t/1000*timebase, 
                         render_options.max_delta_t/1000*timebase/render_options.n_bins);
     
     hist = plot_histogram(hist, render_options.height);
-    key_to_rendered_options.set(key, clone_simple(render_options));
+    let opts = clone_simple(render_options);
+    pkey_to_rendered_options.set(pkey, opts);
     exec_main_b('plot_hist', {
-        key: key,
-        generation: key_generation,
+        pkey: pkey,
+        generation: pkey_generation,
         hist_name: 'hist',
-        dims: [render_options.n_bins, render_options.height],
-        render_options: key_to_rendered_options.get(key)
+        dims: [opts.n_bins, opts.height],
+        render_options: opts
     }, {hist: hist});
 }
 
@@ -160,10 +162,12 @@ var get_group_hist_sub = function(ret, group_times, D, b){
     // up the time separation, with bin size b, and record it in hist, ret.
     for(var later_idx=1, earlier_idx=0; later_idx<group_times.length; later_idx++){
         let later_time = group_times[later_idx];
-        while (group_times[earlier_idx] < later_time - D)
+        while (group_times[earlier_idx] < later_time - D){
             earlier_idx++;
-        for(let i=earlier_idx; i<later_idx; i++)
+        }
+        for(let i=earlier_idx; i<later_idx; i++){
             ret[0 | ((later_time - group_times[i])/b)]++;
+        }
     }
 }
 
@@ -232,108 +236,98 @@ var is_equal_simple = function(a, b){
     Polymer({
         is:'tac-plots',
         properties: {
-            max_delta_t: {
+               max_delta_t: {
                 type: Number, // in miliseconds
                 value: 2,
                 notify: true
-            },
-            spike_times: {
+            }, spike_times: {
                 type: Object, // array akey "data" and timebase Number in Hz (ie per second not per milisecond)
                 value: function(){ return {};},
                 notify: true
-            },
-            show: {
+            }, show: {
                 type: String, // "y" or "n" (to match other modules which have multiple toggle-able things)
                 value: "y",
                 notify: true
-            },
-            groups: {
+            }, groups: {
                 type: Array,
                 value: function(){return [];},
                 notify: true,
                 observer: '_groups_set'
             }
-        },
-        observers: [
+        }, observers: [
             '_groups_spliced(groups.splices)', 
             '_options_modified(max_delta_t)',
             '_times_modified(spike_times)',
             '_show_changed(show)'
-        ],
-        created: function(){
+        ], created: function(){
+            // copy-paste defaults from worker code above (could implement
+            // something  more complicated, but hey this works and is easy).
+            this._options = {
+                max_delta_t: 500, // miliseconds
+                n_bins: 100,
+                height: 50 //px, width matches n_bins exactly
+            };
             var worker_builder = Polymer.DomModule.import('tac-plots','#worker');
             this._worker = worker_builder.create_for(this);
-            this._key_to_canvas = new Map();
-            this._key_to_rendered_options = new Map();
-            this._key_is_on_worker = new Map();
-            this._key_generation = 0;
+            this._pkey_generation = 0;
             this._times_is_on_worker = false;
-        },
-        _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
+        }, _update_keys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
 
             var added_arrays = {};
+            var pkeys_to_add = []; 
             if (this.show === 'y'){
                 // get clones of new arrays to send to worker
-                for(let key of keys_to_add){
-                    let box = this.groups_collection.getItem(key);
-                    if(box){
-                        added_arrays[key] = am.get_array_clone(box.akey);
-                        this._key_is_on_worker.set(key, true);                        
-                    }
+                for(let okey of okeys_to_add){
+                    pkeys_to_add.push(okey._pkey);
+                    added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
+                    okey._tac_is_on_worker = true;                    
                 }
-            } else {
-                // if we are not showing the plot, we don't actually get 
-                // any arrays, but we need to remmeber that we never sent them
-                // to the worker.
-                for(let key of keys_to_add){
-                    this._key_is_on_worker.set(key, false);
-                }
-                keys_to_add = [];
+            }
+
+            // free canvases, it's our responsiblity to do this, whereas 
+            // freeing the inds arrays was the responsibility of cut-obj.
+            var pkeys_to_remove = [];
+            for(let okey of okeys_to_remove){
+                pkeys_to_remove.push(okey._pkey);
+                cm.free_canvas(okey.tac);
+                cm.free_canvas(okey._tac_other);
+                okey.tac = null;
+                okey._tac_other = null;
+                okey._tac_other_options = null;
+                okey._tac_is_on_worker = false;
             }
 
             // inform worker of the new/deleted arrays
             this._worker.exec_b('update_keys', {
-                add: keys_to_add,
-                remove: keys_to_remove,
+                add: pkeys_to_add,
+                remove: pkeys_to_remove,
                 generation_remove: generation_remove,
                 generation_add: generation_add
             }, added_arrays);
 
-            // free canvases, it's our responsiblity to do this, whereas 
-            // freeing the inds arrays was the responsibility of cut-obj.
-            for(let key of keys_to_remove){
-                let canvas = this._key_to_canvas.get(key);
-                if(canvas){
-                    cm.free_canvas(canvas);
-                }
-                // TODO: the next line doesn't work because the item has already been removed from the collection at this point
-                //this.groups_collection.getItem(key).tac = null; // note we don't use Polymer set as this okey is  being (temporarily) discarded
-                this._key_to_canvas.delete(key);
-                this._key_to_rendered_options.delete(key);
-                this._key_is_on_worker.delete(key); // we can also forget this
-            }
-        },
-        _groups_set: function(new_val, old_val){
-            var removed = this.groups_collection ? 
-                            this.groups_collection.getKeys() : []; 
-            this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
-            var added = this.groups_collection ? 
-                            this.groups_collection.getKeys() : []; 
-            this._update_keys(removed, added, this._key_generation, ++this._key_generation); // added keys are for a new generation
-        },
-        _groups_spliced: function(splices){
-            if(!splices) return;
-            var dedupes = Utils.dedupe(splices.keySplices);
-            this._update_keys(dedupes.removed, dedupes.added, this._key_generation, this._key_generation);
-        },
-        _options_modified: function(){
+        }, _groups_set: function(new_val, old_val){
+            this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            this._update_keys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
+        }, _groups_spliced: function(splices){
+            let parsed = Utils.parse_splices(splices);
+            this._update_keys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
+        }, _options_modified: function(){
+            this._options.max_delta_t = this.max_delta_t;
             this._worker.exec('set_options', {
                 max_delta_t: this.max_delta_t
             });
-        },
-        _times_modified: function(){
+            // if we already have the right answer in any cases, then we must apply that now
+            // because the worker is not going to send it again
+            for(let okey of this.groups){
+                if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
+                    cm.free_canvas(okey.tac);
+                    okey.tac = okey._tac_other;
+                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
+                }
+            }
+        }, _times_modified: function(){
             if(this.show === 'y'){
                 if(this.spike_times){
                     var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.times);
@@ -349,14 +343,13 @@ var is_equal_simple = function(a, b){
                 }
                 this._times_is_on_worker = false;
             }
-        },
-        _show_changed: function(){
+        }, _show_changed: function(){
             if(this.show === 'y'){
                 var added = [];
-                for(let [k,v] in this._key_is_on_worker)if(!v){
-                    added.push(k);
+                for(let okey of this.groups)if(!okey._tac_is_on_worker){
+                    added.push(okey);
                 }
-                this._update_keys([], added, this._key_generation, this._key_generation);
+                this._update_keys([], added, this._pkey_generation, this._pkey_generation);
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
@@ -368,16 +361,20 @@ var is_equal_simple = function(a, b){
             if(this._worker){
                 this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
             }
-        },
-        plot_hist: function(data, arrays) {
-            if(data.generation !== this._key_generation)
+        }, plot_hist: function(data, arrays) {
+            if(data.generation !== this._pkey_generation)
                 return; // pft! get with the times, dude.
-            let group = this.groups_collection.getItem(data.key);
+            let okey = this._groups_collection.getItem(data.pkey);
             let cm = Utils.canvas_manager;
             let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
-            this.set('groups.' + data.key + '.tac', ckey);
-            this._key_to_canvas.set(data.key, ckey);
-            this._key_to_rendered_options.set(data.key, data.render_options);
+            cm.free_canvas(okey._tac_other);
+            okey._tac_other = ckey;
+            okey._tac_other_options = data.render_options;
+            if(Utils.is_equal_simple(data.render_options, this._options)){
+                cm.free_canvas(okey.tac);
+                okey.tac = ckey;
+                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
+            }
         }
 
     });

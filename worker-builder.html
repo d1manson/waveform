@@ -214,6 +214,8 @@ var endian = function(){
     return (new Int16Array(b))[0] == 256? 'L' : 'B';
 }();
 
+// call created user funciton if it exists
+self.created && self.created();
 </script>
 
 
