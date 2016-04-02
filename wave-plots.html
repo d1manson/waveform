@@ -46,6 +46,9 @@ data if you wanted to observe the limitations of the 32bit precision.
 TODO: it probably wouldn't be that hard to implement chanel-specific toggling. Keep the indices
 of the wave buffers fixed as though all were in use, but only upload those that are needed and
 be careful when building render metrics and using them.
+
+
+http://jsperf.com/looped-drawimage/5
 -->
 
 
@@ -81,15 +84,15 @@ var n_w = 50; // number of t points per channel
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
 var off_canv_h = 512;  // full height
-var off_canv_wave_h = 164; // height of a wave
-var off_canv_dt = 4; //distance from t to t+1 on the wave
+var off_canv_wave_h = 128; // height of a wave
+var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
 
 // These two are applied in css..the actual width used matches the pixels on the off_canv
 var on_canv_width = n_c*n_w*2;
 var on_canv_height = 128;
 
-
+var off_canv_count_increment = 0.00001;
 
 var shader_strs = (function(){
 // multiline, template strings are nice, but it's wierd that they use the enclosing scope
@@ -157,7 +160,7 @@ return {
 
     fragment_density_1: `
         void main(void) {
-            gl_FragColor = vec4(1., 0., 0., 1.);  // it's that simple
+            gl_FragColor = vec4(${off_canv_count_increment}, 0., 0., 1.); 
         }
     `,
 
@@ -168,10 +171,10 @@ return {
         attribute vec2 a_position;
         const vec2 u_resolution = vec2(${off_canv_w}.0, ${off_canv_h}.0);
         void main() {
-            vec2 zeroToOne = a_position / u_resolution;
-            vec2 zeroToTwo = zeroToOne * 2.0;
-            vec2 clipSpace = zeroToTwo - 1.0;
-            gl_Position = vec4(clipSpace, 0, 1);
+            vec2 zero_to_one = a_position / u_resolution;
+            vec2 zero_to_two = zero_to_one * 2.0;
+            vec2 clip_space = zero_to_two - 1.0;
+            gl_Position = vec4(clip_space, 0, 1);
             v_tex_coord = a_tex_coord;
         }
     `,
@@ -184,7 +187,8 @@ return {
         uniform highp float normalising_factor;
         void main() {
             highp vec4 src = texture2D(u_src, v_tex_coord);
-            highp float counts = sqrt(src.r*normalising_factor);
+            highp float counts = sqrt(src.r*normalising_factor*10.);
+            gl_FragColor = src;
             gl_FragColor = vec4(counts > 0.5 ?
                                      counts > 0.75 ?
                                          4. - 4.*counts 
@@ -318,17 +322,14 @@ var WavesRenderer = function(callback, debug){
     this._locs_density_1.t_x_offset = gl.getUniformLocation(this._prog_density_1, "t_x_offset");
 
     this._locs_density_2 = {};
-    this._locs_density_2.a_position = gl.getUniformLocation(this._prog_density_2, "a_position");
-    this._locs_density_2.a_tex_coord = gl.getUniformLocation(this._prog_density_2, "a_tex_coord");
+    this._locs_density_2.a_position = gl.getAttribLocation(this._prog_density_2, "a_position");
+    this._locs_density_2.a_tex_coord = gl.getAttribLocation(this._prog_density_2, "a_tex_coord");
     this._locs_density_2.u_src = gl.getUniformLocation(this._prog_density_2, "u_src");
     this._locs_density_2.normalising_factor = gl.getUniformLocation(this._prog_density_2, "normalising_factor");
 
     // create all the neccessarry buffers (no space is actually allocated at this stage for data)
     this._buf_wave = gl.createBuffer();
-    this._bufs_voltage = [];
-    for(let ii=0; ii<(n_w-1)*n_c; ii++){
-        this._bufs_voltage.push(gl.createBuffer());
-    }
+    this._buf_voltage = gl.createBuffer();
     this._buf_is_t_plus_one = gl.createBuffer();
     
     // well, these two buffers are small and simple... (used only in the density_2 program)
@@ -356,6 +357,7 @@ var WavesRenderer = function(callback, debug){
     }
     this._okey_to_rendered = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
     this.show = 'y'; // currently you cannot toggle individual channels.
+    this._has_voltages = false;
     this._timer = 0;
 }
 
@@ -399,9 +401,6 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._off_fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + float_texture_register_ind, gl.TEXTURE_2D, this._off_texture, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-        throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
-    }
 
     gl.enableVertexAttribArray(this._locs_density_1.is_t_plus_one);
     gl.enableVertexAttribArray(this._locs_density_1.wave_xy_offset);
@@ -417,8 +416,11 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
 WavesRenderer.prototype._switch_to_density_2_prog = function(){
     var gl = this.gl;
     this._active_sub_prog = 'density_2';
+
     gl.useProgram(this._prog_density_2);
-    
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
     gl.enableVertexAttribArray(this._locs_density_2.a_position);
     gl.enableVertexAttribArray(this._locs_density_2.a_tex_coord);
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_a_position);
@@ -430,16 +432,14 @@ WavesRenderer.prototype._switch_to_density_2_prog = function(){
     gl.activeTexture(gl.TEXTURE0 + float_texture_register_ind);
     gl.bindTexture(gl.TEXTURE_2D, this._off_texture); 
 
-    gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n); 
+    gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n/off_canv_count_increment); 
     
-    gl.disable(gl.BLEND); 
 }
 
 
 
 WavesRenderer.prototype._run_density_2_prog = function(){
     var gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
@@ -447,7 +447,7 @@ WavesRenderer.prototype.set_n = function(n){
     var gl = this.gl;
     this._n = n;
     if(this._active_sub_prog === 'density_2'){
-        gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n); 
+        gl.uniform1f(this._locs_density_2.normalising_factor, 1/this._n/off_canv_count_increment); 
     } 
 
     // uploads an 2n-length vector to the gpu, the vector is of the form 0 1 0 1 ... 0 1
@@ -458,7 +458,7 @@ WavesRenderer.prototype.set_n = function(n){
 
     // upload to the gpu
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); 
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW); 
 
 }
 
@@ -466,40 +466,49 @@ WavesRenderer.prototype.set_mode = function(mode){
     if(this._mode === mode){
         return;
     }
+    var gl = this.gl;
 
     this._mode = mode;
     if(this._mode === "flag"){
         this._switch_to_flag_prog();
     }else if(this._mode === "density"){
         this._switch_to_density_1_prog();
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+           throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
+        }
     } else {
         throw "unrecognised mode";
     }
 
     // update all the pending logic...
-    this._deal_with_modified_okeys(this._okey_to_part_rendered.keys());
+    this._deal_with_modified_okeys(Array.from(this._okey_to_part_rendered.keys())); //need to copy this because the map may be modified inside the function
     this._deal_with_modified_okeys(this._okey_to_rendered.keys());
     this._render_metrics = undefined;
+    this._touch_timer();
 }
 
 WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
     var gl = this.gl;
     // the voltage data is pre-prepared exactly the way we wanted by the parse-data module.
-    
-    // The prepared_voltage data is really a concatenated list of many separate arrays,
+
+     // The prepared_voltage data is really a concatenated list of many separate arrays,
     // where each array contains the data for all spikes at a specific channel-time, and is of
     // the form: v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)
     // note there are 1 fewer such arrays then time points on the wave, n_w.
-    prepared_voltage_data = prepared_voltage_data ? new Int8Array(prepared_voltage_data.buffer) : new Uint8Array(0); // note we force it to be u8
-    for(let ii=0; ii<this._bufs_voltage.length; ii++){
-        //upload the current buffer to the gpu.  
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[ii]);
-        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data.subarray(ii *this._n*2, (ii+1) *this._n*2), gl.STATIC_DRAW); 
-                                //It is more static than the waves buffer, but it does change when we switch tets.
+    if(prepared_voltage_data){
+        this._has_voltages = true;
+        prepared_voltage_data = new Uint8Array(prepared_voltage_data.buffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data, gl.DYNAMIC_DRAW); 
+    } else {
+        this._has_voltages = false;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.bufferData(gl.ARRAY_BUFFER, gl.NONE, gl.DYNAMIC_DRAW);       
     }
 
     // note we don't set vertexAttribPointer here, because we do it multiple times
     // during the render
+    this._touch_timer();
 }
 
 WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
@@ -580,8 +589,8 @@ WavesRenderer.prototype._upload_okey_data = function(){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
             for(let jj=0; jj<inds.length; jj++){
-                data_i16[(inds[jj]<<2) +0] = xy;
-                data_i16[(inds[jj]<<2) +1] = xy;
+                data_i16[(inds[jj]<<1) +0] = xy;
+                data_i16[(inds[jj]<<1) +1] = xy;
             }
         }
     }else{
@@ -596,7 +605,6 @@ WavesRenderer.prototype._upload_okey_data = function(){
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
-            // TODO: check if bits are correct
             let gx = okeys[ii].group_num |  (xy << 8); 
             let yg = ((0xff00 & xy) >>> 8) | (okeys[ii].group_num << 8);
             for(var jj=0; jj<inds.length; jj++){
@@ -622,12 +630,12 @@ WavesRenderer.prototype._upload_okey_data = function(){
 }
 
 WavesRenderer.prototype._options_match = function(a, group_num){
-    if(!a || a.mode !== this.mode){
+    if(!a || a.mode !== this._mode){
         return false;
     }
-    if(a.mode === 'density'){
+    if(a._mode === 'density'){
         return true;
-    } else if(this.mode === 'flag' && a.group_num == group_num){
+    } else if(this._mode === 'flag' && a.group_num == group_num){
         return true;
     }
     return false;
@@ -635,17 +643,17 @@ WavesRenderer.prototype._options_match = function(a, group_num){
 
 
 WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
-    // TODO: the plan has changed a bit. We must now send back any pre-existing
-    // valid canvases when we get a request for them.
-    for(var ii=0; ii<okeys_modified.length; ii++){
-        var okey = okeys_modified[ii];
-        if(this._options_match(this._okey_to_rendered.get(okey)),
-            okey.group_num){
+    let results = new Map(); // we may be able to provide some resutls already
+
+    for(let okey of okeys_modified){
+        if(this._options_match(this._okey_to_rendered.get(okey), okey.group_num)){
             // this matches the last canvas we sent, so abandon any partial render (if there was one)
+            // and send the results back to main again
             if(this._okey_to_part_rendered.has(okey)){
                 this._n_t_to_okeys[this._okey_to_part_rendered.get(okey).n_t].delete(okey);
                 this._okey_to_part_rendered.delete(okey);
             }
+            results.set(okey, this._okey_to_rendered.get(okey).el_canv);
         } if (!this._okey_to_part_rendered.has(okey)){
             // this is different to the last thing we renderd, and we weren't
             // previously planning on rendering it. So need to render from scratch
@@ -653,18 +661,23 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
                 n_t: 0
             })
             this._n_t_to_okeys[0].add(okey);
-        } else if (this._options_match(this._okey_to_part_rendered.get(okey), 
-            okey.group_num)){
+        } else if (this._options_match(this._okey_to_part_rendered.get(okey), okey.group_num)){
             // this matches what we are already in the middle of trying to render,
             // so don't change anything
-
         } else {
             // we were trying to render this, but we now need to start again with new options
-            this._n_t_to_okeys[this._okey_to_part_rendered.get(okey).n_t].delete(okey);
-            this._okey_to_part_rendered.get(okey).n_t = 0;
-            this._n_t_to_okeys[0].add(okey);
+            let parts = this._okey_to_part_rendered.get(okey);
+            if(parts.n_t > 0){ // had we actually rendered anything yet?
+                this._n_t_to_okeys[parts.n_t].delete(okey);
+                parts.ctx.clearRect(0, 0, parts.n_t*off_canv_dt, off_canv_wave_h);
+                parts.n_t = 0;
+                this._n_t_to_okeys[0].add(okey);
+            }
         }
+    }
 
+    if(results.size > 0){
+        this._callback(results);
     }
 }
 
@@ -706,10 +719,12 @@ WavesRenderer.prototype._touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from elsewhere to interupt
     // between ticks, we can thus cancel work as and when needed.
-    if(this._okey_to_part_rendered.size && this.show === 'y')
+    if(this._has_voltages && this._okey_to_part_rendered.size && this.show === 'y'){
         this._timer = this._timer || setImmediate(this._timer_tick.bind(this));
-    else
+    } else{
         clearImmediate(this._timer);
+        this._timer = 0;
+    }
 }
 
 
@@ -758,22 +773,20 @@ WavesRenderer.prototype._timer_tick = function(){
         this._render_batch_flag(from_t, end_t);
     }
 
+    this.gl.finish();
     // copy fragments from off_canv into individual canvases
     var width = (end_t - from_t) * off_canv_dt;
     var x_offsets = this._render_metrics.x_offset;
     var y_offsets = this._render_metrics.y_offset;  
-    for(let ii=0; ii<okeys.length; ii++){
-        let okey = okeys[ii];
+    for(let [ii, okey] of okeys.entries()){
         let part = this._okey_to_part_rendered.get(okey);
         if(!part.el_canv){
             part.el_canv = document.createElement('canvas');
             part.el_canv.width = off_canv_dt*n_c*(n_w-1);
             part.el_canv.height = off_canv_wave_h;
-            part.el_canv.style.width = on_canv_width + 'px';
-            part.el_canv.style.height = on_canv_height + 'px';
             part.ctx = part.el_canv.getContext('2d');
         }
-        part.ctx.drawImage(this.el_off_canv, x_offsets[ii], y_offsets[ii],
+        part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
     }
 
@@ -790,7 +803,7 @@ WavesRenderer.prototype._timer_tick = function(){
         let results = new Map();
         for(let okey of okeys){
             let item =  {
-                mode: this.mode,
+                mode: this._mode,
                 group_num: okey.group_num,
                 el_canv: this._okey_to_part_rendered.get(okey).el_canv
             };
@@ -843,8 +856,8 @@ WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
         gl.uniform1f(this._locs_flag.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
-        gl.vertexAttribPointer(this._locs_flag.voltage, 1, gl.BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 }
@@ -858,8 +871,8 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
         gl.uniform1f(this._locs_density_1.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 
@@ -916,7 +929,7 @@ Polymer({
         '_data_for_gl_changed(data_for_gl)'
     ], created: function(){
         try{
-            this._renderer = new WavesRenderer(this._okey_rendered.bind(this));
+            this._renderer = new WavesRenderer(this._okey_rendered.bind(this), false);
         } catch (e){
             console.log("failed to create renderer....\n" + e);
         }
@@ -967,16 +980,11 @@ Polymer({
             if(!key){
                 throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
             }
-            let ckey_old = okey.waves;
-            let ckey;
-            if(ckey_old && cm.get_canvas(ckey_old) === el_canvas){
-                ckey = ckey_old; // renderer was able to reuse a previously rendered canvas
-            } else {
-                ckey_old && cm.free_canvas(ckey_old);  // if there was an old canvas, free it, because there's a new one now
-                ckey = cm.store_canvas(el_canvas);
-            }
-            okey.waves = ckey;
-            this.notifyPath('groups.' + key + '.waves', ckey);            
+            if(cm.get_canvas(okey.waves) !== el_canvas){
+                cm.free_canvas(okey.waves);  // if there was an old canvas, free it, because there's a new one now
+                okey.waves = cm.store_canvas(el_canvas);
+                this.notifyPath('groups.' + key + '.waves', okey.waves);            
+            } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
     }
 });

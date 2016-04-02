@@ -377,7 +377,7 @@ Polymer({
         var trial = this._trial_from_base.get(this.selected_trial);
         var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
         var cut = this.selected_cut;
-        var title = this.selected_trial + " [Wavform]" || "Waveform";
+        var title = this.selected_trial + " [Waveform]" || "Waveform";
         var url = location.pathname + "?";
         url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
         url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";

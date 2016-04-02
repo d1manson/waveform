@@ -115,10 +115,12 @@ var touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && pkeys_pending_render.length && show === 'y')
+    if(spike_times && pkeys_pending_render.length && show === 'y'){
         timer = timer || setImmediate(timer_tick);
-    else
+    } else{
         clearImmediate(timer);
+        timer = 0;
+    }
 }
 
 var timer_tick = function(){

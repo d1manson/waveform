@@ -211,6 +211,7 @@ var touch_timer = function(){
         timer = timer || setImmediate(timer_tick);
     } else {
         clearImmediate(timer);
+        timer = 0;
     }
 }
 

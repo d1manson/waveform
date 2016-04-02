@@ -4,19 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?">
-<title>Cutting GUI</title>
+<title>Waveform</title>
 <link rel="stylesheet" type="text/css" href="main.css">
 <script> window.Polymer = {dom: 'shadow'}</script>
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-localstorage/iron-localstorage.html">
-<link rel="import" href="tile-wall.html">
-<link rel="import" href="iron-splitter.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="bower_components/paper-slider/paper-slider.html">
+<link rel="import" href="bower_components/paper-toggle-button/paper-toggle-button.html">
+<link rel="import" href="bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
+<link rel="import" href="tile-wall.html">
+<link rel="import" href="iron-splitter.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="cross-hair.html">
-<link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="undo-stack-view.html">
 <link rel="import" href="cut-object.html">
 <link rel="import" href="parsed-data.html">
@@ -25,7 +27,6 @@
 <link rel="import" href="floating-pane.html">
 <link rel="import" href="document-focus-marker.html">
 <link rel="import" href="header-view.html">
-<link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
 
 <style is="custom-style">
 :root {
@@ -36,6 +37,8 @@
     width: 38px;
     height: 38px;
 };
+user-drag: none;
+-webkit-user-drag: none;
 }
 </style>
 
@@ -127,8 +130,8 @@ box-shadow: inset 0 0 2px 1px #ccc;
 		<floating-pane id="speed_info">
 			<div class='pane_title'>Speed ratemap [v]</div>
 			<p>
-				Bin size <span id='dir_binsize_val' class="slider_val">4 cm/s</span><br>
-				Upper limit <span id='dir_binsize_val' class="slider_val">45 cm/s</span>
+				Bin size <span class="slider_val">4 cm/s</span><br>
+				Upper limit <span class="slider_val">45 cm/s</span>
 			</p><p>
 				Histogram shows slowest speed at the top, and upper limit speed at the bottom.
 			</p><p>
@@ -138,11 +141,16 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 		<floating-pane id="waves_info" style="display:initial;">
 			<div class='pane_title'>Waves [w]</div>
-			There are two palette modes. TODO: make a button to toggle modes here: 
-			<ul>
-			<li>give each group its own color and render all waves with that color (only groups 0-30 have a special color, beyond 30 everything is shown in black)<br></li>
-			<li>render each pixel based on how many waves cross that pixel.</li>
-			</ul>
+			<p>
+                There are two palette modes. 
+            </p><p class="nodrag">
+                Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
+                <paper-toggle-button id="waves_toggle" checked="{{options.waves_toggle}}"></paper-toggle-button>
+            </p><p>
+    			In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
+            </p><p>
+                In "density" mode, the color of each pixel reflects the proportion of the waves which cross it.
+            </p>
 		</floating-pane>
 
 		<floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
@@ -434,7 +442,8 @@ the_app.initializeDefaultOptions = function(ev) {
 		max_rate_spa: -1,
 		deg_per_dir_bin: 6,
 		smoothing_dir_bins: 3,
-		waves_render_mode: 'density',
+		waves_render_mode: "density",
+        waves_toggle: true,
 		use_n_leds: 2,
 		speed_filter_mps: 4,
 		pos_smoothing_s: 0.2,
@@ -447,9 +456,18 @@ the_app._get_safe = function(a,b){
 	return a && a[b];
 }
 
+the_app.addEventListener('dom-change', function(){
+    // manually hook up a computed property for waves_toggle
+    document.getElementById('waves_toggle').addEventListener('iron-change', function(new_val){
+        the_app.set('options.waves_render_mode', the_app.options.waves_toggle ? "density" : "flag");
+    });
+
+    window.c = document.getElementsByTagName('cut-object')[0]; //debug only
+})
+
+
 document.addEventListener('contextmenu', function(e){e.preventDefault();});
 
-the_app.set('options.waves_render_mode','flag'); //debug
 </script>
 
 

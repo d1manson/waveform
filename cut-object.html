@@ -297,7 +297,7 @@ doesn't have a worker, but it uses a similar system.
             }
         },
         _fork_if_needed: function(){
-            if(!this.cut_box.is_stack){
+            if(this.cut_box.is !== "stack"){
                 // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
                 // note that the new "cut box" will be applied to this element as its cut_box, but this will not
                 // cause any changes as all the values will be the same.

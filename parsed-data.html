@@ -146,6 +146,7 @@ var touch_timer = function(){
         }
     }
     clearImmediate(timer);
+    timer = 0;
 }
 
 var timer_tick = function(){
@@ -981,8 +982,7 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
     // it probably won't help by more than 5-10% I would think.
 
     var q = -1;
-    var i, p;
-    for(i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
+    for(let i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
         for(let c=0;c<n_c;c++){ //for each channel
             q += 5;
             for(let t=0;t<n_w-1;t++){ //for each time point (except the last one)

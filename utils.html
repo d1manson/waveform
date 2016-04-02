@@ -14,14 +14,14 @@ Utils.parse_splices = function(splices, give_moved){
     var added, removed, moved;
 
     // Firstly, get the list of added and removed *keys*
-    if(!splices || splices.keySplices.length === 0){
+    if(!splices || !splices.keySplices || splices.keySplices.length === 0){
         // nothing
         added = [];
         removed = [];
     } else if (splices.keySplices.length === 1){
         // assume that if there's only one element in the array then it's already properly de-deduped
-        added = splices.keySplices[0].added;
-        removed = splices.keySplices[0].removed;
+        added = splices.keySplices[0].added.slice(0);
+        removed = splices.keySplices[0].removed.slice(0);
     } else {
         // multiple splices..I'm not sure how to interpret the indexSplices,
         // but the keySplices is easier.
@@ -65,8 +65,11 @@ Utils.parse_splices = function(splices, give_moved){
                 discarded_items.set(item._pkey, item);  
             }
         }
-        for(let [ii, key] of removed.entries()){
-            removed[ii] = discarded_items.get(key);
+        let removed_keys = removed.slice(0);
+        removed = [];
+        for(let key of removed_keys){
+            let item = discarded_items.get(key);
+            (item !== undefined) && removed.push(item);
         }
     }
 
@@ -260,7 +263,7 @@ Utils.canvas_manager = (function(){
             return last_ckey + suffix;
         },
         get_canvas: function(id){
-            return validate_id(id) && store.get(parseInt(id));
+            return id && validate_id(id) && store.get(parseInt(id));
         },
         get_2d_ctx: function(id){
             return validate_id(id) && store.get(parseInt(id)).getContext('2d');
