@@ -1260,19 +1260,19 @@ var parse_clu_file = function(full_str, fkey){
             },
             pos_xy: {
                 type: Object,
-                value: function(){ return {};}, // data (akey), timebase,  and units_per_cm
+                value: function(){ return {};}, // xy (akey), timebase,  and units_per_cm
                 readOnly: true,
                 notify: true 
             },
             pos_dir: {
                 type: Object,
-                value: function(){ return {};}, // data (akey), timebase
+                value: function(){ return {};}, // dir (akey), timebase
                 readOnly: true,
                 notify: true
             },
             pos_speed: {
                 type: Object,
-                value: function(){ return {};}, // data (akey), timebase
+                value: function(){ return {};}, // speed (akey), timebase
                 readOnly: true,
                 notify: true
             },
@@ -1518,9 +1518,20 @@ var parse_clu_file = function(full_str, fkey){
             }            
         },
         _use_pos: function(result){
-            this._setPos_xy(result.xy);
-            this._setPos_dir(result.dir);
-            this._setPos_speed(result.speed);
+            let timebase = result.header && parseInt(result.header.timebase);
+            this._setPos_xy({
+                xy: result.xy,
+                timebase: timebase,
+                units_per_cm: result.header && parseInt(result.header.units_per_meter)/100
+            });
+            this._setPos_dir({
+                dir: result.dir,
+                timebase: timebase
+            });
+            this._setPos_speed({
+                speed: result.speed,
+                timebase: timebase
+            });
             this._setPos_header(result.header);
         },
         _make_tet_request: function(fkey, file, request, options){

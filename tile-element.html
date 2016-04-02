@@ -179,6 +179,10 @@ flex:2;
                     [[group_spa_max]]Hz
                     <div class="caption-inner-label">spa max</div>
                 </div>
+                <div style$='[[_show(group_mean)]]' class="caption-inner">
+                    [[group_mean]]Hz
+                    <div class="caption-inner-label">mean</div>
+                </div>
                 <div class="caption-inner">[[group_n]]
                     <div class="caption-inner-label">n spikes</div>
                 </div>
@@ -262,6 +266,11 @@ flex:2;
                 notify: true,
                 value: -1,
                 notify: true
+            },
+            group_mean: {
+                type: Number,
+                notify: true,
+                value: -1
             },
             dir_rm: {
                 type: String, //canvas-manger id

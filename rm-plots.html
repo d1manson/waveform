@@ -16,7 +16,6 @@ be considered invalidated, this might be 'pos_xy', or 'cm_per_spa_bin', etc.
 
 Thirdly, there's just more inputs to the calculation, so there's more to keep track of.
 
-
 TODO: deal with show's impact on tick, and send data back to main. Also deal with limits
   of xy ratemap...and possibly some other stuff too.
 
@@ -54,11 +53,11 @@ var pos_xy;
 var pos_units_per_cm;
 var pos_dir;
 var pos_speed;
-var key_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
-var key_to_rendered_options = new Map(); 
-var keys_pending_render = [];
+var pkey_to_array = new Map(); // Note that in the worker, key's are used only for arrays of spike-indices.
+var pkey_to_rendered_options = new Map(); 
+var pkeys_pending_render = [];
 var timer;
-var key_generation = 0;
+var pkey_generation = 0;
 
 // cached stuff.... see clear_cache for logic for cleaning the cache
 var cached_spike_pos_ind;
@@ -94,20 +93,20 @@ var palette = function(){
 
 var set_show = function(v){
     show = v;
-    make_all_keys_pending(); // this may be slightly overkill, but when it comes down to it we will only render stuff that needs it
+    make_all_pkeys_pending(); // this may be slightly overkill, but when it comes down to it we will only render stuff that needs it
     touch_timer();
 }
 
 var set_options = function(opts){
-    var to_clear = [];
-    for(var k in render_options){
-        if(opts[k] === undefined  && render_options[k] !== opts[k]){
+    let to_clear = [];
+    for(let k in render_options){
+        if(opts[k] !== undefined  && render_options[k] !== opts[k]){
             render_options[k] =  opts[k];
             to_clear.push(k);
         }
     }
     clear_cache(to_clear);
-    make_all_keys_pending();
+    make_all_pkeys_pending();
     touch_timer();
 }
 
@@ -115,7 +114,7 @@ var set_spike_times = function(timebase, arrays){
     clear_cache(['spikes_timebase', 'spike_times']);
     spikes_timebase = timebase;
     spike_times = arrays && arrays.data; 
-    make_all_keys_pending();
+    make_all_pkeys_pending();
     touch_timer();
 }
 
@@ -129,7 +128,7 @@ var set_pos_xy = function(timebase, units_per_cm, arrays){
     }
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
     pos_xy = arrays && arrays.data;
-    make_all_keys_pending();
+    make_all_pkeys_pending();
     touch_timer();
 }
 
@@ -142,7 +141,7 @@ var set_pos_dir = function(timebase, arrays){
         clear_cache(['pos_dir']);
     }
     pos_dir = arrays && arrays.data;
-    make_all_keys_pending();
+    make_all_pkeys_pending();
     touch_timer();
 }
 
@@ -155,27 +154,22 @@ var set_pos_speed = function(timebase, arrays){
         clear_cache(['pos_speed']);
     }
     pos_speed = arrays && arrays.data;
-    make_all_keys_pending();
+    make_all_pkeys_pending();
     touch_timer();
 }
 
-var make_all_keys_pending = function(){
-    keys_pending_render = [];    
-    for(let key in key_to_array){
-        keys_pending_render.push(key);
+var make_all_pkeys_pending = function(){
+    pkeys_pending_render = [];    
+    for(let pkey of pkey_to_array.keys()){
+        pkeys_pending_render.push(pkey);
     }
 }
 
 
-var update_keys = function(changes, arrays){
+var update_pkeys = function(changes, arrays){
 
-    if(changes.generation_remove !== key_generation){
-        changes.remove_keys = [];
-        key_to_array.clear();
-        key_to_rendered_options.clear();
-        keys_pending_render = [];
-        console.log("rm-plots worker: key generation mismatch");
-    }
+    if(changes.generation_remove !== pkey_generation)
+        throw "key generation mismatch";
 
     // note we don't both to remove keys from the pending list
     // unless we change key generation, in which case we drop 
@@ -184,45 +178,91 @@ var update_keys = function(changes, arrays){
     // array for the given key we know it's for the relevant 
     // generation and that it's still wanted.
 
-    var remove_keys = changes.remove || [];
-    for(let ii=0; ii<remove_keys.length; ii++){
-        key_to_array.delete(remove_keys[ii]);
-        key_to_rendered_options.delete(remove_keys[ii]);
+    var remove_pkeys = changes.remove || [];
+    for(let pkey of remove_pkeys){
+        pkey_to_array.delete(pkey);
+        pkey_to_rendered_options.delete(pkey);
     }
 
     if(changes.generation_add !== changes.generation_remove){
-        keys_pending_render = [];
-        key_generation = changes.generation_add;
+        pkeys_pending_render = [];
+        pkey_generation = changes.generation_add;
     }
 
-    var add_keys = changes.add || [];
-    for(let ii=0; ii<add_keys.length; ii++){
-        key_to_array[add_keys[ii]] = arrays[add_keys[ii]];
-        keys_pending_render.push(add_keys[ii]);
+    var add_pkeys = changes.add || [];
+    for(let pkey of add_pkeys){
+        pkey_to_array.set(pkey, arrays[pkey]);
+        pkeys_pending_render.push(pkey);
     }
 
     touch_timer();        
 }
 
 var touch_timer = function(){
+    return; // TODO: um, get rid of this!!
+
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && keys_pending_render.length && show !== 'nnn')
+    if(spike_times && pkeys_pending_render.length && show && show !== 'nnn' &&
+        (show[0] === 'n' || pos_xy) && (show[1] === 'n' || pos_dir) 
+            && (show[2] === 'n' || pos_speed)){
         timer = timer || setImmediate(timer_tick);
-    else
+    } else {
         clearImmediate(timer);
+    }
 }
 
 var timer_tick = function(){
     timer = 0;
 
     // find one valid thing to render...
-    while(keys_pending_render.length > 0){
-        var key = keys_pending_render.pop();
-        if(key && key_to_array[key] && !is_equal_simple(key_to_rendered_options[key], render_options)){
-            get_group_hist(key);
+    // this is somewhat ugly, but whatever.
+    while(pkeys_pending_render.length > 0){
+        let pkey = pkeys_pending_render.pop();
+        let pkey_rendered_options = pkey_to_rendered_options.get(pkey)
+        let inds =  pkey_to_array.get(pkey);
+        if(!pkey_rendered_options){
+            pkey_rendered_options = { /* TODO: initialize using all values */};
+            pkey_to_rendered_options.set(pkey, pkey_rendered_options);
+        }
+        if(pkey && inds && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
+            let msg = {
+                pkey: pkey,
+                generation: pkey_generation,
+                render_options: render_options // note we send all options regardless of show 'n'
+            }
+            let arrays={};
+
+            if(show[0] === 'y' && (
+                pkey_rendered_options.cm_per_spa_bin !== render_options.cm_per_spa_bin ||
+                pkey_rendered_options.smoothing_spa_bins !== render_options.smoothing_spa_bins)){
+                    let res = get_group_xy_rm(inds);
+                    msg.spa_rm = 'spa_rm';
+                    msg.spa_max = res.max;
+                    arrays.spa_rm = res.im;
+                    pkey_rendered_options.cm_per_spa_bin = render_options.cm_per_spa_bin;
+                    pkey_rendered_options.smoothing_spa_bins = render_options.smoothing_spa_bins;
+            }
+
+            if(show[1] === 'y' && (
+                pkey_rendered_options.deg_per_dir_bin !== render_options.deg_per_dir_bin ||
+                pkey_rendered_options.smoothing_dir_bins !== render_options.smoothing_dir_bins)){
+                    let im = get_group_dir_rm(inds);
+                    msg.spa_rm = 'spa_dir';
+                    arrays.spa_dir = im;
+                    pkey_rendered_options.deg_per_dir_bin = render_options.deg_per_dir_bin;
+                    pkey_rendered_options.smoothing_dir_bins = render_options.smoothing_dir_bins;
+            }
+
+            if(show[2] === 'y'){
+                let im = get_group_speed_rm(inds);
+                msg.spa_speed = im;
+                arrays.spa_speed = im;
+            }
+
+            exec_main_b('plot_things', msg, arrays);
             break;
         }
     }
@@ -366,9 +406,7 @@ var make_cached_speed_bins_and_dwell = function(){
 
 
 
-var get_group_xy_rm = function(key){
-    var group_inds = key_to_array[key];
-
+var get_group_xy_rm = function(inds){
     var group_xy_bins = pick(cached_spike_xy_bins, group_inds); //cached_spike_xy_bins was stored as 2byte blocks, which is what we want here
     var spike = hist_2(new Uint8Array(group_xy_bins.buffer), n_bins_xy_1, n_bins_xy_0); //now we treat it as 1 byte blocks
     // TODO: see note about zero-bin in make_cached_xy_bins_and_dwell
@@ -378,10 +416,13 @@ var get_group_xy_rm = function(key){
     use_mask(ratemap, cached_xy_no_dwell);
 
     var max_map = max(ratemap);
+    
     var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
 
-    // TODO: send something to main somehow!
-    // im, max_map*pos_timebase, group_inds.length/expLenInSeconds, [n_bins_xy_1, n_bins_xy_0]);
+    return {
+        im: im,
+        max: max_map
+    }
 
 }
 
@@ -403,9 +444,7 @@ var to_image_data = function(map, max_map){
     return im;
 }
 
-var get_group_dir_rm = function(key){
-    var group_inds = key_to_array[key];
-
+var get_group_dir_rm = function(group_inds){
     var n_bins_dir = cached_dir_dwell.length;
     var group_dir_bins = pick(cached_spike_dir_bins,group_inds); 
 
@@ -424,25 +463,19 @@ var get_group_dir_rm = function(key){
     for(let i=0; i<ratemap.length; i++)
         ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
         
-    // TODO: send something to main somehow!
-    // ratemap 
+    // TODO: plot here
+    return new Uint32Array(1);
 
 }
 
-var get_group_speed_rm = function(key){
-    var group_inds = key_to_array[key];
-
+var get_group_speed_rm = function(group_inds){
     var group_speed_bins = pick(cached_spike_speed_bins, group_inds); 
     var spike = hist_1(group_speed_bins, cached_speed_dwell.length + 1);
     spike = spike.subarray(0, spike.length-1);
 
     var ratemap = r_divide_float(spike, cached_speed_dwell);
                     
-    var im = plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
-
-    // TODO: send something to main somehow!
-    // im , speed_plot_size;
-
+    return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
 
 
@@ -580,51 +613,60 @@ var is_equal_simple = function(a, b){
         properties: {
             pos_xy: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
-                value: function(){ return {};}
+                value: function(){ return {};},
+                notify: true
             },
             pos_dir: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
-                value: function(){ return {};}
+                value: function(){ return {};},
+                notify: true
             },
             pos_speed: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
-                value: function(){ return {};}
+                value: function(){ return {};},
+                notify: true
             },
             spike_times: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
-                value: function(){ return {};}
+                value: function(){ return {};},
+                notify: true
             },
             cm_per_spa_bin: {
                 type: Number,
-                value: 2
+                value: 2,
+                notify: true
             },
             smoothing_spa_bins: {
                 type: Number,
-                value: 2
+                value: 2,
+                notify: true
             },
             max_rate_spa: {
                 type: Number,
-                value: -1
+                value: -1,
+                notify: true
             },
             deg_per_dir_bin: {
                 type: Number,
-                value: 6
+                value: 6,
+                notify: true
             },
             smoothing_dir_bins: {
                 type: Number,
-                value: 2
+                value: 2,
+                notify: true
             },
             show: {
                 type: String,
-                value: 'yyy'
+                value: 'yyy',
+                notify: true
             },
             groups: {
                 type: Array,
                 value: function(){return [];},
                 notify: true
             }
-        },
-        observers: [
+        }, observers: [
             '_groups_set(groups)',
             '_groups_spliced(groups.splices)',
             '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
@@ -633,105 +675,111 @@ var is_equal_simple = function(a, b){
             '_pos_dir_modified(pos_dir)',
             '_pos_speed_modified(pos_speed)',
             '_times_modified(spike_times)'
-        ],
-        created: function(){
+        ], created: function(){
+            // copy-paste defaults from worker code above (could implement
+            // something  more complicated, but hey this works and is easy).
+            this._options = {
+                cm_per_spa_bin: undefined,
+                smoothing_spa_bins: undefined,
+                max_rate_spa: undefined,
+                deg_per_dir_bin: undefined,
+                smoothing_dir_bins: undefined,
+                cps_per_speed_bin: 4 // currently not exposed as a user-configurable
+            };
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
             this._worker = worker_builder.create_for(this);
-            this._key_to_spa_canvas = new Map();
-            this._key_to_dir_canvas = new Map();
-            this._key_to_speed_canvas = new Map();
-            this._key_to_rendered_options = new Map();
-            this._key_is_on_worker = new Map();
-            this._key_generation = 0;
+            this._pkey_generation = 0;
             this._times_is_on_worker = false;
             this._pos_xy_is_on_worker = false;
             this._pos_dir_is_on_worker = false;
             this._pos_speed_is_on_worker = false;
-        },
-        _update_keys: function(keys_to_remove, keys_to_add, generation_remove, generation_add){
+        },  _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
 
             var added_arrays = {};
-            if (this.show !== 'nnn'){
+            var pkeys_to_add = []; 
+            if (this.show.indexOf('y') > -1){
                 // get clones of new arrays to send to worker
-                for(let key of keys_to_add){
-                    let box = this.groups_collection.getItem(key);
-                    if(box){
-                        added_arrays[key] = am.get_array_clone(box.akey);
-                        this._key_is_on_worker.set(key, true);
-                    }
+                for(let okey of okeys_to_add){
+                    pkeys_to_add.push(okey._pkey);
+                    added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
+                    okey._rm_is_on_worker = true;                    
                 }
-            } else {
-                // if we are not showing the plots, we don't actually get 
-                // any arrays, but we need to remmeber that we never sent them
-                // to the worker.
-                for(let key of keys_to_add){
-                    this._key_is_on_worker.set(key, false);
-                }
-                keys_to_add = [];
+            }
+
+            // free canvases, it's our responsiblity to do this, whereas 
+            // freeing the inds arrays was the responsibility of cut-obj.
+            var pkeys_to_remove = [];
+            for(let okey of okeys_to_remove){
+                pkeys_to_remove.push(okey._pkey);
+                cm.free_canvas(okey.rm_spa);
+                cm.free_canvas(okey.rm_dir);
+                cm.free_canvas(okey.rm_speed);
+                cm.free_canvas(okey._rm_spa_other);
+                cm.free_canvas(okey._rm_dir_other);
+                cm.free_canvas(okey._rm_speed_other);
+                okey.rm_spa = null;
+                okey.rm_dir = null;
+                okey.rm_speed = null;
+                okey._rm_spa_other = null;
+                okey._rm_dir_other = null;
+                okey._rm_speed_other = null;
+                okey._rm_other_options = null;
+                okey._rm_is_on_worker = false;
             }
 
             // inform worker of the new/deleted arrays
-            this._worker.exec_b('update_keys', {
-                add: keys_to_add,
-                remove: keys_to_remove,
+            this._worker.exec_b('update_pkeys', {
+                add: pkeys_to_add,
+                remove: pkeys_to_remove,
                 generation_remove: generation_remove,
                 generation_add: generation_add
             }, added_arrays);
 
-            // free canvases, it's our responsiblity to do this, whereas 
-            // freeing the inds arrays was the responsibility of cut-obj.
-            for(let ii=0; ii<keys_to_remove.length; ii++){
-                let key = keys_to_remove[ii];
-                let c1 = this._key_to_spa_canvas.get(key);
-                if(c1){
-                    cm.free_canvas(c1);
-                    this._key_to_spa_canvas.delete(key);
+        }, _options_modified: function(){
+            this._options.cm_per_spa_bin = this.cm_per_spa_bin;
+            this._options.smoothing_spa_bins = this.smoothing_spa_bins;
+            this._options.max_rate_spa = this.max_rate_spa;
+            this._options.deg_per_dir_bin = this.deg_per_dir_bin;
+            this._options.smoothing_dir_bins = this.smoothing_dir_bins;
+            this._worker.exec('set_options', this._options);
+
+            // if we already have the right answer in any cases, then we must apply that now
+            // because the worker is not going to send it again
+            for(let okey of this.groups){
+                if(okey.rm_spa !== okey._rm_spa_other && 
+                   okey._rm_other_options.cm_per_spa_bin === this._options.cm_per_spa_bin &&
+                   okey._rm_other_options.smoothing_spa_bins === this._options.smoothing_spa_bins){
+                    cm.free_canvas(okey.rm_spa);
+                    okey.rm_spa = okey._rm_spa_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);         
                 }
-                let c2 = this._key_to_dir_canvas.get(key);
-                if(c2){
-                    cm.free_canvas(c2);
-                    this._key_to_dir_canvas.delete(key);
+                if(okey.rm_dir !== okey._rm_dir_other && 
+                   okey._rm_other_options.deg_per_dir_bin === this._options.deg_per_dir_bin &&
+                   okey._rm_other_options.smoothing_dir_bins === this._options.smoothing_dir_bins){
+                    cm.free_canvas(okey.rm_dir);
+                    okey.rm_dir = okey._rm_dir_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);            
                 }
-                let c3 = this._key_to_speed_canvas.get(key);
-                if(c3){
-                    cm.free_canvas(c3);
-                    this._key_to_speed_canvas.delete(key);
-                }
-                this._key_to_rendered_options.delete(key);
-                this._key_is_on_worker.delete(key); // we can also forget this
+                // there are no configurable options for speed, so anything we had is already valid
             }
-        },
-        _options_modified: function(){
-            this._worker.exec('set_options', {
-                cm_per_spa_bin: this.cm_per_spa_bin,
-                smoothing_spa_bins: this.smoothing_spa_bins,
-                max_rate_spa: this.max_rate_spa,
-                deg_per_dir_bin: this.deg_per_dir_bin,
-                smoothing_dir_bins: this.smoothing_dir_bins
-            });
-        },
-        _groups_set: function(new_val, old_val){
-            var removed = this.groups_collection ? 
-                            this.groups_collection.getKeys() : []; 
-            this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
-            var added = this.groups_collection ? 
-                            this.groups_collection.getKeys() : []; 
-            this._update_keys(removed, added, this._key_generation, ++this._key_generation); // added keys are for a new generation
-        },
-        _groups_spliced: function(splices){
-            if(!splices) return;
-            var dedupes = Utils.dedupe(splices.keySplices);
-            this._update_keys(dedupes.removed, dedupes.added, this._key_generation, this._key_generation);
-        },
-        _show_changed: function(){
-            if(this.show !== 'nnn'){    
+        }, _groups_set: function(new_val, old_val){
+            this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
+        }, _groups_spliced: function(splices){
+            let parsed = Utils.parse_splices(splices);
+            this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
+        }, _show_changed: function(){
+            // TODO: I'm not sure what state all the show-related stuff is in, review it carefully and 
+            // finish implementing it.
+            if(this.show !== 'nnn' && this.groups){  
+
                 var added = [];
-                for(let [k, v] of this._key_is_on_worker) if(!v){
-                    added.push(k);
+                for(let okey of this.groups) if(!okey._rm_is_on_worker){
+                    added.push(okey);
                 }
-                this._update_keys([], added, this._key_generation, this._key_generation);
+                this._update_okeys([], added, this._key_generation, this._key_generation);
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
@@ -744,7 +792,7 @@ var is_equal_simple = function(a, b){
                 if(this.show[2] === 'y' && !this._pos_speed_is_on_worker){
                     this._pos_speed_modified();
                 }
-            } else if (!this.show.match(/^[yn]{3}$/)){
+            } else if (this.show.match(/^[yn]{3}$/)){
                 // nothing to do here
             } else {
                 throw "invalid value for show";
@@ -752,11 +800,10 @@ var is_equal_simple = function(a, b){
             if(this._worker){
                 this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
             }
-        },
-        _pos_xy_modified: function(){
+        }, _pos_xy_modified: function(){
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
-                    var arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.data);
+                    let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
                     this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
                 } else {
                     if(!this._worker) return;
@@ -769,11 +816,10 @@ var is_equal_simple = function(a, b){
                 }
                 this._pos_xy_is_on_worker = false;
             }
-        },
-        _pos_dir_modified: function(){
+        }, _pos_dir_modified: function(){
             if(this.show && this.show[1] === 'y'){
                 if(this.pos_dir){
-                    var arr = Utils.typed_array_manager.get_array_clone(this.pos_dir.data);
+                    let arr = Utils.typed_array_manager.get_array_clone(this.pos_dir.dir);
                     this._worker.exec_b('set_pos_dir', this.pos_dir.timebase, {data: arr});
                 } else {
                     if(!this._worker) return;
@@ -786,11 +832,10 @@ var is_equal_simple = function(a, b){
                 }
                 this._pos_dir_is_on_worker = false;
             }
-        },
-        _pos_speed_modified: function(){
+        }, _pos_speed_modified: function(){
             if(this.show && this.show[2] === 'y'){
                 if(this.pos_speed){
-                    var arr = Utils.typed_array_manager.get_array_clone(this.pos_speed.data);
+                    let arr = Utils.typed_array_manager.get_array_clone(this.pos_speed.speed);
                     this._worker.exec_b('set_pos_speed', this.pos_speed.timebase, {data: arr});
                 } else {
                     if(!this._worker) return;
@@ -803,11 +848,10 @@ var is_equal_simple = function(a, b){
                 }
                 this._pos_speed_is_on_worker = false;
             }
-        },
-         _times_modified: function(){
+        }, _times_modified: function(){
             if(this.show !== 'nnn'){
                 if(this.spike_times){
-                    var arr = Utils.typed_array_manager.get_array_clone(this.spike_times.data);
+                    let arr = Utils.typed_array_manager.get_array_clone(this.spike_times.times);
                     this._worker.exec_b('set_spike_times', this.spike_times.timebase, {data: arr});
                 } else {
                     if(!this._worker) return;
@@ -820,6 +864,26 @@ var is_equal_simple = function(a, b){
                 }
                 this._times_is_on_worker = false;
             }
+        }, plot_things: function(data, arrays) {
+            if(data.generation !== this._pkey_generation)
+                return; // pft! get with the times, dude.
+            let okey = this._groups_collection.getItem(data.pkey);
+            let cm = Utils.canvas_manager;
+            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
+            //  TODO: this will have one or more of spa, dir, and speed
+            // dependigng on the show options.  need to update the relevant
+            // ckeys and *only* the relevant rendered options
+
+            /*
+            cm.free_canvas(okey._tac_other);
+            okey._tac_other = ckey;
+            okey._tac_other_options = data.render_options;
+            if(Utils.is_equal_simple(data.render_options, this._options)){
+                cm.free_canvas(okey.tac);
+                okey.tac = ckey;
+                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
+            }
+            */
         }
     });
 </script>

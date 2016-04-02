@@ -75,10 +75,10 @@ groups is an array of objects with the following properties:
             style$="[[_show(item)]]"
             group_num="[[index]]"
             group_n="[[item.n_spikes]]"
-            group_spa_max="[[item.spa_max]]"
-            dir_rm="[[item.dir_rm]]"
-            spa_rm="[[item.spa_rm]]"
-            speed_rm="[[item.speed_rm]]"
+            group_spa_max="[[item.rm_spa_max]]"
+            dir_rm="[[item.rm_dir]]"
+            spa_rm="[[item.rm_spa]]"
+            speed_rm="[[item.rm_speed]]"
             tac="[[item.tac]]"
             waves="[[item.waves]]"
             ></tile-element>        
@@ -135,7 +135,7 @@ groups is an array of objects with the following properties:
             'groups_modified(groups.*)'
         ],
         groups_modified: function(change){
-            console.log("tile-wall detected groups change")
+            
         }, _show: function(v){
             return v ? '' : 'display: none;';
         }

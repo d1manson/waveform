@@ -71,7 +71,8 @@ Utils.parse_splices = function(splices, give_moved){
     }
 
     if(give_moved){
-        throw "not implemented yet.";
+        console.warn("parse_splices give_moved=true not implemented yet.");
+        moved = [];
     }
 
     return {
@@ -83,53 +84,7 @@ Utils.parse_splices = function(splices, give_moved){
 
 }
 
-Utils.dedupe = function(splices){
-    /* takes an array the form: 
-       [{added: ['a','b','c','d'], removed: ['e','f','g]}, 
-        {added: ...} , ...]
-     and "dedupes" it to a single pair of added and removed arrays,
-     such that any items which were added and removed multiple times
-     end up in the correct one of the two lists (or are ommited entirely).
 
-     Taken/adapted from dom-repeat._applySplicesUserSort.
-    */
-    if(!splices || splices.length === 0){
-        return {added: [], removed: []}; // TODO: check why this can happen
-    } else if (splices.length === 1){
-        // assume that if there's only one element in the array then it's already properly de-deduped
-        return splices[0]; 
-    }
-
-    var key_map = {}; // -1: removed; +1: added; 0: neither added nor removed
-    var key;
-
-    for (var i=0, s; (i<splices.length) && (s=splices[i]); i++) {
-        for (var j=0; j<s.removed.length; j++) {
-            key = s.removed[j];
-            key_map[key] = key_map[key] ? 0 : -1;
-        }
-        for (j=0; j<s.added.length; j++) {
-            key = s.added[j];
-            key_map[key] = key_map[key] ? 0 : 1;
-        }
-    }
-
-    var removed = [];
-    var added = [];
-    for(key in key_map){
-        if(key_map[key] == -1){
-            removed.push(key);
-        }else if(key_map[key] == +1){
-            added.push(key);
-        }
-    }
-
-    return {
-        removed: removed,
-        added: added
-    };
-    
-};
 
 // simplel clone is for when there's nothing complicated to think about
 Utils.simple_clone = function(a){

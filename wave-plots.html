@@ -43,6 +43,9 @@ If you do this, you probably want to express time in seconds, so as to get the m
 range of 32bit floats...although I think you would have to come up with some fairly contrived
 data if you wanted to observe the limitations of the 32bit precision.
 
+TODO: it probably wouldn't be that hard to implement chanel-specific toggling. Keep the indices
+of the wave buffers fixed as though all were in use, but only upload those that are needed and
+be careful when building render metrics and using them.
 -->
 
 
@@ -911,7 +914,6 @@ Polymer({
         '_palette_mode_changed(palette_mode)',
         '_show_chans_changed(show_chans)',
         '_data_for_gl_changed(data_for_gl)'
-        // TODO: send modified okeys when group_num changes on existing okey ...or work it out from splice notifcations
     ], created: function(){
         try{
             this._renderer = new WavesRenderer(this._okey_rendered.bind(this));
@@ -955,17 +957,8 @@ Polymer({
         this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
         this._update_okeys(old_val || [], new_val || [], []);
     }, _groups_spliced: function(splices){
-        if(!splices) return;
-        var dedupes = Utils.dedupe(splices.keySplices);
-        var removed = [];
-        var added = [];
-        for(let key of dedupes.removed){
-            removed.push(this.groups_collection.getItem(key));
-        }
-        for(let key of dedupes.added){
-            added.push(this.groups_collection.getItem(key));
-        }
-        this._update_okeys(removed, added);
+        let parsed = Utils.parse_splices(splices, true); 
+        this._update_okeys(parsed.removed, parsed.added, parsed.moved);
     }, _okey_rendered: function(results){
         // results is a map from okey to canvas.
         var cm = Utils.canvas_manager;
@@ -982,7 +975,8 @@ Polymer({
                 ckey_old && cm.free_canvas(ckey_old);  // if there was an old canvas, free it, because there's a new one now
                 ckey = cm.store_canvas(el_canvas);
             }
-            this.set('groups.' + key + '.waves', ckey);            
+            okey.waves = ckey;
+            this.notifyPath('groups.' + key + '.waves', ckey);            
         }
     }
 });

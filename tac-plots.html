@@ -59,7 +59,7 @@ var set_options = function(opts){
     }
     pkeys_pending_render = [];    
     if(spike_times){
-        for(let [pkey, ignore] of pkey_to_array){
+        for(let pkey of pkey_to_array.keys()){
             pkeys_pending_render.push(pkey);
         }
     }
@@ -71,14 +71,14 @@ var set_spike_times = function(timebase_, arrays){
     spike_times = arrays && arrays.data; 
     pkeys_pending_render = [];    
     if(spike_times){
-        for(let [pkey, ignore] of pkey_to_array){
+        for(let pkey of pkey_to_array.keys()){
             pkeys_pending_render.push(pkey);
         }
     }
     touch_timer();
 }
 
-var update_keys = function(changes, arrays){
+var update_pkeys = function(changes, arrays){
 
     if(changes.generation_remove !== pkey_generation)
         throw "key generation mismatch";
@@ -271,7 +271,7 @@ var is_equal_simple = function(a, b){
             this._worker = worker_builder.create_for(this);
             this._pkey_generation = 0;
             this._times_is_on_worker = false;
-        }, _update_keys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
+        }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
 
@@ -300,7 +300,7 @@ var is_equal_simple = function(a, b){
             }
 
             // inform worker of the new/deleted arrays
-            this._worker.exec_b('update_keys', {
+            this._worker.exec_b('update_pkeys', {
                 add: pkeys_to_add,
                 remove: pkeys_to_remove,
                 generation_remove: generation_remove,
@@ -309,15 +309,14 @@ var is_equal_simple = function(a, b){
 
         }, _groups_set: function(new_val, old_val){
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
-            this._update_keys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
+            this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
         }, _groups_spliced: function(splices){
             let parsed = Utils.parse_splices(splices);
-            this._update_keys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
+            this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
         }, _options_modified: function(){
             this._options.max_delta_t = this.max_delta_t;
-            this._worker.exec('set_options', {
-                max_delta_t: this.max_delta_t
-            });
+            this._worker.exec('set_options', this._options);
+
             // if we already have the right answer in any cases, then we must apply that now
             // because the worker is not going to send it again
             for(let okey of this.groups){
@@ -349,7 +348,7 @@ var is_equal_simple = function(a, b){
                 for(let okey of this.groups)if(!okey._tac_is_on_worker){
                     added.push(okey);
                 }
-                this._update_keys([], added, this._pkey_generation, this._pkey_generation);
+                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
