@@ -293,6 +293,20 @@ var swap_16 = function (val) {
     return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
 }
 
+var take_2_2_swapped = function(src, offset_bytes, stride_bytes){
+    // takes 4 bytes total, swapping bytes 0 and 1, and swapping bytes 2 and 3.
+    
+    var dest = new Uint32Array( (0 | (src.length/stride_bytes)) - (0 | (offset_bytes/stride_bytes)));
+
+    for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src+=stride_bytes,p_dest++){
+        dest[p_dest] =   src[p_src+1]
+                       |(src[p_src+0] << 8)
+                       |(src[p_src+3] << 16)
+                       |(src[p_src+2] << 24);
+    }
+    return dest;
+}
+
 var take = function(data,offset,stride){
     // takes every stride'th element from data, starting with the offset'th element
     
@@ -371,13 +385,6 @@ var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cach
     }
 
     var data_len_bytes = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
-
-    if(endian == 'L'){
-        let data16 = new Int16Array(buffer, data_start, data_len_bytes/2);
-        for (let k=0; k<data16.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
-            data16[k] = swap_16(data16[k]);
-        }
-    }
 
     var pos = post_process(buffer, data_start, data_len_bytes, header, options);
     delete options.fkey;
@@ -545,18 +552,19 @@ var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
     var jump_len = 1;
 
     // Set big jump sections to nan
-    for(let i=start+1,nJumpy=0; i<n_pos; i++){
+    var n_jumpy = 0;
+    for(let i=start+1; i<n_pos; i++){
         let ix = i*2+0;
         let iy = i*2+1;
         // check if this pos is already nan
         // or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
         if(xy[ix] == nan16 || xy[iy] == nan16){
             xy[ix] = xy[iy] = nan16; //just in case only one or the other was nan
-            jump_len++; // note we don't count njumpy here
-        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jump_len) > sqr_max_samp_step ){
+            jump_len++; // note we don't count n_jumpy here
+        }else if (sqr(x_from-xy[ix]) + sqr(y_from-xy[iy]) > sqr_max_samp_step *  sqr(jump_len)){
             //sample is nan or speed is too large, so make this a jump
             xy[ix] = xy[iy] = nan16; 
-            nJumpy++;
+            n_jumpy++;
             jump_len++;
         }else{
             //speed is sufficiently small, so this point is ok
@@ -566,7 +574,7 @@ var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
         }
     }
 
-    return nJumpy;
+    return n_jumpy;
 }       
 
 var swap = function(a, b, do_swap){
@@ -636,18 +644,27 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
 }
 
 var get_dir = function(pos){
-    // TODO: if n_led is 1
     var xy_1 = pos.xy_1;
     var xy_2 = pos.xy_2;
-
     var ret = new Float32Array(xy_1.length/2);
     var pi = 3.14159265;
-    for(let i=0;i<xy_1.length/2;i++){
-        let ix = 2*i+0;
-        let iy = 2*i+1;
-        let dy = xy_2[iy] - xy_1[iy];
-        let dx = xy_2[ix] - xy_1[ix];
-        ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+
+    if(xy_2){
+        for(let i=0;i<xy_1.length/2;i++){
+            let ix = 2*i+0;
+            let iy = 2*i+1;
+            let dy = xy_2[iy] - xy_1[iy];
+            let dx = xy_2[ix] - xy_1[ix];
+            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+        }        
+    } else {
+        // only one led used...
+        for(let i=1;i<xy_1.length/2;i++){
+            let dy = xy_1[2*i+1] - xy_1[2*i-1];
+            let dx = xy_1[2*i+0] - xy_1[2*i-2];
+            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+        }
+        ret[0] = ret[1];
     }
     return ret;
 }
@@ -661,9 +678,9 @@ var get_speed = function(pos){
     return ret;
 }
 
+
 var post_process = function(buffer, offset_bytes, length_bytes, header, options){
-    var data = new Int16Array(buffer, offset_bytes, length_bytes/2);
-    var data32 = new Int32Array(buffer, offset_bytes, length_bytes/4);
+    var data8 = new Uint8Array(buffer, offset_bytes, length_bytes);
 
     var elements_per_pos_sample = bytes_per_pos_sample/2;
     var n_pos = parseInt(header.num_pos_samples); 
@@ -672,14 +689,15 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
     var pos_nan = 1023;
 
      // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-    var xy_1 = new Int16Array(take(data32, 1, bytes_per_pos_sample/4).buffer);
+    var xy_1 = new Int16Array(take_2_2_swapped(data8, 4, bytes_per_pos_sample).buffer);
     replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
     
     var n_led = 1;
+    var xy_2;
     if (options.use_both_leds){
         // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
         // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-        var xy_pix = new Int16Array(take(data32, 3, bytes_per_pos_sample/4).buffer);
+        var xy_pix = new Int16Array(take_2_2_swapped(data8, 12, bytes_per_pos_sample).buffer);
         replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
         for(let i=0; i<n_pos; i++){
             if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
@@ -688,14 +706,12 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
             }
         } // if we make it to the end of the loop then n_led reamined as =1.
 
-    }
-
-    var xy_2;
-    if(n_led == 2){
-         // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
-        xy_2 = new Int16Array(take(data32, 2, bytes_per_pos_sample/4).buffer);
-        replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-    
+        if(n_led == 2){
+             // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+            xy_2 = new Int16Array(take_2_2_swapped(data8, 8, bytes_per_pos_sample).buffer);
+            replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
+        
+        }
     }
     
     if(options.need_to_subtract_mins){
@@ -726,7 +742,7 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
 
         var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
         header.post_n_pix_led1 = "mean=" + pix_props.mean_1.toFixed(2) + " std=" + pix_props.std_1.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_1) + ")";
-        header.psot_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
+        header.post_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
 
         // use std and mean to get z score of pix1 to pix1 and pix2
         for(let i=0; i< n_pos; i++){
@@ -1236,15 +1252,18 @@ var parse_clu_file = function(full_str, fkey){
             },
             use_n_leds: {
                 type: Number, //1 or 2
-                value: 2
+                value: 2,
+                notify: true
             },
             speed_filter_mps: {
                 type: Number,  //mps= meters per second
-                value: 4
+                value: 4,
+                notify: true
             },
             pos_smoothing_s: {
                 type: Number, 
-                value: 0.2
+                value: 0.2,
+                notify: true
             },
             duration: {
                 type: Number, // seconds
@@ -1502,7 +1521,7 @@ var parse_clu_file = function(full_str, fkey){
             msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
             this._pos_from_options.set(msg.options, result);
             if(msg.delete_from_cache){
-                for(let [cached_opts, ignore] of this._pos_from_options){
+                for(let cached_opts of this._pos_from_options.keys()){
                     if(Utils.is_equal_simple(cached_opts, msg.delete_from_cache)){
                         this._pos_from_options.delete(cached_opts);
                     }
@@ -1519,7 +1538,9 @@ var parse_clu_file = function(full_str, fkey){
             this._setPos_xy({
                 xy: result.xy,
                 timebase: timebase,
-                units_per_cm: result.header && parseInt(result.header.units_per_meter)/100
+                units_per_cm: result.header && parseInt(result.header.units_per_meter)/100,
+                max_x: result.header && result.header.max_vals[0],
+                max_y: result.header && result.header.max_vals[1]
             });
             this._setPos_dir({
                 dir: result.dir,
@@ -1599,10 +1620,10 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, _make_pos_options: function(){
             return {
-                use_both_leds: this.use_n_leds,
+                use_both_leds: (this.use_n_leds == 2),
                 need_to_subtract_mins: false,
                 swapping_thresh_cm: 1,
-                max_speed: this.pos_filter_mps,
+                max_speed: this.speed_filter_mps,
                 smoothing_secs: this.pos_smoothing_s
             }
         }, got_gl_data: function(msg, arrays){

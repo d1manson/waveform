@@ -82,37 +82,34 @@ Polymer({
         pos_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_pos'
+            notify: true
         },
         set_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_set'
+            notify: true
         },
         tet_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_tet'
+            notify: true
         },
         cut_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_cut'
+            notify: true
         }
-    }, created: function(){
+    }, observers: [
+        "_clear_cache('pos', pos_header)",
+        "_clear_cache('set', set_header)",
+        "_clear_cache('tet', tet_header)",
+        "_clear_cache('cut', cut_header)"
+    ], created: function(){
         this._cache = {};
-    }, _clear_cache_pos: function(){
-        this._cache['pos'] = undefined;
-    }, _clear_cache_set: function(){
-        this._cache['set'] = undefined;
-    }, _clear_cache_tet: function(){
-        this._cache['tet'] = undefined;
-    }, _clear_cache_cut: function(){
-        this._cache['cut'] = undefined;
+        this._cached_for = {}; // if _clear_cache was guaranteed to be called before _build_array we wouldn't need this
+    }, _clear_cache: function(t, ignored){
+        this._cache[t] = undefined;
+        this._cached_for[t] = undefined;
     }, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter) {
             var a = [];         
             for(let t of new Set(['tet', 'cut', 'pos', 'set'])){
@@ -120,7 +117,7 @@ Polymer({
                 if(!header || !Object.keys(header).length){
                     continue;
                 }
-                if (this._cache[t]){
+                if (this._cache[t] && this._cached_for[t] === header){
                     a = a.concat(this._cache[t]);
                     continue;
                 } 
@@ -143,6 +140,7 @@ Polymer({
                     value: header.file
                 });
                 this._cache[t] = arr;
+                this._cached_for[t] = header;
                 a = a.concat(arr);
 
             }

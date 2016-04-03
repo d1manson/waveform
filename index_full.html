@@ -27,6 +27,7 @@
 <link rel="import" href="floating-pane.html">
 <link rel="import" href="document-focus-marker.html">
 <link rel="import" href="header-view.html">
+<link rel="import" href="managed-canvas.html">
 
 <style is="custom-style">
 :root {
@@ -310,7 +311,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 			<div class="side_panel_row side_panel_row_flex">
 				<div class="grabbable side_panel_row_flex" id="spatial_panel">
-					<canvas id="posplot" class='poslayer' width="200" height="200"></canvas> 
+					<managed-canvas canv_id="[[pos_path]]"></managed-canvas>
 					<canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
 				</div>
 				<div class="info_summary">
@@ -356,7 +357,8 @@ box-shadow: inset 0 0 2px 1px #ccc;
 					pos_dir="[[pos_dir]]"
 					pos_speed="[[pos_speed]]"
 					data_for_gl="[[data_for_gl]]"
-					options="[[options]]"></tile-wall>
+					options="[[options]]"
+                    pos_path="{{pos_path}}"></tile-wall>
 
 	</div>
 

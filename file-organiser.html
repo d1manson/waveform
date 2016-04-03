@@ -108,8 +108,8 @@ vertical-align: bottom;
 .trial_tet_block{
 display: inline-block;
 border-left: 2px solid #000;
-margin-right: 4px;
 margin-bottom: 2px;
+padding-right: 4px;
 }
 .trial_pos,
 .trial_set{
@@ -194,7 +194,8 @@ font-size: 10px;
         </div>
         <div class='trial_bottom'>
             <template is='dom-repeat' items="[[trial.tets]]" as="tet_block"> 
-                <div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]' on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
+                <div class$='trial_tet_block [[_selected_equality(tet_block.tet_num, selected_tet_num)]]'
+                            on-mouseenter="_make_tet_captions" on-click="_tet_block_click">
                     <div class='trial_tet' style$='display:[[_show(tet_block.tet)]];' title$='[[tet_block.tet_caption]]'>~.[[tet_block.tet_num]]</div>
                     <template is='dom-repeat' items="[[tet_block.cuts]]" as="cut">
                         <div class$='trial_cut [[cut.cut_type]] [[_selected_equality(selected_cut,cut.cut)]]' title$='[[cut.caption]]' 
@@ -377,7 +378,7 @@ Polymer({
         var trial = this._trial_from_base.get(this.selected_trial);
         var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
         var cut = this.selected_cut;
-        var title = this.selected_trial + " [Waveform]" || "Waveform";
+        var title = this.selected_trial ?  this.selected_trial + " [Waveform]" : "Waveform";
         var url = location.pathname + "?";
         url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
         url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";

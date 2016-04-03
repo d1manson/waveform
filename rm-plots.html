@@ -118,7 +118,7 @@ var set_spike_times = function(timebase, arrays){
     touch_timer();
 }
 
-var set_pos_xy = function(timebase, units_per_cm, arrays){
+var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     if(timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
@@ -130,6 +130,17 @@ var set_pos_xy = function(timebase, units_per_cm, arrays){
     pos_xy = arrays && arrays.data;
     make_all_pkeys_pending();
     touch_timer();
+
+    // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
+    if(pos_xy){
+       let im = draw_lines(pos_xy, 256, 256, 256/max_x, 256/max_y);
+       exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256]
+       }, {
+        path: im
+       });
+    }
 }
 
 var set_pos_dir = function(timebase, arrays){
@@ -606,6 +617,38 @@ var is_equal_simple = function(a, b){
     }
     return true;
 }
+
+var draw_lines = function(xy, w, h, scale){
+    let color = 0xff000000; //black
+    let im = new Uint32Array(w*h);
+
+    let x0 = (xy[0] * scale) | 0;
+    let y0 = (xy[1] * scale) | 0;
+    for(let ii=2; ii<xy.length; ii+=2){
+        let x1 = (xy[ii+0] * scale) | 0;
+        let y1 = (xy[ii+1] * scale) | 0;
+
+        // Bresenham algorithm adapted from http://stackoverflow.com/a/4672319/2399799
+        let dx = Math.abs(x1-x0);
+        let dy = Math.abs(y1-y0);
+        let sx = (x0 < x1) ? 1 : -1;
+        let sy = (y0 < y1) ? 1 : -1;
+        let err = dx-dy;
+        while(true){
+            im[y0*w + x0] = color;
+
+            if ((x0==x1) && (y0==y1)) break;
+            let e2 = err << 1;
+            if (e2 >-dy){ err -= dy; x0  += sx; }
+            if (e2 < dx){ err += dx; y0  += sy; }
+        }
+
+        x0 = x1;
+        y0 = y1;
+    }
+    return im;
+}
+
 </script>
 
 <template></template>
@@ -617,6 +660,12 @@ var is_equal_simple = function(a, b){
     Polymer({
         is:'rm-plots',
         properties: {
+            pos_path: {
+                type: String, //canvas-manager id
+                value: "",
+                notify: true,
+                readOnly: true
+            },
             pos_xy: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};},
@@ -812,7 +861,8 @@ var is_equal_simple = function(a, b){
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
-                    this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
+                    this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, 
+                        this.pos_xy.units_per_cm, this.pos_xy.max_x, this.pos_xy.max_y, {data: arr});
                 } else {
                     if(!this._worker) return;
                     this._worker.exec('set_pos_xy', {});
@@ -892,6 +942,10 @@ var is_equal_simple = function(a, b){
                 this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
             }
             */
+        }, plot_path: function(msg, arrays){
+            var cm = Utils.canvas_manager;
+            cm.free_canvas(this.pos_path);
+            this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))
         }
     });
 </script>

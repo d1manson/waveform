@@ -51,6 +51,7 @@ groups is an array of objects with the following properties:
      -->
     
     <rm-plots   groups="{{groups}}" 
+                pos_path="{{pos_path}}"
                 spike_times="[[spike_times]]"
                 pos_xy="[[pos_xy]]"
                 pos_dir="[[pos_dir]]"
@@ -97,6 +98,11 @@ groups is an array of objects with the following properties:
                 type: Array,
                 value: function(){return [];},
                 notify: true    
+            },
+            pos_path: {
+                type: String, //canvas-manager id
+                value: "",
+                notify: true
             },
             duration: {
                 type: Number, // seconds
