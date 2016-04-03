@@ -49,6 +49,7 @@ groups is an array of objects with the following properties:
     As well as setting canvases in the groups array, they also record
     the settings used to produce that canvas, e.g. groups[3].dir_smoothing.
      -->
+    
     <rm-plots   groups="{{groups}}" 
                 spike_times="[[spike_times]]"
                 pos_xy="[[pos_xy]]"
@@ -64,6 +65,7 @@ groups is an array of objects with the following properties:
                 max_delta_t="[[options.max_delta_t]]"
                 spike_times="[[spike_times]]"
                 show="[[options.show_tac]]"></tac-plots> 
+                
     <wave-plots groups="{{groups}}" 
                 data_for_gl="[[data_for_gl]]"
                 palette_mode="[[options.waves_render_mode]]"

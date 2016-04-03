@@ -83,7 +83,7 @@ var n_w = 50; // number of t points per channel
 
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
-var off_canv_h = 512;  // full height
+var off_canv_h = 270;  // full height
 var off_canv_wave_h = 128; // height of a wave
 var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
@@ -99,7 +99,7 @@ var shader_strs = (function(){
 // rather than accepting a .format(dict) like in python, anyway....
 
 var delta_t_x_offset = (off_canv_dt/off_canv_w*2).toPrecision(3);
-var y_factor =  (1/(off_canv_h/off_canv_wave_h)).toPrecision(3);
+var y_factor =  (1/(off_canv_h/off_canv_wave_h) * (1/128)).toPrecision(3);
 
 return {
 
@@ -112,16 +112,17 @@ return {
         varying lowp vec4 v_color;
         uniform sampler2D palette;
         const mediump float delta_t_x_offset = ${delta_t_x_offset}; // canvas x-coordinates from point t to point t+1
-        const mediump float y_factor = ${y_factor}; //scales voltage values, initially expressed in [0 1], to lie with 128 pixels expressed in canvas coords [-1 +1]
+        const mediump float y_factor = ${y_factor}; //scales voltage values, initially expressed in [0 1], to lie withn +- wave_h/2, in canvas coords [-1 +1]
 
         void main(void) {
+            //v_color = vec4(1.,0.,0.,1.);
             v_color = texture2D(palette, vec2(wave_color_tex, 0.));
 
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
 
             //calculate the y coordiante in canvas coordinates
-            gl_Position.y = wave_xy_offset.y + voltage*y_factor;
+            gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
 
             // best to set the fourth element to 1
             gl_Position[3] = 1.;
@@ -147,10 +148,10 @@ return {
 
         void main(void) {
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
 
             //calculate the y coordiante in canvas coordinates
-            gl_Position.y = wave_xy_offset.y + voltage*y_factor;
+            gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
 
             // best to set the fourth element to 1
             gl_Position[3] = 1.;
@@ -377,7 +378,7 @@ WavesRenderer.prototype._switch_to_flag_prog = function(){
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
     gl.vertexAttribPointer(this._locs_flag.is_t_plus_one, 1, gl.UNSIGNED_BYTE, true, 1, 0);     
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
+    gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 3, 0); 
     gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
 
 }
@@ -408,7 +409,7 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
     gl.vertexAttribPointer(this._locs_density_1.is_t_plus_one, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0); 
+    gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 2, 0); 
 
 }
 
@@ -568,12 +569,12 @@ WavesRenderer.prototype._upload_okey_data = function(){
     var render_metrics = this._render_metrics;
     var okeys = render_metrics.okeys;
 
-    var xy_offset_gl_i8 = new Int8Array(render_metrics.x_offset.length*2);
-    var xy_offset_gl_i16 = new Int16Array(xy_offset_gl_i8.buffer);  
+    var xy_offset_gl_i8 = new Uint8Array(render_metrics.x_offset.length*2);
+    var xy_offset_gl_i16 = new Uint16Array(xy_offset_gl_i8.buffer);  
 
     for(var p=0; p<render_metrics.x_offset.length; p++){
-        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256 - 128;
-        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256 - 128;
+        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256;
+        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256;
     }
 
     var m = Utils.typed_array_manager;
@@ -581,10 +582,9 @@ WavesRenderer.prototype._upload_okey_data = function(){
     if(this._mode === 'density'){
         // just need to provide x and y
 
-        var data_i8 = new Int8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
-        var data_i16 = new Int16Array(data_i8.buffer);
+        var data_i8 = new Uint8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
+        var data_i16 = new Uint16Array(data_i8.buffer);
 
-        data_i8.fill(127); // can avoid doing this if we know all inds will be set (worth doing)
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
@@ -598,10 +598,9 @@ WavesRenderer.prototype._upload_okey_data = function(){
 
         // TODO: test whether it's faster to provide the full rgb color rather than a palette index. I suspect it might be.
 
-        var data_i8 = new Int8Array(this._n*6);
-        var data_i16 = new Int16Array(data_i8.buffer);
+        var data_i8 = new Uint8Array(this._n*6);
+        var data_i16 = new Uint16Array(data_i8.buffer);
     
-        data_i8.fill(127);  // can avoid doing this if we know all inds will be set (worth doing)
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
@@ -617,13 +616,13 @@ WavesRenderer.prototype._upload_okey_data = function(){
 
     // upload it to the wave buffer on the gpu
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.bufferData(gl.ARRAY_BUFFER, data_i8, gl.DYNAMIC_DRAW); 
+    gl.bufferData(gl.ARRAY_BUFFER, data_i8.buffer, gl.DYNAMIC_DRAW); 
 
     // tell the gpu where to find the wave data
     if(this._mode === 'density'){
-        gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0);        
+        gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 2, 0);        
     }else{
-        gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
+        gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 3, 0); 
         gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
     }
 
@@ -857,7 +856,7 @@ WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
 
         // bind the voltage buffer with data for (t,t+1) and render it
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, t*this._n*2); 
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 }
@@ -872,7 +871,7 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
 
         // bind the voltage buffer with data for (t,t+1) and render it
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, t*this._n*2); 
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 
@@ -886,8 +885,8 @@ WavesRenderer.prototype.debug_show_off_canv = function(){
     this.el_off_canv.style.bottom = "0px";
     this.el_off_canv.style.background = "#fff";
     this.el_off_canv.style.border = "1px solid #f00";
-    this.el_off_canv.style.transform = 'scale(0.5)';
-    this.el_off_canv.style.transformOrigin = 'bottom right';
+    //this.el_off_canv.style.transform = 'scale(0.5)';
+    //this.el_off_canv.style.transformOrigin = 'bottom right';
     document.body.appendChild(this.el_off_canv);
 }
 

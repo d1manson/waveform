@@ -1396,8 +1396,7 @@ var parse_clu_file = function(full_str, fkey){
                 changing.add('cut');
             }
             this._fkeys = Utils.simple_clone(new_fkeys);
-            this.fire('start_nulling', changing);
-
+            
             if(changing.has('set')){
                 this._setDuration(null);
                 this._setSet_header(null);
@@ -1417,8 +1416,6 @@ var parse_clu_file = function(full_str, fkey){
             if(changing.has('cut')){
                 this._setCut_box(null);
             }
-
-            this.fire('end_nulling');
 
             // build request for io-worker, taking as much as possible from the main cache
             var request = {};

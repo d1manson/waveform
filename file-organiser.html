@@ -540,7 +540,7 @@ Polymer({
 
 
         trials.sort(function(a,b){
-            return a.name > b.name;
+            return a.name > b.name ? 1 : -1;
         })
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
@@ -677,7 +677,7 @@ Polymer({
             this._sort_trial_innards(trial);
         }   
         trials.sort(function(a,b){
-            return a.name > b.name;
+            return a.name > b.name ? 1 : -1;
         })
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
