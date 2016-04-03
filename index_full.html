@@ -56,364 +56,364 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 <template is="dom-bind" id="the_app">
 
-	<iron-localstorage
-		name="waveform"
-		value="{{options}}"
-		on-iron-localstorage-load-empty="initializeDefaultOptions"
-		></iron-localstorage>
+    <iron-localstorage
+        name="waveform"
+        value="{{options}}"
+        on-iron-localstorage-load-empty="initializeDefaultOptions"
+        ></iron-localstorage>
 
-	<div class="hidden_clipboard"></div>
+    <div class="hidden_clipboard"></div>
 
-	<div class="floating_layer">
-			
-		<floating-pane id="action_info" style="display:initial;">
-			<div class='pane_title'>Action List [z]</div>
-			<undo-stack-view 
-					undo_stack="[[cut_undo_stack]]"
-					redo_stack="[[cut_redo_stack]]"></undo-stack-view>
-		</floating-pane>
-		
+    <div class="floating_layer">
+            
+        <floating-pane id="action_info" style="display:initial;">
+            <div class='pane_title'>Action List [z]</div>
+            <undo-stack-view 
+                    undo_stack="[[cut_undo_stack]]"
+                    redo_stack="[[cut_redo_stack]]"></undo-stack-view>
+        </floating-pane>
+        
 
-		<floating-pane id="tc_info" style="display: initial;">
-			<div class='pane_title'>Temporal auto correlation [t]</div>
-			<p class="nodrag">
-				Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
-				<paper-slider pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
-			</p><p>
-				The number of bins is fixed at 100.
-			</p>
-		</floating-pane>
+        <floating-pane id="tc_info" style="display: initial;">
+            <div class='pane_title'>Temporal auto correlation [t]</div>
+            <p class="nodrag">
+                Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
+                <paper-slider pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
+            </p><p>
+                The number of bins is fixed at 100.
+            </p>
+        </floating-pane>
 
-		<floating-pane id="drift_info">
-			<div class='pane_title'>Drift [d]</div>
-			Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
-			<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-			So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
-		</floating-pane>
-		
-		<floating-pane id="help_info">
-			<div class='pane_title'>Help [?]</div>
-			Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
-			You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-		</floating-pane>
-			
-		<floating-pane id="shortcut_info">
-			<div class='pane_title'>Shortcuts [k]</div>
-			Shorcuts applied to the "active" group, which is the one under the cursor:
-			<ul>
-			<li><b>e</b> set the cluster painting destination group to the active group.</li>
-			<li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-			<li><b>s</b> launch the swap dialog for the "active" group.</li>
-			<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-			</ul>
-			Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
-			<ul>
-			<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
-			<li><b>r</b> spatial ratemap</li>
-			<li><b>c</b> directional ratemap ("c" is for circle)</li>
-			<li><b>v</b> directional ratemap ("v" is for velocity)</li>
-			<li><b>t</b> temporal autocorrelogram</li>
-			</ul>
-			Other shortcuts:
-			<ul>
-			<li><b>d</b> toggle drift rendering on/off</li>
-			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-			<li><b>enter</b> increment cluster painting destination group</li>
-			<li><b>esc</b> open/close the toolbar</li>
-			<li><b>p</b> toggle waveform palette</li>
-			<li><b>k</b> show this info ("k" is for keyboard)</li>
-			<li><b>h</b> show header info</li>
-			<li><b>?</b> open GitHub info in a new tab</li>
-			</ul>						
-		</floating-pane>
-		
-		<floating-pane id="speed_info">
-			<div class='pane_title'>Speed ratemap [v]</div>
-			<p>
-				Bin size <span class="slider_val">4 cm/s</span><br>
-				Upper limit <span class="slider_val">45 cm/s</span>
-			</p><p>
-				Histogram shows slowest speed at the top, and upper limit speed at the bottom.
-			</p><p>
-				WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
-			</p>
-		</floating-pane>
+        <floating-pane id="drift_info">
+            <div class='pane_title'>Drift [d]</div>
+            Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
+            <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+            So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+        </floating-pane>
+        
+        <floating-pane id="help_info">
+            <div class='pane_title'>Help [?]</div>
+            Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
+            You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
+        </floating-pane>
+            
+        <floating-pane id="shortcut_info">
+            <div class='pane_title'>Shortcuts [k]</div>
+            Shorcuts applied to the "active" group, which is the one under the cursor:
+            <ul>
+            <li><b>e</b> set the cluster painting destination group to the active group.</li>
+            <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+            <li><b>s</b> launch the swap dialog for the "active" group.</li>
+            <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+            </ul>
+            Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+            <ul>
+            <li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
+            <li><b>r</b> spatial ratemap</li>
+            <li><b>c</b> directional ratemap ("c" is for circle)</li>
+            <li><b>v</b> directional ratemap ("v" is for velocity)</li>
+            <li><b>t</b> temporal autocorrelogram</li>
+            </ul>
+            Other shortcuts:
+            <ul>
+            <li><b>d</b> toggle drift rendering on/off</li>
+            <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+            <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+            <li><b>enter</b> increment cluster painting destination group</li>
+            <li><b>esc</b> open/close the toolbar</li>
+            <li><b>p</b> toggle waveform palette</li>
+            <li><b>k</b> show this info ("k" is for keyboard)</li>
+            <li><b>h</b> show header info</li>
+            <li><b>?</b> open GitHub info in a new tab</li>
+            </ul>                       
+        </floating-pane>
+        
+        <floating-pane id="speed_info">
+            <div class='pane_title'>Speed ratemap [v]</div>
+            <p>
+                Bin size <span class="slider_val">4 cm/s</span><br>
+                Upper limit <span class="slider_val">45 cm/s</span>
+            </p><p>
+                Histogram shows slowest speed at the top, and upper limit speed at the bottom.
+            </p><p>
+                WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
+            </p>
+        </floating-pane>
 
-		<floating-pane id="waves_info" style="display:initial;">
-			<div class='pane_title'>Waves [w]</div>
-			<p>
+        <floating-pane id="waves_info" style="display:initial;">
+            <div class='pane_title'>Waves [w]</div>
+            <p>
                 There are two palette modes. 
             </p><p class="nodrag">
                 Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
                 <paper-toggle-button id="waves_toggle" checked="{{options.waves_toggle}}"></paper-toggle-button>
             </p><p>
-    			In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
+                In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
             </p><p>
                 In "density" mode, the color of each pixel reflects the proportion of the waves which cross it.
             </p>
-		</floating-pane>
+        </floating-pane>
 
-		<floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
-			<div class='pane_title'>File headers [h]</div>
-			<header-view 
-			set_header="[[set_header]]"
-			pos_header="[[pos_header]]"
-			tet_header="[[tet_header]]"
-			cut_header="[[_get_safe(cut_box,'header')]]"
-			header_filter="[[options.header_filter]]"
-			></header-view>
-		</floating-pane>
+        <floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
+            <div class='pane_title'>File headers [h]</div>
+            <header-view 
+            set_header="[[set_header]]"
+            pos_header="[[pos_header]]"
+            tet_header="[[tet_header]]"
+            cut_header="[[_get_safe(cut_box,'header')]]"
+            header_filter="[[options.header_filter]]"
+            ></header-view>
+        </floating-pane>
 
-		<floating-pane id="rm_info" style="display: initial;">
-			<div class='pane_title'>Spatial ratemap [r]</div>
-			<p class="nodrag">
-				Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
-				<paper-slider class="nodrag" pin snaps min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style='width:300px'></paper-slider>
-			</p><p class="nodrag">
-				Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
-				<paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
-			</p><p class="nodrag">
-				Ratemap frequency values are <span class="slider_val">[[options.max_rate_spa]]</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
-			</p><p>
-				The true peak rate is shown as "spa max" when you move your cursor over a group.
-			</p>
-		</floating-pane>
-		
-		<floating-pane id="dir_info" style="display: initial;">
-			<div class='pane_title'>Directional ratemap [c]</div>
-			<p class="nodrag">
-				Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
-				<paper-slider class="nodrag" pin snaps min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style='width:300px'></paper-slider>
-			</p><p class="nodrag">
-				Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style='width:300px'></paper-slider>
-			</p><p>
-				Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
-				 the direction of movement is used (this is sometimes refered to as "displacement direction").
-			</p>
-		</floating-pane>
+        <floating-pane id="rm_info" style="display: initial;">
+            <div class='pane_title'>Spatial ratemap [r]</div>
+            <p class="nodrag">
+                Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
+                <paper-slider class="nodrag" pin snaps min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style='width:300px'></paper-slider>
+            </p><p class="nodrag">
+                Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
+                <paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
+            </p><p class="nodrag">
+                Ratemap frequency values are <span class="slider_val">[[options.max_rate_spa]]</span><br>
+                <paper-slider class="nodrag" pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
+            </p><p>
+                The true peak rate is shown as "spa max" when you move your cursor over a group.
+            </p>
+        </floating-pane>
+        
+        <floating-pane id="dir_info" style="display: initial;">
+            <div class='pane_title'>Directional ratemap [c]</div>
+            <p class="nodrag">
+                Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
+                <paper-slider class="nodrag" pin snaps min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style='width:300px'></paper-slider>
+            </p><p class="nodrag">
+                Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
+                <paper-slider class="nodrag" pin snaps min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style='width:300px'></paper-slider>
+            </p><p>
+                Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
+                 the direction of movement is used (this is sometimes refered to as "displacement direction").
+            </p>
+        </floating-pane>
 
-		<floating-pane id="pos_info" style="display: initial;">
-			<div class='pane_title'>position post processing</div>
-			<p>
-				If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
-				the two spots have swapped.
-			</p><p class="nodrag">
-				Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
-				<paper-slider class="nodrag" pin snaps min="1" max="2" step="1" value="{{options.use_n_leds}}" style='width:80px'></paper-slider>
-			</p><p>
-				The following filtering and smoothing is applied to the one/two data streams separately.
-				If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
-			</p><p class="nodrag">
-				Max speed <span class="slider_val">[[options.speed_filter_mps]] m/s</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
-			</p><p>
-				Where the speed appears to rise above this threshold the data is considered invalid.
-			</p><p>
-				Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
-				new values are created by linearly interpolated across the gaps.
-			</p><p class="nodrag">
-				Smoothing <span class="slider_val">[[options.pos_smoothing_s]] s</span><br>
-				<paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
-			</p><p>
-				Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
-			</p>
-		</floating-pane>
+        <floating-pane id="pos_info" style="display: initial;">
+            <div class='pane_title'>position post processing</div>
+            <p>
+                If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
+                the two spots have swapped.
+            </p><p class="nodrag">
+                Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
+                <paper-slider class="nodrag" pin snaps min="1" max="2" step="1" value="{{options.use_n_leds}}" style='width:80px'></paper-slider>
+            </p><p>
+                The following filtering and smoothing is applied to the one/two data streams separately.
+                If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
+            </p><p class="nodrag">
+                Max speed <span class="slider_val">[[options.speed_filter_mps]] m/s</span><br>
+                <paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
+            </p><p>
+                Where the speed appears to rise above this threshold the data is considered invalid.
+            </p><p>
+                Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
+                new values are created by linearly interpolated across the gaps.
+            </p><p class="nodrag">
+                Smoothing <span class="slider_val">[[options.pos_smoothing_s]] s</span><br>
+                <paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
+            </p><p>
+                Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
+            </p>
+        </floating-pane>
 
-	</div>
+    </div>
 
 
 
-	<div class="main_wrapper">
-		
-	<paper-toolbar class="main_toolbar">
-		<div>
-			<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
-			<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
-		</div>
+    <div class="main_wrapper">
+        
+    <paper-toolbar class="main_toolbar">
+        <div>
+            <paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
+            <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
-			<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
+            <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
-			<paper-tooltip>undo [z]</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
+            <paper-tooltip>undo [z]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
-			<paper-tooltip>file headers [h]</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
+            <paper-tooltip>file headers [h]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
-			<paper-tooltip>toggle drift [d]</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
+            <paper-tooltip>toggle drift [d]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
-			<paper-tooltip>sort on group size [n]</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
+            <paper-tooltip>sort on group size [n]</paper-tooltip>
+        </div>
 
-		<div>
-			<paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
-			<paper-tooltip>sort on channel amplitude</paper-tooltip>
-		</div>	
+        <div>
+            <paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
+            <paper-tooltip>sort on channel amplitude</paper-tooltip>
+        </div>  
 
-		<div>
-			<paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
-			<paper-tooltip>position post processing settings</paper-tooltip>
-		</div>
+        <div>
+            <paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
+            <paper-tooltip>position post processing settings</paper-tooltip>
+        </div>
 
-		<div>
-			<div class="button display_button">wav</div>
-			<paper-tooltip>waves [w]</paper-tooltip>
-		</div>
+        <div>
+            <div class="button display_button">wav</div>
+            <paper-tooltip>waves [w]</paper-tooltip>
+        </div>
 
-		<div>
-			<div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
-			<paper-tooltip>spatial ratemap [r]</paper-tooltip>
-		</div>
+        <div>
+            <div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
+            <paper-tooltip>spatial ratemap [r]</paper-tooltip>
+        </div>
 
-		<div>
-			<div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
-			<paper-tooltip>directional ratemap [c]</paper-tooltip>
-		</div>
+        <div>
+            <div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
+            <paper-tooltip>directional ratemap [c]</paper-tooltip>
+        </div>
 
-		<div>
-			<div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
-			<paper-tooltip>speed ratemap [v]</paper-tooltip>
-		</div>
+        <div>
+            <div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
+            <paper-tooltip>speed ratemap [v]</paper-tooltip>
+        </div>
 
-		<div>
-			<div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
-			<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
-		</div>
+        <div>
+            <div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
+            <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+        </div>
 
-	</paper-toolbar>
+    </paper-toolbar>
 
-	<div id="all_below_toolbar">
-		<document-focus-marker></document-focus-marker>
-		
-		<div-iron-resize class="side_panel">
+    <div id="all_below_toolbar">
+        <document-focus-marker></document-focus-marker>
+        
+        <div-iron-resize class="side_panel">
 
-			<file-organiser class="side_panel_row" id="the_file_organiser"
-				is_dragging_in="{{drop_in_progress}}"
-				no_files="{{no_files}}"
-				selected_files="{{selected_files}}"
-			></file-organiser>
-			
-			<iron-splitter direction="up"></iron-splitter>
+            <file-organiser class="side_panel_row" id="the_file_organiser"
+                is_dragging_in="{{drop_in_progress}}"
+                no_files="{{no_files}}"
+                selected_files="{{selected_files}}"
+            ></file-organiser>
+            
+            <iron-splitter direction="up"></iron-splitter>
 
-			<div class="side_panel_row side_panel_row_flex">
-				<div class="grabbable side_panel_row_flex" id="spatial_panel">
-					<managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-					<canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
-				</div>
-				<div class="info_summary">
-					<div class="info_summary_text"></div>
-					<canvas id="speedhist" width="50" height= "84"></canvas>
-					<div id="speedhist_labels" style="display:inline;position:relative;"><div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div></div>
-					<canvas id="eegspect" width="50" height= "84"></canvas>
-				</div>
-			</div>
+            <div class="side_panel_row side_panel_row_flex">
+                <div class="grabbable side_panel_row_flex" id="spatial_panel">
+                    <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
+                    <canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
+                </div>
+                <div class="info_summary">
+                    <div class="info_summary_text"></div>
+                    <canvas id="speedhist" width="50" height= "84"></canvas>
+                    <div id="speedhist_labels" style="display:inline;position:relative;"><div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div></div>
+                    <canvas id="eegspect" width="50" height= "84"></canvas>
+                </div>
+            </div>
 
-			<iron-splitter direction="down"></iron-splitter>
-			
-			<div class="side_panel_row">
-				<div id="cluster_info" class="cluster_info above_scrollable_area">
-						<div class="cluster_painter">
-							<div class='cluster-sticker' id='painter-dest'>?</div> 
-							<paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
-							&#8592; {
-							<div id='painter-src'>
-								<div class='cluster-sticker'>?</div>
-							</div> 
-							<paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
-							}
-						</div>
-						<div class="cluster_others">
-						</div>
-					</div>
-				<div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
-					<cross-hair id='cluster_crosshair' show-bars="0"></cross-hair>
-				</div>
-			</div>
-		
-		</div-iron-resize>
+            <iron-splitter direction="down"></iron-splitter>
+            
+            <div class="side_panel_row">
+                <div id="cluster_info" class="cluster_info above_scrollable_area">
+                        <div class="cluster_painter">
+                            <div class='cluster-sticker' id='painter-dest'>?</div> 
+                            <paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
+                            &#8592; {
+                            <div id='painter-src'>
+                                <div class='cluster-sticker'>?</div>
+                            </div> 
+                            <paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
+                            }
+                        </div>
+                        <div class="cluster_others">
+                        </div>
+                    </div>
+                <div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
+                    <cross-hair id='cluster_crosshair' show-bars="0"></cross-hair>
+                </div>
+            </div>
+        
+        </div-iron-resize>
 
-		<iron-splitter direction="left"></iron-splitter>
-		
-		
-		<tile-wall class="tilewall"
-					groups="{{cut_groups}}"
-					duration="[[duration]]"
-					spike_times="[[spike_times]]"
-					pos_xy="[[pos_xy]]"
-					pos_dir="[[pos_dir]]"
-					pos_speed="[[pos_speed]]"
-					data_for_gl="[[data_for_gl]]"
-					options="[[options]]"
+        <iron-splitter direction="left"></iron-splitter>
+        
+        
+        <tile-wall class="tilewall"
+                    groups="{{cut_groups}}"
+                    duration="[[duration]]"
+                    spike_times="[[spike_times]]"
+                    pos_xy="[[pos_xy]]"
+                    pos_dir="[[pos_dir]]"
+                    pos_speed="[[pos_speed]]"
+                    data_for_gl="[[data_for_gl]]"
+                    options="[[options]]"
                     pos_path="{{pos_path}}"></tile-wall>
 
-	</div>
+    </div>
 
-	</div>
-
-
-
-	<paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
-
-	<drop-zone
-		show_initial="[[no_files]]"
-		drop_in_progress="[[drop_in_progress]]">
-		<div class="primary_text">
-			drag &amp; drop files here
-		</div>
-		<div class='secondary_text'>
-			the following types of data files are recognised: 
-			<b><br>set | pos | tet | cut | clu</b><br>
-			you can drag further files onto the window at any point<br>
-			other file types will be ignored
-		</div>
-		<div class="initial_extra_under_secondary">
-			<div class="github_button github_button_filedrop">
-				Go to <b>quickstart guide</b> on GitHub
-			</div><br><br>
-			<a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
-				<img id="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315"/>
-			</a>
-		</div>
-		<div class='initial_extra_bottom_right'>
-		v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
-		</div>
-	</drop-zone>
+    </div>
 
 
-	<parsed-data 
-				selected_files="[[selected_files]]"
-				use_n_leds="[[options.use_n_leds]]"
-				speed_filter_mps="[[options.speed_filter_mps]]"
-				pos_smoothing_s="[[options.pos_smoothing_s]]"
-	            duration="{{duration}}"
-				spike_times="{{spike_times}}"
-				pos_xy="{{pos_xy}}"
-				pos_dir="{{pos_dir}}"
-				pos_speed="{{pos_speed}}"
-				amplitudes="{{amplitudes}}"
-				data_for_gl="{{data_for_gl}}"
-				cut_box="{{cut_box}}"
-				tet_header="{{tet_header}}"
-				pos_header="{{pos_header}}"
-				set_header="{{set_header}}"></parsed-data>
-	<cut-object groups="{{cut_groups}}"
-				cut_box="[[cut_box]]"
-				undo_stack_descriptions="{{cut_undo_stack}}"
-				redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+
+    <paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
+
+    <drop-zone
+        show_initial="[[no_files]]"
+        drop_in_progress="[[drop_in_progress]]">
+        <div class="primary_text">
+            drag &amp; drop files here
+        </div>
+        <div class='secondary_text'>
+            the following types of data files are recognised: 
+            <b><br>set | pos | tet | cut | clu</b><br>
+            you can drag further files onto the window at any point<br>
+            other file types will be ignored
+        </div>
+        <div class="initial_extra_under_secondary">
+            <div class="github_button github_button_filedrop">
+                Go to <b>quickstart guide</b> on GitHub
+            </div><br><br>
+            <a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
+                <img id="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315"/>
+            </a>
+        </div>
+        <div class='initial_extra_bottom_right'>
+        v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
+        </div>
+    </drop-zone>
+
+
+    <parsed-data 
+                selected_files="[[selected_files]]"
+                use_n_leds="[[options.use_n_leds]]"
+                speed_filter_mps="[[options.speed_filter_mps]]"
+                pos_smoothing_s="[[options.pos_smoothing_s]]"
+                duration="{{duration}}"
+                spike_times="{{spike_times}}"
+                pos_xy="{{pos_xy}}"
+                pos_dir="{{pos_dir}}"
+                pos_speed="{{pos_speed}}"
+                amplitudes="{{amplitudes}}"
+                data_for_gl="{{data_for_gl}}"
+                cut_box="{{cut_box}}"
+                tet_header="{{tet_header}}"
+                pos_header="{{pos_header}}"
+                set_header="{{set_header}}"></parsed-data>
+    <cut-object groups="{{cut_groups}}"
+                cut_box="[[cut_box]]"
+                undo_stack_descriptions="{{cut_undo_stack}}"
+                redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
 
 </template>
@@ -427,29 +427,29 @@ box-shadow: inset 0 0 2px 1px #ccc;
 var the_app = document.getElementById('the_app')
 
 the_app.initializeDefaultOptions = function(ev) {
-	// TODO: bind to on-iron-localstorage-load and update missing/invalid properties
-	this.options = {
-		max_delta_t: 500,
-		show_pos_plots: 'yyy',
-		show_tac: 'y',
-		show_waves: 'yyyy',
-		cm_per_spa_bin: 2,
-		smoothing_spa_bins: 2,
-		max_rate_spa: -1,
-		deg_per_dir_bin: 6,
-		smoothing_dir_bins: 3,
-		waves_render_mode: "density",
+    // TODO: bind to on-iron-localstorage-load and update missing/invalid properties
+    this.options = {
+        max_delta_t: 500,
+        show_pos_plots: 'yyy',
+        show_tac: 'y',
+        show_waves: 'yyyy',
+        cm_per_spa_bin: 2,
+        smoothing_spa_bins: 2,
+        max_rate_spa: -1,
+        deg_per_dir_bin: 6,
+        smoothing_dir_bins: 3,
+        waves_render_mode: "density",
         waves_toggle: true,
-		use_n_leds: 2,
-		speed_filter_mps: 4,
-		pos_smoothing_s: 0.2,
-		header_filter: ''
-	};
+        use_n_leds: 2,
+        speed_filter_mps: 4,
+        pos_smoothing_s: 0.2,
+        header_filter: ''
+    };
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
 the_app._get_safe = function(a,b){
-	return a && a[b];
+    return a && a[b];
 }
 
 the_app.addEventListener('dom-change', function(){
@@ -466,13 +466,6 @@ document.addEventListener('contextmenu', function(e){e.preventDefault();});
 
 </script>
 
-
-<!-- public libraries and generic stuff for this app -->
-<!--<script src="jquery.min.js"></script>  -->
-<!--<script src="jquery.mousewheel.min.js"></script>-->
-<!--<script src="keymaster.min.js"></script>  -->
-<!--<script src="utils.js"></script>-->
-<!--<script src="webgl-debug.js"></script> -->
 
 </body>
 </html>
