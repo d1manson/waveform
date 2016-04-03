@@ -41,15 +41,19 @@ var render_options = {
     max_rate_spa: undefined,
     deg_per_dir_bin: undefined,
     smoothing_dir_bins: undefined,
+    max_speed: undefined,
     cps_per_speed_bin: 4 // currently not exposed as a user-configurable
 };
 var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
+
+var pi = 3.14159265;
 
 var show;
 var spike_times;
 var spikes_timebase;
 var pos_timebase; // Note that changing the pos timebase will force clear all pos_xy, pos_dir, and pos_speed
 var pos_xy;
+var xy_max;
 var pos_units_per_cm;
 var pos_dir;
 var pos_speed;
@@ -72,6 +76,9 @@ var cached_spike_xy_bins;
 var cached_spike_dir_bins;
 var cached_spike_speed_bins;
 
+var n_bins_xy_0; //these are cached as well, but they are managed as a "side effect" of xy_bins
+var n_bins_xy_1; 
+
 var palette = function(){
     var p_colors = 5;
     var buf8 = new Uint8Array(4*(p_colors+1));
@@ -93,6 +100,7 @@ var palette = function(){
 
 var set_show = function(v){
     show = v;
+    build_cache();
     make_all_pkeys_pending(); // this may be slightly overkill, but when it comes down to it we will only render stuff that needs it
     touch_timer();
 }
@@ -106,6 +114,7 @@ var set_options = function(opts){
         }
     }
     clear_cache(to_clear);
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -114,6 +123,7 @@ var set_spike_times = function(timebase, arrays){
     clear_cache(['spikes_timebase', 'spike_times']);
     spikes_timebase = timebase;
     spike_times = arrays && arrays.data; 
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -127,6 +137,7 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
         clear_cache(['pos_xy']);
     }
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
+    xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
     make_all_pkeys_pending();
     touch_timer();
@@ -152,6 +163,7 @@ var set_pos_dir = function(timebase, arrays){
         clear_cache(['pos_dir']);
     }
     pos_dir = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -165,6 +177,7 @@ var set_pos_speed = function(timebase, arrays){
         clear_cache(['pos_speed']);
     }
     pos_speed = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -215,19 +228,56 @@ var update_pkeys = function(changes, arrays){
 }
 
 var touch_timer = function(){
-    return; // TODO: um, get rid of this!!
 
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
     if(spike_times && pkeys_pending_render.length && show && show !== 'nnn' &&
-        (show[0] === 'n' || pos_xy) && (show[1] === 'n' || pos_dir) 
-            && (show[2] === 'n' || pos_speed)){
+        (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
+            && (show[2] === 'n' || cached_speed_bins)){
         timer = timer || setImmediate(timer_tick);
     } else {
         clearImmediate(timer);
         timer = 0;
+    }
+}
+
+var options_match = function(a, b, kind){
+    // copy-pasted from main thread version at bottom of file
+    if((!a && b) || (a && !b)){
+        return false;
+    }
+    if(kind === "spa"){
+        return a.smoothing_spa_bins === b.smoothing_spa_bins
+            && a.cm_per_spa_bin === b.cm_per_spa_bin
+            && a.max_rate_spa === b.max_rate_spa;
+    }
+    if(kind === "dir"){
+        return a.smoothing_dir_bins === b.smoothing_dir_bins
+            && a.deg_per_dir_bin === b.deg_per_dir_bin;
+    }
+    if(kind === "speed"){
+        return a.max_speed === b.max_speed
+            && a.cps_per_speed_bin === b.cps_per_speed_bin;
+    }
+    throw "what kind?";
+}
+
+var copy_options = function(dest, src, kind){
+    // copy-pasted from main thread version at bottom of file
+    if(kind === "spa"){
+        dest.smoothing_spa_bins = src.smoothing_spa_bins;
+        dest.cm_per_spa_bin = src.cm_per_spa_bin;
+        dest.max_rate_spa = src.max_rate_spa;
+    } else if (kind === "dir"){
+        dest.smoothing_dir_bins = src.smoothing_dir_bins;
+        dest.deg_per_dir_bin = src.deg_per_dir_bin;
+    } else if(kind === "speed"){
+        dest.max_speed = src.max_speed;
+        dest.cps_per_speed_bin = src.cps_per_speed_bin;
+    } else {
+        throw "what?"
     }
 }
 
@@ -252,31 +302,29 @@ var timer_tick = function(){
             }
             let arrays={};
 
-            if(show[0] === 'y' && (
-                pkey_rendered_options.cm_per_spa_bin !== render_options.cm_per_spa_bin ||
-                pkey_rendered_options.smoothing_spa_bins !== render_options.smoothing_spa_bins)){
+            if(show[0] === 'y' && !options_match(pkey_rendered_options, render_options, "spa")){
                     let res = get_group_xy_rm(inds);
                     msg.spa_rm = 'spa_rm';
                     msg.spa_max = res.max;
+                    msg.spa_rm_dims = [n_bins_xy_1, n_bins_xy_0];
                     arrays.spa_rm = res.im;
-                    pkey_rendered_options.cm_per_spa_bin = render_options.cm_per_spa_bin;
-                    pkey_rendered_options.smoothing_spa_bins = render_options.smoothing_spa_bins;
+                    copy_options(pkey_rendered_options, render_options, "spa");
             }
 
-            if(show[1] === 'y' && (
-                pkey_rendered_options.deg_per_dir_bin !== render_options.deg_per_dir_bin ||
-                pkey_rendered_options.smoothing_dir_bins !== render_options.smoothing_dir_bins)){
+            if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
                     let im = get_group_dir_rm(inds);
-                    msg.spa_rm = 'spa_dir';
-                    arrays.spa_dir = im;
-                    pkey_rendered_options.deg_per_dir_bin = render_options.deg_per_dir_bin;
-                    pkey_rendered_options.smoothing_dir_bins = render_options.smoothing_dir_bins;
+                    msg.dir_rm = 'dir_rm';
+                    msg.dir_rm_dims = [1,1];
+                    arrays.dir_rm = im;
+                    copy_options(pkey_rendered_options, render_options, "dir");
             }
 
-            if(show[2] === 'y'){
+            if(show[2] === 'y' && !options_match(pkey_rendered_options, render_options, "speed")){
                 let im = get_group_speed_rm(inds);
-                msg.spa_speed = im;
-                arrays.spa_speed = im;
+                msg.speed_rm = 'speed_rm';
+                msg.speed_rm_dims = speed_plot_size;
+                arrays.speed_rm = im;
+                copy_options(pkey_rendered_options, render_options, "speed");
             }
 
             exec_main_b('plot_things', msg, arrays);
@@ -291,6 +339,7 @@ var timer_tick = function(){
 //  The meat of the computation follows...
 // =========================================================
 
+
 var clear_cache = function(names){
     // This is a bit fiddly, but at least it's all in one place, right?!
 
@@ -301,8 +350,15 @@ var clear_cache = function(names){
         cached_spike_xy_bins = undefined;
         cached_spike_dir_bins = undefined;
         cached_spike_speed_bins = undefined;
+        pkey_to_rendered_options.clear(); //whatever we had is now irrelevant
     }
 
+    if(names.has('pos_xy')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "spa");
+        }
+    }
     if(names.has('pos_xy') || names.has('cm_per_spa_bin')){
         cached_xy_bins = undefined;
         cached_xy_dwell = undefined;
@@ -312,6 +368,12 @@ var clear_cache = function(names){
         cached_xy_dwell = undefined;
     }
      
+    if(names.has('pos_dir')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "dir");
+        }
+    }
     if(names.has('pos_dir') || names.has('deg_per_dir_bin')){
         cached_dir_bins = undefined;
         cached_dir_dwell = undefined;
@@ -320,6 +382,12 @@ var clear_cache = function(names){
         cached_dir_dwell = undefined;
     }
 
+    if(names.has('pos_speed')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "speed");
+        }
+    }
     if(names.has('pos_speed') || names.has('max_speed') || names.has('cps_per_speed_bin')){
         cached_speed_bins = undefined;
         cached_speed_dwell = undefined;
@@ -330,10 +398,41 @@ var clear_cache = function(names){
 
 }
 
+var build_cache = function(){
+    // this is called when we change xy/dir/speed/times/options/show
+    // clear_cached will have been called immediately before hand.
+
+    if(!cached_spike_pos_ind && pos_timebase && spikes_timebase && spike_times){
+        make_cached_spike_pos_ind();
+    }    
+
+    if(show && show[0] === 'y'
+         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell)
+         && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
+         && render_options.smoothing_spa_bins !== undefined ){
+        make_cached_xy_bins_and_dwell();
+    }
+
+    if(show && show[1] === 'y'
+        && !(cached_dir_bins && cached_dir_dwell)
+        && pos_dir && cached_spike_pos_ind
+        && render_options.deg_per_dir_bin 
+        && render_options.smoothing_dir_bins !== undefined){
+        make_cached_dir_bins_and_dwell();
+    }
+
+    if(show && show[2] === 'y'
+        && !(cached_spike_speed_bins && cached_speed_dwell)
+        && pos_speed && cached_spike_pos_ind
+        && render_options.cps_per_speed_bin 
+        && render_options.max_speed){
+        make_cached_speed_bins_and_dwell();
+    }
+}
+
+
 var make_cached_spike_pos_ind = function(){    
     // cached_spike_pos_ind gives the indices into pos_xy, pos_dir, pos_speed for each spike
-    if(! (pos_timebase && spikes_timebase && spike_times))
-        return;
 
     cached_spike_pos_ind = new Uint32Array(spike_times.length);
     
@@ -345,11 +444,7 @@ var make_cached_spike_pos_ind = function(){
 }
 
 
-
 var make_cached_xy_bins_and_dwell = function(){
-    if( !(pos_xy && cached_spike_pos_ind && 
-          render_options.cm_per_spa_bin && render_options.smoothing_spa_bins !== undefined) )
-        return;
 
     var factor = 1/pos_units_per_cm/render_options.cm_per_spa_bin;
     cached_xy_bins = new Uint8ClampedArray(pos_xy.length);
@@ -360,9 +455,8 @@ var make_cached_xy_bins_and_dwell = function(){
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
                 
-    // TODO: get max vals from somewhere???
-    n_bins_xy_1 = Math.ceil(max_vals[1]*factor) + 1; // +1 is because of zero indexing
-    n_bins_xy_0 = Math.ceil(max_vals[0]*factor) + 1;   
+    n_bins_xy_1 = Math.ceil(xy_max[1]*factor) + 1; // +1 is because of zero indexing
+    n_bins_xy_0 = Math.ceil(xy_max[0]*factor) + 1;   
 
     var dwell = hist_2(cached_xy_bins, n_bins_xy_1, n_bins_xy_0);
     // TODO: check whether the zero bin has supuriously high data from NaN's, and force it to zero if needed
@@ -376,10 +470,8 @@ var make_cached_xy_bins_and_dwell = function(){
     return true;
 }
 
+
 var make_cached_dir_bins_and_dwell = function(){
-    if( !(pos_dir && cached_spike_pos_ind && 
-          render_options.deg_per_dir_bin && render_options.smoothing_dir_bins !== undefined) )
-        return;
 
     var factor = 180/pi/render_options.deg_per_dir_bin;
     cached_dir_bins = new Uint8ClampedArray(pos_dir.length);
@@ -395,17 +487,13 @@ var make_cached_dir_bins_and_dwell = function(){
     dwell[0] += dwell[n_bins_dir];
     dwell = dwell.subarray(0, n_bins_dir);
                 
-    cached_dir_dwell = get_smoothed1DPeriodic(dwell, render_options.smoothing_dir_bins);
+    cached_dir_dwell = get_smoothed_1d_periodic(dwell, render_options.smoothing_dir_bins);
 
     return true;
 }
 
 
 var make_cached_speed_bins_and_dwell = function(){
-    if( !(pos_speed && cached_spike_pos_ind &&
-          render_options.cps_per_speed_bin && render_options.max_speed) )
-        return;
-        
     var factor = 1/render_options.cps_per_speed_bin;
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
@@ -423,18 +511,18 @@ var make_cached_speed_bins_and_dwell = function(){
 
 
 
-var get_group_xy_rm = function(inds){
+var get_group_xy_rm = function(group_inds){
     var group_xy_bins = pick(cached_spike_xy_bins, group_inds); //cached_spike_xy_bins was stored as 2byte blocks, which is what we want here
     var spike = hist_2(new Uint8Array(group_xy_bins.buffer), n_bins_xy_1, n_bins_xy_0); //now we treat it as 1 byte blocks
     // TODO: see note about zero-bin in make_cached_xy_bins_and_dwell
 
     var spike = get_smoothed(spike, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
-    var ratemap = r_divide_float(spike, cached_xy_dwell);
+    var ratemap = divide_float(spike, cached_xy_dwell);
     use_mask(ratemap, cached_xy_no_dwell);
 
     var max_map = max(ratemap);
     
-    var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
+    var im = to_image_data(ratemap, render_options.max_rate_spa <= 0 ? max_map : render_options.max_rate_spa/pos_timebase);
 
     return {
         im: im,
@@ -470,7 +558,7 @@ var get_group_dir_rm = function(group_inds){
     spike = spike.subarray(0, n_bins_dir);
 
     var spike = get_smoothed_1d_periodic(spike, render_options.smoothing_dir_bins); 
-    var ratemap = r_divide_float(spike, cached_dir_dwell);
+    var ratemap = divide_float(spike, cached_dir_dwell);
     
     // scale ratemap to have max 1...(for easy plotting)
     var f = 1/max(ratemap);
@@ -490,7 +578,7 @@ var get_group_speed_rm = function(group_inds){
     var spike = hist_1(group_speed_bins, cached_speed_dwell.length + 1);
     spike = spike.subarray(0, spike.length-1);
 
-    var ratemap = r_divide_float(spike, cached_speed_dwell);
+    var ratemap = divide_float(spike, cached_speed_dwell);
                     
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
@@ -554,7 +642,7 @@ var get_smoothed_1d_periodic = function(x, w){
     // kernel is box-car of size 2w+1
     var n = x.length;
     var result = new Uint32Array(n);
-    for(let i=0; i<N; i++){
+    for(let i=0; i<n; i++){
         for(let k=-w;k<=w; k++){
             result[i] += x[(i+k) % n];
         }
@@ -649,6 +737,22 @@ var draw_lines = function(xy, w, h, scale){
     return im;
 }
 
+var divide_float = function(numerator, denominator){
+    let out = new Float32Array(numerator.length);
+    for(let ii=0; ii<out.length; ii++){
+        out[ii] = numerator[ii] / denominator[ii];
+    }
+    return out;
+}
+
+var use_mask = function(vector, mask, val){
+    // sets vector elemnts to val where mask is true, if val is omitted it defaults to zero
+    val = typeof(val) === "number" ? val : 0;
+    for(let ii=0; ii<mask.length; ii++) if(mask[ii]){
+        vector[ii] = val;  
+    }
+}
+
 </script>
 
 <template></template>
@@ -739,7 +843,8 @@ var draw_lines = function(xy, w, h, scale){
                 max_rate_spa: undefined,
                 deg_per_dir_bin: undefined,
                 smoothing_dir_bins: undefined,
-                cps_per_speed_bin: 4 // currently not exposed as a user-configurable
+                max_speed: 60, // currently not exposed as user-configurable
+                cps_per_speed_bin: 4 // currently not exposed as user-configurable
             };
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
             this._worker = worker_builder.create_for(this);
@@ -806,20 +911,23 @@ var draw_lines = function(xy, w, h, scale){
             // because the worker is not going to send it again
             for(let okey of this.groups){
                 if(okey.rm_spa !== okey._rm_spa_other && 
-                   okey._rm_other_options.cm_per_spa_bin === this._options.cm_per_spa_bin &&
-                   okey._rm_other_options.smoothing_spa_bins === this._options.smoothing_spa_bins){
+                    this._options_match(okey._rm_other_options, this._options, "spa")){
                     cm.free_canvas(okey.rm_spa);
                     okey.rm_spa = okey._rm_spa_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);         
                 }
                 if(okey.rm_dir !== okey._rm_dir_other && 
-                   okey._rm_other_options.deg_per_dir_bin === this._options.deg_per_dir_bin &&
-                   okey._rm_other_options.smoothing_dir_bins === this._options.smoothing_dir_bins){
+                    this._options_match(okey._rm_other_options, this._options, "dir")){
                     cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = okey._rm_dir_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);            
                 }
-                // there are no configurable options for speed, so anything we had is already valid
+                if(okey.rm_speed !== okey._rm_speed_other && 
+                    this._options_match(okey._rm_other_options, this._options, "dir")){
+                    cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = okey._rm_speed_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);            
+                }
             }
         }, _groups_set: function(new_val, old_val){
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
@@ -922,26 +1030,84 @@ var draw_lines = function(xy, w, h, scale){
                 }
                 this._times_is_on_worker = false;
             }
-        }, plot_things: function(data, arrays) {
-            if(data.generation !== this._pkey_generation)
-                return; // pft! get with the times, dude.
-            let okey = this._groups_collection.getItem(data.pkey);
-            let cm = Utils.canvas_manager;
-            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
-            //  TODO: this will have one or more of spa, dir, and speed
-            // dependigng on the show options.  need to update the relevant
-            // ckeys and *only* the relevant rendered options
-
-            /*
-            cm.free_canvas(okey._tac_other);
-            okey._tac_other = ckey;
-            okey._tac_other_options = data.render_options;
-            if(Utils.is_equal_simple(data.render_options, this._options)){
-                cm.free_canvas(okey.tac);
-                okey.tac = ckey;
-                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
+        }, _options_match: function(a,b,kind){
+            if((!a && b) || (a && !b)){
+                return false;
             }
-            */
+            if(kind === "spa"){
+                return a.smoothing_spa_bins === b.smoothing_spa_bins
+                    && a.cm_per_spa_bin == b.cm_per_spa_bin
+                    && a.max_rate_spa == b.max_rate_spa;
+            }
+            if(kind === "dir"){
+                return a.smoothing_dir_bins === b.smoothing_dir_bins
+                    && a.deg_per_dir_bin == b.deg_per_dir_bin;
+            }
+            if(kind === "speed"){
+                return a.max_speed === b.max_speed
+                    && a.cps_per_speed_bin === b.cps_per_speed_bin;
+            }
+            throw "what kind?";
+        }, _copy_options: function(dest, src, kind){
+            if(kind === "spa"){
+                dest.smoothing_spa_bins = src.smoothing_spa_bins;
+                dest.cm_per_spa_bin = src.cm_per_spa_bin;
+                dest.max_rate_spa = src.max_rate_spa;
+            } else if (kind === "dir"){
+                dest.smoothing_dir_bins = src.smoothing_dir_bins;
+                dest.deg_per_dir_bin = src.deg_per_dir_bin;
+            } else if(kind === "speed"){
+                dest.max_speed = src.max_speed;
+                dest.cps_per_speed_bin = src.cps_per_speed_bin;
+            } else {
+                throw "what?"
+            }
+        }, plot_things: function(msg, arrays) {
+            if(msg.generation !== this._pkey_generation)
+                return; // pft! get with the times, dude.
+
+            let okey = this._groups_collection.getItem(msg.pkey);
+            let cm = Utils.canvas_manager;
+
+            if(msg.spa_rm){
+                if(okey.rm_spa !== okey._rm_spa_other){
+                    cm.free_canvas(okey._rm_spa_other);
+                }
+                okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
+            this._copy_options(okey._rm_other_options, msg.render_options, "spa");
+                if(this._options_match(msg.render_options, this._options, 'spa')){
+                    cm.free_canvas(okey.rm_spa);
+                    okey.rm_spa = okey._rm_spa_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa); 
+                }
+            }
+
+            if(msg.dir_rm){
+                if(okey.rm_dir !== okey._rm_dir_other){
+                    cm.free_canvas(okey._rm_dir_other);
+                }
+                okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                if(this._options_match(msg.render_options, this._options, 'dir')){
+                    cm.free_canvas(okey.rm_dir);
+                    okey.rm_dir = okey._rm_dir_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
+                }
+            }
+
+            if(msg.speed_rm){
+                 if(okey.rm_speed !== okey._rm_speed_other){
+                    cm.free_canvas(okey._rm_speed_other);
+                }
+                okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
+                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                if(this._options_match(msg.render_options, this._options, 'dir')){
+                    cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = okey._rm_speed_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed); 
+                }
+            }
+
         }, plot_path: function(msg, arrays){
             var cm = Utils.canvas_manager;
             cm.free_canvas(this.pos_path);
