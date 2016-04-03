@@ -108,6 +108,11 @@ doesn't have a worker, but it uses a similar system.
             }
             res[p_r] = a[p_a];
         }
+        // add any final b's after the end of a
+        for(;p_b<b.length;p_b++, p_r++){
+            res[p_r] = b[p_b];
+            mask[p_r] = 1;
+        }
         return [res, mask];
     }
     var arange = function(n){

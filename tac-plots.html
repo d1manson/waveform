@@ -80,8 +80,13 @@ var set_spike_times = function(timebase_, arrays){
 
 var update_pkeys = function(changes, arrays){
 
-    if(changes.generation_remove !== pkey_generation)
-        throw "key generation mismatch";
+    if(changes.generation_remove !== pkey_generation){
+        changes.remove = [];
+        pkey_to_array.clear();
+        pkey_to_rendered_options.clear();
+        pkeys_pending_render = [];
+        console.log("tac-plots worker: key generation mismatch");
+    }
 
     // note we don't both to remove keys from the pending list
     // unless we change key generation, in which case we drop 
@@ -282,6 +287,7 @@ var is_equal_simple = function(a, b){
             if (this.show === 'y'){
                 // get clones of new arrays to send to worker
                 for(let okey of okeys_to_add){
+                    if(!okey) continue;
                     pkeys_to_add.push(okey._pkey);
                     added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
                     okey._tac_is_on_worker = true;                    
@@ -292,6 +298,7 @@ var is_equal_simple = function(a, b){
             // freeing the inds arrays was the responsibility of cut-obj.
             var pkeys_to_remove = [];
             for(let okey of okeys_to_remove){
+                if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
                 cm.free_canvas(okey.tac);
                 cm.free_canvas(okey._tac_other);

@@ -497,9 +497,8 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
     // note there are 1 fewer such arrays then time points on the wave, n_w.
     if(prepared_voltage_data){
         this._has_voltages = true;
-        prepared_voltage_data = new Uint8Array(prepared_voltage_data.buffer);
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
-        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data, gl.DYNAMIC_DRAW); 
+        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data.buffer, gl.DYNAMIC_DRAW); 
     } else {
         this._has_voltages = false;
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
@@ -525,8 +524,9 @@ WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     var n_rows = Math.floor(off_canv_h/(off_canv_wave_h+off_canv_wave_gap)); // TODO: we should really have a vertical gap between waves
 
     var success = false;
+    var n_cols;
     for(var batch_t=to_t-from_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
-        var n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
+        n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
         if(n_okeys <= n_cols * n_rows){
             success = true;
             break;
@@ -581,10 +581,10 @@ WavesRenderer.prototype._upload_okey_data = function(){
     if(this._mode === 'density'){
         // just need to provide x and y
 
-        var data_i8 = new Int8Array(this._n*4);
+        var data_i8 = new Int8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
         var data_i16 = new Int16Array(data_i8.buffer);
-        data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
-        
+
+        data_i8.fill(127); // can avoid doing this if we know all inds will be set (worth doing)
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
@@ -600,8 +600,8 @@ WavesRenderer.prototype._upload_okey_data = function(){
 
         var data_i8 = new Int8Array(this._n*6);
         var data_i16 = new Int16Array(data_i8.buffer);
-        data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
-
+    
+        data_i8.fill(127);  // can avoid doing this if we know all inds will be set (worth doing)
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
