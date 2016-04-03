@@ -526,7 +526,7 @@ var get_group_xy_rm = function(group_inds){
 
     return {
         im: im,
-        max: max_map
+        max: max_map * pos_timebase
     }
 
 }
@@ -1078,7 +1078,9 @@ var use_mask = function(vector, mask, val){
                 if(this._options_match(msg.render_options, this._options, 'spa')){
                     cm.free_canvas(okey.rm_spa);
                     okey.rm_spa = okey._rm_spa_other;
+                    okey.rm_spa_max = msg.spa_max.toFixed(1);
                     this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa); 
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
                 }
             }
 

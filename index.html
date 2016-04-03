@@ -15851,9 +15851,9 @@ flex:2;
                 notify: true
             },
             group_spa_max: {
-                type: Number,
+                type: String, // a number, but pre-rendered as a string
                 notify: true,
-                value: -1,
+                value: "",
                 notify: true
             },
             state: {
@@ -16337,50 +16337,52 @@ Utils.parse_splices = function(splices, give_moved){
     // if give_moodified is truthy, then we provide a third array, modified
     // giving an array of objects which had their index changed
 
-    var added, removed, moved;
+    var added_keys, removed_keys, moved_keys;
 
     // Firstly, get the list of added and removed *keys*
-    if(!splices || splices.keySplices.length === 0){
+    if(!splices || !splices.keySplices || splices.keySplices.length === 0){
         // nothing
-        added = [];
-        removed = [];
+        added_keys = [];
+        removed_keys = [];
     } else if (splices.keySplices.length === 1){
         // assume that if there's only one element in the array then it's already properly de-deduped
-        added = splices.keySplices[0].added;
-        removed = splices.keySplices[0].removed;
+        added_keys = splices.keySplices[0].added;
+        removed_keys = splices.keySplices[0].removed;
     } else {
         // multiple splices..I'm not sure how to interpret the indexSplices,
         // but the keySplices is easier.
-        let keys_added = new Set(), keys_removed = new Set();
+        added_keys = new Set(), removed_keys = new Set();
         for (let s of splices.keySplices) {
             for (let key of s.removed) {
-                if(keys_added.has(key)){
-                    keys_added.delete(key);
+                if(added_keys.has(key)){
+                    added_keys.delete(key);
                 } else {
-                    keys_removed.add(key);
+                    removed_keys.add(key);
                 }
             }
             for (let key of s.added) {
-                if(keys_removed.has(key)){
-                    keys_removed.delete(key);
+                if(removed_keys.has(key)){
+                    removed_keys.delete(key);
                 } else {
-                    keys_added.add(key);
+                    added_keys.add(key);
                 }
             }
         }
-        removed = Array.from(keys_removed);
-        added = Array.from(keys_added);
     }
 
    
     // Now convert the keys to objects...
-    if(added.length){
+    var added = [], removed = [], moved = [];
+
+    if(added_keys.length || added_keys.size){
         let coll = Polymer.Collection.get(splices.indexSplices[0].object);
-        for(let [ii, key] of added.entries()){
-            added[ii] = coll.getItem(key);
-        }
+        for(let key of added_keys){
+            let item = coll.getItem(key);
+            (item !== undefined) && added.push(item);
+        }        
     }
-    if(removed.length){
+
+    if(removed.length || removed.size){
         // we can't use getItem for removed items, because they're no longer in the
         // collection.
 
@@ -16391,8 +16393,9 @@ Utils.parse_splices = function(splices, give_moved){
                 discarded_items.set(item._pkey, item);  
             }
         }
-        for(let [ii, key] of removed.entries()){
-            removed[ii] = discarded_items.get(key);
+        for(let key of removed_keys){
+            let item = discarded_items.get(key);
+            (item !== undefined) && removed.push(item);
         }
     }
 
@@ -16609,15 +16612,19 @@ var render_options = {
     max_rate_spa: undefined,
     deg_per_dir_bin: undefined,
     smoothing_dir_bins: undefined,
+    max_speed: undefined,
     cps_per_speed_bin: 4 // currently not exposed as a user-configurable
 };
 var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
+
+var pi = 3.14159265;
 
 var show;
 var spike_times;
 var spikes_timebase;
 var pos_timebase; // Note that changing the pos timebase will force clear all pos_xy, pos_dir, and pos_speed
 var pos_xy;
+var xy_max;
 var pos_units_per_cm;
 var pos_dir;
 var pos_speed;
@@ -16640,6 +16647,9 @@ var cached_spike_xy_bins;
 var cached_spike_dir_bins;
 var cached_spike_speed_bins;
 
+var n_bins_xy_0; //these are cached as well, but they are managed as a "side effect" of xy_bins
+var n_bins_xy_1; 
+
 var palette = function(){
     var p_colors = 5;
     var buf8 = new Uint8Array(4*(p_colors+1));
@@ -16661,6 +16671,7 @@ var palette = function(){
 
 var set_show = function(v){
     show = v;
+    build_cache();
     make_all_pkeys_pending(); // this may be slightly overkill, but when it comes down to it we will only render stuff that needs it
     touch_timer();
 }
@@ -16674,6 +16685,7 @@ var set_options = function(opts){
         }
     }
     clear_cache(to_clear);
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -16682,11 +16694,12 @@ var set_spike_times = function(timebase, arrays){
     clear_cache(['spikes_timebase', 'spike_times']);
     spikes_timebase = timebase;
     spike_times = arrays && arrays.data; 
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
 
-var set_pos_xy = function(timebase, units_per_cm, arrays){
+var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     if(timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
@@ -16695,9 +16708,21 @@ var set_pos_xy = function(timebase, units_per_cm, arrays){
         clear_cache(['pos_xy']);
     }
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
+    xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
     make_all_pkeys_pending();
     touch_timer();
+
+    // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
+    if(pos_xy){
+       let im = draw_lines(pos_xy, 256, 256, 256/max_x, 256/max_y);
+       exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256]
+       }, {
+        path: im
+       });
+    }
 }
 
 var set_pos_dir = function(timebase, arrays){
@@ -16709,6 +16734,7 @@ var set_pos_dir = function(timebase, arrays){
         clear_cache(['pos_dir']);
     }
     pos_dir = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -16722,6 +16748,7 @@ var set_pos_speed = function(timebase, arrays){
         clear_cache(['pos_speed']);
     }
     pos_speed = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 }
@@ -16736,8 +16763,13 @@ var make_all_pkeys_pending = function(){
 
 var update_pkeys = function(changes, arrays){
 
-    if(changes.generation_remove !== pkey_generation)
-        throw "key generation mismatch";
+    if(changes.generation_remove !== pkey_generation){
+        changes.remove = [];
+        pkey_to_array.clear();
+        pkey_to_rendered_options.clear();
+        pkeys_pending_render = [];
+        console.log("rm-plots worker: key generation mismatch");
+    }
 
     // note we don't both to remove keys from the pending list
     // unless we change key generation, in which case we drop 
@@ -16767,19 +16799,56 @@ var update_pkeys = function(changes, arrays){
 }
 
 var touch_timer = function(){
-    return; // TODO: um, get rid of this!!
 
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
     if(spike_times && pkeys_pending_render.length && show && show !== 'nnn' &&
-        (show[0] === 'n' || pos_xy) && (show[1] === 'n' || pos_dir) 
-            && (show[2] === 'n' || pos_speed)){
+        (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
+            && (show[2] === 'n' || cached_speed_bins)){
         timer = timer || setImmediate(timer_tick);
     } else {
         clearImmediate(timer);
         timer = 0;
+    }
+}
+
+var options_match = function(a, b, kind){
+    // copy-pasted from main thread version at bottom of file
+    if((!a && b) || (a && !b)){
+        return false;
+    }
+    if(kind === "spa"){
+        return a.smoothing_spa_bins === b.smoothing_spa_bins
+            && a.cm_per_spa_bin === b.cm_per_spa_bin
+            && a.max_rate_spa === b.max_rate_spa;
+    }
+    if(kind === "dir"){
+        return a.smoothing_dir_bins === b.smoothing_dir_bins
+            && a.deg_per_dir_bin === b.deg_per_dir_bin;
+    }
+    if(kind === "speed"){
+        return a.max_speed === b.max_speed
+            && a.cps_per_speed_bin === b.cps_per_speed_bin;
+    }
+    throw "what kind?";
+}
+
+var copy_options = function(dest, src, kind){
+    // copy-pasted from main thread version at bottom of file
+    if(kind === "spa"){
+        dest.smoothing_spa_bins = src.smoothing_spa_bins;
+        dest.cm_per_spa_bin = src.cm_per_spa_bin;
+        dest.max_rate_spa = src.max_rate_spa;
+    } else if (kind === "dir"){
+        dest.smoothing_dir_bins = src.smoothing_dir_bins;
+        dest.deg_per_dir_bin = src.deg_per_dir_bin;
+    } else if(kind === "speed"){
+        dest.max_speed = src.max_speed;
+        dest.cps_per_speed_bin = src.cps_per_speed_bin;
+    } else {
+        throw "what?"
     }
 }
 
@@ -16804,31 +16873,29 @@ var timer_tick = function(){
             }
             let arrays={};
 
-            if(show[0] === 'y' && (
-                pkey_rendered_options.cm_per_spa_bin !== render_options.cm_per_spa_bin ||
-                pkey_rendered_options.smoothing_spa_bins !== render_options.smoothing_spa_bins)){
+            if(show[0] === 'y' && !options_match(pkey_rendered_options, render_options, "spa")){
                     let res = get_group_xy_rm(inds);
                     msg.spa_rm = 'spa_rm';
                     msg.spa_max = res.max;
+                    msg.spa_rm_dims = [n_bins_xy_1, n_bins_xy_0];
                     arrays.spa_rm = res.im;
-                    pkey_rendered_options.cm_per_spa_bin = render_options.cm_per_spa_bin;
-                    pkey_rendered_options.smoothing_spa_bins = render_options.smoothing_spa_bins;
+                    copy_options(pkey_rendered_options, render_options, "spa");
             }
 
-            if(show[1] === 'y' && (
-                pkey_rendered_options.deg_per_dir_bin !== render_options.deg_per_dir_bin ||
-                pkey_rendered_options.smoothing_dir_bins !== render_options.smoothing_dir_bins)){
+            if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
                     let im = get_group_dir_rm(inds);
-                    msg.spa_rm = 'spa_dir';
-                    arrays.spa_dir = im;
-                    pkey_rendered_options.deg_per_dir_bin = render_options.deg_per_dir_bin;
-                    pkey_rendered_options.smoothing_dir_bins = render_options.smoothing_dir_bins;
+                    msg.dir_rm = 'dir_rm';
+                    msg.dir_rm_dims = [1,1];
+                    arrays.dir_rm = im;
+                    copy_options(pkey_rendered_options, render_options, "dir");
             }
 
-            if(show[2] === 'y'){
+            if(show[2] === 'y' && !options_match(pkey_rendered_options, render_options, "speed")){
                 let im = get_group_speed_rm(inds);
-                msg.spa_speed = im;
-                arrays.spa_speed = im;
+                msg.speed_rm = 'speed_rm';
+                msg.speed_rm_dims = speed_plot_size;
+                arrays.speed_rm = im;
+                copy_options(pkey_rendered_options, render_options, "speed");
             }
 
             exec_main_b('plot_things', msg, arrays);
@@ -16843,6 +16910,7 @@ var timer_tick = function(){
 //  The meat of the computation follows...
 // =========================================================
 
+
 var clear_cache = function(names){
     // This is a bit fiddly, but at least it's all in one place, right?!
 
@@ -16853,8 +16921,15 @@ var clear_cache = function(names){
         cached_spike_xy_bins = undefined;
         cached_spike_dir_bins = undefined;
         cached_spike_speed_bins = undefined;
+        pkey_to_rendered_options.clear(); //whatever we had is now irrelevant
     }
 
+    if(names.has('pos_xy')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "spa");
+        }
+    }
     if(names.has('pos_xy') || names.has('cm_per_spa_bin')){
         cached_xy_bins = undefined;
         cached_xy_dwell = undefined;
@@ -16864,6 +16939,12 @@ var clear_cache = function(names){
         cached_xy_dwell = undefined;
     }
      
+    if(names.has('pos_dir')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "dir");
+        }
+    }
     if(names.has('pos_dir') || names.has('deg_per_dir_bin')){
         cached_dir_bins = undefined;
         cached_dir_dwell = undefined;
@@ -16872,6 +16953,12 @@ var clear_cache = function(names){
         cached_dir_dwell = undefined;
     }
 
+    if(names.has('pos_speed')){
+        let null_opts = {};
+        for(let opts of pkey_to_rendered_options.values()){
+            copy_options(opts, null_opts, "speed");
+        }
+    }
     if(names.has('pos_speed') || names.has('max_speed') || names.has('cps_per_speed_bin')){
         cached_speed_bins = undefined;
         cached_speed_dwell = undefined;
@@ -16882,10 +16969,41 @@ var clear_cache = function(names){
 
 }
 
+var build_cache = function(){
+    // this is called when we change xy/dir/speed/times/options/show
+    // clear_cached will have been called immediately before hand.
+
+    if(!cached_spike_pos_ind && pos_timebase && spikes_timebase && spike_times){
+        make_cached_spike_pos_ind();
+    }    
+
+    if(show && show[0] === 'y'
+         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell)
+         && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
+         && render_options.smoothing_spa_bins !== undefined ){
+        make_cached_xy_bins_and_dwell();
+    }
+
+    if(show && show[1] === 'y'
+        && !(cached_dir_bins && cached_dir_dwell)
+        && pos_dir && cached_spike_pos_ind
+        && render_options.deg_per_dir_bin 
+        && render_options.smoothing_dir_bins !== undefined){
+        make_cached_dir_bins_and_dwell();
+    }
+
+    if(show && show[2] === 'y'
+        && !(cached_spike_speed_bins && cached_speed_dwell)
+        && pos_speed && cached_spike_pos_ind
+        && render_options.cps_per_speed_bin 
+        && render_options.max_speed){
+        make_cached_speed_bins_and_dwell();
+    }
+}
+
+
 var make_cached_spike_pos_ind = function(){    
     // cached_spike_pos_ind gives the indices into pos_xy, pos_dir, pos_speed for each spike
-    if(! (pos_timebase && spikes_timebase && spike_times))
-        return;
 
     cached_spike_pos_ind = new Uint32Array(spike_times.length);
     
@@ -16897,11 +17015,7 @@ var make_cached_spike_pos_ind = function(){
 }
 
 
-
 var make_cached_xy_bins_and_dwell = function(){
-    if( !(pos_xy && cached_spike_pos_ind && 
-          render_options.cm_per_spa_bin && render_options.smoothing_spa_bins !== undefined) )
-        return;
 
     var factor = 1/pos_units_per_cm/render_options.cm_per_spa_bin;
     cached_xy_bins = new Uint8ClampedArray(pos_xy.length);
@@ -16912,9 +17026,8 @@ var make_cached_xy_bins_and_dwell = function(){
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
                 
-    // TODO: get max vals from somewhere???
-    n_bins_xy_1 = Math.ceil(max_vals[1]*factor) + 1; // +1 is because of zero indexing
-    n_bins_xy_0 = Math.ceil(max_vals[0]*factor) + 1;   
+    n_bins_xy_1 = Math.ceil(xy_max[1]*factor) + 1; // +1 is because of zero indexing
+    n_bins_xy_0 = Math.ceil(xy_max[0]*factor) + 1;   
 
     var dwell = hist_2(cached_xy_bins, n_bins_xy_1, n_bins_xy_0);
     // TODO: check whether the zero bin has supuriously high data from NaN's, and force it to zero if needed
@@ -16928,10 +17041,8 @@ var make_cached_xy_bins_and_dwell = function(){
     return true;
 }
 
+
 var make_cached_dir_bins_and_dwell = function(){
-    if( !(pos_dir && cached_spike_pos_ind && 
-          render_options.deg_per_dir_bin && render_options.smoothing_dir_bins !== undefined) )
-        return;
 
     var factor = 180/pi/render_options.deg_per_dir_bin;
     cached_dir_bins = new Uint8ClampedArray(pos_dir.length);
@@ -16947,17 +17058,13 @@ var make_cached_dir_bins_and_dwell = function(){
     dwell[0] += dwell[n_bins_dir];
     dwell = dwell.subarray(0, n_bins_dir);
                 
-    cached_dir_dwell = get_smoothed1DPeriodic(dwell, render_options.smoothing_dir_bins);
+    cached_dir_dwell = get_smoothed_1d_periodic(dwell, render_options.smoothing_dir_bins);
 
     return true;
 }
 
 
 var make_cached_speed_bins_and_dwell = function(){
-    if( !(pos_speed && cached_spike_pos_ind &&
-          render_options.cps_per_speed_bin && render_options.max_speed) )
-        return;
-        
     var factor = 1/render_options.cps_per_speed_bin;
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
@@ -16975,22 +17082,22 @@ var make_cached_speed_bins_and_dwell = function(){
 
 
 
-var get_group_xy_rm = function(inds){
+var get_group_xy_rm = function(group_inds){
     var group_xy_bins = pick(cached_spike_xy_bins, group_inds); //cached_spike_xy_bins was stored as 2byte blocks, which is what we want here
     var spike = hist_2(new Uint8Array(group_xy_bins.buffer), n_bins_xy_1, n_bins_xy_0); //now we treat it as 1 byte blocks
     // TODO: see note about zero-bin in make_cached_xy_bins_and_dwell
 
     var spike = get_smoothed(spike, n_bins_xy_1, n_bins_xy_0, render_options.smoothing_spa_bins);
-    var ratemap = r_divide_float(spike, cached_xy_dwell);
+    var ratemap = divide_float(spike, cached_xy_dwell);
     use_mask(ratemap, cached_xy_no_dwell);
 
     var max_map = max(ratemap);
     
-    var im = to_image_data(ratemap, render_options.max_rate_spa == -1 ? max_map : render_options.max_rate_spa/pos_timebase);
+    var im = to_image_data(ratemap, render_options.max_rate_spa <= 0 ? max_map : render_options.max_rate_spa/pos_timebase);
 
     return {
         im: im,
-        max: max_map
+        max: max_map * pos_timebase
     }
 
 }
@@ -17022,7 +17129,7 @@ var get_group_dir_rm = function(group_inds){
     spike = spike.subarray(0, n_bins_dir);
 
     var spike = get_smoothed_1d_periodic(spike, render_options.smoothing_dir_bins); 
-    var ratemap = r_divide_float(spike, cached_dir_dwell);
+    var ratemap = divide_float(spike, cached_dir_dwell);
     
     // scale ratemap to have max 1...(for easy plotting)
     var f = 1/max(ratemap);
@@ -17042,7 +17149,7 @@ var get_group_speed_rm = function(group_inds){
     var spike = hist_1(group_speed_bins, cached_speed_dwell.length + 1);
     spike = spike.subarray(0, spike.length-1);
 
-    var ratemap = r_divide_float(spike, cached_speed_dwell);
+    var ratemap = divide_float(spike, cached_speed_dwell);
                     
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
@@ -17106,7 +17213,7 @@ var get_smoothed_1d_periodic = function(x, w){
     // kernel is box-car of size 2w+1
     var n = x.length;
     var result = new Uint32Array(n);
-    for(let i=0; i<N; i++){
+    for(let i=0; i<n; i++){
         for(let k=-w;k<=w; k++){
             result[i] += x[(i+k) % n];
         }
@@ -17169,6 +17276,54 @@ var is_equal_simple = function(a, b){
     }
     return true;
 }
+
+var draw_lines = function(xy, w, h, scale){
+    let color = 0xff000000; //black
+    let im = new Uint32Array(w*h);
+
+    let x0 = (xy[0] * scale) | 0;
+    let y0 = (xy[1] * scale) | 0;
+    for(let ii=2; ii<xy.length; ii+=2){
+        let x1 = (xy[ii+0] * scale) | 0;
+        let y1 = (xy[ii+1] * scale) | 0;
+
+        // Bresenham algorithm adapted from http://stackoverflow.com/a/4672319/2399799
+        let dx = Math.abs(x1-x0);
+        let dy = Math.abs(y1-y0);
+        let sx = (x0 < x1) ? 1 : -1;
+        let sy = (y0 < y1) ? 1 : -1;
+        let err = dx-dy;
+        while(true){
+            im[y0*w + x0] = color;
+
+            if ((x0==x1) && (y0==y1)) break;
+            let e2 = err << 1;
+            if (e2 >-dy){ err -= dy; x0  += sx; }
+            if (e2 < dx){ err += dx; y0  += sy; }
+        }
+
+        x0 = x1;
+        y0 = y1;
+    }
+    return im;
+}
+
+var divide_float = function(numerator, denominator){
+    let out = new Float32Array(numerator.length);
+    for(let ii=0; ii<out.length; ii++){
+        out[ii] = numerator[ii] / denominator[ii];
+    }
+    return out;
+}
+
+var use_mask = function(vector, mask, val){
+    // sets vector elemnts to val where mask is true, if val is omitted it defaults to zero
+    val = typeof(val) === "number" ? val : 0;
+    for(let ii=0; ii<mask.length; ii++) if(mask[ii]){
+        vector[ii] = val;  
+    }
+}
+
 </script>
 
 <template></template>
@@ -17180,6 +17335,12 @@ var is_equal_simple = function(a, b){
     Polymer({
         is:'rm-plots',
         properties: {
+            pos_path: {
+                type: String, //canvas-manager id
+                value: "",
+                notify: true,
+                readOnly: true
+            },
             pos_xy: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};},
@@ -17253,7 +17414,8 @@ var is_equal_simple = function(a, b){
                 max_rate_spa: undefined,
                 deg_per_dir_bin: undefined,
                 smoothing_dir_bins: undefined,
-                cps_per_speed_bin: 4 // currently not exposed as a user-configurable
+                max_speed: 60, // currently not exposed as user-configurable
+                cps_per_speed_bin: 4 // currently not exposed as user-configurable
             };
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
             this._worker = worker_builder.create_for(this);
@@ -17271,6 +17433,7 @@ var is_equal_simple = function(a, b){
             if (this.show.indexOf('y') > -1){
                 // get clones of new arrays to send to worker
                 for(let okey of okeys_to_add){
+                    if(!okey) continue;
                     pkeys_to_add.push(okey._pkey);
                     added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
                     okey._rm_is_on_worker = true;                    
@@ -17281,6 +17444,7 @@ var is_equal_simple = function(a, b){
             // freeing the inds arrays was the responsibility of cut-obj.
             var pkeys_to_remove = [];
             for(let okey of okeys_to_remove){
+                if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
                 cm.free_canvas(okey.rm_spa);
                 cm.free_canvas(okey.rm_dir);
@@ -17318,20 +17482,23 @@ var is_equal_simple = function(a, b){
             // because the worker is not going to send it again
             for(let okey of this.groups){
                 if(okey.rm_spa !== okey._rm_spa_other && 
-                   okey._rm_other_options.cm_per_spa_bin === this._options.cm_per_spa_bin &&
-                   okey._rm_other_options.smoothing_spa_bins === this._options.smoothing_spa_bins){
+                    this._options_match(okey._rm_other_options, this._options, "spa")){
                     cm.free_canvas(okey.rm_spa);
                     okey.rm_spa = okey._rm_spa_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);         
                 }
                 if(okey.rm_dir !== okey._rm_dir_other && 
-                   okey._rm_other_options.deg_per_dir_bin === this._options.deg_per_dir_bin &&
-                   okey._rm_other_options.smoothing_dir_bins === this._options.smoothing_dir_bins){
+                    this._options_match(okey._rm_other_options, this._options, "dir")){
                     cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = okey._rm_dir_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);            
                 }
-                // there are no configurable options for speed, so anything we had is already valid
+                if(okey.rm_speed !== okey._rm_speed_other && 
+                    this._options_match(okey._rm_other_options, this._options, "dir")){
+                    cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = okey._rm_speed_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);            
+                }
             }
         }, _groups_set: function(new_val, old_val){
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
@@ -17373,7 +17540,8 @@ var is_equal_simple = function(a, b){
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
-                    this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, this.pos_xy.units_per_cm, {data: arr});
+                    this._worker.exec_b('set_pos_xy', this.pos_xy.timebase, 
+                        this.pos_xy.units_per_cm, this.pos_xy.max_x, this.pos_xy.max_y, {data: arr});
                 } else {
                     if(!this._worker) return;
                     this._worker.exec('set_pos_xy', {});
@@ -17433,26 +17601,90 @@ var is_equal_simple = function(a, b){
                 }
                 this._times_is_on_worker = false;
             }
-        }, plot_things: function(data, arrays) {
-            if(data.generation !== this._pkey_generation)
-                return; // pft! get with the times, dude.
-            let okey = this._groups_collection.getItem(data.pkey);
-            let cm = Utils.canvas_manager;
-            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
-            //  TODO: this will have one or more of spa, dir, and speed
-            // dependigng on the show options.  need to update the relevant
-            // ckeys and *only* the relevant rendered options
-
-            /*
-            cm.free_canvas(okey._tac_other);
-            okey._tac_other = ckey;
-            okey._tac_other_options = data.render_options;
-            if(Utils.is_equal_simple(data.render_options, this._options)){
-                cm.free_canvas(okey.tac);
-                okey.tac = ckey;
-                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
+        }, _options_match: function(a,b,kind){
+            if((!a && b) || (a && !b)){
+                return false;
             }
-            */
+            if(kind === "spa"){
+                return a.smoothing_spa_bins === b.smoothing_spa_bins
+                    && a.cm_per_spa_bin == b.cm_per_spa_bin
+                    && a.max_rate_spa == b.max_rate_spa;
+            }
+            if(kind === "dir"){
+                return a.smoothing_dir_bins === b.smoothing_dir_bins
+                    && a.deg_per_dir_bin == b.deg_per_dir_bin;
+            }
+            if(kind === "speed"){
+                return a.max_speed === b.max_speed
+                    && a.cps_per_speed_bin === b.cps_per_speed_bin;
+            }
+            throw "what kind?";
+        }, _copy_options: function(dest, src, kind){
+            if(kind === "spa"){
+                dest.smoothing_spa_bins = src.smoothing_spa_bins;
+                dest.cm_per_spa_bin = src.cm_per_spa_bin;
+                dest.max_rate_spa = src.max_rate_spa;
+            } else if (kind === "dir"){
+                dest.smoothing_dir_bins = src.smoothing_dir_bins;
+                dest.deg_per_dir_bin = src.deg_per_dir_bin;
+            } else if(kind === "speed"){
+                dest.max_speed = src.max_speed;
+                dest.cps_per_speed_bin = src.cps_per_speed_bin;
+            } else {
+                throw "what?"
+            }
+        }, plot_things: function(msg, arrays) {
+            if(msg.generation !== this._pkey_generation)
+                return; // pft! get with the times, dude.
+
+            let okey = this._groups_collection.getItem(msg.pkey);
+            let cm = Utils.canvas_manager;
+
+            if(msg.spa_rm){
+                if(okey.rm_spa !== okey._rm_spa_other){
+                    cm.free_canvas(okey._rm_spa_other);
+                }
+                okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
+            this._copy_options(okey._rm_other_options, msg.render_options, "spa");
+                if(this._options_match(msg.render_options, this._options, 'spa')){
+                    cm.free_canvas(okey.rm_spa);
+                    okey.rm_spa = okey._rm_spa_other;
+                    okey.rm_spa_max = msg.spa_max.toFixed(1);
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa); 
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
+                }
+            }
+
+            if(msg.dir_rm){
+                if(okey.rm_dir !== okey._rm_dir_other){
+                    cm.free_canvas(okey._rm_dir_other);
+                }
+                okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                if(this._options_match(msg.render_options, this._options, 'dir')){
+                    cm.free_canvas(okey.rm_dir);
+                    okey.rm_dir = okey._rm_dir_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
+                }
+            }
+
+            if(msg.speed_rm){
+                 if(okey.rm_speed !== okey._rm_speed_other){
+                    cm.free_canvas(okey._rm_speed_other);
+                }
+                okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
+                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                if(this._options_match(msg.render_options, this._options, 'dir')){
+                    cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = okey._rm_speed_other;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed); 
+                }
+            }
+
+        }, plot_path: function(msg, arrays){
+            var cm = Utils.canvas_manager;
+            cm.free_canvas(this.pos_path);
+            this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))
         }
     });
 </script>
@@ -17512,8 +17744,13 @@ var set_spike_times = function(timebase_, arrays){
 
 var update_pkeys = function(changes, arrays){
 
-    if(changes.generation_remove !== pkey_generation)
-        throw "key generation mismatch";
+    if(changes.generation_remove !== pkey_generation){
+        changes.remove = [];
+        pkey_to_array.clear();
+        pkey_to_rendered_options.clear();
+        pkeys_pending_render = [];
+        console.log("tac-plots worker: key generation mismatch");
+    }
 
     // note we don't both to remove keys from the pending list
     // unless we change key generation, in which case we drop 
@@ -17714,6 +17951,7 @@ var is_equal_simple = function(a, b){
             if (this.show === 'y'){
                 // get clones of new arrays to send to worker
                 for(let okey of okeys_to_add){
+                    if(!okey) continue;
                     pkeys_to_add.push(okey._pkey);
                     added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
                     okey._tac_is_on_worker = true;                    
@@ -17724,6 +17962,7 @@ var is_equal_simple = function(a, b){
             // freeing the inds arrays was the responsibility of cut-obj.
             var pkeys_to_remove = [];
             for(let okey of okeys_to_remove){
+                if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
                 cm.free_canvas(okey.tac);
                 cm.free_canvas(okey._tac_other);
@@ -18738,8 +18977,8 @@ var n_w = 50; // number of t points per channel
 
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
-var off_canv_h = 512;  // full height
-var off_canv_wave_h = 164; // height of a wave
+var off_canv_h = 270;  // full height
+var off_canv_wave_h = 128; // height of a wave
 var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
 
@@ -18754,7 +18993,7 @@ var shader_strs = (function(){
 // rather than accepting a .format(dict) like in python, anyway....
 
 var delta_t_x_offset = (off_canv_dt/off_canv_w*2).toPrecision(3);
-var y_factor =  (1/(off_canv_h/off_canv_wave_h)).toPrecision(3);
+var y_factor =  (1/(off_canv_h/off_canv_wave_h) * (1/128)).toPrecision(3);
 
 return {
 
@@ -18767,16 +19006,17 @@ return {
         varying lowp vec4 v_color;
         uniform sampler2D palette;
         const mediump float delta_t_x_offset = ${delta_t_x_offset}; // canvas x-coordinates from point t to point t+1
-        const mediump float y_factor = ${y_factor}; //scales voltage values, initially expressed in [0 1], to lie with 128 pixels expressed in canvas coords [-1 +1]
+        const mediump float y_factor = ${y_factor}; //scales voltage values, initially expressed in [0 1], to lie withn +- wave_h/2, in canvas coords [-1 +1]
 
         void main(void) {
+            //v_color = vec4(1.,0.,0.,1.);
             v_color = texture2D(palette, vec2(wave_color_tex, 0.));
 
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
 
             //calculate the y coordiante in canvas coordinates
-            gl_Position.y = wave_xy_offset.y + voltage*y_factor;
+            gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
 
             // best to set the fourth element to 1
             gl_Position[3] = 1.;
@@ -18802,10 +19042,10 @@ return {
 
         void main(void) {
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
 
             //calculate the y coordiante in canvas coordinates
-            gl_Position.y = wave_xy_offset.y + voltage*y_factor;
+            gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
 
             // best to set the fourth element to 1
             gl_Position[3] = 1.;
@@ -18984,10 +19224,7 @@ var WavesRenderer = function(callback, debug){
 
     // create all the neccessarry buffers (no space is actually allocated at this stage for data)
     this._buf_wave = gl.createBuffer();
-    this._bufs_voltage = [];
-    for(let ii=0; ii<(n_w-1)*n_c; ii++){
-        this._bufs_voltage.push(gl.createBuffer());
-    }
+    this._buf_voltage = gl.createBuffer();
     this._buf_is_t_plus_one = gl.createBuffer();
     
     // well, these two buffers are small and simple... (used only in the density_2 program)
@@ -19035,7 +19272,7 @@ WavesRenderer.prototype._switch_to_flag_prog = function(){
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
     gl.vertexAttribPointer(this._locs_flag.is_t_plus_one, 1, gl.UNSIGNED_BYTE, true, 1, 0);     
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
+    gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 3, 0); 
     gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
 
 }
@@ -19059,9 +19296,6 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._off_fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + float_texture_register_ind, gl.TEXTURE_2D, this._off_texture, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
-        throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
-    }
 
     gl.enableVertexAttribArray(this._locs_density_1.is_t_plus_one);
     gl.enableVertexAttribArray(this._locs_density_1.wave_xy_offset);
@@ -19069,7 +19303,7 @@ WavesRenderer.prototype._switch_to_density_1_prog = function(){
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
     gl.vertexAttribPointer(this._locs_density_1.is_t_plus_one, 1, gl.UNSIGNED_BYTE, true, 1, 0); 
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0); 
+    gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 2, 0); 
 
 }
 
@@ -19119,7 +19353,7 @@ WavesRenderer.prototype.set_n = function(n){
 
     // upload to the gpu
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_is_t_plus_one);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); 
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW); 
 
 }
 
@@ -19127,12 +19361,16 @@ WavesRenderer.prototype.set_mode = function(mode){
     if(this._mode === mode){
         return;
     }
+    var gl = this.gl;
 
     this._mode = mode;
     if(this._mode === "flag"){
         this._switch_to_flag_prog();
     }else if(this._mode === "density"){
         this._switch_to_density_1_prog();
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+           throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
+        }
     } else {
         throw "unrecognised mode";
     }
@@ -19147,18 +19385,19 @@ WavesRenderer.prototype.set_mode = function(mode){
 WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
     var gl = this.gl;
     // the voltage data is pre-prepared exactly the way we wanted by the parse-data module.
-    this._has_voltages = prepared_voltage_data ? true : 0;
 
-    // The prepared_voltage data is really a concatenated list of many separate arrays,
+     // The prepared_voltage data is really a concatenated list of many separate arrays,
     // where each array contains the data for all spikes at a specific channel-time, and is of
     // the form: v_1(t) v_1(t+1) v_2(t) v_2(t+1) v_3(t) ... v_n(t+1)
     // note there are 1 fewer such arrays then time points on the wave, n_w.
-    prepared_voltage_data = prepared_voltage_data ? new Int8Array(prepared_voltage_data.buffer) : new Uint8Array(0); // note we force it to be u8
-    for(let ii=0; ii<this._bufs_voltage.length; ii++){
-        //upload the current buffer to the gpu.  
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[ii]);
-        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data.subarray(ii *this._n*2, (ii+1) *this._n*2), gl.STATIC_DRAW); 
-                                //It is more static than the waves buffer, but it does change when we switch tets.
+    if(prepared_voltage_data){
+        this._has_voltages = true;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.bufferData(gl.ARRAY_BUFFER, prepared_voltage_data.buffer, gl.DYNAMIC_DRAW); 
+    } else {
+        this._has_voltages = false;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.bufferData(gl.ARRAY_BUFFER, gl.NONE, gl.DYNAMIC_DRAW);       
     }
 
     // note we don't set vertexAttribPointer here, because we do it multiple times
@@ -19180,8 +19419,9 @@ WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     var n_rows = Math.floor(off_canv_h/(off_canv_wave_h+off_canv_wave_gap)); // TODO: we should really have a vertical gap between waves
 
     var success = false;
+    var n_cols;
     for(var batch_t=to_t-from_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
-        var n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
+        n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
         if(n_okeys <= n_cols * n_rows){
             success = true;
             break;
@@ -19223,12 +19463,12 @@ WavesRenderer.prototype._upload_okey_data = function(){
     var render_metrics = this._render_metrics;
     var okeys = render_metrics.okeys;
 
-    var xy_offset_gl_i8 = new Int8Array(render_metrics.x_offset.length*2);
-    var xy_offset_gl_i16 = new Int16Array(xy_offset_gl_i8.buffer);  
+    var xy_offset_gl_i8 = new Uint8Array(render_metrics.x_offset.length*2);
+    var xy_offset_gl_i16 = new Uint16Array(xy_offset_gl_i8.buffer);  
 
     for(var p=0; p<render_metrics.x_offset.length; p++){
-        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256 - 128;
-        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256 - 128;
+        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256;
+        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256;
     }
 
     var m = Utils.typed_array_manager;
@@ -19236,10 +19476,9 @@ WavesRenderer.prototype._upload_okey_data = function(){
     if(this._mode === 'density'){
         // just need to provide x and y
 
-        var data_i8 = new Int8Array(this._n*4);
-        var data_i16 = new Int16Array(data_i8.buffer);
-        data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
-        
+        var data_i8 = new Uint8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
+        var data_i16 = new Uint16Array(data_i8.buffer);
+
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
@@ -19253,10 +19492,9 @@ WavesRenderer.prototype._upload_okey_data = function(){
 
         // TODO: test whether it's faster to provide the full rgb color rather than a palette index. I suspect it might be.
 
-        var data_i8 = new Int8Array(this._n*6);
-        var data_i16 = new Int16Array(data_i8.buffer);
-        data_i8.fill(127); // if we aren't rendering all waves, then hide the missing ones off to the side
-
+        var data_i8 = new Uint8Array(this._n*6);
+        var data_i16 = new Uint16Array(data_i8.buffer);
+    
         for(let ii=0; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
@@ -19272,13 +19510,13 @@ WavesRenderer.prototype._upload_okey_data = function(){
 
     // upload it to the wave buffer on the gpu
     gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_wave);
-    gl.bufferData(gl.ARRAY_BUFFER, data_i8, gl.DYNAMIC_DRAW); 
+    gl.bufferData(gl.ARRAY_BUFFER, data_i8.buffer, gl.DYNAMIC_DRAW); 
 
     // tell the gpu where to find the wave data
     if(this._mode === 'density'){
-        gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.BYTE, true, 2, 0);        
+        gl.vertexAttribPointer(this._locs_density_1.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 2, 0);        
     }else{
-        gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.BYTE, true, 3, 0); 
+        gl.vertexAttribPointer(this._locs_flag.wave_xy_offset, 2, gl.UNSIGNED_BYTE, false, 3, 0); 
         gl.vertexAttribPointer(this._locs_flag.wave_color_tex, 1, gl.UNSIGNED_BYTE, true, 3, 2);       
     }
 
@@ -19428,19 +19666,17 @@ WavesRenderer.prototype._timer_tick = function(){
         this._render_batch_flag(from_t, end_t);
     }
 
+    this.gl.finish();
     // copy fragments from off_canv into individual canvases
     var width = (end_t - from_t) * off_canv_dt;
     var x_offsets = this._render_metrics.x_offset;
     var y_offsets = this._render_metrics.y_offset;  
-    for(let ii=0; ii<okeys.length; ii++){
-        let okey = okeys[ii];
+    for(let [ii, okey] of okeys.entries()){
         let part = this._okey_to_part_rendered.get(okey);
         if(!part.el_canv){
             part.el_canv = document.createElement('canvas');
             part.el_canv.width = off_canv_dt*n_c*(n_w-1);
             part.el_canv.height = off_canv_wave_h;
-            part.el_canv.style.width = on_canv_width + 'px';
-            part.el_canv.style.height = on_canv_height + 'px';
             part.ctx = part.el_canv.getContext('2d');
         }
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
@@ -19513,8 +19749,8 @@ WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
         gl.uniform1f(this._locs_flag.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
-        gl.vertexAttribPointer(this._locs_flag.voltage, 1, gl.BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 }
@@ -19528,8 +19764,8 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
         gl.uniform1f(this._locs_density_1.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._bufs_voltage[t]);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, true, 1, 0); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
+        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 
@@ -19543,8 +19779,8 @@ WavesRenderer.prototype.debug_show_off_canv = function(){
     this.el_off_canv.style.bottom = "0px";
     this.el_off_canv.style.background = "#fff";
     this.el_off_canv.style.border = "1px solid #f00";
-    this.el_off_canv.style.transform = 'scale(0.5)';
-    this.el_off_canv.style.transformOrigin = 'bottom right';
+    //this.el_off_canv.style.transform = 'scale(0.5)';
+    //this.el_off_canv.style.transformOrigin = 'bottom right';
     document.body.appendChild(this.el_off_canv);
 }
 
@@ -19658,8 +19894,10 @@ Polymer({
 
 
     
-    <rm-plots groups="{{groups}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show_pos_plots="[[options.show_pos_plots]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+    
+    <rm-plots groups="{{groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show_pos_plots="[[options.show_pos_plots]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
     <tac-plots groups="{{groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]"></tac-plots> 
+                
     <wave-plots groups="{{groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]"></wave-plots> 
     
 
@@ -19678,6 +19916,11 @@ Polymer({
                 type: Array,
                 value: function(){return [];},
                 notify: true    
+            },
+            pos_path: {
+                type: String, //canvas-manager id
+                value: "",
+                notify: true
             },
             duration: {
                 type: Number, // seconds
@@ -20096,21 +20339,28 @@ Polymer({
 </dom-module>
 <dom-module id="undo-stack-view" assetpath="/">
 <style>
+.redo,
+.undo{
+background: rgba(106, 119, 130, 0.08);  
+margin-top: 2px;
+}
 .redo{
-color: #ccc;
+color: #1A64A5;
+text-align: right;
+}
+:host{
+max-height: 150px;
+overflow: scroll;
+cursor: default;
 }
 </style>
 <template>
-    <div class="floating_title">Action List [z]</div>
-    <div class="floating_body">
-        <template is="dom-repeat" items="[[redo_stack]]">
-            <div class="redo">[[item]]</div>
-        </template>
-        TODO: reverse the order of the undo stack...
-        <template is="dom-repeat" items="[[undo_stack]]">
-            <div class="undo">[[item]]</div>
-        </template>
-    </div>
+<template is="dom-repeat" items="[[redo_stack]]">
+    <div class="redo">([[item]])</div>
+</template>
+<template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}">
+    <div class="undo">[[item]]</div>
+</template>
 </template>
 
 
@@ -20130,6 +20380,10 @@ color: #ccc;
                 value: function(){return [];},
                 notify: true
             }
+        }, _reversed_undo: function(){
+            let arr = this.undo_stack.slice(0);
+            arr.reverse();
+            return arr;
         }
     });
 </script>
@@ -20198,6 +20452,11 @@ color: #ccc;
                 mask[p_r] = 1;
             }
             res[p_r] = a[p_a];
+        }
+        // add any final b's after the end of a
+        for(;p_b<b.length;p_b++, p_r++){
+            res[p_r] = b[p_b];
+            mask[p_r] = 1;
         }
         return [res, mask];
     }
@@ -20306,14 +20565,14 @@ color: #ccc;
 
                 // private properties for use by tac-plots module, never notified
                 _tac_other: null,
-                _tac_other_options: null,
+                _tac_other_options: {},
                 _tac_is_on_worker: false,
 
                 // private properties for use by rm-plots module, never notified
                 _rm_spa_other: null,
                 _rm_dir_other: null,
                 _rm_speed_other: null,
-                _rm_other_options: null,
+                _rm_other_options: {},
                 _rm_is_on_worker: false,
 
                 // property set by Polymer.Collection
@@ -20388,7 +20647,7 @@ color: #ccc;
             }
         },
         _fork_if_needed: function(){
-            if(!this.cut_box.is_stack){
+            if(this.cut_box.is !== "stack"){
                 // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
                 // note that the new "cut box" will be applied to this element as its cut_box, but this will not
                 // cause any changes as all the values will be the same.
@@ -20776,6 +21035,20 @@ var swap_16 = function (val) {
     return ((val & 0xFF) << 8) | ((val >> 8) & 0xFF);
 }
 
+var take_2_2_swapped = function(src, offset_bytes, stride_bytes){
+    // takes 4 bytes total, swapping bytes 0 and 1, and swapping bytes 2 and 3.
+    
+    var dest = new Uint32Array( (0 | (src.length/stride_bytes)) - (0 | (offset_bytes/stride_bytes)));
+
+    for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src+=stride_bytes,p_dest++){
+        dest[p_dest] =   src[p_src+1]
+                       |(src[p_src+0] << 8)
+                       |(src[p_src+3] << 16)
+                       |(src[p_src+2] << 24);
+    }
+    return dest;
+}
+
 var take = function(data,offset,stride){
     // takes every stride'th element from data, starting with the offset'th element
     
@@ -20854,13 +21127,6 @@ var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cach
     }
 
     var data_len_bytes = parseInt(header.num_pos_samples)*bytes_per_pos_sample;
-
-    if(endian == 'L'){
-        let data16 = new Int16Array(buffer, data_start, data_len_bytes/2);
-        for (let k=0; k<data16.length; k++){ //note that timestamps are 4 bytes, so this is really unhelpful if you want to read timestamps
-            data16[k] = swap_16(data16[k]);
-        }
-    }
 
     var pos = post_process(buffer, data_start, data_len_bytes, header, options);
     delete options.fkey;
@@ -21028,18 +21294,19 @@ var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
     var jump_len = 1;
 
     // Set big jump sections to nan
-    for(let i=start+1,nJumpy=0; i<n_pos; i++){
+    var n_jumpy = 0;
+    for(let i=start+1; i<n_pos; i++){
         let ix = i*2+0;
         let iy = i*2+1;
         // check if this pos is already nan
         // or if (dx^2 + dy^2)/dt^2 is greater than maxSpeed^2, where the d's are relative to the last "good" sample
         if(xy[ix] == nan16 || xy[iy] == nan16){
             xy[ix] = xy[iy] = nan16; //just in case only one or the other was nan
-            jump_len++; // note we don't count njumpy here
-        }else if ((sqr(x_from-xy[ix]) + sqr(y_from-xy[iy])) / sqr(jump_len) > sqr_max_samp_step ){
+            jump_len++; // note we don't count n_jumpy here
+        }else if (sqr(x_from-xy[ix]) + sqr(y_from-xy[iy]) > sqr_max_samp_step *  sqr(jump_len)){
             //sample is nan or speed is too large, so make this a jump
             xy[ix] = xy[iy] = nan16; 
-            nJumpy++;
+            n_jumpy++;
             jump_len++;
         }else{
             //speed is sufficiently small, so this point is ok
@@ -21049,7 +21316,7 @@ var jump_filter = function(xy, n_pos, max_speed, units_per_m, pos_timebase){
         }
     }
 
-    return nJumpy;
+    return n_jumpy;
 }       
 
 var swap = function(a, b, do_swap){
@@ -21119,18 +21386,27 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
 }
 
 var get_dir = function(pos){
-    // TODO: if n_led is 1
     var xy_1 = pos.xy_1;
     var xy_2 = pos.xy_2;
-
     var ret = new Float32Array(xy_1.length/2);
     var pi = 3.14159265;
-    for(let i=0;i<xy_1.length/2;i++){
-        let ix = 2*i+0;
-        let iy = 2*i+1;
-        let dy = xy_2[iy] - xy_1[iy];
-        let dx = xy_2[ix] - xy_1[ix];
-        ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+
+    if(xy_2){
+        for(let i=0;i<xy_1.length/2;i++){
+            let ix = 2*i+0;
+            let iy = 2*i+1;
+            let dy = xy_2[iy] - xy_1[iy];
+            let dx = xy_2[ix] - xy_1[ix];
+            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+        }        
+    } else {
+        // only one led used...
+        for(let i=1;i<xy_1.length/2;i++){
+            let dy = xy_1[2*i+1] - xy_1[2*i-1];
+            let dx = xy_1[2*i+0] - xy_1[2*i-2];
+            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+        }
+        ret[0] = ret[1];
     }
     return ret;
 }
@@ -21144,9 +21420,9 @@ var get_speed = function(pos){
     return ret;
 }
 
+
 var post_process = function(buffer, offset_bytes, length_bytes, header, options){
-    var data = new Int16Array(buffer, offset_bytes, length_bytes/2);
-    var data32 = new Int32Array(buffer, offset_bytes, length_bytes/4);
+    var data8 = new Uint8Array(buffer, offset_bytes, length_bytes);
 
     var elements_per_pos_sample = bytes_per_pos_sample/2;
     var n_pos = parseInt(header.num_pos_samples); 
@@ -21155,14 +21431,15 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
     var pos_nan = 1023;
 
      // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-    var xy_1 = new Int16Array(take(data32, 1, bytes_per_pos_sample/4).buffer);
+    var xy_1 = new Int16Array(take_2_2_swapped(data8, 4, bytes_per_pos_sample).buffer);
     replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
     
     var n_led = 1;
+    var xy_2;
     if (options.use_both_leds){
         // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
         // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-        var xy_pix = new Int16Array(take(data32, 3, bytes_per_pos_sample/4).buffer);
+        var xy_pix = new Int16Array(take_2_2_swapped(data8, 12, bytes_per_pos_sample).buffer);
         replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
         for(let i=0; i<n_pos; i++){
             if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
@@ -21171,14 +21448,12 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
             }
         } // if we make it to the end of the loop then n_led reamined as =1.
 
-    }
-
-    var xy_2;
-    if(n_led == 2){
-         // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
-        xy_2 = new Int16Array(take(data32, 2, bytes_per_pos_sample/4).buffer);
-        replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-    
+        if(n_led == 2){
+             // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
+            xy_2 = new Int16Array(take_2_2_swapped(data8, 8, bytes_per_pos_sample).buffer);
+            replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
+        
+        }
     }
     
     if(options.need_to_subtract_mins){
@@ -21209,7 +21484,7 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
 
         var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
         header.post_n_pix_led1 = "mean=" + pix_props.mean_1.toFixed(2) + " std=" + pix_props.std_1.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_1) + ")";
-        header.psot_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
+        header.post_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
 
         // use std and mean to get z score of pix1 to pix1 and pix2
         for(let i=0; i< n_pos; i++){
@@ -21719,15 +21994,18 @@ var parse_clu_file = function(full_str, fkey){
             },
             use_n_leds: {
                 type: Number, //1 or 2
-                value: 2
+                value: 2,
+                notify: true
             },
             speed_filter_mps: {
                 type: Number,  //mps= meters per second
-                value: 4
+                value: 4,
+                notify: true
             },
             pos_smoothing_s: {
                 type: Number, 
-                value: 0.2
+                value: 0.2,
+                notify: true
             },
             duration: {
                 type: Number, // seconds
@@ -21879,8 +22157,7 @@ var parse_clu_file = function(full_str, fkey){
                 changing.add('cut');
             }
             this._fkeys = Utils.simple_clone(new_fkeys);
-            this.fire('start_nulling', changing);
-
+            
             if(changing.has('set')){
                 this._setDuration(null);
                 this._setSet_header(null);
@@ -21900,8 +22177,6 @@ var parse_clu_file = function(full_str, fkey){
             if(changing.has('cut')){
                 this._setCut_box(null);
             }
-
-            this.fire('end_nulling');
 
             // build request for io-worker, taking as much as possible from the main cache
             var request = {};
@@ -21988,7 +22263,7 @@ var parse_clu_file = function(full_str, fkey){
             msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
             this._pos_from_options.set(msg.options, result);
             if(msg.delete_from_cache){
-                for(let [cached_opts, ignore] of this._pos_from_options){
+                for(let cached_opts of this._pos_from_options.keys()){
                     if(Utils.is_equal_simple(cached_opts, msg.delete_from_cache)){
                         this._pos_from_options.delete(cached_opts);
                     }
@@ -22005,7 +22280,9 @@ var parse_clu_file = function(full_str, fkey){
             this._setPos_xy({
                 xy: result.xy,
                 timebase: timebase,
-                units_per_cm: result.header && parseInt(result.header.units_per_meter)/100
+                units_per_cm: result.header && parseInt(result.header.units_per_meter)/100,
+                max_x: result.header && result.header.max_vals[0],
+                max_y: result.header && result.header.max_vals[1]
             });
             this._setPos_dir({
                 dir: result.dir,
@@ -22085,10 +22362,10 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, _make_pos_options: function(){
             return {
-                use_both_leds: this.use_n_leds,
+                use_both_leds: (this.use_n_leds == 2),
                 need_to_subtract_mins: false,
                 swapping_thresh_cm: 1,
-                max_speed: this.pos_filter_mps,
+                max_speed: this.speed_filter_mps,
                 smoothing_secs: this.pos_smoothing_s
             }
         }, got_gl_data: function(msg, arrays){
@@ -23931,8 +24208,8 @@ vertical-align: bottom;
 .trial_tet_block{
 display: inline-block;
 border-left: 2px solid #000;
-margin-right: 4px;
 margin-bottom: 2px;
+padding-right: 4px;
 }
 .trial_pos,
 .trial_set{
@@ -24199,7 +24476,7 @@ Polymer({
         var trial = this._trial_from_base.get(this.selected_trial);
         var tet_obj = trial && this._get_tet_obj(trial, this.selected_tet_num, false);
         var cut = this.selected_cut;
-        var title = this.selected_trial + " [Waveform]" || "Waveform";
+        var title = this.selected_trial ?  this.selected_trial + " [Waveform]" : "Waveform";
         var url = location.pathname + "?";
         url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
         url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
@@ -24362,7 +24639,7 @@ Polymer({
 
 
         trials.sort(function(a,b){
-            return a.name > b.name;
+            return a.name > b.name ? 1 : -1;
         })
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
@@ -24499,7 +24776,7 @@ Polymer({
             this._sort_trial_innards(trial);
         }   
         trials.sort(function(a,b){
-            return a.name > b.name;
+            return a.name > b.name ? 1 : -1;
         })
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
@@ -24950,37 +25227,34 @@ Polymer({
         pos_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_pos'
+            notify: true
         },
         set_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_set'
+            notify: true
         },
         tet_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_tet'
+            notify: true
         },
         cut_header: {
             type: Object,
             value: function(){ return {};},
-            notify: true,
-            observer: '_clear_cache_cut'
+            notify: true
         }
-    }, created: function(){
+    }, observers: [
+        "_clear_cache('pos', pos_header)",
+        "_clear_cache('set', set_header)",
+        "_clear_cache('tet', tet_header)",
+        "_clear_cache('cut', cut_header)"
+    ], created: function(){
         this._cache = {};
-    }, _clear_cache_pos: function(){
-        this._cache['pos'] = undefined;
-    }, _clear_cache_set: function(){
-        this._cache['set'] = undefined;
-    }, _clear_cache_tet: function(){
-        this._cache['tet'] = undefined;
-    }, _clear_cache_cut: function(){
-        this._cache['cut'] = undefined;
+        this._cached_for = {}; // if _clear_cache was guaranteed to be called before _build_array we wouldn't need this
+    }, _clear_cache: function(t, ignored){
+        this._cache[t] = undefined;
+        this._cached_for[t] = undefined;
     }, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter) {
             var a = [];         
             for(let t of new Set(['tet', 'cut', 'pos', 'set'])){
@@ -24988,7 +25262,7 @@ Polymer({
                 if(!header || !Object.keys(header).length){
                     continue;
                 }
-                if (this._cache[t]){
+                if (this._cache[t] && this._cached_for[t] === header){
                     a = a.concat(this._cache[t]);
                     continue;
                 } 
@@ -25011,6 +25285,7 @@ Polymer({
                     value: header.file
                 });
                 this._cache[t] = arr;
+                this._cached_for[t] = header;
                 a = a.concat(arr);
 
             }
@@ -25270,7 +25545,7 @@ Polymer({
 
 			<div class="side_panel_row side_panel_row_flex">
 				<div class="grabbable side_panel_row_flex" id="spatial_panel">
-					<canvas id="posplot" class="poslayer" width="200" height="200"></canvas> 
+					<managed-canvas canv_id="[[pos_path]]"></managed-canvas>
 					<canvas id="posoverlay" class="poslayer" width="200" height="200"></canvas> 
 				</div>
 				<div class="info_summary">
@@ -25308,7 +25583,7 @@ Polymer({
 		<iron-splitter direction="left"></iron-splitter>
 		
 		
-		<tile-wall class="tilewall" groups="{{cut_groups}}" duration="[[duration]]" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" data_for_gl="[[data_for_gl]]" options="[[options]]"></tile-wall>
+		<tile-wall class="tilewall" groups="{{cut_groups}}" duration="[[duration]]" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" data_for_gl="[[data_for_gl]]" options="[[options]]" pos_path="{{pos_path}}"></tile-wall>
 
 	</div>
 
@@ -25352,8 +25627,6 @@ Polymer({
 
 
 
-
-
 <script>
 "use strict";
 var the_app = document.getElementById('the_app')
@@ -25389,6 +25662,8 @@ the_app.addEventListener('dom-change', function(){
     document.getElementById('waves_toggle').addEventListener('iron-change', function(new_val){
         the_app.set('options.waves_render_mode', the_app.options.waves_toggle ? "density" : "flag");
     });
+
+    window.c = document.getElementsByTagName('cut-object')[0]; //debug only
 })
 
 

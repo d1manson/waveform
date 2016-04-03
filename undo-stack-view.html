@@ -16,21 +16,28 @@ It also shows the redo-stack.
 
 <dom-module id="undo-stack-view">
 <style>
+.redo,
+.undo{
+background: rgba(106, 119, 130, 0.08);  
+margin-top: 2px;
+}
 .redo{
-color: #ccc;
+color: #1A64A5;
+text-align: right;
+}
+:host{
+max-height: 150px;
+overflow: scroll;
+cursor: default;
 }
 </style>
 <template>
-    <div class='floating_title'>Action List [z]</div>
-    <div class='floating_body'>
-        <template is="dom-repeat" items="[[redo_stack]]">
-            <div class="redo">[[item]]</div>
-        </template>
-        TODO: reverse the order of the undo stack...
-        <template is="dom-repeat" items="[[undo_stack]]" >
-            <div class="undo">[[item]]</div>
-        </template>
-    </div>
+<template is="dom-repeat" items="[[redo_stack]]">
+    <div class="redo">([[item]])</div>
+</template>
+<template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}" >
+    <div class="undo">[[item]]</div>
+</template>
 </template>
 
 
@@ -50,6 +57,10 @@ color: #ccc;
                 value: function(){return [];},
                 notify: true
             }
+        }, _reversed_undo: function(){
+            let arr = this.undo_stack.slice(0);
+            arr.reverse();
+            return arr;
         }
     });
 </script>
