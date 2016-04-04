@@ -930,7 +930,7 @@ var use_mask = function(vector, mask, val){
 
             // if we already have the right answer in any cases, then we must apply that now
             // because the worker is not going to send it again
-            for(let okey of this.groups){
+            for(let okey of (this.groups || []))if(okey){
                 if(okey.rm_spa !== okey._rm_spa_other && 
                     this._options_match(okey._rm_other_options, this._options, "spa")){
                     cm.free_canvas(okey.rm_spa);

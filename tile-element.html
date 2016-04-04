@@ -107,9 +107,6 @@ z-index: 100;
 background: rgba(0,0,0,0.5);
 display: none;
 }
-canvas{
-image-rendering: pixelated;
-}
 .dir-rm{
 height:78px;
 }
@@ -158,36 +155,37 @@ flex:2;
 100%   { opacity: 1;   }
 }
 </style>
+
 <template>
     <div class="canvas_part_1">
-        <managed-canvas canv_id="[[waves]]"></managed-canvas>
-        <managed-canvas canv_id="[[spa_rm]]" fix_height="[[spa_rm_height]]"></managed-canvas>
+        <managed-canvas canv_id="[[group_model.waves]]"></managed-canvas>
+        <managed-canvas canv_id="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
         <div>
-            <managed-canvas canv_id="[[dir_rm]]"></managed-canvas>
-            <managed-canvas canv_id="[[speed_rm]]"></managed-canvas>
+            <managed-canvas canv_id="[[group_model.rm_dir]]"></managed-canvas>
+            <managed-canvas canv_id="[[group_model.rm_speed]]"></managed-canvas>
         </div>
-        <managed-canvas canv_id="[[tac]]"></managed-canvas>
+        <managed-canvas canv_id="[[group_model.tac]]"></managed-canvas>
     </div>
     <div id='sticker' class='tile-sticker' style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
     <div id='over' class='tile-over hidden_grabbed'>
         <div class='tile-side'>
             <div class="flex"></div>
             <div class='tile-caption'>
-                <div style$='[[_show(group_spa_max)]]' class="caption-inner">
-                    [[group_spa_max]]Hz
+                <div style$='[[_show(group_model.rm_spa_max)]]' class="caption-inner">
+                    [[group_model.rm_spa_max]]Hz
                     <div class="caption-inner-label">spa max</div>
                 </div>
-                <div style$='[[_show(group_dir_max)]]' class="caption-inner">
-                    [[group_dir_max]]Hz
+                <div style$='[[_show(group_model.rm_dir_max)]]' class="caption-inner">
+                    [[group_model.rm_dir_max]]Hz
                     <div class="caption-inner-label">dir max</div>
                 </div>
-                <div style$='[[_show(group_mean)]]' class="caption-inner">
-                    [[group_mean]]Hz
+                <div style$='[[_show(group_model.group_mean)]]' class="caption-inner">
+                    [[group_model.group_mean]]Hz
                     <div class="caption-inner-label">mean</div>
                 </div>
-                <div class="caption-inner">[[group_n]]
+                <div class="caption-inner">[[group_model.n_spikes]]
                     <div class="caption-inner-label">n spikes</div>
                 </div>
             </div>
@@ -265,52 +263,10 @@ flex:2;
                 value: -1,
                 notify: true
             },
-            group_n: {
-                type: Number,
+            group_model: {
+                type: Object,
                 notify: true,
-                value: -1,
-                notify: true
-            },
-            group_mean: {
-                type: Number,
-                notify: true,
-                value: -1
-            },
-            dir_rm: {
-                type: String, //canvas-manger id
-                value: "",
-                notify: true
-            },
-            spa_rm: {
-                type: String, //canvas-manger id
-                value: "",
-                notify: true
-            },
-            speed_rm: {
-                type: String, //canvas-manger id
-                value: "",
-                notify: true
-            },
-            waves: {
-                type: String, //canvas-manger id
-                value: "",
-                notify: true
-            },
-            tac: {
-                type: String, //canvas-manger id
-                value: "",
-                notify: true
-            },
-            group_spa_max: {
-                type: String, // a number, but pre-rendered as a string
-                notify: true,
-                value: "",
-                notify: true
-            },
-            group_dir_max: {
-                type: String, // a number, but pre-rendered as a string
-                notify: true,
-                value: "",
+                value: function(){return {};},
                 notify: true
             },
             state: {

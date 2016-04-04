@@ -18,9 +18,6 @@ groups is an array of objects with the following properties:
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="tile-element.html">
-<link rel="import" href="rm-plots.html">
-<link rel="import" href="tac-plots.html">
-<link rel="import" href="wave-plots.html">
 <link rel="import" href="utils.html">
 
 <dom-module id="tile-wall">
@@ -50,42 +47,13 @@ groups is an array of objects with the following properties:
     the settings used to produce that canvas, e.g. groups[3].dir_smoothing.
      -->
     
-    <rm-plots   groups="{{groups}}" 
-                pos_path="{{pos_path}}"
-                spike_times="[[spike_times]]"
-                pos_xy="[[pos_xy]]"
-                pos_dir="[[pos_dir]]"
-                pos_speed="[[pos_speed]]"
-                show_pos_plots="[[options.show_pos_plots]]"
-                cm_per_spa_bin="[[options.cm_per_spa_bin]]"
-                smoothing_spa_bins="[[options.smoothing_spa_bins]]"
-                max_rate_spa="[[options.max_rate_spa]]"
-                deg_per_dir_bin="[[options.deg_per_dir_bin]]"
-                smoothing_dir_bins="[[options.smoothing_dir_bins]]"
-                ></rm-plots> 
-    <tac-plots  groups="{{groups}}" 
-                max_delta_t="[[options.max_delta_t]]"
-                spike_times="[[spike_times]]"
-                show="[[options.show_tac]]"></tac-plots> 
-                
-    <wave-plots groups="{{groups}}" 
-                data_for_gl="[[data_for_gl]]"
-                palette_mode="[[options.waves_render_mode]]"
-                show_chans="[[options.show_waves]]"></wave-plots> 
-    
+
 
     <template is="dom-repeat" items="[[groups]]">
         <tile-element 
             style$="[[_show(item)]]"
             group_num="[[index]]"
-            group_n="[[item.n_spikes]]"
-            group_spa_max="[[item.rm_spa_max]]"
-            group_dir_max="[[item.rm_dir_max]]"
-            dir_rm="[[item.rm_dir]]"
-            spa_rm="[[item.rm_spa]]"
-            speed_rm="[[item.rm_speed]]"
-            tac="[[item.tac]]"
-            waves="[[item.waves]]"
+            group_model="[[item]]"
             spa_rm_height="[[options.spa_rm_height]]"
             ></tile-element>        
     </template>
@@ -101,41 +69,6 @@ groups is an array of objects with the following properties:
                 type: Array,
                 value: function(){return [];},
                 notify: true    
-            },
-            pos_path: {
-                type: String, //canvas-manager id
-                value: "",
-                notify: true
-            },
-            duration: {
-                type: Number, // seconds
-                value: 0,
-                notify: true
-            },
-            spike_times: {
-                type: Object,
-                value: function(){ return {};}, // data (akey), timebase
-                notify: true
-            },
-            pos_xy: {
-                type: Object,
-                value: function(){ return {};}, // data (akey), timebase, and units_per_cm
-                notify: true
-            },
-            pos_dir: {
-                type: Object,
-                value: function(){ return {};}, // data (akey), timebase
-                notify: true
-            },
-            pos_speed: {
-                type: Object,
-                value: function(){ return {};}, // data (akey), timebase
-                notify: true
-            },
-            data_for_gl: {
-                type: Object,
-                value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
-                notify: true
             },
             options: {
                 type: Object,

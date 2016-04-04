@@ -29,6 +29,10 @@
 <link rel="import" href="header-view.html">
 <link rel="import" href="managed-canvas.html">
 <link rel="import" href="value-transform.html">
+<link rel="import" href="rm-plots.html">
+<link rel="import" href="tac-plots.html">
+<link rel="import" href="wave-plots.html">
+
 
 <style is="custom-style">
 :root {
@@ -233,10 +237,6 @@ box-shadow: inset 0 0 2px 1px #ccc;
         </floating-pane>
 
     </div>
-
-
-
-    <div class="main_wrapper">
         
     <paper-toolbar class="main_toolbar">
         <div>
@@ -361,20 +361,10 @@ box-shadow: inset 0 0 2px 1px #ccc;
         
         <tile-wall class="tilewall"
                     groups="{{cut_groups}}"
-                    duration="[[duration]]"
-                    spike_times="[[spike_times]]"
-                    pos_xy="[[pos_xy]]"
-                    pos_dir="[[pos_dir]]"
-                    pos_speed="[[pos_speed]]"
-                    data_for_gl="[[data_for_gl]]"
                     options="[[options]]"
-                    pos_path="{{pos_path}}"></tile-wall>
+                    ></tile-wall>
 
     </div>
-
-    </div>
-
-
 
     <paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
 
@@ -403,29 +393,55 @@ box-shadow: inset 0 0 2px 1px #ccc;
         </div>
     </drop-zone>
 
-
     <parsed-data 
-                selected_files="[[selected_files]]"
-                use_n_leds="[[options.use_n_leds]]"
-                speed_filter_mps="[[options.speed_filter_mps]]"
-                pos_smoothing_s="[[options.pos_smoothing_s]]"
-                duration="{{duration}}"
-                spike_times="{{spike_times}}"
-                pos_xy="{{pos_xy}}"
-                pos_dir="{{pos_dir}}"
-                pos_speed="{{pos_speed}}"
-                amplitudes="{{amplitudes}}"
-                data_for_gl="{{data_for_gl}}"
-                cut_box="{{cut_box}}"
-                tet_header="{{tet_header}}"
-                pos_header="{{pos_header}}"
-                set_header="{{set_header}}"></parsed-data>
-    <cut-object groups="{{cut_groups}}"
-                cut_box="[[cut_box]]"
-                undo_stack_descriptions="{{cut_undo_stack}}"
-                redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+        selected_files="[[selected_files]]"
+        use_n_leds="[[options.use_n_leds]]"
+        speed_filter_mps="[[options.speed_filter_mps]]"
+        pos_smoothing_s="[[options.pos_smoothing_s]]"
+        duration="{{duration}}"
+        spike_times="{{spike_times}}"
+        pos_xy="{{pos_xy}}"
+        pos_dir="{{pos_dir}}"
+        pos_speed="{{pos_speed}}"
+        amplitudes="{{amplitudes}}"
+        data_for_gl="{{data_for_gl}}"
+        cut_box="{{cut_box}}"
+        tet_header="{{tet_header}}"
+        pos_header="{{pos_header}}"
+        set_header="{{set_header}}"></parsed-data>
 
+    <cut-object 
+        groups="{{cut_groups}}"
+        cut_box="[[cut_box]]"
+        undo_stack_descriptions="{{cut_undo_stack}}"
+        redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
+    <rm-plots  
+        groups="{{cut_groups}}" 
+        pos_path="{{pos_path}}"
+        spike_times="[[spike_times]]"
+        pos_xy="[[pos_xy]]"
+        pos_dir="[[pos_dir]]"
+        pos_speed="[[pos_speed]]"
+        show_pos_plots="[[options.show_pos_plots]]"
+        cm_per_spa_bin="[[options.cm_per_spa_bin]]"
+        smoothing_spa_bins="[[options.smoothing_spa_bins]]"
+        max_rate_spa="[[options.max_rate_spa]]"
+        deg_per_dir_bin="[[options.deg_per_dir_bin]]"
+        smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+
+    <tac-plots 
+        groups="{{cut_groups}}" 
+        max_delta_t="[[options.max_delta_t]]"
+        spike_times="[[spike_times]]"
+        show="[[options.show_tac]]"></tac-plots> 
+                
+    <wave-plots
+        groups="{{cut_groups}}" 
+        data_for_gl="[[data_for_gl]]"
+        palette_mode="[[options.waves_render_mode]]"
+        show_chans="[[options.show_waves]]"></wave-plots> 
+    
 </template>
 
 

@@ -15,6 +15,7 @@ It also shows the redo-stack.
 
 
 <dom-module id="undo-stack-view">
+
 <style>
 .redo,
 .undo{
@@ -31,13 +32,14 @@ overflow: scroll;
 cursor: default;
 }
 </style>
+
 <template>
-<template is="dom-repeat" items="[[redo_stack]]">
-    <div class="redo">([[item]])</div>
-</template>
-<template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}" >
-    <div class="undo">[[item]]</div>
-</template>
+    <template is="dom-repeat" items="[[redo_stack]]">
+        <div class="redo">([[item]])</div>
+    </template>
+    <template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}" >
+        <div class="undo">[[item]]</div>
+    </template>
 </template>
 
 

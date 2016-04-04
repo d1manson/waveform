@@ -328,7 +328,7 @@ var is_equal_simple = function(a, b){
 
             // if we already have the right answer in any cases, then we must apply that now
             // because the worker is not going to send it again
-            for(let okey of this.groups){
+            for(let okey of (this.groups || [])){
                 if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
                     cm.free_canvas(okey.tac);
                     okey.tac = okey._tac_other;
@@ -354,7 +354,7 @@ var is_equal_simple = function(a, b){
         }, _show_changed: function(){
             if(this.show === 'y'){
                 var added = [];
-                for(let okey of this.groups)if(!okey._tac_is_on_worker){
+                for(let okey of (this.groups || []))if(!okey._tac_is_on_worker){
                     added.push(okey);
                 }
                 this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
