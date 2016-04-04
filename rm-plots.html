@@ -286,7 +286,7 @@ var timer_tick = function(){
     // find one valid thing to render...
     // this is somewhat ugly, but whatever.
     while(pkeys_pending_render.length > 0){
-        let pkey = pkeys_pending_render.pop();
+        let pkey = pkeys_pending_render.shift();
         let pkey_rendered_options = pkey_to_rendered_options.get(pkey)
         let inds =  pkey_to_array.get(pkey);
         if(!pkey_rendered_options){

@@ -133,7 +133,7 @@ var timer_tick = function(){
 
     // find one valid thing to render...
     while(pkeys_pending_render.length > 0){
-        let pkey = pkeys_pending_render.pop();
+        let pkey = pkeys_pending_render.shift();
         if(pkey && pkey_to_array.get(pkey) && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
             get_group_hist(pkey);
             break;

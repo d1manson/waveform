@@ -83,7 +83,7 @@ var n_w = 50; // number of t points per channel
 
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
-var off_canv_h = 270;  // full height
+var off_canv_h = 800;  // full height
 var off_canv_wave_h = 128; // height of a wave
 var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
@@ -656,9 +656,15 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
         } if (!this._okey_to_part_rendered.has(okey)){
             // this is different to the last thing we renderd, and we weren't
             // previously planning on rendering it. So need to render from scratch
-            this._okey_to_part_rendered.set(okey, {
-                n_t: 0
-            })
+            let part = {
+                n_t: 0,
+                el_canv: document.createElement('canvas'),
+                main_has_canv: false
+            };
+            part.el_canv.width = off_canv_dt*n_c*(n_w-1);
+            part.el_canv.height = off_canv_wave_h;
+            part.ctx = part.el_canv.getContext('2d');
+            this._okey_to_part_rendered.set(okey, part);
             this._n_t_to_okeys[0].add(okey);
         } else if (this._options_match(this._okey_to_part_rendered.get(okey), okey.group_num)){
             // this matches what we are already in the middle of trying to render,
@@ -695,12 +701,24 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
         }
     }
 
+    // originally the idea was to wait till we've finished rendering before providing
+    // results, but actually the first time we render an okey we can actually make the
+    // canvas we are going to draw to, and send it to main immediately.
+    let results = new Map();
     for(let okey of okeys_to_add){
-        this._okey_to_part_rendered.set(okey, {
-            n_t: 0
-        });
+        let part = {
+            n_t: 0,
+            el_canv: document.createElement('canvas'),
+            main_has_canv: true
+        }
+        this._okey_to_part_rendered.set(okey, part);
+        part.el_canv.width = off_canv_dt*n_c*(n_w-1);
+        part.el_canv.height = off_canv_wave_h;
+        part.ctx = part.el_canv.getContext('2d');
         this._n_t_to_okeys[0].add(okey);
+        results.set(okey, part.el_canv);
     }
+    this._callback(results)
 
     // dealing with modifeid okey is more complicated (and we
     // also do it when render mode changes), hence it has a function...
@@ -779,12 +797,6 @@ WavesRenderer.prototype._timer_tick = function(){
     var y_offsets = this._render_metrics.y_offset;  
     for(let [ii, okey] of okeys.entries()){
         let part = this._okey_to_part_rendered.get(okey);
-        if(!part.el_canv){
-            part.el_canv = document.createElement('canvas');
-            part.el_canv.width = off_canv_dt*n_c*(n_w-1);
-            part.el_canv.height = off_canv_wave_h;
-            part.ctx = part.el_canv.getContext('2d');
-        }
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
     }
@@ -801,14 +813,17 @@ WavesRenderer.prototype._timer_tick = function(){
         // because we're on the same thread as main and get notifications about changes to groups etc..
         let results = new Map();
         for(let okey of okeys){
+            let part = this._okey_to_part_rendered.get(okey);
             let item =  {
                 mode: this._mode,
                 group_num: okey.group_num,
-                el_canv: this._okey_to_part_rendered.get(okey).el_canv
+                el_canv: part.el_canv
             };
             this._okey_to_rendered.set(okey, item);
+            if(!part.main_has_canv){
+                results.set(okey, item.el_canv);
+            }
             this._okey_to_part_rendered.delete(okey);
-            results.set(okey, item.el_canv);
         }
         this._callback(results)
 
