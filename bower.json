@@ -18,6 +18,8 @@
     "iron-resizable-behavior": "PolymerElements/iron-resizable-behavior#^1.0.3",
     "iron-localstorage": "^1.0.5",
     "iron-list": "PolymerElements/iron-list#^1.2.8",
-    "paper-toggle-button": "PolymerElements/paper-toggle-button#^1.1.2"
+    "paper-toggle-button": "PolymerElements/paper-toggle-button#^1.1.2",
+    "iron-a11y-keys": "PolymerElements/iron-a11y-keys#^1.0.4",
+    "iron-a11y-keys-behavior": "https://github.com/d1manson/iron-a11y-keys-behavior.git#1.1.3"
   }
 }

@@ -15,6 +15,7 @@
 <link rel="import" href="bower_components/paper-toggle-button/paper-toggle-button.html">
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
+<link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="iron-splitter.html">
 <link rel="import" href="tile-element.html">
@@ -73,7 +74,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
     <div class="floating_layer">
             
-        <floating-pane id="action_info" style="display:initial;">
+        <floating-pane id="action_info">
             <div class='pane_title'>Action List [z]</div>
             <undo-stack-view 
                     undo_stack="[[cut_undo_stack]]"
@@ -104,35 +105,47 @@ box-shadow: inset 0 0 2px 1px #ccc;
             You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
         </floating-pane>
             
-        <floating-pane id="shortcut_info">
+        <floating-pane id="shortcut_info" style="max-height: 350px;">
             <div class='pane_title'>Shortcuts [k]</div>
-            Shorcuts applied to the "active" group, which is the one under the cursor:
-            <ul>
-            <li><b>e</b> set the cluster painting destination group to the active group.</li>
-            <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-            <li><b>s</b> launch the swap dialog for the "active" group.</li>
-            <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-            </ul>
-            Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
-            <ul>
-            <li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
-            <li><b>r</b> spatial ratemap</li>
-            <li><b>c</b> directional ratemap ("c" is for circle)</li>
-            <li><b>v</b> directional ratemap ("v" is for velocity)</li>
-            <li><b>t</b> temporal autocorrelogram</li>
-            </ul>
-            Other shortcuts:
-            <ul>
-            <li><b>d</b> toggle drift rendering on/off</li>
-            <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-            <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-            <li><b>enter</b> increment cluster painting destination group</li>
-            <li><b>esc</b> open/close the toolbar</li>
-            <li><b>p</b> toggle waveform palette</li>
-            <li><b>k</b> show this info ("k" is for keyboard)</li>
-            <li><b>h</b> show header info</li>
-            <li><b>?</b> open GitHub info in a new tab</li>
-            </ul>                       
+            <p>
+                For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
+                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <alt>r</alt> 
+                by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
+                the only action linked to the shortcut.)
+            </p><p>
+                 Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+                <ul>
+                <li><b>w</b> waveforms</li>
+                <li><b>r</b> spatial ratemap</li>
+                <li><b>c</b> directional ratemap ("c" is for circle)</li>
+                <li><b>v</b> speed ratemap ("v" is for velocity)</li>
+                <li><b>t</b> temporal autocorrelogram</li>
+                </ul>
+            </p><p>
+                Shorcuts applied to the "active" group, which is the one under the cursor:
+                <ul>
+                <li><b>e</b> set the cluster painting destination group to the active group.</li>
+                <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+                <li><b>s</b> launch the swap dialog for the "active" group.</li>
+                <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+                </ul>           
+            </p><p>
+                Other shortcuts:
+                <ul>
+                <li><b>0-9</b> jump to tetrode number with 1s digit 0-9</li>
+                <li><b>o</b> (the letter "o") toggle 10s digit of tetrode number</li>
+                <li><b>d</b> toggle drift rendering on/off</li>
+                <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+                <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+                <li><b>enter</b> increment cluster painting destination group</li>
+                <li><b>esc</b> open/close the toolbar</li>
+                <li><b>p</b> toggle waveform palette</li>
+                <li><b>h</b> show header info</li>
+                <li><b>s</b> show pos settings</li>
+                <li><b>k</b> show this info ("k" is for keyboard)</li>
+                <li><b>?</b> open GitHub info in a new tab</li>
+                </ul>   
+            </p>                    
         </floating-pane>
         
         <floating-pane id="speed_info">
@@ -147,7 +160,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id="waves_info" style="display:initial;">
+        <floating-pane id="waves_info">
             <div class='pane_title'>Waves [w]</div>
             <p>
                 There are two palette modes. 
@@ -164,7 +177,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
+        <floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers">
             <div class='pane_title'>File headers [h]</div>
             <header-view 
             set_header="[[set_header]]"
@@ -175,7 +188,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             ></header-view>
         </floating-pane>
 
-        <floating-pane id="rm_info" style="display: initial;">
+        <floating-pane id="rm_info">
             <div class='pane_title'>Spatial ratemap [r]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
@@ -195,7 +208,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
         
-        <floating-pane id="dir_info" style="display: initial;">
+        <floating-pane id="dir_info">
             <div class='pane_title'>Directional ratemap [c]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
@@ -211,7 +224,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id="pos_info" style="display: initial;">
+        <floating-pane id="pos_info">
             <div class='pane_title'>position post processing</div>
             <p>
                 If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
@@ -431,6 +444,22 @@ box-shadow: inset 0 0 2px 1px #ccc;
         palette_mode="[[options.waves_render_mode]]"
         show_chans="[[options.show_waves]]"></wave-plots> 
     
+    <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane"      target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette"           target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+r" on-keys-pressed="toggle_spa_rm_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+c" on-keys-pressed="toggle_dir_rm_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+v" on-keys-pressed="toggle_speed_rm_pane"      target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+t" on-keys-pressed="toggle_tac_pane"           target="[[keyboard_target]]"></iron-a11y-keys>    
+    <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane"    target="[[keyboard_target]]"></iron-a11y-keys>
+
+     <!-- TODO: use question mark key when bug is fixed: https://github.com/PolymerElements/iron-a11y-keys-behavior/issues/27#issuecomment-184833697 --> 
+    <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github"              target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="¿+alt" on-keys-pressed="toggle_help_pane"              target="[[keyboard_target]]"></iron-a11y-keys>   
+    
+    
 </template>
 
 
@@ -490,6 +519,47 @@ the_app._make_pos_smoothing_caption = function(v){
 the_app._make_spa_rm_height_caption = function(v){
     return v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
 }
+
+the_app.toggle_palette = function(){
+    the_app.set('options.waves_render_mode', the_app.options.waves_render_mode === "density" ? 
+                        "flag" : "density");
+}
+
+the_app.toggle_action_pane = function(){
+    the_app.$.action_info.toggle();
+}
+the_app.toggle_keyboard_pane = function(){
+    the_app.$.shortcut_info.toggle();
+}
+the_app.toggle_tac_pane = function(){
+    the_app.$.tc_info.toggle();
+}
+the_app.toggle_spa_rm_pane = function(){
+    the_app.$.rm_info.toggle();
+}
+the_app.toggle_dir_rm_pane = function(){
+    the_app.$.dir_info.toggle();
+}
+the_app.toggle_speed_rm_pane = function(){
+    the_app.$.speed_info.toggle();
+}
+the_app.toggle_pos_pane = function(){
+    the_app.$.pos_info.toggle();
+}
+the_app.toggle_palette_pane = function(){
+    the_app.$.waves_info.toggle();
+}
+the_app.toggle_header_pane = function(){
+    the_app.$.header_info.toggle();
+}
+the_app.toggle_help_pane = function(){
+    the_app.$.help_info.toggle();
+}
+the_app.open_github = function(){
+    window.open('https://github.com/d1manson/waveform', '_blank');
+}
+the_app.keyboard_target = document.querySelector('body');
+
 the_app.addEventListener('dom-change', function(){
     window.c = document.getElementsByTagName('cut-object')[0]; //debug only
 })

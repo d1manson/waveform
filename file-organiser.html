@@ -12,6 +12,7 @@ sure what you'll get if you drop modify a file on disk after dropping it into th
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-list/iron-list.html">
+<link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="utils.html">
 <link rel="import" href="worker-builder.html">
 
@@ -179,6 +180,9 @@ font-size: 10px;
 */
 </style>
 <template>
+  <iron-a11y-keys keys="1 2 3 4 5 6 7 8 9 0" on-keys-pressed="_on_numeric_key" target="[[keyboard_target]]"></iron-a11y-keys>
+  <iron-a11y-keys keys="o" on-keys-pressed="_on_tens_key" target="[[keyboard_target]]"></iron-a11y-keys>
+
   <div class="tet_switcher" style$="[[_scroll_shadow(scrolled_down)]]">
     <div class="tet_switcher_title">tetrode:</div>
     <template is="dom-repeat" items="[[available_tets]]">
@@ -273,6 +277,10 @@ Polymer({
             value: function(){ return [];},
             notify: true,
             readOnly: true
+        },
+        keyboard_target: {
+            type: Object,
+            value: function(){return document.querySelector('body');}
         }
     }, created: function(){
         this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
@@ -612,7 +620,7 @@ Polymer({
         return v ? 'selected' : '';
     }, _selected_equality: function(a, b){
         return a && a === b ? "selected" : "";
-    },_make_trial_captions: function(e){
+    }, _make_trial_captions: function(e){
         var model = e.model;
         if(!model.trial.set_caption && model.trial.set){
             model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
@@ -695,11 +703,26 @@ Polymer({
         let filename = trial_base + "_" + tet_num + ".cut";
         let blob_url = cut.get_blob_url(trial_base);
 
-        e.dataTransfer.setData("DownloadURL", 'application/octet-stream:' + filename +':' + blob_url);
+        e.dataTransfer.setData("DownloadURL", 'application/octet-stream:' + filename +':' + blob_url);12
         this._setIs_dragging_out(true);
         return true;
      }, _cut_dragend: function(e){
         this._setIs_dragging_out(false);
+     }, _on_numeric_key: function(e){
+        let num = parseInt(e.detail.keyboardEvent.code.slice("Digit".length)); // TODO: is there a better way of doing this?
+        let current_tens = 0|(this.selected_tet_num/10);
+        num = current_tens*10 + num;
+        if(this.available_tets.indexOf(num) > -1){
+            this.set('selected_tet_num', num);
+        }
+     }, _on_tens_key: function(){
+        let max_tet_tens = 0|(this.available_tets.slice(-1)[0]/10);
+        let current_tens = 0|(this.selected_tet_num/10);
+        current_tens = (current_tens + 1) % (max_tet_tens+1)
+        let num = current_tens*10 + (this.selected_tet_num % 10);
+        if(this.available_tets.indexOf(num) > -1){
+           this.set('selected_tet_num', num);
+        }
      }
 })
 

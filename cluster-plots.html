@@ -10,6 +10,7 @@ Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off
 <link rel="import" href="managed-canvas.html">
 <link rel="import" href="utils.html">
 <link rel="import" href="palettes.html">
+<link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 
 <dom-module id="cluster-plots">
 
@@ -71,6 +72,8 @@ background: #ffffe0;
 </style>
 
 <template>
+    <iron-a11y-keys keys="enter+only" on-keys-pressed="_new_dest"  target="[[keyboard_target]]"></iron-a11y-keys>
+
     <div class="top">
         <div class="active_stickers">
             <div class="sticker_list">
@@ -141,6 +144,10 @@ background: #ffffe0;
                 value: function(){return [];},
                 readOnly: true // TODO: this is really a computed-property, but I couldn't get it to work with .splices
                                 // instead we use observers
+            },
+            keyboard_target: {
+                type: Object,
+                value: function(){return document.querySelector('body');}
             }
         }, observers: [
             '_groups_spliced(groups.splices)',

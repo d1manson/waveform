@@ -41,12 +41,16 @@ doesn't have a worker, but it uses a similar system.
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="utils.html">
 
 
 <dom-module id="cut-object">
 
-<template></template>
+<template>
+    <iron-a11y-keys keys="z+only ctrl+z" on-keys-pressed="undo"  target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="y+only ctrl+y" on-keys-pressed="redo"  target="[[keyboard_target]]"></iron-a11y-keys>
+</template>
 
 
 <script>
@@ -206,6 +210,10 @@ doesn't have a worker, but it uses a similar system.
                 value: function(){return {};},
                 notify: true,
                 observer: '_use_cut_box'
+            },
+            keyboard_target: {
+                type: Object,
+                value: function(){return document.querySelector('body');}
             }
         },
         _make_okey: function(inds, num){
