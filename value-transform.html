@@ -1,0 +1,82 @@
+<!--
+This is designed for use within a dom-bind or other element. It allows two-way computed
+binding via a pair of functions that encode and decode.
+
+<paper-slider min="0" max="10" step="1" value="{{something_ugly}}"></paper-slider>
+<value-transform  raw_value="{{something_ugly}}" value="{{something_beautiful}}"
+    encode="_to_beautiful" decode="_to_ugly"></value-transform>
+The current value is: [[something_beautiful]].
+
+...
+
+<script>
+
+my_element._to_beautiful = function(the_int){
+    return the_int > 0 ? the_int : "off";
+}
+
+my_element._to_ugly = function(the_str){
+    return parseInt(the_str) || 0; // "off" is mapped to 0
+}
+
+</script>
+
+Note that if the forward and reverse transformations do not match up then the
+values will end up in an inconsistent state (recursion is prevent at the very
+first level, so there is no oppurtunity for values to oscillate back and forth
+before agreeing).
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+
+<dom-module id="value-transform">
+<template></template>
+
+<script>
+    "use strict";
+
+    Polymer({
+        is:'value-transform',
+        properties: {
+            raw_value: {
+                notify: true,
+                observer: '_raw_value_changed'
+            },
+            value: {
+                notify: true,
+                observer: '_value_changed'
+            },
+            encode: {
+                type: String
+            },
+            decode: {
+                type: String
+            }
+        }, attached: function(){
+            let host = this.domHost || this.dataHost; // not sure if this is really correct, but it does the job for now
+            this._encode_func = host ? host[this.encode] : null;
+            this._decode_func = host ? host[this.decode] : null;
+            this._is_attached = true;
+            this._value_changed(); // not sure whether to use this or raw_value_changed??
+        }, _value_changed: function(){
+            if(self._changing || !this._is_attached){
+                return;
+            }
+            this._changing = true;
+            this.set('raw_value', this._decode_func ? this._decode_func(this.value) : this.value);
+            this._changing = false;
+        }, _raw_value_changed: function(new_value){
+            if(self._changing || !this._is_attached){
+                return;
+            }
+            this._changing = true;
+            this.set('value', this._encode_func ? this._encode_func(this.raw_value) : this.raw_value);
+            this._changing = false;
+        }
+    });
+</script>
+
+  
+</dom-module>

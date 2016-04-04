@@ -28,6 +28,7 @@
 <link rel="import" href="document-focus-marker.html">
 <link rel="import" href="header-view.html">
 <link rel="import" href="managed-canvas.html">
+<link rel="import" href="value-transform.html">
 
 <style is="custom-style">
 :root {
@@ -146,7 +147,10 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 There are two palette modes. 
             </p><p class="nodrag">
                 Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
-                <paper-toggle-button id="waves_toggle" checked="{{options.waves_toggle}}"></paper-toggle-button>
+                <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
+                <value-transform value="{{options.waves_render_mode}}" raw_value="{{waves_toggle_raw}}"
+                        encode="_to_render_mode_str" decode="_from_render_mode_str"
+                        ></value-transform>
             </p><p>
                 In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
             </p><p>
@@ -174,7 +178,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
                 <paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
             </p><p class="nodrag">
-                Ratemap frequency values are <span class="slider_val">[[options.max_rate_spa]]</span><br>
+                Ratemap frequency values are <span class="slider_val">{{_make_max_rate_caption(options.max_rate_spa)}}</span><br>
                 <paper-slider class="nodrag" pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
             </p><p>
                 The true peak rate is shown as "spa max" when you move your cursor over a group.
@@ -207,7 +211,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 The following filtering and smoothing is applied to the one/two data streams separately.
                 If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
             </p><p class="nodrag">
-                Max speed <span class="slider_val">[[options.speed_filter_mps]] m/s</span><br>
+                Speed <span class="slider_val">{{_make_max_speed_caption(options.speed_filter_mps)}}</span><br>
                 <paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
             </p><p>
                 Where the speed appears to rise above this threshold the data is considered invalid.
@@ -215,7 +219,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
                 new values are created by linearly interpolated across the gaps.
             </p><p class="nodrag">
-                Smoothing <span class="slider_val">[[options.pos_smoothing_s]] s</span><br>
+                Smoothing <span class="slider_val">{{_make_pos_smoothing_caption(options.pos_smoothing_s)}}</span><br>
                 <paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
             </p><p>
                 Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
@@ -439,7 +443,6 @@ the_app.initializeDefaultOptions = function(ev) {
         deg_per_dir_bin: 6,
         smoothing_dir_bins: 3,
         waves_render_mode: "density",
-        waves_toggle: true,
         use_n_leds: 2,
         speed_filter_mps: 4,
         pos_smoothing_s: 0.2,
@@ -452,15 +455,29 @@ the_app._get_safe = function(a,b){
     return a && a[b];
 }
 
-the_app.addEventListener('dom-change', function(){
-    // manually hook up a computed property for waves_toggle
-    document.getElementById('waves_toggle').addEventListener('iron-change', function(new_val){
-        the_app.set('options.waves_render_mode', the_app.options.waves_toggle ? "density" : "flag");
-    });
+the_app._to_render_mode_str = function(is_checked){
+    return is_checked ? "density" : "flag";
+}
 
+the_app._from_render_mode_str = function(str){
+    return (str==="density");
+}
+
+the_app._make_max_rate_caption = function(v){
+    return v > 0 ? "scaled to max of " + v + "Hz" : "individually scaled";
+}
+
+the_app._make_max_speed_caption = function(v){
+    return v > 0 ? "capped at " + v + " m/s" : "not limited";
+}
+
+the_app._make_pos_smoothing_caption = function(v){
+    return v > 0 ? v + " s" : "turned off";
+}
+
+the_app.addEventListener('dom-change', function(){
     window.c = document.getElementsByTagName('cut-object')[0]; //debug only
 })
-
 
 document.addEventListener('contextmenu', function(e){e.preventDefault();});
 

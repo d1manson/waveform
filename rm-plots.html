@@ -183,10 +183,7 @@ var set_pos_speed = function(timebase, arrays){
 }
 
 var make_all_pkeys_pending = function(){
-    pkeys_pending_render = [];    
-    for(let pkey of pkey_to_array.keys()){
-        pkeys_pending_render.push(pkey);
-    }
+    pkeys_pending_render = Array.from(pkey_to_array.keys());
 }
 
 
