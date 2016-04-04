@@ -61,7 +61,8 @@ groups is an array of objects with the following properties:
                 smoothing_spa_bins="[[options.smoothing_spa_bins]]"
                 max_rate_spa="[[options.max_rate_spa]]"
                 deg_per_dir_bin="[[options.deg_per_dir_bin]]"
-                smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+                smoothing_dir_bins="[[options.smoothing_dir_bins]]"
+                ></rm-plots> 
     <tac-plots  groups="{{groups}}" 
                 max_delta_t="[[options.max_delta_t]]"
                 spike_times="[[spike_times]]"
@@ -79,11 +80,13 @@ groups is an array of objects with the following properties:
             group_num="[[index]]"
             group_n="[[item.n_spikes]]"
             group_spa_max="[[item.rm_spa_max]]"
+            group_dir_max="[[item.rm_dir_max]]"
             dir_rm="[[item.rm_dir]]"
             spa_rm="[[item.rm_spa]]"
             speed_rm="[[item.rm_speed]]"
             tac="[[item.tac]]"
             waves="[[item.waves]]"
+            spa_rm_height="[[options.spa_rm_height]]"
             ></tile-element>        
     </template>
 </template>

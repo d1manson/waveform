@@ -373,6 +373,9 @@ var is_equal_simple = function(a, b){
             if(data.generation !== this._pkey_generation)
                 return; // pft! get with the times, dude.
             let okey = this._groups_collection.getItem(data.pkey);
+            if(!okey){
+                return;
+            }
             let cm = Utils.canvas_manager;
             let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
             cm.free_canvas(okey._tac_other);

@@ -161,7 +161,7 @@ flex:2;
 <template>
     <div class="canvas_part_1">
         <managed-canvas canv_id="[[waves]]"></managed-canvas>
-        <managed-canvas canv_id="[[spa_rm]]"></managed-canvas>
+        <managed-canvas canv_id="[[spa_rm]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
         <div>
@@ -178,6 +178,10 @@ flex:2;
                 <div style$='[[_show(group_spa_max)]]' class="caption-inner">
                     [[group_spa_max]]Hz
                     <div class="caption-inner-label">spa max</div>
+                </div>
+                <div style$='[[_show(group_dir_max)]]' class="caption-inner">
+                    [[group_dir_max]]Hz
+                    <div class="caption-inner-label">dir max</div>
                 </div>
                 <div style$='[[_show(group_mean)]]' class="caption-inner">
                     [[group_mean]]Hz
@@ -303,6 +307,12 @@ flex:2;
                 value: "",
                 notify: true
             },
+            group_dir_max: {
+                type: String, // a number, but pre-rendered as a string
+                notify: true,
+                value: "",
+                notify: true
+            },
             state: {
                 notify: true,
                 value: null,
@@ -328,6 +338,11 @@ flex:2;
                 value: false,
                 notify: true
             },
+            spa_rm_height:{
+                type: Number,
+                value: 120,
+                notify: true
+            },
             border_width: {
                 type: Number,
                 value: 1,
@@ -338,7 +353,7 @@ flex:2;
         observers: [
             '_update_state(active, moving, proximate, disabled)'
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
-            return val >= 0 ? '' : 'display:none;';
+            return val !== "" && val >= 0 ? '' : 'display:none;';
         }, updateCanvas: function(newCanv, canvasNum){
             return;
             var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];

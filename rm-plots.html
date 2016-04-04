@@ -45,6 +45,7 @@ var render_options = {
     cps_per_speed_bin: 4 // currently not exposed as a user-configurable
 };
 var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
+var dir_plot_size = 78;
 
 var pi = 3.14159265;
 
@@ -139,12 +140,13 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
     xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 
     // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
     if(pos_xy){
-       let im = draw_lines(pos_xy, 256, 256, 256/max_x, 256/max_y);
+       let im = draw_lines(pos_xy, 256, 256, 256/Math.max(max_x, max_y));
        exec_main_b('plot_path', {
         path: 'path',
         dims: [256, 256]
@@ -309,10 +311,11 @@ var timer_tick = function(){
             }
 
             if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
-                    let im = get_group_dir_rm(inds);
+                    let res = get_group_dir_rm(inds);
                     msg.dir_rm = 'dir_rm';
-                    msg.dir_rm_dims = [1,1];
-                    arrays.dir_rm = im;
+                    msg.dir_max = res.max;
+                    msg.dir_rm_dims = [dir_plot_size, dir_plot_size];
+                    arrays.dir_rm = res.im;
                     copy_options(pkey_rendered_options, render_options, "dir");
             }
 
@@ -404,14 +407,14 @@ var build_cache = function(){
     }    
 
     if(show && show[0] === 'y'
-         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell)
+         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell && cached_spike_xy_bins)
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
         make_cached_xy_bins_and_dwell();
     }
 
     if(show && show[1] === 'y'
-        && !(cached_dir_bins && cached_dir_dwell)
+        && !(cached_dir_bins && cached_dir_dwell && cached_spike_dir_bins)
         && pos_dir && cached_spike_pos_ind
         && render_options.deg_per_dir_bin 
         && render_options.smoothing_dir_bins !== undefined){
@@ -419,7 +422,7 @@ var build_cache = function(){
     }
 
     if(show && show[2] === 'y'
-        && !(cached_spike_speed_bins && cached_speed_dwell)
+        && !(cached_spike_speed_bins && cached_speed_dwell && cached_spike_speed_bins)
         && pos_speed && cached_spike_pos_ind
         && render_options.cps_per_speed_bin 
         && render_options.max_speed){
@@ -557,16 +560,13 @@ var get_group_dir_rm = function(group_inds){
     var spike = get_smoothed_1d_periodic(spike, render_options.smoothing_dir_bins); 
     var ratemap = divide_float(spike, cached_dir_dwell);
     
-    // scale ratemap to have max 1...(for easy plotting)
-    var f = 1/max(ratemap);
-    for(let i=0;i<ratemap.length; i++)
-        ratemap[i] *=f; 
-    // replace nans with zero..TODO: this isn't right there are problems..!
-    for(let i=0; i<ratemap.length; i++)
-        ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
-        
-    // TODO: plot here
-    return new Uint32Array(1);
+    var max_map = max(ratemap);
+    var im = plot_dir(ratemap, dir_plot_size, max_map);
+
+    return {
+        im: im,
+        max: max_map * pos_timebase
+    }
 
 }
 
@@ -581,6 +581,29 @@ var get_group_speed_rm = function(group_inds){
 }       
 
 
+var plot_dir = function(vals, s, max){
+    // produces a square plot
+    var im = new Uint32Array(s*s);
+
+    // draw axes
+    draw_lines([0, s/2, s, s/2], s, s, 1, im, 0x99999999);
+    draw_lines([s/2, 0, s/2, s], s, s, 1, im, 0x99999999);
+
+    // go from linear to polar
+    var n = vals.length;
+    var xy = new Int8Array(n*2+2)
+    for(let ii=0; ii<n; ii++){
+        let theta = 2*pi/n*ii;
+        xy[ii*2+0] = s/2 + Math.cos(theta) * vals[ii]/max*s/2;
+        xy[ii*2+1] = s/2 - Math.sin(theta) * vals[ii]/max*s/2;
+    }
+    // join up the start and end
+    xy[2*n+0] = xy[0];
+    xy[2*n+1] = xy[1];
+
+    draw_lines(xy, s, s, 1, im);
+    return im;
+}
 
 var plot_histogram = function(w, h, vals){
     var color_a = 0xff000000;
@@ -703,9 +726,9 @@ var is_equal_simple = function(a, b){
     return true;
 }
 
-var draw_lines = function(xy, w, h, scale){
-    let color = 0xff000000; //black
-    let im = new Uint32Array(w*h);
+var draw_lines = function(xy, w, h, scale, im, color){
+    color = color || 0xff000000; //black
+    im = im || new Uint32Array(w*h);
 
     let x0 = (xy[0] * scale) | 0;
     let y0 = (xy[1] * scale) | 0;
@@ -820,10 +843,10 @@ var use_mask = function(vector, mask, val){
             groups: {
                 type: Array,
                 value: function(){return [];},
-                notify: true
+                notify: true,
+                observer: '_groups_set'
             }
         }, observers: [
-            '_groups_set(groups)',
             '_groups_spliced(groups.splices)',
             '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
             '_show_changed(show)',
@@ -897,6 +920,7 @@ var use_mask = function(vector, mask, val){
             }, added_arrays);
 
         }, _options_modified: function(){
+            let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
             this._options.smoothing_spa_bins = this.smoothing_spa_bins;
             this._options.max_rate_spa = this.max_rate_spa;
@@ -1060,10 +1084,15 @@ var use_mask = function(vector, mask, val){
                 throw "what?"
             }
         }, plot_things: function(msg, arrays) {
-            if(msg.generation !== this._pkey_generation)
+            if(msg.generation !== this._pkey_generation){
                 return; // pft! get with the times, dude.
+            }
 
             let okey = this._groups_collection.getItem(msg.pkey);
+            if(!okey){
+                return;
+            }
+
             let cm = Utils.canvas_manager;
 
             if(msg.spa_rm){
@@ -1086,11 +1115,13 @@ var use_mask = function(vector, mask, val){
                     cm.free_canvas(okey._rm_dir_other);
                 }
                 okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                okey.rm_dir_max = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
                 if(this._options_match(msg.render_options, this._options, 'dir')){
                     cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = okey._rm_dir_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
                 }
             }
 

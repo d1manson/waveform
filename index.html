@@ -15493,7 +15493,9 @@ Polymer({
 });
 </script>
 </dom-module><dom-module id="managed-canvas" assetpath="/">
-<template></template>
+<template>
+    
+</template>
 <script>
 "use strict";
 
@@ -15504,15 +15506,29 @@ Polymer({
             type: String,
             value: "",
             observer: '_update'
+        },
+        fix_height: {
+            type: Number,
+            value: 0,
+            observer: '_height_changed'
         }
-    },
-    _update: function(){
+    }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
             Polymer.dom(this.root).removeChild(old);
         }
         if(Utils.canvas_manager && this.canv_id){
-            Polymer.dom(this.root).appendChild(Utils.canvas_manager.get_canvas(this.canv_id));
+            let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
+            this._update_canv_style(el_canv);
+            Polymer.dom(this.root).appendChild(el_canv);
+        }
+    }, _height_changed: function(){
+        let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
+        this._update_canv_style(el_canv)
+    }, _update_canv_style: function(el_canv){
+        if(el_canv){
+            el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
+            el_canv.style.imageRendering = "pixelated";            
         }
     }
 });
@@ -15714,7 +15730,7 @@ flex:2;
 <template>
     <div class="canvas_part_1">
         <managed-canvas canv_id="[[waves]]"></managed-canvas>
-        <managed-canvas canv_id="[[spa_rm]]"></managed-canvas>
+        <managed-canvas canv_id="[[spa_rm]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
         <div>
@@ -15731,6 +15747,10 @@ flex:2;
                 <div style$="[[_show(group_spa_max)]]" class="caption-inner">
                     [[group_spa_max]]Hz
                     <div class="caption-inner-label">spa max</div>
+                </div>
+                <div style$="[[_show(group_dir_max)]]" class="caption-inner">
+                    [[group_dir_max]]Hz
+                    <div class="caption-inner-label">dir max</div>
                 </div>
                 <div style$="[[_show(group_mean)]]" class="caption-inner">
                     [[group_mean]]Hz
@@ -15856,6 +15876,12 @@ flex:2;
                 value: "",
                 notify: true
             },
+            group_dir_max: {
+                type: String, // a number, but pre-rendered as a string
+                notify: true,
+                value: "",
+                notify: true
+            },
             state: {
                 notify: true,
                 value: null,
@@ -15881,6 +15907,11 @@ flex:2;
                 value: false,
                 notify: true
             },
+            spa_rm_height:{
+                type: Number,
+                value: 120,
+                notify: true
+            },
             border_width: {
                 type: Number,
                 value: 1,
@@ -15891,7 +15922,7 @@ flex:2;
         observers: [
             '_update_state(active, moving, proximate, disabled)'
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
-            return val >= 0 ? '' : 'display:none;';
+            return val !== "" && val >= 0 ? '' : 'display:none;';
         }, updateCanvas: function(newCanv, canvasNum){
             return;
             var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
@@ -16616,6 +16647,7 @@ var render_options = {
     cps_per_speed_bin: 4 // currently not exposed as a user-configurable
 };
 var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
+var dir_plot_size = 78;
 
 var pi = 3.14159265;
 
@@ -16710,12 +16742,13 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
     xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
+    build_cache();
     make_all_pkeys_pending();
     touch_timer();
 
     // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
     if(pos_xy){
-       let im = draw_lines(pos_xy, 256, 256, 256/max_x, 256/max_y);
+       let im = draw_lines(pos_xy, 256, 256, 256/Math.max(max_x, max_y));
        exec_main_b('plot_path', {
         path: 'path',
         dims: [256, 256]
@@ -16754,10 +16787,7 @@ var set_pos_speed = function(timebase, arrays){
 }
 
 var make_all_pkeys_pending = function(){
-    pkeys_pending_render = [];    
-    for(let pkey of pkey_to_array.keys()){
-        pkeys_pending_render.push(pkey);
-    }
+    pkeys_pending_render = Array.from(pkey_to_array.keys());
 }
 
 
@@ -16883,10 +16913,11 @@ var timer_tick = function(){
             }
 
             if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
-                    let im = get_group_dir_rm(inds);
+                    let res = get_group_dir_rm(inds);
                     msg.dir_rm = 'dir_rm';
-                    msg.dir_rm_dims = [1,1];
-                    arrays.dir_rm = im;
+                    msg.dir_max = res.max;
+                    msg.dir_rm_dims = [dir_plot_size, dir_plot_size];
+                    arrays.dir_rm = res.im;
                     copy_options(pkey_rendered_options, render_options, "dir");
             }
 
@@ -16978,14 +17009,14 @@ var build_cache = function(){
     }    
 
     if(show && show[0] === 'y'
-         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell)
+         && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell && cached_spike_xy_bins)
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
         make_cached_xy_bins_and_dwell();
     }
 
     if(show && show[1] === 'y'
-        && !(cached_dir_bins && cached_dir_dwell)
+        && !(cached_dir_bins && cached_dir_dwell && cached_spike_dir_bins)
         && pos_dir && cached_spike_pos_ind
         && render_options.deg_per_dir_bin 
         && render_options.smoothing_dir_bins !== undefined){
@@ -16993,7 +17024,7 @@ var build_cache = function(){
     }
 
     if(show && show[2] === 'y'
-        && !(cached_spike_speed_bins && cached_speed_dwell)
+        && !(cached_spike_speed_bins && cached_speed_dwell && cached_spike_speed_bins)
         && pos_speed && cached_spike_pos_ind
         && render_options.cps_per_speed_bin 
         && render_options.max_speed){
@@ -17131,16 +17162,13 @@ var get_group_dir_rm = function(group_inds){
     var spike = get_smoothed_1d_periodic(spike, render_options.smoothing_dir_bins); 
     var ratemap = divide_float(spike, cached_dir_dwell);
     
-    // scale ratemap to have max 1...(for easy plotting)
-    var f = 1/max(ratemap);
-    for(let i=0;i<ratemap.length; i++)
-        ratemap[i] *=f; 
-    // replace nans with zero..TODO: this isn't right there are problems..!
-    for(let i=0; i<ratemap.length; i++)
-        ratemap[i] = isNaN(ratemap[i]) ? 0 : ratemap[i];
-        
-    // TODO: plot here
-    return new Uint32Array(1);
+    var max_map = max(ratemap);
+    var im = plot_dir(ratemap, dir_plot_size, max_map);
+
+    return {
+        im: im,
+        max: max_map * pos_timebase
+    }
 
 }
 
@@ -17155,6 +17183,29 @@ var get_group_speed_rm = function(group_inds){
 }       
 
 
+var plot_dir = function(vals, s, max){
+    // produces a square plot
+    var im = new Uint32Array(s*s);
+
+    // draw axes
+    draw_lines([0, s/2, s, s/2], s, s, 1, im, 0x99999999);
+    draw_lines([s/2, 0, s/2, s], s, s, 1, im, 0x99999999);
+
+    // go from linear to polar
+    var n = vals.length;
+    var xy = new Int8Array(n*2+2)
+    for(let ii=0; ii<n; ii++){
+        let theta = 2*pi/n*ii;
+        xy[ii*2+0] = s/2 + Math.cos(theta) * vals[ii]/max*s/2;
+        xy[ii*2+1] = s/2 - Math.sin(theta) * vals[ii]/max*s/2;
+    }
+    // join up the start and end
+    xy[2*n+0] = xy[0];
+    xy[2*n+1] = xy[1];
+
+    draw_lines(xy, s, s, 1, im);
+    return im;
+}
 
 var plot_histogram = function(w, h, vals){
     var color_a = 0xff000000;
@@ -17277,9 +17328,9 @@ var is_equal_simple = function(a, b){
     return true;
 }
 
-var draw_lines = function(xy, w, h, scale){
-    let color = 0xff000000; //black
-    let im = new Uint32Array(w*h);
+var draw_lines = function(xy, w, h, scale, im, color){
+    color = color || 0xff000000; //black
+    im = im || new Uint32Array(w*h);
 
     let x0 = (xy[0] * scale) | 0;
     let y0 = (xy[1] * scale) | 0;
@@ -17394,10 +17445,10 @@ var use_mask = function(vector, mask, val){
             groups: {
                 type: Array,
                 value: function(){return [];},
-                notify: true
+                notify: true,
+                observer: '_groups_set'
             }
         }, observers: [
-            '_groups_set(groups)',
             '_groups_spliced(groups.splices)',
             '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
             '_show_changed(show)',
@@ -17471,6 +17522,7 @@ var use_mask = function(vector, mask, val){
             }, added_arrays);
 
         }, _options_modified: function(){
+            let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
             this._options.smoothing_spa_bins = this.smoothing_spa_bins;
             this._options.max_rate_spa = this.max_rate_spa;
@@ -17634,10 +17686,15 @@ var use_mask = function(vector, mask, val){
                 throw "what?"
             }
         }, plot_things: function(msg, arrays) {
-            if(msg.generation !== this._pkey_generation)
+            if(msg.generation !== this._pkey_generation){
                 return; // pft! get with the times, dude.
+            }
 
             let okey = this._groups_collection.getItem(msg.pkey);
+            if(!okey){
+                return;
+            }
+
             let cm = Utils.canvas_manager;
 
             if(msg.spa_rm){
@@ -17660,11 +17717,13 @@ var use_mask = function(vector, mask, val){
                     cm.free_canvas(okey._rm_dir_other);
                 }
                 okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                okey.rm_dir_max = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
                 if(this._options_match(msg.render_options, this._options, 'dir')){
                     cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = okey._rm_dir_other;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
                 }
             }
 
@@ -18037,6 +18096,9 @@ var is_equal_simple = function(a, b){
             if(data.generation !== this._pkey_generation)
                 return; // pft! get with the times, dude.
             let okey = this._groups_collection.getItem(data.pkey);
+            if(!okey){
+                return;
+            }
             let cm = Utils.canvas_manager;
             let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
             cm.free_canvas(okey._tac_other);
@@ -19902,7 +19964,7 @@ Polymer({
     
 
     <template is="dom-repeat" items="[[groups]]">
-        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_n="[[item.n_spikes]]" group_spa_max="[[item.rm_spa_max]]" dir_rm="[[item.rm_dir]]" spa_rm="[[item.rm_spa]]" speed_rm="[[item.rm_speed]]" tac="[[item.tac]]" waves="[[item.waves]]"></tile-element>        
+        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_n="[[item.n_spikes]]" group_spa_max="[[item.rm_spa_max]]" group_dir_max="[[item.rm_dir_max]]" dir_rm="[[item.rm_dir]]" spa_rm="[[item.rm_spa]]" speed_rm="[[item.rm_speed]]" tac="[[item.tac]]" waves="[[item.waves]]" spa_rm_height="[[options.spa_rm_height]]"></tile-element>        
     </template>
 </template>
 
@@ -20366,7 +20428,6 @@ cursor: default;
 
 <script>
     "use strict";
-    // TODO: probably should sort undo in reverse order
     Polymer({
         is:'undo-stack-view',
         properties: {
@@ -20556,7 +20617,8 @@ cursor: default;
 
                 // Theses properties are visualized by the tile element
                 n_spikes: inds.length,
-                rm_spa_max: -1,
+                rm_spa_max: "",
+                rm_dir_max: "",
                 rm_dir: "",
                 rm_spa: "",
                 rm_speed: "",
@@ -25301,324 +25363,379 @@ Polymer({
 
 
 </script>
+</dom-module><dom-module id="value-transform" assetpath="/">
+<template></template>
+
+<script>
+    "use strict";
+
+    Polymer({
+        is:'value-transform',
+        properties: {
+            raw_value: {
+                notify: true,
+                observer: '_raw_value_changed'
+            },
+            value: {
+                notify: true,
+                observer: '_value_changed'
+            },
+            encode: {
+                type: String
+            },
+            decode: {
+                type: String
+            }
+        }, attached: function(){
+            let host = this.domHost || this.dataHost; // not sure if this is really correct, but it does the job for now
+            this._encode_func = host ? host[this.encode] : null;
+            this._decode_func = host ? host[this.decode] : null;
+            this._is_attached = true;
+            this._value_changed(); // not sure whether to use this or raw_value_changed??
+        }, _value_changed: function(){
+            if(self._changing || !this._is_attached){
+                return;
+            }
+            this._changing = true;
+            this.set('raw_value', this._decode_func ? this._decode_func(this.value) : this.value);
+            this._changing = false;
+        }, _raw_value_changed: function(new_value){
+            if(self._changing || !this._is_attached){
+                return;
+            }
+            this._changing = true;
+            this.set('value', this._encode_func ? this._encode_func(this.raw_value) : this.raw_value);
+            this._changing = false;
+        }
+    });
+</script>
+
+  
 </dom-module></div>
 <paper-iconset id="meta"></paper-iconset>
 
 <template is="dom-bind" id="the_app">
 
-	<iron-localstorage name="waveform" value="{{options}}" on-iron-localstorage-load-empty="initializeDefaultOptions"></iron-localstorage>
+    <iron-localstorage name="waveform" value="{{options}}" on-iron-localstorage-load-empty="initializeDefaultOptions"></iron-localstorage>
 
-	<div class="hidden_clipboard"></div>
+    <div class="hidden_clipboard"></div>
 
-	<div class="floating_layer">
-			
-		<floating-pane id="action_info" style="display:initial;">
-			<div class="pane_title">Action List [z]</div>
-			<undo-stack-view undo_stack="[[cut_undo_stack]]" redo_stack="[[cut_redo_stack]]"></undo-stack-view>
-		</floating-pane>
-		
+    <div class="floating_layer">
+            
+        <floating-pane id="action_info" style="display:initial;">
+            <div class="pane_title">Action List [z]</div>
+            <undo-stack-view undo_stack="[[cut_undo_stack]]" redo_stack="[[cut_redo_stack]]"></undo-stack-view>
+        </floating-pane>
+        
 
-		<floating-pane id="tc_info" style="display: initial;">
-			<div class="pane_title">Temporal auto correlation [t]</div>
-			<p class="nodrag">
-				Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
-				<paper-slider pin="" snaps="" min="20" max="5000" step="20" value="{{options.max_delta_t}}" style="width:300px;"></paper-slider><br>
-			</p><p>
-				The number of bins is fixed at 100.
-			</p>
-		</floating-pane>
+        <floating-pane id="tc_info" style="display: initial;">
+            <div class="pane_title">Temporal auto correlation [t]</div>
+            <p class="nodrag">
+                Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
+                <paper-slider pin="" snaps="" min="20" max="5000" step="20" value="{{options.max_delta_t}}" style="width:300px;"></paper-slider><br>
+            </p><p>
+                The number of bins is fixed at 100.
+            </p>
+        </floating-pane>
 
-		<floating-pane id="drift_info">
-			<div class="pane_title">Drift [d]</div>
-			Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
-			<div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-			So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
-		</floating-pane>
-		
-		<floating-pane id="help_info">
-			<div class="pane_title">Help [?]</div>
-			Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"> readme - click to open in a new tab. <br><br>
-			You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"> (see the button on the right hand side). You can also contribute to the code!
-		</floating-pane>
-			
-		<floating-pane id="shortcut_info">
-			<div class="pane_title">Shortcuts [k]</div>
-			Shorcuts applied to the "active" group, which is the one under the cursor:
-			<ul>
-			<li><b>e</b> set the cluster painting destination group to the active group.</li>
-			<li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-			<li><b>s</b> launch the swap dialog for the "active" group.</li>
-			<li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-			</ul>
-			Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
-			<ul>
-			<li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
-			<li><b>r</b> spatial ratemap</li>
-			<li><b>c</b> directional ratemap ("c" is for circle)</li>
-			<li><b>v</b> directional ratemap ("v" is for velocity)</li>
-			<li><b>t</b> temporal autocorrelogram</li>
-			</ul>
-			Other shortcuts:
-			<ul>
-			<li><b>d</b> toggle drift rendering on/off</li>
-			<li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-			<li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-			<li><b>enter</b> increment cluster painting destination group</li>
-			<li><b>esc</b> open/close the toolbar</li>
-			<li><b>p</b> toggle waveform palette</li>
-			<li><b>k</b> show this info ("k" is for keyboard)</li>
-			<li><b>h</b> show header info</li>
-			<li><b>?</b> open GitHub info in a new tab</li>
-			</ul>						
-		</floating-pane>
-		
-		<floating-pane id="speed_info">
-			<div class="pane_title">Speed ratemap [v]</div>
-			<p>
-				Bin size <span class="slider_val">4 cm/s</span><br>
-				Upper limit <span class="slider_val">45 cm/s</span>
-			</p><p>
-				Histogram shows slowest speed at the top, and upper limit speed at the bottom.
-			</p><p>
-				WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
-			</p>
-		</floating-pane>
+        <floating-pane id="drift_info">
+            <div class="pane_title">Drift [d]</div>
+            Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
+            <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+            So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+        </floating-pane>
+        
+        <floating-pane id="help_info">
+            <div class="pane_title">Help [?]</div>
+            Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"> readme - click to open in a new tab. <br><br>
+            You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"> (see the button on the right hand side). You can also contribute to the code!
+        </floating-pane>
+            
+        <floating-pane id="shortcut_info">
+            <div class="pane_title">Shortcuts [k]</div>
+            Shorcuts applied to the "active" group, which is the one under the cursor:
+            <ul>
+            <li><b>e</b> set the cluster painting destination group to the active group.</li>
+            <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+            <li><b>s</b> launch the swap dialog for the "active" group.</li>
+            <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+            </ul>
+            Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+            <ul>
+            <li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
+            <li><b>r</b> spatial ratemap</li>
+            <li><b>c</b> directional ratemap ("c" is for circle)</li>
+            <li><b>v</b> directional ratemap ("v" is for velocity)</li>
+            <li><b>t</b> temporal autocorrelogram</li>
+            </ul>
+            Other shortcuts:
+            <ul>
+            <li><b>d</b> toggle drift rendering on/off</li>
+            <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+            <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+            <li><b>enter</b> increment cluster painting destination group</li>
+            <li><b>esc</b> open/close the toolbar</li>
+            <li><b>p</b> toggle waveform palette</li>
+            <li><b>k</b> show this info ("k" is for keyboard)</li>
+            <li><b>h</b> show header info</li>
+            <li><b>?</b> open GitHub info in a new tab</li>
+            </ul>                       
+        </floating-pane>
+        
+        <floating-pane id="speed_info">
+            <div class="pane_title">Speed ratemap [v]</div>
+            <p>
+                Bin size <span class="slider_val">4 cm/s</span><br>
+                Upper limit <span class="slider_val">45 cm/s</span>
+            </p><p>
+                Histogram shows slowest speed at the top, and upper limit speed at the bottom.
+            </p><p>
+                WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
+            </p>
+        </floating-pane>
 
-		<floating-pane id="waves_info" style="display:initial;">
-			<div class="pane_title">Waves [w]</div>
-			<p>
+        <floating-pane id="waves_info" style="display:initial;">
+            <div class="pane_title">Waves [w]</div>
+            <p>
                 There are two palette modes. 
             </p><p class="nodrag">
                 Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
-                <paper-toggle-button id="waves_toggle" checked="{{options.waves_toggle}}"></paper-toggle-button>
+                <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
+                <value-transform value="{{options.waves_render_mode}}" raw_value="{{waves_toggle_raw}}" encode="_to_render_mode_str" decode="_from_render_mode_str"></value-transform>
             </p><p>
-    			In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
+                In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
             </p><p>
                 In "density" mode, the color of each pixel reflects the proportion of the waves which cross it.
             </p>
-		</floating-pane>
+        </floating-pane>
 
-		<floating-pane id="header_info" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
-			<div class="pane_title">File headers [h]</div>
-			<header-view set_header="[[set_header]]" pos_header="[[pos_header]]" tet_header="[[tet_header]]" cut_header="[[_get_safe(cut_box,'header')]]" header_filter="[[options.header_filter]]"></header-view>
-		</floating-pane>
+        <floating-pane id="header_info" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
+            <div class="pane_title">File headers [h]</div>
+            <header-view set_header="[[set_header]]" pos_header="[[pos_header]]" tet_header="[[tet_header]]" cut_header="[[_get_safe(cut_box,'header')]]" header_filter="[[options.header_filter]]"></header-view>
+        </floating-pane>
 
-		<floating-pane id="rm_info" style="display: initial;">
-			<div class="pane_title">Spatial ratemap [r]</div>
-			<p class="nodrag">
-				Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style="width:300px"></paper-slider>
-			</p><p class="nodrag">
-				Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
-				<paper-slider pin="" snaps="" min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style="width:300px;"></paper-slider>
-			</p><p class="nodrag">
-				Ratemap frequency values are <span class="slider_val">[[options.max_rate_spa]]</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="0" max="20" step="1" value="{{options.max_rate_spa}}" style="width:300px"></paper-slider>
-			</p><p>
-				The true peak rate is shown as "spa max" when you move your cursor over a group.
-			</p>
-		</floating-pane>
-		
-		<floating-pane id="dir_info" style="display: initial;">
-			<div class="pane_title">Directional ratemap [c]</div>
-			<p class="nodrag">
-				Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style="width:300px"></paper-slider>
-			</p><p class="nodrag">
-				Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style="width:300px"></paper-slider>
-			</p><p>
-				Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
-				 the direction of movement is used (this is sometimes refered to as "displacement direction").
-			</p>
-		</floating-pane>
+        <floating-pane id="rm_info" style="display: initial;">
+            <div class="pane_title">Spatial ratemap [r]</div>
+            <p class="nodrag">
+                Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
+                <paper-slider pin="" snaps="" min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style="width:300px"></paper-slider>
+            </p><p class="nodrag">
+                Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
+                <paper-slider pin="" snaps="" min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style="width:300px;"></paper-slider>
+            </p><p class="nodrag">
+                Ratemap frequency values are <span class="slider_val">{{_make_max_rate_caption(options.max_rate_spa)}}</span><br>
+                <paper-slider pin="" snaps="" min="0" max="20" step="1" value="{{options.max_rate_spa}}" style="width:300px"></paper-slider>
+            </p><p>
+                The true peak rate is shown as "spa max" when you move your cursor over a group.
+            </p>
+            <p class="nodrag">
+                Ratemap height:<span class="slider_val">{{_make_spa_rm_height_caption(options.spa_rm_height)}}</span><br>
+                <paper-slider pin="" snaps="" min="0" max="400" step="20" value="{{options.spa_rm_height}}"></paper-slider>
+            </p>
+        </floating-pane>
+        
+        <floating-pane id="dir_info" style="display: initial;">
+            <div class="pane_title">Directional ratemap [c]</div>
+            <p class="nodrag">
+                Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
+                <paper-slider pin="" snaps="" min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style="width:300px"></paper-slider>
+            </p><p class="nodrag">
+                Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
+                <paper-slider pin="" snaps="" min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style="width:300px"></paper-slider>
+            </p><p>
+                Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
+                 the direction of movement is used (this is sometimes refered to as "displacement direction").
+            </p><p>
+                The true peak rate is shown as "dir max" when you move your cursor over a group.
+            </p>
+        </floating-pane>
 
-		<floating-pane id="pos_info" style="display: initial;">
-			<div class="pane_title">position post processing</div>
-			<p>
-				If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
-				the two spots have swapped.
-			</p><p class="nodrag">
-				Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
-				<paper-slider class="nodrag" pin="" snaps="" min="1" max="2" step="1" value="{{options.use_n_leds}}" style="width:80px"></paper-slider>
-			</p><p>
-				The following filtering and smoothing is applied to the one/two data streams separately.
-				If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
-			</p><p class="nodrag">
-				Max speed <span class="slider_val">[[options.speed_filter_mps]] m/s</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style="width:300px"></paper-slider><br>
-			</p><p>
-				Where the speed appears to rise above this threshold the data is considered invalid.
-			</p><p>
-				Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
-				new values are created by linearly interpolated across the gaps.
-			</p><p class="nodrag">
-				Smoothing <span class="slider_val">[[options.pos_smoothing_s]] s</span><br>
-				<paper-slider class="nodrag" pin="" snaps="" min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style="width:300px"></paper-slider>
-			</p><p>
-				Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
-			</p>
-		</floating-pane>
+        <floating-pane id="pos_info" style="display: initial;">
+            <div class="pane_title">position post processing</div>
+            <p>
+                If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
+                the two spots have swapped.
+            </p><p class="nodrag">
+                Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
+                <paper-slider class="nodrag" pin="" snaps="" min="1" max="2" step="1" value="{{options.use_n_leds}}" style="width:80px"></paper-slider>
+            </p><p>
+                The following filtering and smoothing is applied to the one/two data streams separately.
+                If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
+            </p><p class="nodrag">
+                Speed <span class="slider_val">{{_make_max_speed_caption(options.speed_filter_mps)}}</span><br>
+                <paper-slider class="nodrag" pin="" snaps="" min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style="width:300px"></paper-slider><br>
+            </p><p>
+                Where the speed appears to rise above this threshold the data is considered invalid.
+            </p><p>
+                Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
+                new values are created by linearly interpolated across the gaps.
+            </p><p class="nodrag">
+                Smoothing <span class="slider_val">{{_make_pos_smoothing_caption(options.pos_smoothing_s)}}</span><br>
+                <paper-slider class="nodrag" pin="" snaps="" min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style="width:300px"></paper-slider>
+            </p><p>
+                Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
+            </p>
+        </floating-pane>
 
-	</div>
-
-
-
-	<div class="main_wrapper">
-		
-	<paper-toolbar class="main_toolbar">
-		<div>
-			<paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name="help_info"></paper-icon-button>
-			<paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name="shortcut_info"></paper-icon-button>
-			<paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name="action_info"></paper-icon-button>
-			<paper-tooltip>undo [z]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="info" id="file_headers_button" class="info_linked" data-info-name="file_info"></paper-icon-button>
-			<paper-tooltip>file headers [h]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="swap-horiz" id="drift_button" class="info_linked" data-info-name="drift_info"></paper-icon-button>
-			<paper-tooltip>toggle drift [d]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="sort" id="reorder_n_button"></paper-icon-button>
-			<paper-tooltip>sort on group size [n]</paper-tooltip>
-		</div>
-
-		<div>
-			<paper-icon-button icon="sort" id="reorder_A_button"></paper-icon-button>
-			<paper-tooltip>sort on channel amplitude</paper-tooltip>
-		</div>	
-
-		<div>
-			<paper-icon-button icon="settings-applications" id="pos_settings" class="info_linked" data-info-name="pos_info"></paper-icon-button>
-			<paper-tooltip>position post processing settings</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button">wav</div>
-			<paper-tooltip>waves [w]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button info_linked" data-info-name="rm_info">rm</div>
-			<paper-tooltip>spatial ratemap [r]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button info_linked" data-info-name="dir_info">dir</div>
-			<paper-tooltip>directional ratemap [c]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button info_linked" data-info-name="speed_info">spd</div>
-			<paper-tooltip>speed ratemap [v]</paper-tooltip>
-		</div>
-
-		<div>
-			<div class="button display_button info_linked" data-info-name="tc_info">tc</div>
-			<paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
-		</div>
-
-	</paper-toolbar>
-
-	<div id="all_below_toolbar">
-		<document-focus-marker></document-focus-marker>
-		
-		<div-iron-resize class="side_panel">
-
-			<file-organiser class="side_panel_row" id="the_file_organiser" is_dragging_in="{{drop_in_progress}}" no_files="{{no_files}}" selected_files="{{selected_files}}"></file-organiser>
-			
-			<iron-splitter direction="up"></iron-splitter>
-
-			<div class="side_panel_row side_panel_row_flex">
-				<div class="grabbable side_panel_row_flex" id="spatial_panel">
-					<managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-					<canvas id="posoverlay" class="poslayer" width="200" height="200"></canvas> 
-				</div>
-				<div class="info_summary">
-					<div class="info_summary_text"></div>
-					<canvas id="speedhist" width="50" height="84"></canvas>
-					<div id="speedhist_labels" style="display:inline;position:relative;"><div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div></div>
-					<canvas id="eegspect" width="50" height="84"></canvas>
-				</div>
-			</div>
-
-			<iron-splitter direction="down"></iron-splitter>
-			
-			<div class="side_panel_row">
-				<div id="cluster_info" class="cluster_info above_scrollable_area">
-						<div class="cluster_painter">
-							<div class="cluster-sticker" id="painter-dest">?</div> 
-							<paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
-							← {
-							<div id="painter-src">
-								<div class="cluster-sticker">?</div>
-							</div> 
-							<paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
-							}
-						</div>
-						<div class="cluster_others">
-						</div>
-					</div>
-				<div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
-					<cross-hair id="cluster_crosshair" show-bars="0"></cross-hair>
-				</div>
-			</div>
-		
-		</div-iron-resize>
-
-		<iron-splitter direction="left"></iron-splitter>
-		
-		
-		<tile-wall class="tilewall" groups="{{cut_groups}}" duration="[[duration]]" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" data_for_gl="[[data_for_gl]]" options="[[options]]" pos_path="{{pos_path}}"></tile-wall>
-
-	</div>
-
-	</div>
+    </div>
 
 
 
-	<paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
+    <div class="main_wrapper">
+        
+    <paper-toolbar class="main_toolbar">
+        <div>
+            <paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name="help_info"></paper-icon-button>
+            <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+        </div>
 
-	<drop-zone show_initial="[[no_files]]" drop_in_progress="[[drop_in_progress]]">
-		<div class="primary_text">
-			drag &amp; drop files here
-		</div>
-		<div class="secondary_text">
-			the following types of data files are recognised: 
-			<b><br>set | pos | tet | cut | clu</b><br>
-			you can drag further files onto the window at any point<br>
-			other file types will be ignored
-		</div>
-		<div class="initial_extra_under_secondary">
-			<div class="github_button github_button_filedrop">
-				Go to <b>quickstart guide</b> on GitHub
-			</div><br><br>
-			<a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
-				<img id="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315">
-			</a>
-		</div>
-		<div class="initial_extra_bottom_right">
-		v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px">
-		</div>
-	</drop-zone>
+        <div>
+            <paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name="shortcut_info"></paper-icon-button>
+            <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name="action_info"></paper-icon-button>
+            <paper-tooltip>undo [z]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="info" id="file_headers_button" class="info_linked" data-info-name="file_info"></paper-icon-button>
+            <paper-tooltip>file headers [h]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="swap-horiz" id="drift_button" class="info_linked" data-info-name="drift_info"></paper-icon-button>
+            <paper-tooltip>toggle drift [d]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="sort" id="reorder_n_button"></paper-icon-button>
+            <paper-tooltip>sort on group size [n]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="sort" id="reorder_A_button"></paper-icon-button>
+            <paper-tooltip>sort on channel amplitude</paper-tooltip>
+        </div>  
+
+        <div>
+            <paper-icon-button icon="settings-applications" id="pos_settings" class="info_linked" data-info-name="pos_info"></paper-icon-button>
+            <paper-tooltip>position post processing settings</paper-tooltip>
+        </div>
+
+        <div>
+            <div class="button display_button">wav</div>
+            <paper-tooltip>waves [w]</paper-tooltip>
+        </div>
+
+        <div>
+            <div class="button display_button info_linked" data-info-name="rm_info">rm</div>
+            <paper-tooltip>spatial ratemap [r]</paper-tooltip>
+        </div>
+
+        <div>
+            <div class="button display_button info_linked" data-info-name="dir_info">dir</div>
+            <paper-tooltip>directional ratemap [c]</paper-tooltip>
+        </div>
+
+        <div>
+            <div class="button display_button info_linked" data-info-name="speed_info">spd</div>
+            <paper-tooltip>speed ratemap [v]</paper-tooltip>
+        </div>
+
+        <div>
+            <div class="button display_button info_linked" data-info-name="tc_info">tc</div>
+            <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+        </div>
+
+    </paper-toolbar>
+
+    <div id="all_below_toolbar">
+        <document-focus-marker></document-focus-marker>
+        
+        <div-iron-resize class="side_panel">
+
+            <file-organiser class="side_panel_row" id="the_file_organiser" is_dragging_in="{{drop_in_progress}}" no_files="{{no_files}}" selected_files="{{selected_files}}"></file-organiser>
+            
+            <iron-splitter direction="up"></iron-splitter>
+
+            <div class="side_panel_row side_panel_row_flex">
+                <div class="grabbable side_panel_row_flex" id="spatial_panel">
+                    <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
+                    <canvas id="posoverlay" class="poslayer" width="200" height="200"></canvas> 
+                </div>
+                <div class="info_summary">
+                    <div class="info_summary_text"></div>
+                    <canvas id="speedhist" width="50" height="84"></canvas>
+                    <div id="speedhist_labels" style="display:inline;position:relative;"><div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div></div>
+                    <canvas id="eegspect" width="50" height="84"></canvas>
+                </div>
+            </div>
+
+            <iron-splitter direction="down"></iron-splitter>
+            
+            <div class="side_panel_row">
+                <div id="cluster_info" class="cluster_info above_scrollable_area">
+                        <div class="cluster_painter">
+                            <div class="cluster-sticker" id="painter-dest">?</div> 
+                            <paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
+                            ← {
+                            <div id="painter-src">
+                                <div class="cluster-sticker">?</div>
+                            </div> 
+                            <paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
+                            }
+                        </div>
+                        <div class="cluster_others">
+                        </div>
+                    </div>
+                <div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
+                    <cross-hair id="cluster_crosshair" show-bars="0"></cross-hair>
+                </div>
+            </div>
+        
+        </div-iron-resize>
+
+        <iron-splitter direction="left"></iron-splitter>
+        
+        
+        <tile-wall class="tilewall" groups="{{cut_groups}}" duration="[[duration]]" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" data_for_gl="[[data_for_gl]]" options="[[options]]" pos_path="{{pos_path}}"></tile-wall>
+
+    </div>
+
+    </div>
 
 
-	<parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}"></parsed-data>
-	<cut-object groups="{{cut_groups}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+
+    <paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
+
+    <drop-zone show_initial="[[no_files]]" drop_in_progress="[[drop_in_progress]]">
+        <div class="primary_text">
+            drag &amp; drop files here
+        </div>
+        <div class="secondary_text">
+            the following types of data files are recognised: 
+            <b><br>set | pos | tet | cut | clu</b><br>
+            you can drag further files onto the window at any point<br>
+            other file types will be ignored
+        </div>
+        <div class="initial_extra_under_secondary">
+            <div class="github_button github_button_filedrop">
+                Go to <b>quickstart guide</b> on GitHub
+            </div><br><br>
+            <a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
+                <img id="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315">
+            </a>
+        </div>
+        <div class="initial_extra_bottom_right">
+        v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px">
+        </div>
+    </drop-zone>
+
+
+    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}"></parsed-data>
+    <cut-object groups="{{cut_groups}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
 
 </template>
@@ -25632,51 +25749,61 @@ Polymer({
 var the_app = document.getElementById('the_app')
 
 the_app.initializeDefaultOptions = function(ev) {
-	// TODO: bind to on-iron-localstorage-load and update missing/invalid properties
-	this.options = {
-		max_delta_t: 500,
-		show_pos_plots: 'yyy',
-		show_tac: 'y',
-		show_waves: 'yyyy',
-		cm_per_spa_bin: 2,
-		smoothing_spa_bins: 2,
-		max_rate_spa: -1,
-		deg_per_dir_bin: 6,
-		smoothing_dir_bins: 3,
-		waves_render_mode: "density",
-        waves_toggle: true,
-		use_n_leds: 2,
-		speed_filter_mps: 4,
-		pos_smoothing_s: 0.2,
-		header_filter: ''
-	};
+    // TODO: bind to on-iron-localstorage-load and update missing/invalid properties
+    this.options = {
+        max_delta_t: 500,
+        show_pos_plots: 'yyy',
+        show_tac: 'y',
+        show_waves: 'yyyy',
+        cm_per_spa_bin: 2,
+        smoothing_spa_bins: 2,
+        max_rate_spa: -1,
+        deg_per_dir_bin: 6,
+        smoothing_dir_bins: 3,
+        waves_render_mode: "density",
+        use_n_leds: 2,
+        speed_filter_mps: 4,
+        pos_smoothing_s: 0.2,
+        header_filter: '',
+        spa_rm_height: 120
+    };
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
 the_app._get_safe = function(a,b){
-	return a && a[b];
+    return a && a[b];
 }
 
-the_app.addEventListener('dom-change', function(){
-    // manually hook up a computed property for waves_toggle
-    document.getElementById('waves_toggle').addEventListener('iron-change', function(new_val){
-        the_app.set('options.waves_render_mode', the_app.options.waves_toggle ? "density" : "flag");
-    });
+the_app._to_render_mode_str = function(is_checked){
+    return is_checked ? "density" : "flag";
+}
 
+the_app._from_render_mode_str = function(str){
+    return (str==="density");
+}
+
+the_app._make_max_rate_caption = function(v){
+    return v > 0 ? "scaled to max of " + v + "Hz" : "individually scaled";
+}
+
+the_app._make_max_speed_caption = function(v){
+    return v > 0 ? "capped at " + v + " m/s" : "not limited";
+}
+
+the_app._make_pos_smoothing_caption = function(v){
+    return v > 0 ? v + " s" : "turned off";
+}
+
+the_app._make_spa_rm_height_caption = function(v){
+    return v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
+}
+the_app.addEventListener('dom-change', function(){
     window.c = document.getElementsByTagName('cut-object')[0]; //debug only
 })
-
 
 document.addEventListener('contextmenu', function(e){e.preventDefault();});
 
 </script>
-
-
-
-
-
-
-
 
 
 
