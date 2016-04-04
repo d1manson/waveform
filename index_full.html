@@ -32,6 +32,7 @@
 <link rel="import" href="rm-plots.html">
 <link rel="import" href="tac-plots.html">
 <link rel="import" href="wave-plots.html">
+<link rel="import" href="cluster-plots.html">
 
 
 <style is="custom-style">
@@ -39,6 +40,7 @@
 --paper-toolbar-height: 40px;
 --paper-toolbar-background: #efefef;
 --paper-toolbar-color: #000;
+--paper-tooltip-opacity: 0.96;
 --paper-icon-button: {
     width: 38px;
     height: 38px;
@@ -335,23 +337,9 @@ box-shadow: inset 0 0 2px 1px #ccc;
             <iron-splitter direction="down"></iron-splitter>
             
             <div class="side_panel_row">
-                <div id="cluster_info" class="cluster_info above_scrollable_area">
-                        <div class="cluster_painter">
-                            <div class='cluster-sticker' id='painter-dest'>?</div> 
-                            <paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
-                            &#8592; {
-                            <div id='painter-src'>
-                                <div class='cluster-sticker'>?</div>
-                            </div> 
-                            <paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
-                            }
-                        </div>
-                        <div class="cluster_others">
-                        </div>
-                    </div>
-                <div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
-                    <cross-hair id='cluster_crosshair' show-bars="0"></cross-hair>
-                </div>
+                <cluster-plots groups="[[cut_groups]]"
+                               painter_state="{{cut_painter_state}}"
+                               ampltidues="[[ampltidues]]"></cluster-plots>                              
             </div>
         
         </div-iron-resize>
@@ -412,6 +400,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
     <cut-object 
         groups="{{cut_groups}}"
+        painter_state="{{cut_painter_state}}"
         cut_box="[[cut_box]]"
         undo_stack_descriptions="{{cut_undo_stack}}"
         redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>

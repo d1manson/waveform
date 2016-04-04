@@ -129,6 +129,7 @@ doesn't have a worker, but it uses a similar system.
         this.groups = that.groups;
         this.undo_stack = that.undo_stack;
         this.redo_stack = that.redo_stack;
+        this.painter_state = that.painter_state;
         return this;
     }
 
@@ -195,6 +196,11 @@ doesn't have a worker, but it uses a similar system.
                 value: function(){return [];},
                 notify: true
             },
+            painter_state: {
+                type: Object,
+                notify: true,
+                value: function(){return {};}
+            },
             cut_box: {
                 type: Object,
                 value: function(){return {};},
@@ -202,9 +208,9 @@ doesn't have a worker, but it uses a similar system.
                 observer: '_use_cut_box'
             }
         },
-        _make_box: function(inds){
+        _make_okey: function(inds, num){
             return {
-                group_num: 1, // TODO: update this properly
+                group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
                 akey: Utils.typed_array_manager.store_array(inds),
@@ -255,23 +261,27 @@ doesn't have a worker, but it uses a similar system.
                 group_n.fill(0); // we repurpose this as a counter during arg_splitting
                 arg_split(groups, akey, group_n);
 
-                // now we are ready to create the this.groups array of boxes               
-                let boxes = [];
-                for(let gg of groups){
+                // now we are ready to create the this.groups array of okeys               
+                let okeys = [];
+                for(let [ii, gg] of groups.entries()){
                     if(gg){
-                        boxes.push(this._make_box(gg));
+                        okeys.push(this._make_okey(gg, ii));
                     }else{
-                        boxes.push(null);
+                        okeys.push(null);
                     }
                 }
                 this.undo_stack = [{
                     action: 'load'
                 }];
 
-                this.set('groups', boxes); 
+                this.set('groups', okeys); 
                 this.set('undo_stack_descriptions', ['load from file']);
                 this.set('redo_stack_descriptions', []);
                 this.redo_stack = [];
+                this.set('painter_state', {
+                    dest: 1,
+                    srcs: [0]
+                });
 
             } else if (this.cut_box && this.cut_box.is === "stack"){
                 // reinstate existing cut object
@@ -280,6 +290,7 @@ doesn't have a worker, but it uses a similar system.
                 this.set('redo_stack_descriptions', this.cut_box.redo_stack_descriptions);
                 this.undo_stack = this.cut_box.undo_stack;
                 this.redo_stack = this.cut_box.redo_stack;
+                this.set('painter_state', this.cut_box.painter_state);
 
             } else if(this.cut_box && this.cut_box.is === "n"){
                 // no cut_file, so just make a zero-group with inds 0:n 
@@ -288,9 +299,13 @@ doesn't have a worker, but it uses a similar system.
                 }];
                 this.set('undo_stack_descriptions', ['create blank cut']);
                 this.set('redo_stack_descriptions', []);
-                this.set('groups', [this._make_box(arange(this.cut_box.n_spikes))]);
+                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes))], 0);
                 this.undo_stack = [];
                 this.redo_stack = [];
+                this.set('painter_state', {
+                    dest: 1,
+                    srcs: [0]
+                });
 
             } else {
                 // clear current state
@@ -299,7 +314,10 @@ doesn't have a worker, but it uses a similar system.
                 this.set('redo_stack_descriptions', []);
                 this.undo_stack = [];
                 this.redo_stack = [];
-
+                this.set('painter_state', {
+                    dest: 0,
+                    srcs: [0]
+                });
             }
         },
         _fork_if_needed: function(){
@@ -338,6 +356,10 @@ doesn't have a worker, but it uses a similar system.
             var group_a = this.groups[a];
             var group_b = this.groups[b];
 
+            // update group_nums in preparation for announcing splice
+            group_a.group_num = b;
+            group_b.group_num = a;
+
             // TODO: check that this really is the correct way to do it
             // https://github.com/Polymer/polymer/issues/3377
             this.groups.splice(a, 1, group_b);
@@ -355,8 +377,11 @@ doesn't have a worker, but it uses a similar system.
 
             var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
             m.free_array(this.groups[a].akey);
-            this.splice('groups', a, 1, this._make_box(new_arrs[0]), this._make_box(new_arrs[1]));
-
+            // update group_nums in preparation for announcing splice
+            for(let ii=a+1; ii<this.groups.length; ii++){
+                this.groups[ii] && (this.groups[ii].group_num = ii+1);
+            }
+            this.splice('groups', a, 1, this._make_okey(new_arrs[0], a), this._make_okey(new_arrs[1], a+1));
             this.redo_stack.splice(0, this.redo_stack.length); // clear                   
             this.undo_stack.push({
                 action: 'split',
@@ -384,8 +409,9 @@ doesn't have a worker, but it uses a similar system.
 
             m.free_array(this.groups[a].akey);
             m.free_array(this.groups[b].akey);
-            this.splice('groups', b, 1);
-            this.splice('groups', a, 1, this._make_box(inds));
+
+            this.splice('groups', b, 1, null);
+            this.splice('groups', a, 1, this._make_okey(inds, a));
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear
             this.undo_stack.push({
@@ -407,8 +433,8 @@ doesn't have a worker, but it uses a similar system.
                 case "merge":
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 m.free_array(this.groups[delta.a].akey);
-                this.splice('groups', delta.a, 1, this._make_box(new_arrs[0]));
-                this.splice('groups', delta.b, 0, this._make_box(new_arrs[1]));
+                this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
+                this.splice('groups', delta.b, 0, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
                 break;
@@ -420,7 +446,11 @@ doesn't have a worker, but it uses a similar system.
                 var inds = packed[0];
                 m.free_array(this.groups[delta.a].akey);
                 m.free_array(this.groups[delta.a+1].akey);
-                this.splice('groups', delta.a, 2, this._make_box(inds));
+                // update group_nums in preparation for announcing splice
+                for(let ii=delta.a+1; a<this.groups.length; ii++){
+                    this.groups[ii] && (this.groups[ii].group_num = ii-1);
+                }
+                this.splice('groups', delta.a, 2, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
                 success = true;
                 break;
@@ -456,8 +486,8 @@ doesn't have a worker, but it uses a similar system.
                 var inds = packed[0];
                 m.free_array(this.groups[delta.a].akey);
                 m.free_array(this.groups[delta.b].akey);
-                this.splice('groups', delta.b, 1);
-                this.splice('groups', delta.a, 1, this._make_box(inds));
+                this.splice('groups', delta.b, 1, null);
+                this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
                 success = true;
                 break;
@@ -467,7 +497,10 @@ doesn't have a worker, but it uses a similar system.
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 delete delta['mask'];
                 m.free_array(this.groups[delta.a].akey);
-                this.splice('groups', delta.a, 1, this._make_box(new_arrs[0]), this._make_box(new_arrs[1]));
+                for(let ii=delta.a+1; ii<this.groups.length; i++){
+                    this.groups[ii] && (groups[ii].group_num = ii+1);
+                }
+                this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a), this._make_okey(new_arrs[1], delta.a+1));
                 success = true;
                 break;
 

@@ -1,0 +1,237 @@
+<!--
+
+Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off, which makes life a little simpler.
+
+-->
+
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="worker-builder.html">
+<link rel="import" href="managed-canvas.html">
+<link rel="import" href="utils.html">
+<link rel="import" href="palettes.html">
+
+<dom-module id="cluster-plots">
+
+<script is='worker-builder' id="worker" title="cluster-plots" type='javascript/worker'>
+"use strict";
+
+var update_pkeys = function(){
+
+}
+
+</script>
+
+
+<style>
+.sticker{
+display: inline-block;
+line-height: 14px;
+width: 20px;
+height: 17px;
+border: 1px solid #000;
+text-align: center;
+font-size: 10px;
+padding-top: 3px;
+margin: 1px;
+cursor: pointer;
+}
+.sticker_list{
+line-height: 19px;
+display: inline;
+font-size: 0px;
+}
+.braket{
+line-height: 19px;
+font-size: 24px;
+vertical-align: top;
+}
+:host{
+--paper-tooltip-opacity: 0.96;
+padding-left: 2px;
+padding-right: 2px;
+display: flex;
+flex-direction: column;
+height: 100%;
+}
+.bottom{
+flex: 2;
+}
+.active_stickers{
+float: left;
+display: inline-block;
+}
+.others{
+text-align: right;
+display: block;
+}
+.new_group{
+background: #ffffe0;
+}
+</style>
+
+<template>
+    <div class="top">
+        <div class="active_stickers">
+            <div class="sticker_list">
+                <div class="sticker" style$="{{_sticker_style(painter_state.dest)}}">
+                    [[painter_state.dest]] <paper-tooltip position="below">destination group [e]</paper-tooltip>
+                </div>
+            </div>
+            <span class="braket">&#8592;</span>
+            <div class="sticker_list"><span class="braket">{</span>
+                <template is="dom-repeat" items="[[painter_state.srcs]]">
+                   <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+                </template>
+                <span class="braket">}</span>
+                <paper-tooltip>source groups [e]</paper-tooltip>
+            </div>
+        </div>
+        <div class="sticker_list others">
+            <div class="sticker new_group" on-tap="_new_dest">&#10133;
+                <paper-tooltip>new destination group [Enter]</paper-tooltip>
+            </div>
+            <template is="dom-repeat" items="[[other_groups]]">
+               <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+            </template>
+        </div>
+    </div>
+
+    <div class="bottom">
+        <template is="dom-repeat" items="[[cluster_plots]]">
+           <managed-canvas canv_id="[[item.ckey]]"></managed-canvas>
+        </template>
+    </div>
+
+</template>
+
+
+<script>
+    "use strict";
+    Polymer({
+        is:'cluster-plots',
+        properties: {
+            amplitudes: {
+                type: String,
+                notify: true,
+                value: function(){return {};}
+            },
+            cluster_plots: {
+                type: Array,
+                notify: true,
+                value: function(){return [];}
+            },
+            groups: {
+                type: Array,
+                notify: true,
+                value: function(){return [];},
+                observer: '_groups_set'
+            },
+            painter_state: {
+                type: Object,
+                notify: true,
+                value: function(){return {
+                    srcs: [0],
+                    dest: 0
+                }}
+            },
+            other_groups:{
+                type: Array,
+                notify: true,
+                value: function(){return [];},
+                readOnly: true // TODO: this is really a computed-property, but I couldn't get it to work with .splices
+                                // instead we use observers
+            }
+        }, observers: [
+            '_groups_spliced(groups.splices)',
+            '_compute_unused_groups(painter_state.*)'
+        ], created: function(){
+            var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
+            this._worker = worker_builder.create_for(this);
+            this._pkey_generation = 0;
+        }, _groups_set: function(new_val, old_val){
+            this._compute_unused_groups();
+            this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
+        }, _groups_spliced: function(splices){
+            this._compute_unused_groups();
+            let parsed = Utils.parse_splices(splices);
+            this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
+        }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
+            var am = Utils.typed_array_manager;
+            var cm = Utils.canvas_manager;
+
+            var added_arrays = {};
+            var pkeys_to_add = []; 
+            // get clones of new arrays to send to worker
+            for(let okey of okeys_to_add){
+                if(!okey) continue;
+                pkeys_to_add.push(okey._pkey);
+                added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
+            }
+
+            var pkeys_to_remove = [];
+            for(let okey of okeys_to_remove){
+                if(!okey) continue;
+                pkeys_to_remove.push(okey._pkey);
+            }
+
+            // inform worker of the new/deleted arrays
+            this._worker.exec_b('update_pkeys', {
+                add: pkeys_to_add,
+                remove: pkeys_to_remove,
+                generation_remove: generation_remove,
+                generation_add: generation_add
+            }, added_arrays);
+
+        }, _sticker_style: function(group_num){
+            return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
+        }, _compute_unused_groups: function(){
+            if(!this.groups){
+                this._setOther_groups([]);
+                return [];
+            }
+            let others = [];
+            for(let okey of this.groups)if(okey){
+                if(this.painter_state.srcs.indexOf(okey.group_num) === -1 &&
+                    this.painter_state.dest !== okey.group_num){
+                    others.push(okey.group_num)
+                }
+            }
+            this._setOther_groups(others);
+        }, _new_dest: function(){
+            // finds first unused number, ignoring zero
+            for(let [ii, gg] of this.groups.entries()){
+                if(!gg && ii>0){
+                    this.set('painter_state.dest', ii);
+                }
+            }
+            this.set('painter_state.dest', this.groups.length);
+        }, _sticker_click: function(e){
+            let num = e.model.item;
+            let index_in_src = this.painter_state.srcs.indexOf(num);
+            if(e.button === 0){
+                // left button, select as source
+                this.set('painter_state.dest', num);
+                if(index_in_src >=0){
+                    this.splice('painter_state.srcs', index_in_src, 1);
+                }
+            } else {
+                // not left button, select as dest, 
+                // splice in/out if shift down, otherwise clear array and set to just num
+                if(e.shiftKey){
+                    if(index_in_src > -1){
+                        this.splice('painter_state.srcs', index_in_src, 1);
+                    } else {
+                        this.push('painter_state.srcs', num);
+                    }
+                }else{
+                    this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num);
+                }
+            }
+        }
+    });
+</script>
+
+  
+</dom-module>
