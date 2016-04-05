@@ -364,7 +364,8 @@ var is_equal_simple = function(a, b){
             } else if (this.show === 'n'){
                 // nothing to do here
             } else {
-                throw "invalid value for show";
+                console.log("invalid value for tac show");
+                this.set('show', 'y');
             }
             if(this._worker){
                 this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.

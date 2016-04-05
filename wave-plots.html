@@ -478,7 +478,7 @@ WavesRenderer.prototype.set_mode = function(mode){
            throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
         }
     } else {
-        throw "unrecognised mode";
+        console.log("unrecognised mode");
     }
 
     // update all the pending logic...

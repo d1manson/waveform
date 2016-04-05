@@ -87,10 +87,11 @@ display: inline-block;
     <div class$="pane_title [[_wide(has_search)]]">
         <content select=".pane_title"></content>
         <div class="flexer"></div>
-        <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}" placeholder="[[search_placeholder]]">
+        <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}"
+            placeholder="[[search_placeholder]]" on-focus="_search_focus" on-blur="_search_blur">
     </div>
     <div class="pane_body"><content></content></div>
-    <div class="grabber" id="grabber" hidden$="{{!space_is_down}}"></div>
+    <div class="grabber" id="grabber" hidden$="{{!grabber_mode}}"></div>
 </template>
 
 <script>
@@ -104,11 +105,10 @@ Polymer({
     is: 'floating-pane',
     behaviors: [Polymer.IronResizableBehavior],
     properties: {
-        space_is_down: {
+        grabber_mode: {
             type: Boolean,
             value: false,
-            notify: true,
-            readOnly: true
+            notify: true
         },
         has_search: {
             type: Boolean,
@@ -124,6 +124,11 @@ Polymer({
             type: String,
             value: "search",
             notify: true,   
+        },
+        disable_shortcuts: {
+            type: Boolean,
+            notify: true,
+            value: false
         }
     }, created: function(){
         // bind these methods so we can add/remove easily
@@ -140,20 +145,10 @@ Polymer({
         this.$.search_input.addEventListener('mousedown', function(e){
          e.stopPropagation(); // if it propagates out of the shadow dom, then it will appear to be a mousedown on the pane itself, which would lead to a drag_start
         });
-        document.addEventListener('keydown', function(e){
-            if(e.which === 32){
-                self._setSpace_is_down(true)
-            }
-        }, true);
-        document.addEventListener('keyup', function(e){
-            if(e.which === 32){
-                self._setSpace_is_down(false);
-            }
-        }, true);
         init_x += 100;
         this._translate(init_x, 400); // not sure this is that helpful, but hey
     }, _on_mouseup: function(e){
-        this.style.display = 'none';
+        this.toggle();
     }, _on_drag_start: function(e){
         // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
         var el = e.target;
@@ -190,6 +185,10 @@ Polymer({
             this.setAttribute('hidden', "true");            
         }
         this.notifyResize();
+    }, _search_focus: function(){
+        this.set('disable_shortcuts', true); 
+    }, _search_blur: function(){
+        this.set('disable_shortcuts', false);
     }
 });
 

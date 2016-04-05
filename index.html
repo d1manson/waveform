@@ -50,6 +50,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 user-drag: none;
 -webkit-user-drag: none;
 }
+paper-button{
+min-width: 40px;
+font-size: 0.8em;
+border: 1px solid;
+}
+paper-button[active] {
+background-color: #ffffe0;
+color: #c77;
+}
 </style>
 
 <style>
@@ -14311,6 +14320,332 @@ is separate from validation, and `allowed-pattern` does not affect how the input
      */
   </script>
 </dom-module>
+<style is="custom-style">
+
+  :root {
+
+    --shadow-transition: {
+      transition: box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    };
+
+    --shadow-none: {
+      box-shadow: none;
+    };
+
+    /* from http://codepen.io/shyndman/pen/c5394ddf2e8b2a5c9185904b57421cdb */
+
+    --shadow-elevation-2dp: {
+      box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 5px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 1px -2px rgba(0, 0, 0, 0.2);
+    };
+
+    --shadow-elevation-3dp: {
+      box-shadow: 0 3px 4px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 8px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 3px -2px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-4dp: {
+      box-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 10px 0 rgba(0, 0, 0, 0.12),
+                  0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-6dp: {
+      box-shadow: 0 6px 10px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 18px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 5px -1px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-8dp: {
+      box-shadow: 0 8px 10px 1px rgba(0, 0, 0, 0.14),
+                  0 3px 14px 2px rgba(0, 0, 0, 0.12),
+                  0 5px 5px -3px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-12dp: {
+      box-shadow: 0 12px 16px 1px rgba(0, 0, 0, 0.14),
+                  0 4px 22px 3px rgba(0, 0, 0, 0.12),
+                  0 6px 7px -4px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-16dp: {
+      box-shadow: 0 16px 24px 2px rgba(0, 0, 0, 0.14),
+                  0  6px 30px 5px rgba(0, 0, 0, 0.12),
+                  0  8px 10px -5px rgba(0, 0, 0, 0.4);
+    };
+
+  }
+
+</style>
+<dom-module id="paper-material-shared-styles" assetpath="bower_components/paper-material/">
+  <template>
+    <style>
+      :host {
+        display: block;
+        position: relative;
+      }
+
+      :host([elevation="1"]) {
+        @apply(--shadow-elevation-2dp);
+      }
+
+      :host([elevation="2"]) {
+        @apply(--shadow-elevation-4dp);
+      }
+
+      :host([elevation="3"]) {
+        @apply(--shadow-elevation-6dp);
+      }
+
+      :host([elevation="4"]) {
+        @apply(--shadow-elevation-8dp);
+      }
+
+      :host([elevation="5"]) {
+        @apply(--shadow-elevation-16dp);
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="paper-material" assetpath="bower_components/paper-material/">
+  <template>
+    <style include="paper-material-shared-styles"></style>
+    <style>
+      :host([animated]) {
+        @apply(--shadow-transition);
+      }
+    </style>
+
+    <content></content>
+  </template>
+</dom-module>
+<script>
+  Polymer({
+    is: 'paper-material',
+
+    properties: {
+      /**
+       * The z-depth of this element, from 0-5. Setting to 0 will remove the
+       * shadow, and each increasing number greater than 0 will be "deeper"
+       * than the last.
+       *
+       * @attribute elevation
+       * @type number
+       * @default 1
+       */
+      elevation: {
+        type: Number,
+        reflectToAttribute: true,
+        value: 1
+      },
+
+      /**
+       * Set this to true to animate the shadow when setting a new
+       * `elevation` value.
+       *
+       * @attribute animated
+       * @type boolean
+       * @default false
+       */
+      animated: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false
+      }
+    }
+  });
+</script>
+<script>
+
+  /** @polymerBehavior Polymer.PaperButtonBehavior */
+  Polymer.PaperButtonBehaviorImpl = {
+
+    properties: {
+
+      /**
+       * The z-depth of this element, from 0-5. Setting to 0 will remove the
+       * shadow, and each increasing number greater than 0 will be "deeper"
+       * than the last.
+       *
+       * @attribute elevation
+       * @type number
+       * @default 1
+       */
+      elevation: {
+        type: Number,
+        reflectToAttribute: true,
+        readOnly: true
+      }
+
+    },
+
+    observers: [
+      '_calculateElevation(focused, disabled, active, pressed, receivedFocusFromKeyboard)',
+      '_computeKeyboardClass(receivedFocusFromKeyboard)'
+    ],
+
+    hostAttributes: {
+      role: 'button',
+      tabindex: '0',
+      animated: true
+    },
+
+    _calculateElevation: function() {
+      var e = 1;
+      if (this.disabled) {
+        e = 0;
+      } else if (this.active || this.pressed) {
+        e = 4;
+      } else if (this.receivedFocusFromKeyboard) {
+        e = 3;
+      }
+      this._setElevation(e);
+    },
+
+    _computeKeyboardClass: function(receivedFocusFromKeyboard) {
+      this.toggleClass('keyboard-focus', receivedFocusFromKeyboard);
+    },
+
+    /**
+     * In addition to `IronButtonState` behavior, when space key goes down,
+     * create a ripple down effect.
+     *
+     * @param {!KeyboardEvent} event .
+     */
+    _spaceKeyDownHandler: function(event) {
+      Polymer.IronButtonStateImpl._spaceKeyDownHandler.call(this, event);
+      // Ensure that there is at most one ripple when the space key is held down.
+      if (this.hasRipple() && this.getRipple().ripples.length < 1) {
+        this._ripple.uiDownAction();
+      }
+    },
+
+    /**
+     * In addition to `IronButtonState` behavior, when space key goes up,
+     * create a ripple up effect.
+     *
+     * @param {!KeyboardEvent} event .
+     */
+    _spaceKeyUpHandler: function(event) {
+      Polymer.IronButtonStateImpl._spaceKeyUpHandler.call(this, event);
+      if (this.hasRipple()) {
+        this._ripple.uiUpAction();
+      }
+    }
+
+  };
+
+  /** @polymerBehavior */
+  Polymer.PaperButtonBehavior = [
+    Polymer.IronButtonState,
+    Polymer.IronControlState,
+    Polymer.PaperRippleBehavior,
+    Polymer.PaperButtonBehaviorImpl
+  ];
+
+</script>
+
+
+<dom-module id="paper-button" assetpath="bower_components/paper-button/">
+  <template strip-whitespace="">
+
+    <style include="paper-material">
+      :host {
+        display: inline-block;
+        position: relative;
+        box-sizing: border-box;
+        min-width: 5.14em;
+        margin: 0 0.29em;
+        background: transparent;
+        text-align: center;
+        font: inherit;
+        text-transform: uppercase;
+        outline-width: 0;
+        border-radius: 3px;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-user-select: none;
+        user-select: none;
+        cursor: pointer;
+        z-index: 0;
+        padding: 0.7em 0.57em;
+
+        @apply(--paper-button);
+      }
+
+      :host([raised].keyboard-focus) {
+        font-weight: bold;
+        @apply(--paper-button-raised-keyboard-focus);
+      }
+
+      :host(:not([raised]).keyboard-focus) {
+        font-weight: bold;
+        @apply(--paper-button-flat-keyboard-focus);
+      }
+
+      :host([disabled]) {
+        background: #eaeaea;
+        color: #a8a8a8;
+        cursor: auto;
+        pointer-events: none;
+
+        @apply(--paper-button-disabled);
+      }
+
+      paper-ripple {
+        color: var(--paper-button-ink-color);
+      }
+
+      :host > ::content * {
+        text-transform: inherit;
+      }
+    </style>
+    <content></content>
+  </template>
+</dom-module>
+
+<script>
+  Polymer({
+    is: 'paper-button',
+
+    behaviors: [
+      Polymer.PaperButtonBehavior
+    ],
+
+    properties: {
+      /**
+       * If true, the button should be styled with a shadow.
+       */
+      raised: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false,
+        observer: '_calculateElevation'
+      }
+    },
+
+    _calculateElevation: function() {
+      if (!this.raised) {
+        this._setElevation(0);
+      } else {
+        Polymer.PaperButtonBehaviorImpl._calculateElevation.apply(this);
+      }
+    }
+    /**
+
+    Fired when the animation finishes.
+    This is useful if you want to wait until
+    the ripple animation finishes to perform some action.
+
+    @event transitionend
+    @param {{node: Object}} detail Contains the animated node.
+    */
+  });
+</script>
 <script>
 
   /**
@@ -22295,52 +22630,56 @@ Polymer({
 </script>
 </dom-module><dom-module id="value-transform" assetpath="/">
 <template></template>
-
 <script>
     "use strict";
-
     Polymer({
         is:'value-transform',
         properties: {
-            raw_value: {
-                notify: true,
-                observer: '_raw_value_changed'
+            value_a: {
+                notify: true
             },
-            value: {
-                notify: true,
-                observer: '_value_changed'
+            value_b: {
+                notify: true
             },
-            encode: {
+            a_to_b: {
                 type: String
             },
-            decode: {
+            b_to_a: {
                 type: String
             }
-        }, attached: function(){
-            let host = this.domHost || this.dataHost; // not sure if this is really correct, but it does the job for now
-            this._encode_func = host ? host[this.encode] : null;
-            this._decode_func = host ? host[this.decode] : null;
+        }, observers: [
+            '_value_a_changed(value_a.*)',
+            '_value_b_changed(value_b.*)'
+        ], attached: function(){
+            let host = this.domHost || this.dataHost; // TODO: is that right?
+            this._a_to_b_func = host ? host[this.a_to_b] : null;
+            this._b_to_a_func = host ? host[this.b_to_a] : null;
             this._is_attached = true;
-            this._value_changed(); // not sure whether to use this or raw_value_changed??
-        }, _value_changed: function(){
-            if(self._changing || !this._is_attached){
+        }, _value_a_changed: function(e){
+            if(this._changing || !this._is_attached){
                 return;
             }
-            this._changing = true;
-            this.set('raw_value', this._decode_func ? this._decode_func(this.value) : this.value);
+            this._changing = true;            
+            if(this._a_to_b_func){
+                this.set('value_b', this._a_to_b_func(this.value_a));
+            } else {
+                this.set('value_b' + e.path.slice("value_a".length), e.value);
+            }
             this._changing = false;
-        }, _raw_value_changed: function(new_value){
-            if(self._changing || !this._is_attached){
+        }, _value_b_changed: function(e){
+            if(this._changing || !this._is_attached){
                 return;
             }
             this._changing = true;
-            this.set('value', this._encode_func ? this._encode_func(this.raw_value) : this.raw_value);
+            if(this._b_to_a_func){
+                this.set('value_a', this._b_to_a_func(this.value_b));
+            } else {
+                this.set('value_a' + e.path.slice("value_b".length), e.value);
+            }
             this._changing = false;
         }
     });
 </script>
-
-  
 </dom-module><dom-module id="rm-plots" assetpath="/">
 
 <script is="worker-builder" id="worker" title="rm-plots" type="javascript/worker">
@@ -23796,7 +24135,8 @@ var is_equal_simple = function(a, b){
             } else if (this.show === 'n'){
                 // nothing to do here
             } else {
-                throw "invalid value for show";
+                console.log("invalid value for tac show");
+                this.set('show', 'y');
             }
             if(this._worker){
                 this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
@@ -25143,7 +25483,7 @@ WavesRenderer.prototype.set_mode = function(mode){
            throw "gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE";
         }
     } else {
-        throw "unrecognised mode";
+        console.log("unrecognised mode");
     }
 
     // update all the pending logic...
@@ -26136,7 +26476,8 @@ font-size: 10px;
 
 <template is="dom-bind" id="the_app">
 
-    <iron-localstorage name="waveform" value="{{options}}" on-iron-localstorage-load-empty="initializeDefaultOptions"></iron-localstorage>
+    <iron-localstorage name="waveform" value="{{stored_options}}"></iron-localstorage>
+    <value-transform value_b="{{options}}" value_a="{{stored_options}}" a_to_b="_sanitize_options"></value-transform>
 
     <div class="hidden_clipboard"></div>
 
@@ -26233,7 +26574,7 @@ font-size: 10px;
             </p><p class="nodrag">
                 Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
                 <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
-                <value-transform value="{{options.waves_render_mode}}" raw_value="{{waves_toggle_raw}}" encode="_to_render_mode_str" decode="_from_render_mode_str"></value-transform>
+                <value-transform value_a="{{options.waves_render_mode}}" value_b="{{waves_toggle_raw}}" b_to_a="_to_render_mode_str" a_to_b="_from_render_mode_str"></value-transform>
             </p><p>
                 In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
             </p><p>
@@ -26313,27 +26654,27 @@ font-size: 10px;
         
     <paper-toolbar class="main_toolbar">
         <div>
-            <paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name="help_info"></paper-icon-button>
+            <paper-icon-button icon="flip-to-front"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name="shortcut_info"></paper-icon-button>
+            <paper-icon-button icon="list"></paper-icon-button>
             <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name="action_info"></paper-icon-button>
+            <paper-icon-button icon="reply" id="undo_button"></paper-icon-button>
             <paper-tooltip>undo [z]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="info" id="file_headers_button" class="info_linked" data-info-name="file_info"></paper-icon-button>
+            <paper-icon-button icon="info" id="file_headers_button"></paper-icon-button>
             <paper-tooltip>file headers [h]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="swap-horiz" id="drift_button" class="info_linked" data-info-name="drift_info"></paper-icon-button>
+            <paper-icon-button icon="swap-horiz" id="drift_button"></paper-icon-button>
             <paper-tooltip>toggle drift [d]</paper-tooltip>
         </div>
 
@@ -26343,37 +26684,32 @@ font-size: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="sort" id="reorder_A_button"></paper-icon-button>
-            <paper-tooltip>sort on channel amplitude</paper-tooltip>
-        </div>  
-
-        <div>
-            <paper-icon-button icon="settings-applications" id="pos_settings" class="info_linked" data-info-name="pos_info"></paper-icon-button>
-            <paper-tooltip>position post processing settings</paper-tooltip>
+            <paper-icon-button icon="settings-applications" id="pos_settings"></paper-icon-button>
+            <paper-tooltip>position post processing settings [s]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button">wav</div>
+            <paper-button toggles="" active="{{_yn_to_bool(options.show_waves, 0)}}">wav</paper-button>
             <paper-tooltip>waves [w]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name="rm_info">rm</div>
+            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 0)}}">rm</paper-button>
             <paper-tooltip>spatial ratemap [r]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name="dir_info">dir</div>
+            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 1)}}">dir</paper-button>
             <paper-tooltip>directional ratemap [c]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name="speed_info">spd</div>
+            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 2)}}">spd</paper-button>
             <paper-tooltip>speed ratemap [v]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name="tc_info">tc</div>
+            <paper-button toggles="" active="{{_yn_to_bool(options.show_tac, 0)}}">tc</paper-button>
             <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
         </div>
 
@@ -26445,7 +26781,7 @@ font-size: 10px;
 
     <cut-object groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show_pos_plots="[[options.show_pos_plots]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
 
     <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]"></tac-plots> 
                 
@@ -26477,11 +26813,10 @@ font-size: 10px;
 "use strict";
 var the_app = document.getElementById('the_app')
 
-the_app.initializeDefaultOptions = function(ev) {
-    // TODO: bind to on-iron-localstorage-load and update missing/invalid properties
-    this.options = {
+the_app._sanitize_options = function(stored_options) {
+    let opts = {
         max_delta_t: 500,
-        show_pos_plots: 'yyy',
+        show_rms: 'yyy',
         show_tac: 'y',
         show_waves: 'yyyy',
         cm_per_spa_bin: 2,
@@ -26496,10 +26831,21 @@ the_app.initializeDefaultOptions = function(ev) {
         header_filter: '',
         spa_rm_height: 120,
         cluster_plot_size: 128,
-        splitter_a_size: 200,
-        splitter_b_size: 300,
-        splitter_c_size: 350
+        splitter_a_size: "200px",
+        splitter_b_size: "300px",
+        splitter_c_size: "350px"
     };
+
+    if(!stored_options){
+        return opts;
+    }
+
+    for(let k in opts){
+        if(stored_options[k] !== undefined){
+            opts[k] = stored_options[k];
+        }
+    }
+    return opts;
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
@@ -26568,6 +26914,9 @@ the_app.toggle_help_pane = function(){
 }
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');
+}
+the_app._yn_to_bool = function(v, index){
+    return (v && v[index] === 'y');
 }
 the_app.keyboard_target = document.querySelector('body');
 

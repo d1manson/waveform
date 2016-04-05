@@ -6,12 +6,24 @@
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?">
 <title>Waveform</title>
 <link rel="stylesheet" type="text/css" href="main.css">
-<script> window.Polymer = {dom: 'shadow'}</script>
+
+<script> 
+document.addEventListener('keydown', function(e){
+    if(the_app.disable_shortcuts){
+        e.stopImmediatePropagation(); // for this to be effective it needs to be the first registered listener
+        return;
+    }
+}, true);
+
+window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
+</script>
+
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-localstorage/iron-localstorage.html">
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="bower_components/paper-slider/paper-slider.html">
+<link rel="import" href="bower_components/paper-button/paper-button.html">
 <link rel="import" href="bower_components/paper-toggle-button/paper-toggle-button.html">
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
@@ -49,9 +61,18 @@
 user-drag: none;
 -webkit-user-drag: none;
 }
-</style>
 
-<style>
+paper-button{
+min-width: 40px;
+font-size: 0.8em;
+border: 1px solid;
+}
+
+paper-button[selected] {
+background-color: #ffffe0;
+color: #c77;
+}
+
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
 }
@@ -64,17 +85,15 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
 <template is="dom-bind" id="the_app">
 
-    <iron-localstorage
-        name="waveform"
-        value="{{options}}"
-        on-iron-localstorage-load-empty="initializeDefaultOptions"
-        ></iron-localstorage>
+    <iron-localstorage name="waveform" value="{{stored_options}}"></iron-localstorage>
+    <value-transform value_b="{{options}}" value_a="{{stored_options}}"
+        a_to_b="_sanitize_options"></value-transform>
 
     <div class="hidden_clipboard"></div>
 
     <div class="floating_layer">
             
-        <floating-pane id="action_info">
+        <floating-pane id="action_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Action List [z]</div>
             <undo-stack-view 
                     undo_stack="[[cut_undo_stack]]"
@@ -82,7 +101,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
         </floating-pane>
         
 
-        <floating-pane id="tc_info" style="display: initial;">
+        <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Temporal auto correlation [t]</div>
             <p class="nodrag">
                 Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
@@ -92,20 +111,20 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id="drift_info">
+        <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Drift [d]</div>
             Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
             <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
             So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
         </floating-pane>
         
-        <floating-pane id="help_info">
+        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Help [?]</div>
             Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
             You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
         </floating-pane>
             
-        <floating-pane id="shortcut_info" style="max-height: 350px;">
+        <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;">
             <div class='pane_title'>Shortcuts [k]</div>
             <p>
                 For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
@@ -148,7 +167,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>                    
         </floating-pane>
         
-        <floating-pane id="speed_info">
+        <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Speed ratemap [v]</div>
             <p>
                 Bin size <span class="slider_val">4 cm/s</span><br>
@@ -160,15 +179,15 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id="waves_info">
+        <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Waves [w]</div>
             <p>
                 There are two palette modes. 
             </p><p class="nodrag">
                 Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
                 <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
-                <value-transform value="{{options.waves_render_mode}}" raw_value="{{waves_toggle_raw}}"
-                        encode="_to_render_mode_str" decode="_from_render_mode_str"
+                <value-transform value_a="{{options.waves_render_mode}}" value_b="{{waves_toggle_raw}}"
+                        b_to_a="_to_render_mode_str" a_to_b="_from_render_mode_str"
                         ></value-transform>
             </p><p>
                 In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
@@ -177,7 +196,8 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id='header_info' has_search search_text="{{options.header_filter}}" search_placeholder="filter headers">
+        <floating-pane id='header_info' grabber_mode="[[grabber_mode]]" has_search search_text="{{options.header_filter}}" 
+                    search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}">
             <div class='pane_title'>File headers [h]</div>
             <header-view 
             set_header="[[set_header]]"
@@ -188,7 +208,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             ></header-view>
         </floating-pane>
 
-        <floating-pane id="rm_info">
+        <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Spatial ratemap [r]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
@@ -208,7 +228,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
         
-        <floating-pane id="dir_info">
+        <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>Directional ratemap [c]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
@@ -224,7 +244,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
             </p>
         </floating-pane>
 
-        <floating-pane id="pos_info">
+        <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]">
             <div class='pane_title'>position post processing</div>
             <p>
                 If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
@@ -253,29 +273,29 @@ box-shadow: inset 0 0 2px 1px #ccc;
 
     </div>
         
-    <paper-toolbar class="main_toolbar">
+    <paper-toolbar>
         <div>
-            <paper-icon-button icon="flip-to-front" class="github_button info_linked" data-info-name='help_info'></paper-icon-button>
+            <paper-icon-button icon="flip-to-front"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="list" class="shortcuts_button info_linked" data-info-name='shortcut_info'></paper-icon-button>
+            <paper-icon-button icon="list"></paper-icon-button>
             <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="reply" id="undo_button" class="info_linked" data-info-name='action_info'></paper-icon-button>
+            <paper-icon-button icon="reply" id="undo_button"></paper-icon-button>
             <paper-tooltip>undo [z]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="info" id='file_headers_button' class="info_linked" data-info-name='file_info'></paper-icon-button>
+            <paper-icon-button icon="info" id='file_headers_button'></paper-icon-button>
             <paper-tooltip>file headers [h]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="swap-horiz" id='drift_button' class="info_linked" data-info-name='drift_info'></paper-icon-button>
+            <paper-icon-button icon="swap-horiz" id='drift_button'></paper-icon-button>
             <paper-tooltip>toggle drift [d]</paper-tooltip>
         </div>
 
@@ -285,37 +305,32 @@ box-shadow: inset 0 0 2px 1px #ccc;
         </div>
 
         <div>
-            <paper-icon-button icon="sort" id='reorder_A_button'></paper-icon-button>
-            <paper-tooltip>sort on channel amplitude</paper-tooltip>
-        </div>  
-
-        <div>
-            <paper-icon-button icon="settings-applications" id='pos_settings' class="info_linked" data-info-name='pos_info'></paper-icon-button>
-            <paper-tooltip>position post processing settings</paper-tooltip>
+            <paper-icon-button icon="settings-applications" id='pos_settings'></paper-icon-button>
+            <paper-tooltip>position post processing settings [s]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button">wav</div>
+            <paper-button selected$="{{_yn_to_bool(options.show_waves, 0)}}" on-tap="show_tap" id="show_wav">wav</paper-button>
             <paper-tooltip>waves [w]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name='rm_info'>rm</div>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 0)}}" on-tap="show_tap" id="show_rm">rm</paper-button>
             <paper-tooltip>spatial ratemap [r]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name='dir_info'>dir</div>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 1)}}" on-tap="show_tap" id="show_dir">dir</paper-button>
             <paper-tooltip>directional ratemap [c]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name='speed_info'>spd</div>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 2)}}" on-tap="show_tap" id="show_spd">spd</paper-button>
             <paper-tooltip>speed ratemap [v]</paper-tooltip>
         </div>
 
         <div>
-            <div class="button display_button info_linked" data-info-name='tc_info'>tc</div>
+            <paper-button selected$="{{_yn_to_bool(options.show_tac, 0)}}" on-tap="show_tap" id="show_tc">tc</paper-button>
             <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
         </div>
 
@@ -426,7 +441,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
         pos_xy="[[pos_xy]]"
         pos_dir="[[pos_dir]]"
         pos_speed="[[pos_speed]]"
-        show_pos_plots="[[options.show_pos_plots]]"
+        show="[[options.show_rms]]"
         cm_per_spa_bin="[[options.cm_per_spa_bin]]"
         smoothing_spa_bins="[[options.smoothing_spa_bins]]"
         max_rate_spa="[[options.max_rate_spa]]"
@@ -445,7 +460,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
         palette_mode="[[options.waves_render_mode]]"
         show_chans="[[options.show_waves]]"></wave-plots> 
     
-    <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane"      target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette"           target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+r" on-keys-pressed="toggle_spa_rm_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
@@ -471,11 +486,10 @@ box-shadow: inset 0 0 2px 1px #ccc;
 "use strict";
 var the_app = document.getElementById('the_app')
 
-the_app.initializeDefaultOptions = function(ev) {
-    // TODO: bind to on-iron-localstorage-load and update missing/invalid properties
-    this.options = {
+the_app._sanitize_options = function(stored_options) {
+    let opts = {
         max_delta_t: 500,
-        show_pos_plots: 'yyy',
+        show_rms: 'yyy',
         show_tac: 'y',
         show_waves: 'yyyy',
         cm_per_spa_bin: 2,
@@ -490,10 +504,21 @@ the_app.initializeDefaultOptions = function(ev) {
         header_filter: '',
         spa_rm_height: 120,
         cluster_plot_size: 128,
-        splitter_a_size: 200,
-        splitter_b_size: 300,
-        splitter_c_size: 350
+        splitter_a_size: "200px",
+        splitter_b_size: "300px",
+        splitter_c_size: "350px"
     };
+
+    if(!stored_options){
+        return opts;
+    }
+
+    for(let k in opts){
+        if(stored_options[k] !== undefined){
+            opts[k] = stored_options[k];
+        }
+    }
+    return opts;
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
@@ -563,13 +588,132 @@ the_app.toggle_help_pane = function(){
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');
 }
+the_app._yn_to_bool = function(v, index){
+    return (v && v[index] === 'y');
+}
+the_app.show_tap = function(e){
+    // This is a bit ugly sadly. We want to allow basic toggling
+    // without shift, and multi-toggling with shift.
+    let id = e.target.id;
+    let result;
+    if(!e.detail.sourceEvent.shiftKey){
+        result = {
+            waves: 'nnnn',
+            tac: 'n',
+            rms: 'nnn'
+        };
+        switch (id){
+            case "show_wav":
+            result.waves = 'yyyy';
+            break;
+
+            case "show_tc":
+            result.tac = 'y';
+            break;
+
+            case "show_rm":
+            result.rms = "ynn";
+            break;
+
+            case "show_dir":
+            result.rms = "nyn";
+            break;
+
+            case "show_spd":
+            result.rms = "nny";
+            break;
+        } 
+    } else {
+        result = {
+            waves: the_app.options.show_waves,
+            tac: the_app.options.show_tac,
+            rms: the_app.options.show_rms
+        };
+        let n_selected = (result.waves.indexOf('y') > -1) + 
+                       (result.tac === 'y') + 
+                       (result.rms[0] === 'y') + (result.rms[1] === 'y') + (result.rms[2] === 'y');
+
+        switch (id){
+            case "show_wav":
+            if(result.waves === "yyyy" && n_selected > 1){
+                result.waves = 'nnnn';                
+            } else {
+                result.waves = 'yyyy';
+            }
+            break;
+
+            case "show_tc":
+            if(result.tac === "y" && n_selected > 1){
+                result.tac = 'n';                
+            } else {
+                result.tac = 'y';
+            }
+            break;
+
+            case "show_rm":
+            if(result.rms[0] === "y" && n_selected > 1){
+                result.rms = "n" + result.rms.slice(1);                
+            } else {
+                result.rms = 'y' + result.rms.slice(1);
+            }
+            break;
+
+            case "show_dir":
+            if(result.rms[1] === "y" && n_selected > 1){
+                result.rms = result.rms[0] + "n" + result.rms[2];                
+            } else {
+                result.rms = result.rms[0] + 'y' + result.rms[2];
+            }
+            break;
+
+            case "show_spd":
+            if(result.rms[2] === "y" && n_selected > 1){
+                result.rms = result.rms.slice(0,-1) + "n";                
+            } else {
+                result.rms = result.rms.slice(0,-1) + 'y';
+            }
+            break;
+        } 
+
+    }
+
+    the_app.set('options.show_waves', result.waves);
+    the_app.set('options.show_tac', result.tac);
+    the_app.set('options.show_rms', result.rms);
+    e.preventDefault(); 
+}
+
 the_app.keyboard_target = document.querySelector('body');
 
-the_app.addEventListener('dom-change', function(){
-    window.c = document.getElementsByTagName('cut-object')[0]; //debug only
+// and then some stuff that doesn't sit so well with polymer...
+document.addEventListener('contextmenu', function(e){e.preventDefault();});
+document.addEventListener('keydown', function(e){
+    if(e.which === 32){//  space
+        the_app.set('grabber_mode', true);
+    }
+    if(e.which == 32){ //space
+        e.preventDefault(); // normally does things like toggle buttons and scroll divs
+    } 
+}, true);
+document.addEventListener('keyup', function(e){
+    if(e.which === 32){
+        the_app.set('grabber_mode', false);
+    }
 })
 
-document.addEventListener('contextmenu', function(e){e.preventDefault();});
+the_app.addEventListener('dom-change', function(){
+    // remove keyboard handlers from buttons. Note that ripple still shows.
+    let els =   Array.from(document.getElementsByTagName('paper-button'))
+        .concat(Array.from(document.getElementsByTagName('paper-icon-button')));
+    for(let el of els){
+        el._unlistenKeyEventListeners();
+    }
+
+
+    window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
+})
+
+
 
 </script>
 

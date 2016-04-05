@@ -1,6 +1,9 @@
 <!--
+See https://github.com/Polymer/polymer/issues/3563
+
 This is designed for use within a dom-bind or other element. It allows two-way computed
-binding via a pair of functions that encode and decode.
+binding via a pair of functions that encode and decode.  It is helpful when you have
+two elements that need to be bound together but they don't agree on a data format.
 
 <paper-slider min="0" max="10" step="1" value="{{something_ugly}}"></paper-slider>
 <value-transform  raw_value="{{something_ugly}}" value="{{something_beautiful}}"
@@ -30,53 +33,56 @@ before agreeing).
 
 <link rel="import" href="bower_components/polymer/polymer.html">
 
-
 <dom-module id="value-transform">
 <template></template>
-
 <script>
     "use strict";
-
     Polymer({
         is:'value-transform',
         properties: {
-            raw_value: {
-                notify: true,
-                observer: '_raw_value_changed'
+            value_a: {
+                notify: true
             },
-            value: {
-                notify: true,
-                observer: '_value_changed'
+            value_b: {
+                notify: true
             },
-            encode: {
+            a_to_b: {
                 type: String
             },
-            decode: {
+            b_to_a: {
                 type: String
             }
-        }, attached: function(){
-            let host = this.domHost || this.dataHost; // not sure if this is really correct, but it does the job for now
-            this._encode_func = host ? host[this.encode] : null;
-            this._decode_func = host ? host[this.decode] : null;
+        }, observers: [
+            '_value_a_changed(value_a.*)',
+            '_value_b_changed(value_b.*)'
+        ], attached: function(){
+            let host = this.domHost || this.dataHost; // TODO: is that right?
+            this._a_to_b_func = host ? host[this.a_to_b] : null;
+            this._b_to_a_func = host ? host[this.b_to_a] : null;
             this._is_attached = true;
-            this._value_changed(); // not sure whether to use this or raw_value_changed??
-        }, _value_changed: function(){
-            if(self._changing || !this._is_attached){
+        }, _value_a_changed: function(e){
+            if(this._changing || !this._is_attached){
                 return;
             }
-            this._changing = true;
-            this.set('raw_value', this._decode_func ? this._decode_func(this.value) : this.value);
+            this._changing = true;            
+            if(this._a_to_b_func){
+                this.set('value_b', this._a_to_b_func(this.value_a));
+            } else {
+                this.set('value_b' + e.path.slice("value_a".length), e.value);
+            }
             this._changing = false;
-        }, _raw_value_changed: function(new_value){
-            if(self._changing || !this._is_attached){
+        }, _value_b_changed: function(e){
+            if(this._changing || !this._is_attached){
                 return;
             }
             this._changing = true;
-            this.set('value', this._encode_func ? this._encode_func(this.raw_value) : this.raw_value);
+            if(this._b_to_a_func){
+                this.set('value_a', this._b_to_a_func(this.value_b));
+            } else {
+                this.set('value_a' + e.path.slice("value_b".length), e.value);
+            }
             this._changing = false;
         }
     });
 </script>
-
-  
 </dom-module>
