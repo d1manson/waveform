@@ -271,6 +271,13 @@ Utils.canvas_manager = (function(){
         free_canvas: function(id){
             id && validate_id(id);
             store.delete(parseInt(id));
+        },
+        update_from_buffer: function(id, buffer){
+            let el = validate_id(id) && store.get(parseInt(id));
+            let ctx = el.getContext('2d');
+            var im_data = ctx.createImageData(el.width, el.height);
+            im_data.data.set(new Uint8ClampedArray(buffer));
+            ctx.putImageData(im_data, 0, 0);
         }
     };
 

@@ -2,6 +2,7 @@
 
 Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off, which makes life a little simpler.
 
+
 -->
 
 
@@ -17,8 +18,140 @@ Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off
 <script is='worker-builder' id="worker" title="cluster-plots" type='javascript/worker'>
 "use strict";
 
-var update_pkeys = function(){
 
+var palette_flag;
+
+var set_palettes = function(arrays){
+    palette_flag = new Uint32Array(arrays.flag.buffer);
+}
+
+var n_spikes;
+var chan_is_ok;
+var amps;
+var timer = 0;
+
+var pkey_generation = 0;
+var pkey_to_array = new Map();
+var pkey_to_desired_options = new Map();
+var pkeys_pending_render = [];
+
+var n_c = 4; // TODO: probably shouldn't hard code this here..see parsed-data
+var s = 256; // currently there is a 1-to-1 from amp values to pixels
+
+// note that we initalize arrays for the maximum number of plots and never delte them
+var plots = (function(){
+    let p = [];
+    for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
+        p.push(new Uint32Array(s*s));
+    }
+    return p;
+})();
+
+
+var update_pkeys = function(changes, options, arrays){
+
+    if(changes.generation_remove !== pkey_generation){
+        changes.remove = [];
+        pkey_to_array.clear();
+        pkey_to_rendered_options.clear();
+        pkeys_pending_render = [];
+        console.log("tac-plots worker: key generation mismatch");
+    }
+
+    // note we don't both to remove keys from the pending list
+    // unless we change key generation, in which case we drop 
+    // everything that's pending. This is ensures that when we
+    // attempt a render we can be sure that if we do find the
+    // array for the given key we know it's for the relevant 
+    // generation and that it's still wanted.
+
+    var remove_pkeys = changes.remove || [];
+    for(let pkey of remove_pkeys){
+        pkey_to_array.delete(pkey);
+        pkey_to_desired_options.delete(pkey);
+    }
+
+    if(changes.generation_add !== changes.generation_remove){
+        pkeys_pending_render = [];
+        pkey_generation = changes.generation_add;
+    }
+
+    var add_pkeys = changes.add || [];
+    for(let pkey of add_pkeys){
+        pkey_to_array.set(pkey, arrays[pkey]);
+    }
+
+    for(let item of options){
+        pkey_to_desired_options.set(item.pkey, item);
+        pkeys_pending_render.push(item.pkey);
+    }
+    touch_timer();
+}
+
+
+var set_amps = function(n_spikes_, chan_is_ok_, arrays){
+    n_spikes = n_spikes_;
+    chan_is_ok = chan_is_ok_;
+    amps = arrays && arrays.data; 
+    for(let ii=0; ii<plots.length; ii++){
+        plots[ii].fill(0);
+    }
+    touch_timer();
+}
+
+var touch_timer = function(){
+    // turns timer on if there's work to be done, otherwise stops it (if it was running)
+    // note it's not actually a timer, because the interval is zero!
+    // the point of using this is that it enables messages from main thread to interupt
+    // between ticks, we can thus cancel work as an when needed.
+    if(amps && pkeys_pending_render.length){
+        timer = timer || setImmediate(timer_tick);
+    } else{
+        clearImmediate(timer);
+        timer = 0;
+    }
+}
+
+var timer_tick = function(){
+    timer = 0;
+
+    // unlike tac and rm we render all pending groups in a single tick and then *copy*
+    // the results back.
+    while(pkeys_pending_render.length){
+        let pkey = pkeys_pending_render.shift();
+        let group_inds = pkey_to_array.get(pkey);
+        if(!group_inds){
+            continue;
+        }
+        let pkey_opts = pkey_to_desired_options.get(pkey);
+        let color = palette_flag[pkey_opts.group_num];
+        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+                let im = plots[p];
+                for(let ii=0; ii<group_inds.length; ii++){
+                    let a1 = amps[group_inds[ii]*n_c +c1];
+                    let a2 = amps[group_inds[ii]*n_c +c2];
+                    im[(s-1-a1)*s + a2] = color;
+                }
+            }
+        }
+    }
+
+    // copy plots into the object to send back to main, and label each plot
+    // with its channel numbers.
+    var arrays = {};
+    var plot_names = [];
+    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+        for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+            let name = (c1+1) + 'Ax' + (c2+1) + 'A';
+            arrays[name] = plots[p].slice(0);
+            plot_names.push(name);
+        }
+    }
+    exec_main_b('plot_clusters', {
+        generation: pkey_generation,
+        plots: plot_names
+    }, arrays);
 }
 
 </script>
@@ -54,9 +187,24 @@ padding-right: 2px;
 display: flex;
 flex-direction: column;
 height: 100%;
+font-size: 0px;
+}
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
 }
 .bottom{
 flex: 2;
+overflow-y: scroll;
 }
 .active_stickers{
 float: left;
@@ -69,10 +217,35 @@ display: block;
 .new_group{
 background: #ffffe0;
 }
+.plot{
+display: inline-block;
+position: relative;
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
 </style>
 
 <template>
     <iron-a11y-keys keys="enter+only" on-keys-pressed="_new_dest"  target="[[keyboard_target]]"></iron-a11y-keys>
+    <!-- TODO: replace the random unicode chars with plus and minus -->
+    <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size"  target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size"  target="[[keyboard_target]]"></iron-a11y-keys>
 
     <div class="top">
         <div class="active_stickers">
@@ -102,20 +275,27 @@ background: #ffffe0;
 
     <div class="bottom">
         <template is="dom-repeat" items="[[cluster_plots]]">
-           <managed-canvas canv_id="[[item.ckey]]"></managed-canvas>
+            <div class="plot" style$="{{_show(item.is_used)}}">
+               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]"></managed-canvas>
+               <div class="x_axis_label">[[item.x_axis]]</div>
+               <div class="y_axis_label">[[item.y_axis]]</div>
+            </div>
         </template>
     </div>
 
 </template>
-
-
 <script>
     "use strict";
     Polymer({
         is:'cluster-plots',
         properties: {
+            canvas_size: {
+                type: Number,
+                notify: true,
+                value: 128
+            },
             amplitudes: {
-                type: String,
+                type: Object,
                 notify: true,
                 value: function(){return {};}
             },
@@ -151,11 +331,35 @@ background: #ffffe0;
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
-            '_compute_unused_groups(painter_state.*)'
+            '_compute_unused_groups(painter_state.*)',
+            '_amplitudes_modified(amplitudes)'
         ], created: function(){
             var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
             this._worker = worker_builder.create_for(this);
+            this._worker.exec_b('set_palettes', {flag: Palettes.flag.slice(0)});
             this._pkey_generation = 0;
+        }, ready: function(){
+            let n_c = 4; // TODO: get this from parsed-data
+            let s = 256; // TODO: this too, and maybe alow scaling
+            let cm = Utils.canvas_manager;
+            let plots = [];
+            for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
+                plots.push({
+                    ckey: cm.store_from_dims([s,s]),
+                    is_used: false
+                });
+            }
+            this.set('cluster_plots', plots);
+            // TODO: we might want to tie the plots to the cut for ease of grabbing
+        }, _amplitudes_modified: function(){
+            if(this.amplitudes){
+                var arr = Utils.typed_array_manager.get_array_clone(this.amplitudes.amps);
+                this._worker.exec_b('set_amps', this.amplitudes.n, this.amplitudes.chan_is_ok, 
+                                    {data: arr});
+            } else {
+                if(!this._worker) return;
+                this._worker.exec('set_amps', {});
+            }
         }, _groups_set: function(new_val, old_val){
             this._compute_unused_groups();
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
@@ -170,11 +374,16 @@ background: #ffffe0;
 
             var added_arrays = {};
             var pkeys_to_add = []; 
+            var options = [];
             // get clones of new arrays to send to worker
             for(let okey of okeys_to_add){
                 if(!okey) continue;
                 pkeys_to_add.push(okey._pkey);
                 added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
+                options.push({
+                    pkey: okey._pkey,
+                    group_num: okey.group_num
+                });
             }
 
             var pkeys_to_remove = [];
@@ -189,7 +398,7 @@ background: #ffffe0;
                 remove: pkeys_to_remove,
                 generation_remove: generation_remove,
                 generation_add: generation_add
-            }, added_arrays);
+            }, options, added_arrays);
 
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
@@ -236,6 +445,28 @@ background: #ffffe0;
                     this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num);
                 }
             }
+        }, plot_clusters: function(msg, arrays){
+            if(msg.generation !== this._pkey_generation){
+                return; // pft, get with the times
+            }
+            let cm = Utils.canvas_manager;
+            for(let [ii,label] of msg.plots.entries()){
+                cm.update_from_buffer(this.cluster_plots[ii].ckey, 
+                                        arrays[label].buffer);
+                let axes = label.split('x');
+                this.set('cluster_plots.' + ii + '.x_axis', axes[1]);
+                this.set('cluster_plots.' + ii + '.y_axis', axes[0]);
+                this.set('cluster_plots.' + ii + '.is_used', true);
+            }
+            for(let ii=msg.plots.length; ii<this.cluster_plots.length; ii++){
+                this.set('cluster_plots.' + ii + '.is_used', false);
+            }
+        }, _inc_size: function(){
+            this.set('canvas_size', Math.min(this.canvas_size+32, 512));
+        }, _dec_size: function(){
+            this.set('canvas_size', Math.max(this.canvas_size-32, 32));
+        }, _show: function(v){
+            return v ? '' : 'display: none;';
         }
     });
 </script>

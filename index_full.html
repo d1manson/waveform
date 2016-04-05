@@ -332,7 +332,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 selected_files="{{selected_files}}"
             ></file-organiser>
             
-            <iron-splitter direction="up"></iron-splitter>
+            <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div class="side_panel_row side_panel_row_flex">
                 <div class="grabbable side_panel_row_flex" id="spatial_panel">
@@ -347,17 +347,18 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 </div>
             </div>
 
-            <iron-splitter direction="down"></iron-splitter>
+            <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
             
             <div class="side_panel_row">
                 <cluster-plots groups="[[cut_groups]]"
                                painter_state="{{cut_painter_state}}"
-                               ampltidues="[[ampltidues]]"></cluster-plots>                              
+                               amplitudes="[[amplitudes]]"
+                               canvas_size="{{options.cluster_plot_size}}"></cluster-plots>                              
             </div>
         
         </div-iron-resize>
 
-        <iron-splitter direction="left"></iron-splitter>
+        <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
         
         <tile-wall class="tilewall"
@@ -487,7 +488,11 @@ the_app.initializeDefaultOptions = function(ev) {
         speed_filter_mps: 4,
         pos_smoothing_s: 0.2,
         header_filter: '',
-        spa_rm_height: 120
+        spa_rm_height: 120,
+        cluster_plot_size: 128,
+        splitter_a_size: 200,
+        splitter_b_size: 300,
+        splitter_c_size: 350
     };
 }
 

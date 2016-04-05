@@ -328,7 +328,7 @@ var is_equal_simple = function(a, b){
 
             // if we already have the right answer in any cases, then we must apply that now
             // because the worker is not going to send it again
-            for(let okey of (this.groups || [])){
+            for(let okey of (this.groups || []))if(okey){
                 if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
                     cm.free_canvas(okey.tac);
                     okey.tac = okey._tac_other;

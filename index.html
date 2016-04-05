@@ -9,6 +9,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 --><!--
 @license
 Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE
+The complete set of authors may be found at http://polymer.github.io/AUTHORS
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS
+--><!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
 The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
@@ -34,6 +42,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 --paper-toolbar-height: 40px;
 --paper-toolbar-background: #efefef;
 --paper-toolbar-color: #000;
+--paper-tooltip-opacity: 0.96;
 --paper-icon-button: {
     width: 38px;
     height: 38px;
@@ -9425,6 +9434,13 @@ this.fire('dom-change');
     var SPACE_KEY = /^space(bar)?/;
 
     /**
+     * Matches ESC key.
+     *
+     * Value from: http://w3c.github.io/uievents-key/#key-Escape
+     */
+    var ESC_KEY = /^escape$/;
+
+    /**
      * Transforms the key.
      * @param {string} key The KeyBoardEvent.key
      * @param {Boolean} [noSpecialChars] Limits the transformation to
@@ -9436,6 +9452,8 @@ this.fire('dom-change');
         var lKey = key.toLowerCase();
         if (lKey === ' ' || SPACE_KEY.test(lKey)) {
           validKey = 'space';
+        } else if (ESC_KEY.test(lKey)) {
+          validKey = 'esc';
         } else if (lKey.length == 1) {
           if (!noSpecialChars || KEY_CHAR.test(lKey)) {
             validKey = lKey;
@@ -9479,10 +9497,10 @@ this.fire('dom-change');
           validKey = 'f' + (keyCode - 112);
         } else if (keyCode >= 48 && keyCode <= 57) {
           // top 0-9 keys
-          validKey = String(48 - keyCode);
+          validKey = String(keyCode - 48);
         } else if (keyCode >= 96 && keyCode <= 105) {
           // num pad 0-9
-          validKey = String(96 - keyCode);
+          validKey = String(keyCode - 96);
         } else {
           validKey = KEY_CODE[keyCode];
         }
@@ -9536,6 +9554,8 @@ this.fire('dom-change');
 
         if (keyName in MODIFIER_KEYS) {
           parsedKeyCombo[MODIFIER_KEYS[keyName]] = true;
+          parsedKeyCombo.hasModifiers = true;
+        } else if (keyName === "only"){
           parsedKeyCombo.hasModifiers = true;
         } else {
           parsedKeyCombo.key = keyName;
@@ -9647,6 +9667,13 @@ this.fire('dom-change');
         this._resetKeyEventListeners();
       },
 
+      /**
+       * Returns true if a keyboard event matches `eventString`.
+       *
+       * @param {KeyboardEvent} event
+       * @param {string} eventString
+       * @return {boolean}
+       */
       keyboardEventMatchesKeys: function(event, eventString) {
         var keyCombos = parseEventString(eventString);
         for (var i = 0; i < keyCombos.length; ++i) {
@@ -15407,6 +15434,164 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     });
   </script>
 </dom-module>
+<script>
+
+/*
+`iron-a11y-keys` provides a cross-browser interface for processing 
+keyboard commands. The interface adheres to [WAI-ARIA best 
+practices](http://www.w3.org/TR/wai-aria-practices/#kbd_general_binding). 
+It uses an expressive syntax to filter key presses.
+
+## Basic usage
+
+The sample code below is a portion of a custom element. The goal is to call
+the `onEnter` method whenever the `paper-input` element is in focus and 
+the `Enter` key is pressed.
+
+    <iron-a11y-keys id="a11y" target="[[target]]" keys="enter"
+                        on-keys-pressed="onEnter"></iron-a11y-keys>
+    <paper-input id="input"
+                 placeholder="Type something. Press enter. Check console."
+                 value="{{userInput::input}}"></paper-input>
+
+The custom element declares an `iron-a11y-keys` element that is bound to a 
+property called `target`. The `target` property
+needs to evaluate to the `paper-input` node. `iron-a11y-keys` registers 
+an event handler for the target node using Polymer's [annotated event handler
+syntax](https://www.polymer-project.org/1.0/docs/devguide/events.html#annotated-listeners). `{{userInput::input}}` sets the `userInput` property to the 
+user's input on each keystroke. 
+
+The last step is to link the two elements within the custom element's 
+registration.
+
+    ...
+    properties: {
+      userInput: {
+        type: String,
+        notify: true,
+      },
+      target: {
+        type: Object,
+        value: function() {
+          return this.$.input;
+        }
+      },
+    },
+    onEnter: function() {
+      console.log(this.userInput);
+    }
+    ...
+
+## The `keys` attribute
+
+The `keys` attribute expresses what combination of keys triggers the event.
+
+The attribute accepts a space-separated, plus-sign-concatenated 
+set of modifier keys and some common keyboard keys.
+
+The common keys are: `a-z`, `0-9` (top row and number pad), `*` (shift 8 and 
+number pad), `F1-F12`, `Page Up`, `Page Down`, `Left Arrow`, `Right Arrow`,
+`Down Arrow`, `Up Arrow`, `Home`, `End`, `Escape`, `Space`, `Tab`, `Enter`.
+
+The modifier keys are: `Shift`, `Control`, `Alt`.
+
+All keys are expected to be lowercase and shortened. E.g.
+`Left Arrow` is `left`, `Page Down` is `pagedown`, `Control` is `ctrl`, 
+`F1` is `f1`, `Escape` is `esc`, etc.
+
+### Grammar
+
+Below is the [EBNF](http://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form) 
+Grammar of the `keys` attribute.
+
+    modifier = "shift" | "ctrl" | "alt";
+    ascii = ? /[a-z0-9]/ ? ;
+    fnkey = ? f1 through f12 ? ;
+    arrow = "up" | "down" | "left" | "right" ;
+    key = "tab" | "esc" | "space" | "*" | "pageup" | "pagedown" | 
+          "home" | "end" | arrow | ascii | fnkey;
+    keycombo = { modifier, "+" }, key ;
+    keys = keycombo, { " ", keycombo } ;
+
+### Example
+
+Given the following value for `keys`: 
+
+`ctrl+shift+f7 up pagedown esc space alt+m`
+
+The event is fired if any of the following key combinations are fired: 
+`Control` and `Shift` and `F7` keys, `Up Arrow` key, `Page Down` key, 
+`Escape` key, `Space` key, `Alt` and `M` keys.
+
+### WAI-ARIA Slider Example
+
+The following is an example of the set of keys that fulfills WAI-ARIA's 
+"slider" role [best
+practices](http://www.w3.org/TR/wai-aria-practices/#slider):
+
+    <iron-a11y-keys target="[[target]]" keys="left pagedown down" 
+                    on-keys-pressed="decrement"></iron-a11y-keys>
+    <iron-a11y-keys target=""[[target]] keys="right pageup up" 
+                    on-keys-pressed="increment"></iron-a11y-keys>
+    <iron-a11y-keys target="[[target]]" keys="home" 
+                    on-keys-pressed="setMin"></iron-a11y-keys>
+    <iron-a11y-keys target=""[[target]] keys="end" 
+                    on-keys-pressed="setMax"></iron-a11y-keys>
+
+The `target` properties must evaluate to a node. See the basic usage 
+example above.
+
+Each of the values for the `on-keys-pressed` attributes must evalute
+to methods. The `increment` method should move the slider a set amount 
+toward the maximum value. `decrement` should move the slider a set amount 
+toward the minimum value. `setMin` should move the slider to the minimum 
+value. `setMax` should move the slider to the maximum value.
+
+@demo demo/index.html
+*/
+
+
+  Polymer({
+    is: 'iron-a11y-keys',
+
+    behaviors: [
+      Polymer.IronA11yKeysBehavior
+    ],
+
+    properties: {
+      /** @type {?Node} */
+      target: {
+        type: Object,
+        observer: '_targetChanged'
+      },
+
+      keys: {
+        type: String,
+        reflectToAttribute: true,
+        observer: '_keysChanged'
+      }
+    },
+
+    attached: function() {
+      if (!this.target) {
+        this.target = this.parentNode;
+      }
+    },
+
+    _targetChanged: function(target) {
+      this.keyEventTarget = target;
+    },
+
+    _keysChanged: function() {
+      this.removeOwnKeyBindings();
+      this.addOwnKeyBinding(this.keys, '_fireKeysPressed');
+    },
+
+    _fireKeysPressed: function(event) {
+      this.fire('keys-pressed', event.detail, {});
+    }
+  });
+</script>
 <dom-module id="cross-hair" assetpath="/">
 
 <template>
@@ -16343,6 +16528,13 @@ Utils.canvas_manager = (function(){
         free_canvas: function(id){
             id && validate_id(id);
             store.delete(parseInt(id));
+        },
+        update_from_buffer: function(id, buffer){
+            let el = validate_id(id) && store.get(parseInt(id));
+            let ctx = el.getContext('2d');
+            var im_data = ctx.createImageData(el.width, el.height);
+            im_data.data.set(new Uint8ClampedArray(buffer));
+            ctx.putImageData(im_data, 0, 0);
         }
     };
 
@@ -16717,15 +16909,6 @@ Utils.canvas_manager = (function(){
           this.target.notifyResize && this.target.notifyResize(); // TODO: this is super-hacky, I really don't get the iron-resize paradigm
           this.notifyResize();
       },
-      setSizePc: function(new_val){
-          var parent_size = parseInt(getComputedStyle(this.target.parentNode)[this.dimension]) || 0;
-          var size_px = parseFloat(new_val)/100*parent_size;
-          this.set('size', size_px + 'px');
-      },
-      getSizePc: function(){
-          var parent_size = parseInt(getComputedStyle(this.target.parentNode)[this.dimension]) || 0;
-          return (parseInt(this.size)/parent_size * 100);
-      },
       track: function (e) {
         if (this.locked) {
           return;
@@ -16760,6 +16943,7 @@ Utils.canvas_manager = (function(){
   </script>
 </dom-module>
 <dom-module id="undo-stack-view" assetpath="/">
+
 <style>
 .redo,
 .undo{
@@ -16776,13 +16960,14 @@ overflow: scroll;
 cursor: default;
 }
 </style>
+
 <template>
-<template is="dom-repeat" items="[[redo_stack]]">
-    <div class="redo">([[item]])</div>
-</template>
-<template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}">
-    <div class="undo">[[item]]</div>
-</template>
+    <template is="dom-repeat" items="[[redo_stack]]">
+        <div class="redo">([[item]])</div>
+    </template>
+    <template is="dom-repeat" items="{{_reversed_undo(undo_stack.splices)}}">
+        <div class="undo">[[item]]</div>
+    </template>
 </template>
 
 
@@ -16812,7 +16997,10 @@ cursor: default;
   
 </dom-module><dom-module id="cut-object" assetpath="/">
 
-<template></template>
+<template>
+    <iron-a11y-keys keys="z+only ctrl+z" on-keys-pressed="undo" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="y+only ctrl+y" on-keys-pressed="redo" target="[[keyboard_target]]"></iron-a11y-keys>
+</template>
 
 
 <script>
@@ -16895,6 +17083,7 @@ cursor: default;
         this.groups = that.groups;
         this.undo_stack = that.undo_stack;
         this.redo_stack = that.redo_stack;
+        this.painter_state = that.painter_state;
         return this;
     }
 
@@ -16961,16 +17150,25 @@ cursor: default;
                 value: function(){return [];},
                 notify: true
             },
+            painter_state: {
+                type: Object,
+                notify: true,
+                value: function(){return {};}
+            },
             cut_box: {
                 type: Object,
                 value: function(){return {};},
                 notify: true,
                 observer: '_use_cut_box'
+            },
+            keyboard_target: {
+                type: Object,
+                value: function(){return document.querySelector('body');}
             }
         },
-        _make_box: function(inds){
+        _make_okey: function(inds, num){
             return {
-                group_num: 1, // TODO: update this properly
+                group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
                 akey: Utils.typed_array_manager.store_array(inds),
@@ -17021,23 +17219,27 @@ cursor: default;
                 group_n.fill(0); // we repurpose this as a counter during arg_splitting
                 arg_split(groups, akey, group_n);
 
-                // now we are ready to create the this.groups array of boxes               
-                let boxes = [];
-                for(let gg of groups){
+                // now we are ready to create the this.groups array of okeys               
+                let okeys = [];
+                for(let [ii, gg] of groups.entries()){
                     if(gg){
-                        boxes.push(this._make_box(gg));
+                        okeys.push(this._make_okey(gg, ii));
                     }else{
-                        boxes.push(null);
+                        okeys.push(null);
                     }
                 }
                 this.undo_stack = [{
                     action: 'load'
                 }];
 
-                this.set('groups', boxes); 
+                this.set('groups', okeys); 
                 this.set('undo_stack_descriptions', ['load from file']);
                 this.set('redo_stack_descriptions', []);
                 this.redo_stack = [];
+                this.set('painter_state', {
+                    dest: 1,
+                    srcs: [0]
+                });
 
             } else if (this.cut_box && this.cut_box.is === "stack"){
                 // reinstate existing cut object
@@ -17046,6 +17248,7 @@ cursor: default;
                 this.set('redo_stack_descriptions', this.cut_box.redo_stack_descriptions);
                 this.undo_stack = this.cut_box.undo_stack;
                 this.redo_stack = this.cut_box.redo_stack;
+                this.set('painter_state', this.cut_box.painter_state);
 
             } else if(this.cut_box && this.cut_box.is === "n"){
                 // no cut_file, so just make a zero-group with inds 0:n 
@@ -17054,9 +17257,13 @@ cursor: default;
                 }];
                 this.set('undo_stack_descriptions', ['create blank cut']);
                 this.set('redo_stack_descriptions', []);
-                this.set('groups', [this._make_box(arange(this.cut_box.n_spikes))]);
+                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes))], 0);
                 this.undo_stack = [];
                 this.redo_stack = [];
+                this.set('painter_state', {
+                    dest: 1,
+                    srcs: [0]
+                });
 
             } else {
                 // clear current state
@@ -17065,7 +17272,10 @@ cursor: default;
                 this.set('redo_stack_descriptions', []);
                 this.undo_stack = [];
                 this.redo_stack = [];
-
+                this.set('painter_state', {
+                    dest: 0,
+                    srcs: [0]
+                });
             }
         },
         _fork_if_needed: function(){
@@ -17104,6 +17314,10 @@ cursor: default;
             var group_a = this.groups[a];
             var group_b = this.groups[b];
 
+            // update group_nums in preparation for announcing splice
+            group_a.group_num = b;
+            group_b.group_num = a;
+
             // TODO: check that this really is the correct way to do it
             // https://github.com/Polymer/polymer/issues/3377
             this.groups.splice(a, 1, group_b);
@@ -17121,8 +17335,11 @@ cursor: default;
 
             var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
             m.free_array(this.groups[a].akey);
-            this.splice('groups', a, 1, this._make_box(new_arrs[0]), this._make_box(new_arrs[1]));
-
+            // update group_nums in preparation for announcing splice
+            for(let ii=a+1; ii<this.groups.length; ii++){
+                this.groups[ii] && (this.groups[ii].group_num = ii+1);
+            }
+            this.splice('groups', a, 1, this._make_okey(new_arrs[0], a), this._make_okey(new_arrs[1], a+1));
             this.redo_stack.splice(0, this.redo_stack.length); // clear                   
             this.undo_stack.push({
                 action: 'split',
@@ -17150,8 +17367,9 @@ cursor: default;
 
             m.free_array(this.groups[a].akey);
             m.free_array(this.groups[b].akey);
-            this.splice('groups', b, 1);
-            this.splice('groups', a, 1, this._make_box(inds));
+
+            this.splice('groups', b, 1, null);
+            this.splice('groups', a, 1, this._make_okey(inds, a));
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear
             this.undo_stack.push({
@@ -17173,8 +17391,8 @@ cursor: default;
                 case "merge":
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 m.free_array(this.groups[delta.a].akey);
-                this.splice('groups', delta.a, 1, this._make_box(new_arrs[0]));
-                this.splice('groups', delta.b, 0, this._make_box(new_arrs[1]));
+                this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
+                this.splice('groups', delta.b, 0, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
                 break;
@@ -17186,7 +17404,11 @@ cursor: default;
                 var inds = packed[0];
                 m.free_array(this.groups[delta.a].akey);
                 m.free_array(this.groups[delta.a+1].akey);
-                this.splice('groups', delta.a, 2, this._make_box(inds));
+                // update group_nums in preparation for announcing splice
+                for(let ii=delta.a+1; a<this.groups.length; ii++){
+                    this.groups[ii] && (this.groups[ii].group_num = ii-1);
+                }
+                this.splice('groups', delta.a, 2, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
                 success = true;
                 break;
@@ -17222,8 +17444,8 @@ cursor: default;
                 var inds = packed[0];
                 m.free_array(this.groups[delta.a].akey);
                 m.free_array(this.groups[delta.b].akey);
-                this.splice('groups', delta.b, 1);
-                this.splice('groups', delta.a, 1, this._make_box(inds));
+                this.splice('groups', delta.b, 1, null);
+                this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
                 success = true;
                 break;
@@ -17233,7 +17455,10 @@ cursor: default;
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 delete delta['mask'];
                 m.free_array(this.groups[delta.a].akey);
-                this.splice('groups', delta.a, 1, this._make_box(new_arrs[0]), this._make_box(new_arrs[1]));
+                for(let ii=delta.a+1; ii<this.groups.length; i++){
+                    this.groups[ii] && (groups[ii].group_num = ii+1);
+                }
+                this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a), this._make_okey(new_arrs[1], delta.a+1));
                 success = true;
                 break;
 
@@ -17700,7 +17925,7 @@ var swap_16 = function (val) {
 
 var take_2_2_swapped = function(src, offset_bytes, stride_bytes){
     // takes 4 bytes total, swapping bytes 0 and 1, and swapping bytes 2 and 3.
-    
+
     var dest = new Uint32Array( (0 | (src.length/stride_bytes)) - (0 | (offset_bytes/stride_bytes)));
 
     for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src+=stride_bytes,p_dest++){
@@ -18272,7 +18497,6 @@ var got_ports = function(ports){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
                 main_cached_opts.add(cached_opts);
-                fkey_in_cache = cached_opts;
                 // remove the things that are already in cache
                 if(cached_opts.times){
                     delete options.times;
@@ -18386,8 +18610,10 @@ var parse_tet_file = function(buffer, fkey, options, file_name){
 
     if(options.amps){
         var data = get_amplitudes(buffer, data_start, data_len_bytes, n);
+        var good_chans = check_channels(data);
         exec_main_b('got_amplitudes', {
             data: 'data', 
+            chan_is_ok: good_chans,
             fkey: fkey,
             n_spikes: n
         }, {data: data});
@@ -18457,10 +18683,26 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     }
 }
 
+var check_channels = function(amps){
+    let small_amp = 5; // arbitrary threshold
+
+    let chan_is_ok = new Uint8Array(n_c);
+    for(let c=0; c<n_c; c++){
+        for(let ii=c; ii<amps.length; ii+=n_c){
+            chan_is_ok[c] = (amps[ii] > small_amp);
+            if(chan_is_ok[c]){
+                break;
+            }
+        }
+    }
+    return chan_is_ok;
+}
+
 var get_amplitudes = function(buffer, offset_bytes, length_bytes, n_spikes){
     var old_data = new Int8Array(buffer, offset_bytes, length_bytes);
     var amps = new Uint8Array(n_spikes * n_c);
     get_amplitudes_sub(old_data, amps, n_spikes * n_c, n_w);
+
     return amps;
 }
 
@@ -18728,8 +18970,8 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true
             },
             amplitudes: {
-                type: String,
-                value: "", // typed-array-manager id
+                type: Object,
+                value: function(){return {};}, // n, chan_is_ok bool[4], amps taid
                 notify: true,
                 readOnly: true
             },
@@ -19054,7 +19296,8 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.amps = {
                 n: msg.n_spikes,
-                amps: am.store_array(arrays.data)
+                amps: am.store_array(arrays.data),
+                chan_is_ok: msg.chan_is_ok
             };
             if(msg.fkey === this.selected_files.tet){
                 this._setAmplitudes(cached.amps);
@@ -20942,6 +21185,9 @@ font-size: 10px;
 */
 </style>
 <template>
+  <iron-a11y-keys keys="1 2 3 4 5 6 7 8 9 0" on-keys-pressed="_on_numeric_key" target="[[keyboard_target]]"></iron-a11y-keys>
+  <iron-a11y-keys keys="o" on-keys-pressed="_on_tens_key" target="[[keyboard_target]]"></iron-a11y-keys>
+
   <div class="tet_switcher" style$="[[_scroll_shadow(scrolled_down)]]">
     <div class="tet_switcher_title">tetrode:</div>
     <template is="dom-repeat" items="[[available_tets]]">
@@ -21034,6 +21280,10 @@ Polymer({
             value: function(){ return [];},
             notify: true,
             readOnly: true
+        },
+        keyboard_target: {
+            type: Object,
+            value: function(){return document.querySelector('body');}
         }
     }, created: function(){
         this._time_formatter = new Intl.DateTimeFormat({},{hour: "numeric", minute: "numeric"});
@@ -21373,7 +21623,7 @@ Polymer({
         return v ? 'selected' : '';
     }, _selected_equality: function(a, b){
         return a && a === b ? "selected" : "";
-    },_make_trial_captions: function(e){
+    }, _make_trial_captions: function(e){
         var model = e.model;
         if(!model.trial.set_caption && model.trial.set){
             model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
@@ -21456,11 +21706,26 @@ Polymer({
         let filename = trial_base + "_" + tet_num + ".cut";
         let blob_url = cut.get_blob_url(trial_base);
 
-        e.dataTransfer.setData("DownloadURL", 'application/octet-stream:' + filename +':' + blob_url);
+        e.dataTransfer.setData("DownloadURL", 'application/octet-stream:' + filename +':' + blob_url);12
         this._setIs_dragging_out(true);
         return true;
      }, _cut_dragend: function(e){
         this._setIs_dragging_out(false);
+     }, _on_numeric_key: function(e){
+        let num = parseInt(e.detail.keyboardEvent.code.slice("Digit".length)); // TODO: is there a better way of doing this?
+        let current_tens = 0|(this.selected_tet_num/10);
+        num = current_tens*10 + num;
+        if(this.available_tets.indexOf(num) > -1){
+            this.set('selected_tet_num', num);
+        }
+     }, _on_tens_key: function(){
+        let max_tet_tens = 0|(this.available_tets.slice(-1)[0]/10);
+        let current_tens = 0|(this.selected_tet_num/10);
+        current_tens = (current_tens + 1) % (max_tet_tens+1)
+        let num = current_tens*10 + (this.selected_tet_num % 10);
+        if(this.available_tets.indexOf(num) > -1){
+           this.set('selected_tet_num', num);
+        }
      }
 })
 
@@ -21605,10 +21870,10 @@ margin-top: -8%;
 background: #333;
 color: #fff;
 font-weight: bold;
-display: block;
 padding: 5px;
 display: flex;
 flex-direction: row;
+min-height: 14px;
 }
 :host{
 position: fixed;
@@ -21620,10 +21885,24 @@ min-width: 200px;
 max-width: 400px;
 max-height: 600px;
 background-color: rgba(255,255,255,0.92);
-display: none;
 z-index: 100;
 cursor: move;
 box-shadow: 3px 3px 7px #999;
+display: flex;
+flex-direction: column;
+}
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
 }
 .pane_title.wide{
 min-width: 360px;
@@ -21631,6 +21910,8 @@ min-width: 360px;
 .pane_body{
 padding: 5px;
 border: 1px solid #000;
+flex: 2;
+overflow-y: auto;
 }
 .grabber{
 position: absolute;
@@ -21676,6 +21957,7 @@ var init_x = 100;
 
 Polymer({
     is: 'floating-pane',
+    behaviors: [Polymer.IronResizableBehavior],
     properties: {
         space_is_down: {
             type: Boolean,
@@ -21705,6 +21987,8 @@ Polymer({
 
     }, attached: function(){
         var self = this;
+        this.setAttribute('hidden',true);
+
         // I don't get Polymer's listener thing..or maybe I do, but this works fine..
         this.$.grabber.addEventListener('mouseup', this._on_mouseup.bind(this));
         this.addEventListener('mousedown', this._on_drag_start.bind(this));
@@ -21753,6 +22037,14 @@ Polymer({
         this.transform('translate(' + x + "px, " + y + "px)");
     }, _wide: function(v){
         return v ? "wide" : "";
+    }, toggle: function(){
+        if(this.getAttribute('hidden')){
+            this.removeAttribute('hidden');
+            this.style.zIndex = ++top_x_index;
+        } else {
+            this.setAttribute('hidden', "true");            
+        }
+        this.notifyResize();
     }
 });
 
@@ -21847,6 +22139,19 @@ width: 100%;
 --iron-list-items-container: {
   };
 }
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
 .file_name{
 font-size: 10px;
 display: inline-block;
@@ -21862,7 +22167,7 @@ width: 100%;
 }
 </style>
 <template>
-    <iron-list items="{{_build_array(set_header, pos_header, tet_header, cut_header, header_filter)}}" as="item">
+    <iron-list id="the_list" items="{{_build_array(set_header, pos_header, tet_header, cut_header, header_filter, is_showing)}}" as="item">
         <template><div class="row">
             <div class$="[[item.class_a]]">
                 [[item.name]]
@@ -21881,6 +22186,10 @@ width: 100%;
 
 Polymer({
     is: 'header-view',
+    behaviors: [Polymer.IronResizableBehavior],
+    listeners: {
+        'iron-resize': '_on_resize'
+    },
     properties: {
         header_filter: {
             type: String,
@@ -21906,6 +22215,12 @@ Polymer({
             type: Object,
             value: function(){ return {};},
             notify: true
+        },
+        is_showing: {
+            type: Boolean,
+            value: false,
+            notify: true,
+            readOnly: true
         }
     }, observers: [
         "_clear_cache('pos', pos_header)",
@@ -21915,10 +22230,24 @@ Polymer({
     ], created: function(){
         this._cache = {};
         this._cached_for = {}; // if _clear_cache was guaranteed to be called before _build_array we wouldn't need this
+    }, _on_resize: function(){
+        let showing = true;
+        let node = this.parentNode;
+        while(node){
+            if(node.hidden){
+                showing = false;
+                break;
+            }
+            node = node.parentNode;
+        }
+        this._setIs_showing(showing);
     }, _clear_cache: function(t, ignored){
         this._cache[t] = undefined;
         this._cached_for[t] = undefined;
-    }, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter) {
+    }, _build_array: function(set_header, pos_header, tet_header, cut_header, header_filter, is_showing) {
+            if(!this.is_showing){
+                return [];
+            }
             var a = [];         
             for(let t of new Set(['tet', 'cut', 'pos', 'set'])){
                 let header = this[t + '_header'];
@@ -22268,7 +22597,7 @@ var timer_tick = function(){
     // find one valid thing to render...
     // this is somewhat ugly, but whatever.
     while(pkeys_pending_render.length > 0){
-        let pkey = pkeys_pending_render.pop();
+        let pkey = pkeys_pending_render.shift();
         let pkey_rendered_options = pkey_to_rendered_options.get(pkey)
         let inds =  pkey_to_array.get(pkey);
         if(!pkey_rendered_options){
@@ -22889,7 +23218,7 @@ var use_mask = function(vector, mask, val){
                 okey._rm_spa_other = null;
                 okey._rm_dir_other = null;
                 okey._rm_speed_other = null;
-                okey._rm_other_options = null;
+                okey._rm_other_options = {};
                 okey._rm_is_on_worker = false;
             }
 
@@ -23236,7 +23565,7 @@ var timer_tick = function(){
 
     // find one valid thing to render...
     while(pkeys_pending_render.length > 0){
-        let pkey = pkeys_pending_render.pop();
+        let pkey = pkeys_pending_render.shift();
         if(pkey && pkey_to_array.get(pkey) && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
             get_group_hist(pkey);
             break;
@@ -23407,7 +23736,7 @@ var is_equal_simple = function(a, b){
                 cm.free_canvas(okey._tac_other);
                 okey.tac = null;
                 okey._tac_other = null;
-                okey._tac_other_options = null;
+                okey._tac_other_options = {};
                 okey._tac_is_on_worker = false;
             }
 
@@ -23431,7 +23760,7 @@ var is_equal_simple = function(a, b){
 
             // if we already have the right answer in any cases, then we must apply that now
             // because the worker is not going to send it again
-            for(let okey of (this.groups || [])){
+            for(let okey of (this.groups || []))if(okey){
                 if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
                     cm.free_canvas(okey.tac);
                     okey.tac = okey._tac_other;
@@ -24419,7 +24748,7 @@ var n_w = 50; // number of t points per channel
 
 // The following are all in units of actual pixels
 var off_canv_w = 512;  // full width 
-var off_canv_h = 270;  // full height
+var off_canv_h = 800;  // full height
 var off_canv_wave_h = 128; // height of a wave
 var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
@@ -24992,9 +25321,15 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
         } if (!this._okey_to_part_rendered.has(okey)){
             // this is different to the last thing we renderd, and we weren't
             // previously planning on rendering it. So need to render from scratch
-            this._okey_to_part_rendered.set(okey, {
-                n_t: 0
-            })
+            let part = {
+                n_t: 0,
+                el_canv: document.createElement('canvas'),
+                main_has_canv: false
+            };
+            part.el_canv.width = off_canv_dt*n_c*(n_w-1);
+            part.el_canv.height = off_canv_wave_h;
+            part.ctx = part.el_canv.getContext('2d');
+            this._okey_to_part_rendered.set(okey, part);
             this._n_t_to_okeys[0].add(okey);
         } else if (this._options_match(this._okey_to_part_rendered.get(okey), okey.group_num)){
             // this matches what we are already in the middle of trying to render,
@@ -25031,12 +25366,24 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
         }
     }
 
+    // originally the idea was to wait till we've finished rendering before providing
+    // results, but actually the first time we render an okey we can actually make the
+    // canvas we are going to draw to, and send it to main immediately.
+    let results = new Map();
     for(let okey of okeys_to_add){
-        this._okey_to_part_rendered.set(okey, {
-            n_t: 0
-        });
+        let part = {
+            n_t: 0,
+            el_canv: document.createElement('canvas'),
+            main_has_canv: true
+        }
+        this._okey_to_part_rendered.set(okey, part);
+        part.el_canv.width = off_canv_dt*n_c*(n_w-1);
+        part.el_canv.height = off_canv_wave_h;
+        part.ctx = part.el_canv.getContext('2d');
         this._n_t_to_okeys[0].add(okey);
+        results.set(okey, part.el_canv);
     }
+    this._callback(results)
 
     // dealing with modifeid okey is more complicated (and we
     // also do it when render mode changes), hence it has a function...
@@ -25115,12 +25462,6 @@ WavesRenderer.prototype._timer_tick = function(){
     var y_offsets = this._render_metrics.y_offset;  
     for(let [ii, okey] of okeys.entries()){
         let part = this._okey_to_part_rendered.get(okey);
-        if(!part.el_canv){
-            part.el_canv = document.createElement('canvas');
-            part.el_canv.width = off_canv_dt*n_c*(n_w-1);
-            part.el_canv.height = off_canv_wave_h;
-            part.ctx = part.el_canv.getContext('2d');
-        }
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
     }
@@ -25137,14 +25478,17 @@ WavesRenderer.prototype._timer_tick = function(){
         // because we're on the same thread as main and get notifications about changes to groups etc..
         let results = new Map();
         for(let okey of okeys){
+            let part = this._okey_to_part_rendered.get(okey);
             let item =  {
                 mode: this._mode,
                 group_num: okey.group_num,
-                el_canv: this._okey_to_part_rendered.get(okey).el_canv
+                el_canv: part.el_canv
             };
             this._okey_to_rendered.set(okey, item);
+            if(!part.main_has_canv){
+                results.set(okey, item.el_canv);
+            }
             this._okey_to_part_rendered.delete(okey);
-            results.set(okey, item.el_canv);
         }
         this._callback(results)
 
@@ -25328,6 +25672,465 @@ Polymer({
 </script>
 
   
+</dom-module><dom-module id="cluster-plots" assetpath="/">
+
+<script is="worker-builder" id="worker" title="cluster-plots" type="javascript/worker">
+"use strict";
+
+
+var palette_flag;
+
+var set_palettes = function(arrays){
+    palette_flag = new Uint32Array(arrays.flag.buffer);
+}
+
+var n_spikes;
+var chan_is_ok;
+var amps;
+var timer = 0;
+
+var pkey_generation = 0;
+var pkey_to_array = new Map();
+var pkey_to_desired_options = new Map();
+var pkeys_pending_render = [];
+
+var n_c = 4; // TODO: probably shouldn't hard code this here..see parsed-data
+var s = 256; // currently there is a 1-to-1 from amp values to pixels
+
+// note that we initalize arrays for the maximum number of plots and never delte them
+var plots = (function(){
+    let p = [];
+    for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
+        p.push(new Uint32Array(s*s));
+    }
+    return p;
+})();
+
+
+var update_pkeys = function(changes, options, arrays){
+
+    if(changes.generation_remove !== pkey_generation){
+        changes.remove = [];
+        pkey_to_array.clear();
+        pkey_to_rendered_options.clear();
+        pkeys_pending_render = [];
+        console.log("tac-plots worker: key generation mismatch");
+    }
+
+    // note we don't both to remove keys from the pending list
+    // unless we change key generation, in which case we drop 
+    // everything that's pending. This is ensures that when we
+    // attempt a render we can be sure that if we do find the
+    // array for the given key we know it's for the relevant 
+    // generation and that it's still wanted.
+
+    var remove_pkeys = changes.remove || [];
+    for(let pkey of remove_pkeys){
+        pkey_to_array.delete(pkey);
+        pkey_to_desired_options.delete(pkey);
+    }
+
+    if(changes.generation_add !== changes.generation_remove){
+        pkeys_pending_render = [];
+        pkey_generation = changes.generation_add;
+    }
+
+    var add_pkeys = changes.add || [];
+    for(let pkey of add_pkeys){
+        pkey_to_array.set(pkey, arrays[pkey]);
+    }
+
+    for(let item of options){
+        pkey_to_desired_options.set(item.pkey, item);
+        pkeys_pending_render.push(item.pkey);
+    }
+    touch_timer();
+}
+
+
+var set_amps = function(n_spikes_, chan_is_ok_, arrays){
+    n_spikes = n_spikes_;
+    chan_is_ok = chan_is_ok_;
+    amps = arrays && arrays.data; 
+    for(let ii=0; ii<plots.length; ii++){
+        plots[ii].fill(0);
+    }
+    touch_timer();
+}
+
+var touch_timer = function(){
+    // turns timer on if there's work to be done, otherwise stops it (if it was running)
+    // note it's not actually a timer, because the interval is zero!
+    // the point of using this is that it enables messages from main thread to interupt
+    // between ticks, we can thus cancel work as an when needed.
+    if(amps && pkeys_pending_render.length){
+        timer = timer || setImmediate(timer_tick);
+    } else{
+        clearImmediate(timer);
+        timer = 0;
+    }
+}
+
+var timer_tick = function(){
+    timer = 0;
+
+    // unlike tac and rm we render all pending groups in a single tick and then *copy*
+    // the results back.
+    while(pkeys_pending_render.length){
+        let pkey = pkeys_pending_render.shift();
+        let group_inds = pkey_to_array.get(pkey);
+        if(!group_inds){
+            continue;
+        }
+        let pkey_opts = pkey_to_desired_options.get(pkey);
+        let color = palette_flag[pkey_opts.group_num];
+        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+                let im = plots[p];
+                for(let ii=0; ii<group_inds.length; ii++){
+                    let a1 = amps[group_inds[ii]*n_c +c1];
+                    let a2 = amps[group_inds[ii]*n_c +c2];
+                    im[(s-1-a1)*s + a2] = color;
+                }
+            }
+        }
+    }
+
+    // copy plots into the object to send back to main, and label each plot
+    // with its channel numbers.
+    var arrays = {};
+    var plot_names = [];
+    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+        for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+            let name = (c1+1) + 'Ax' + (c2+1) + 'A';
+            arrays[name] = plots[p].slice(0);
+            plot_names.push(name);
+        }
+    }
+    exec_main_b('plot_clusters', {
+        generation: pkey_generation,
+        plots: plot_names
+    }, arrays);
+}
+
+</script>
+
+
+<style>
+.sticker{
+display: inline-block;
+line-height: 14px;
+width: 20px;
+height: 17px;
+border: 1px solid #000;
+text-align: center;
+font-size: 10px;
+padding-top: 3px;
+margin: 1px;
+cursor: pointer;
+}
+.sticker_list{
+line-height: 19px;
+display: inline;
+font-size: 0px;
+}
+.braket{
+line-height: 19px;
+font-size: 24px;
+vertical-align: top;
+}
+:host{
+--paper-tooltip-opacity: 0.96;
+padding-left: 2px;
+padding-right: 2px;
+display: flex;
+flex-direction: column;
+height: 100%;
+font-size: 0px;
+}
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
+.bottom{
+flex: 2;
+overflow-y: scroll;
+}
+.active_stickers{
+float: left;
+display: inline-block;
+}
+.others{
+text-align: right;
+display: block;
+}
+.new_group{
+background: #ffffe0;
+}
+.plot{
+display: inline-block;
+position: relative;
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
+</style>
+
+<template>
+    <iron-a11y-keys keys="enter+only" on-keys-pressed="_new_dest" target="[[keyboard_target]]"></iron-a11y-keys>
+    
+    <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size" target="[[keyboard_target]]"></iron-a11y-keys>
+
+    <div class="top">
+        <div class="active_stickers">
+            <div class="sticker_list">
+                <div class="sticker" style$="{{_sticker_style(painter_state.dest)}}">
+                    [[painter_state.dest]] <paper-tooltip position="below">destination group [e]</paper-tooltip>
+                </div>
+            </div>
+            <span class="braket">←</span>
+            <div class="sticker_list"><span class="braket">{</span>
+                <template is="dom-repeat" items="[[painter_state.srcs]]">
+                   <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+                </template>
+                <span class="braket">}</span>
+                <paper-tooltip>source groups [e]</paper-tooltip>
+            </div>
+        </div>
+        <div class="sticker_list others">
+            <div class="sticker new_group" on-tap="_new_dest">➕
+                <paper-tooltip>new destination group [Enter]</paper-tooltip>
+            </div>
+            <template is="dom-repeat" items="[[other_groups]]">
+               <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+            </template>
+        </div>
+    </div>
+
+    <div class="bottom">
+        <template is="dom-repeat" items="[[cluster_plots]]">
+            <div class="plot" style$="{{_show(item.is_used)}}">
+               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]"></managed-canvas>
+               <div class="x_axis_label">[[item.x_axis]]</div>
+               <div class="y_axis_label">[[item.y_axis]]</div>
+            </div>
+        </template>
+    </div>
+
+</template>
+<script>
+    "use strict";
+    Polymer({
+        is:'cluster-plots',
+        properties: {
+            canvas_size: {
+                type: Number,
+                notify: true,
+                value: 128
+            },
+            amplitudes: {
+                type: Object,
+                notify: true,
+                value: function(){return {};}
+            },
+            cluster_plots: {
+                type: Array,
+                notify: true,
+                value: function(){return [];}
+            },
+            groups: {
+                type: Array,
+                notify: true,
+                value: function(){return [];},
+                observer: '_groups_set'
+            },
+            painter_state: {
+                type: Object,
+                notify: true,
+                value: function(){return {
+                    srcs: [0],
+                    dest: 0
+                }}
+            },
+            other_groups:{
+                type: Array,
+                notify: true,
+                value: function(){return [];},
+                readOnly: true // TODO: this is really a computed-property, but I couldn't get it to work with .splices
+                                // instead we use observers
+            },
+            keyboard_target: {
+                type: Object,
+                value: function(){return document.querySelector('body');}
+            }
+        }, observers: [
+            '_groups_spliced(groups.splices)',
+            '_compute_unused_groups(painter_state.*)',
+            '_amplitudes_modified(amplitudes)'
+        ], created: function(){
+            var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
+            this._worker = worker_builder.create_for(this);
+            this._worker.exec_b('set_palettes', {flag: Palettes.flag.slice(0)});
+            this._pkey_generation = 0;
+        }, ready: function(){
+            let n_c = 4; // TODO: get this from parsed-data
+            let s = 256; // TODO: this too, and maybe alow scaling
+            let cm = Utils.canvas_manager;
+            let plots = [];
+            for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
+                plots.push({
+                    ckey: cm.store_from_dims([s,s]),
+                    is_used: false
+                });
+            }
+            this.set('cluster_plots', plots);
+            // TODO: we might want to tie the plots to the cut for ease of grabbing
+        }, _amplitudes_modified: function(){
+            if(this.amplitudes){
+                var arr = Utils.typed_array_manager.get_array_clone(this.amplitudes.amps);
+                this._worker.exec_b('set_amps', this.amplitudes.n, this.amplitudes.chan_is_ok, 
+                                    {data: arr});
+            } else {
+                if(!this._worker) return;
+                this._worker.exec('set_amps', {});
+            }
+        }, _groups_set: function(new_val, old_val){
+            this._compute_unused_groups();
+            this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
+            this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
+        }, _groups_spliced: function(splices){
+            this._compute_unused_groups();
+            let parsed = Utils.parse_splices(splices);
+            this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
+        }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
+            var am = Utils.typed_array_manager;
+            var cm = Utils.canvas_manager;
+
+            var added_arrays = {};
+            var pkeys_to_add = []; 
+            var options = [];
+            // get clones of new arrays to send to worker
+            for(let okey of okeys_to_add){
+                if(!okey) continue;
+                pkeys_to_add.push(okey._pkey);
+                added_arrays[okey._pkey] = am.get_array_clone(okey.akey);
+                options.push({
+                    pkey: okey._pkey,
+                    group_num: okey.group_num
+                });
+            }
+
+            var pkeys_to_remove = [];
+            for(let okey of okeys_to_remove){
+                if(!okey) continue;
+                pkeys_to_remove.push(okey._pkey);
+            }
+
+            // inform worker of the new/deleted arrays
+            this._worker.exec_b('update_pkeys', {
+                add: pkeys_to_add,
+                remove: pkeys_to_remove,
+                generation_remove: generation_remove,
+                generation_add: generation_add
+            }, options, added_arrays);
+
+        }, _sticker_style: function(group_num){
+            return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
+        }, _compute_unused_groups: function(){
+            if(!this.groups){
+                this._setOther_groups([]);
+                return [];
+            }
+            let others = [];
+            for(let okey of this.groups)if(okey){
+                if(this.painter_state.srcs.indexOf(okey.group_num) === -1 &&
+                    this.painter_state.dest !== okey.group_num){
+                    others.push(okey.group_num)
+                }
+            }
+            this._setOther_groups(others);
+        }, _new_dest: function(){
+            // finds first unused number, ignoring zero
+            for(let [ii, gg] of this.groups.entries()){
+                if(!gg && ii>0){
+                    this.set('painter_state.dest', ii);
+                }
+            }
+            this.set('painter_state.dest', this.groups.length);
+        }, _sticker_click: function(e){
+            let num = e.model.item;
+            let index_in_src = this.painter_state.srcs.indexOf(num);
+            if(e.button === 0){
+                // left button, select as source
+                this.set('painter_state.dest', num);
+                if(index_in_src >=0){
+                    this.splice('painter_state.srcs', index_in_src, 1);
+                }
+            } else {
+                // not left button, select as dest, 
+                // splice in/out if shift down, otherwise clear array and set to just num
+                if(e.shiftKey){
+                    if(index_in_src > -1){
+                        this.splice('painter_state.srcs', index_in_src, 1);
+                    } else {
+                        this.push('painter_state.srcs', num);
+                    }
+                }else{
+                    this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num);
+                }
+            }
+        }, plot_clusters: function(msg, arrays){
+            if(msg.generation !== this._pkey_generation){
+                return; // pft, get with the times
+            }
+            let cm = Utils.canvas_manager;
+            for(let [ii,label] of msg.plots.entries()){
+                cm.update_from_buffer(this.cluster_plots[ii].ckey, 
+                                        arrays[label].buffer);
+                let axes = label.split('x');
+                this.set('cluster_plots.' + ii + '.x_axis', axes[1]);
+                this.set('cluster_plots.' + ii + '.y_axis', axes[0]);
+                this.set('cluster_plots.' + ii + '.is_used', true);
+            }
+            for(let ii=msg.plots.length; ii<this.cluster_plots.length; ii++){
+                this.set('cluster_plots.' + ii + '.is_used', false);
+            }
+        }, _inc_size: function(){
+            this.set('canvas_size', Math.min(this.canvas_size+32, 512));
+        }, _dec_size: function(){
+            this.set('canvas_size', Math.max(this.canvas_size-32, 32));
+        }, _show: function(v){
+            return v ? '' : 'display: none;';
+        }
+    });
+</script>
+
+  
 </dom-module></div>
 <paper-iconset id="meta"></paper-iconset>
 
@@ -25339,7 +26142,7 @@ Polymer({
 
     <div class="floating_layer">
             
-        <floating-pane id="action_info" style="display:initial;">
+        <floating-pane id="action_info">
             <div class="pane_title">Action List [z]</div>
             <undo-stack-view undo_stack="[[cut_undo_stack]]" redo_stack="[[cut_redo_stack]]"></undo-stack-view>
         </floating-pane>
@@ -25368,35 +26171,47 @@ Polymer({
             You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"> (see the button on the right hand side). You can also contribute to the code!
         </floating-pane>
             
-        <floating-pane id="shortcut_info">
+        <floating-pane id="shortcut_info" style="max-height: 350px;">
             <div class="pane_title">Shortcuts [k]</div>
-            Shorcuts applied to the "active" group, which is the one under the cursor:
-            <ul>
-            <li><b>e</b> set the cluster painting destination group to the active group.</li>
-            <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-            <li><b>s</b> launch the swap dialog for the "active" group.</li>
-            <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-            </ul>
-            Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
-            <ul>
-            <li><b>1 2 3 4</b> waveforms on channels 1 to 4.</li>
-            <li><b>r</b> spatial ratemap</li>
-            <li><b>c</b> directional ratemap ("c" is for circle)</li>
-            <li><b>v</b> directional ratemap ("v" is for velocity)</li>
-            <li><b>t</b> temporal autocorrelogram</li>
-            </ul>
-            Other shortcuts:
-            <ul>
-            <li><b>d</b> toggle drift rendering on/off</li>
-            <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-            <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-            <li><b>enter</b> increment cluster painting destination group</li>
-            <li><b>esc</b> open/close the toolbar</li>
-            <li><b>p</b> toggle waveform palette</li>
-            <li><b>k</b> show this info ("k" is for keyboard)</li>
-            <li><b>h</b> show header info</li>
-            <li><b>?</b> open GitHub info in a new tab</li>
-            </ul>                       
+            <p>
+                For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
+                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <alt>r</alt> 
+                by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
+                the only action linked to the shortcut.)
+            </p><p>
+                 Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+                </p><ul>
+                <li><b>w</b> waveforms</li>
+                <li><b>r</b> spatial ratemap</li>
+                <li><b>c</b> directional ratemap ("c" is for circle)</li>
+                <li><b>v</b> speed ratemap ("v" is for velocity)</li>
+                <li><b>t</b> temporal autocorrelogram</li>
+                </ul>
+            <p></p><p>
+                Shorcuts applied to the "active" group, which is the one under the cursor:
+                </p><ul>
+                <li><b>e</b> set the cluster painting destination group to the active group.</li>
+                <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+                <li><b>s</b> launch the swap dialog for the "active" group.</li>
+                <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+                </ul>           
+            <p></p><p>
+                Other shortcuts:
+                </p><ul>
+                <li><b>0-9</b> jump to tetrode number with 1s digit 0-9</li>
+                <li><b>o</b> (the letter "o") toggle 10s digit of tetrode number</li>
+                <li><b>d</b> toggle drift rendering on/off</li>
+                <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+                <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+                <li><b>enter</b> increment cluster painting destination group</li>
+                <li><b>esc</b> open/close the toolbar</li>
+                <li><b>p</b> toggle waveform palette</li>
+                <li><b>h</b> show header info</li>
+                <li><b>s</b> show pos settings</li>
+                <li><b>k</b> show this info ("k" is for keyboard)</li>
+                <li><b>?</b> open GitHub info in a new tab</li>
+                </ul>   
+            <p></p>                    
         </floating-pane>
         
         <floating-pane id="speed_info">
@@ -25411,7 +26226,7 @@ Polymer({
             </p>
         </floating-pane>
 
-        <floating-pane id="waves_info" style="display:initial;">
+        <floating-pane id="waves_info">
             <div class="pane_title">Waves [w]</div>
             <p>
                 There are two palette modes. 
@@ -25426,12 +26241,12 @@ Polymer({
             </p>
         </floating-pane>
 
-        <floating-pane id="header_info" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers" style="display: initial;">
+        <floating-pane id="header_info" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers">
             <div class="pane_title">File headers [h]</div>
             <header-view set_header="[[set_header]]" pos_header="[[pos_header]]" tet_header="[[tet_header]]" cut_header="[[_get_safe(cut_box,'header')]]" header_filter="[[options.header_filter]]"></header-view>
         </floating-pane>
 
-        <floating-pane id="rm_info" style="display: initial;">
+        <floating-pane id="rm_info">
             <div class="pane_title">Spatial ratemap [r]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
@@ -25451,7 +26266,7 @@ Polymer({
             </p>
         </floating-pane>
         
-        <floating-pane id="dir_info" style="display: initial;">
+        <floating-pane id="dir_info">
             <div class="pane_title">Directional ratemap [c]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
@@ -25467,7 +26282,7 @@ Polymer({
             </p>
         </floating-pane>
 
-        <floating-pane id="pos_info" style="display: initial;">
+        <floating-pane id="pos_info">
             <div class="pane_title">position post processing</div>
             <p>
                 If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
@@ -25571,7 +26386,7 @@ Polymer({
 
             <file-organiser class="side_panel_row" id="the_file_organiser" is_dragging_in="{{drop_in_progress}}" no_files="{{no_files}}" selected_files="{{selected_files}}"></file-organiser>
             
-            <iron-splitter direction="up"></iron-splitter>
+            <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div class="side_panel_row side_panel_row_flex">
                 <div class="grabbable side_panel_row_flex" id="spatial_panel">
@@ -25586,31 +26401,15 @@ Polymer({
                 </div>
             </div>
 
-            <iron-splitter direction="down"></iron-splitter>
+            <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
             
             <div class="side_panel_row">
-                <div id="cluster_info" class="cluster_info above_scrollable_area">
-                        <div class="cluster_painter">
-                            <div class="cluster-sticker" id="painter-dest">?</div> 
-                            <paper-tooltip for="painter-dest" position="right">destination group [e]</paper-tooltip>
-                            ← {
-                            <div id="painter-src">
-                                <div class="cluster-sticker">?</div>
-                            </div> 
-                            <paper-tooltip for="painter-src">source groups [f]</paper-tooltip>
-                            }
-                        </div>
-                        <div class="cluster_others">
-                        </div>
-                    </div>
-                <div id="cluster_panel" class="scrollable_area grabbable side_panel_row_flex">
-                    <cross-hair id="cluster_crosshair" show-bars="0"></cross-hair>
-                </div>
+                <cluster-plots groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}"></cluster-plots>                              
             </div>
         
         </div-iron-resize>
 
-        <iron-splitter direction="left"></iron-splitter>
+        <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
         
         <tile-wall class="tilewall" groups="{{cut_groups}}" options="[[options]]"></tile-wall>
@@ -25644,13 +26443,29 @@ Polymer({
 
     <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}"></parsed-data>
 
-    <cut-object groups="{{cut_groups}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+    <cut-object groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
     <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show_pos_plots="[[options.show_pos_plots]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
 
     <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]"></tac-plots> 
                 
     <wave-plots groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]"></wave-plots> 
+    
+    <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+r" on-keys-pressed="toggle_spa_rm_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+c" on-keys-pressed="toggle_dir_rm_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+v" on-keys-pressed="toggle_speed_rm_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+t" on-keys-pressed="toggle_tac_pane" target="[[keyboard_target]]"></iron-a11y-keys>    
+    <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+
+      
+    <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="¿+alt" on-keys-pressed="toggle_help_pane" target="[[keyboard_target]]"></iron-a11y-keys>   
+    
     
 </template>
 
@@ -25679,7 +26494,11 @@ the_app.initializeDefaultOptions = function(ev) {
         speed_filter_mps: 4,
         pos_smoothing_s: 0.2,
         header_filter: '',
-        spa_rm_height: 120
+        spa_rm_height: 120,
+        cluster_plot_size: 128,
+        splitter_a_size: 200,
+        splitter_b_size: 300,
+        splitter_c_size: 350
     };
 }
 
@@ -25711,6 +26530,47 @@ the_app._make_pos_smoothing_caption = function(v){
 the_app._make_spa_rm_height_caption = function(v){
     return v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
 }
+
+the_app.toggle_palette = function(){
+    the_app.set('options.waves_render_mode', the_app.options.waves_render_mode === "density" ? 
+                        "flag" : "density");
+}
+
+the_app.toggle_action_pane = function(){
+    the_app.$.action_info.toggle();
+}
+the_app.toggle_keyboard_pane = function(){
+    the_app.$.shortcut_info.toggle();
+}
+the_app.toggle_tac_pane = function(){
+    the_app.$.tc_info.toggle();
+}
+the_app.toggle_spa_rm_pane = function(){
+    the_app.$.rm_info.toggle();
+}
+the_app.toggle_dir_rm_pane = function(){
+    the_app.$.dir_info.toggle();
+}
+the_app.toggle_speed_rm_pane = function(){
+    the_app.$.speed_info.toggle();
+}
+the_app.toggle_pos_pane = function(){
+    the_app.$.pos_info.toggle();
+}
+the_app.toggle_palette_pane = function(){
+    the_app.$.waves_info.toggle();
+}
+the_app.toggle_header_pane = function(){
+    the_app.$.header_info.toggle();
+}
+the_app.toggle_help_pane = function(){
+    the_app.$.help_info.toggle();
+}
+the_app.open_github = function(){
+    window.open('https://github.com/d1manson/waveform', '_blank');
+}
+the_app.keyboard_target = document.querySelector('body');
+
 the_app.addEventListener('dom-change', function(){
     window.c = document.getElementsByTagName('cut-object')[0]; //debug only
 })

@@ -980,8 +980,10 @@ var parse_tet_file = function(buffer, fkey, options, file_name){
 
     if(options.amps){
         var data = get_amplitudes(buffer, data_start, data_len_bytes, n);
+        var good_chans = check_channels(data);
         exec_main_b('got_amplitudes', {
             data: 'data', 
+            chan_is_ok: good_chans,
             fkey: fkey,
             n_spikes: n
         }, {data: data});
@@ -1051,10 +1053,26 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     }
 }
 
+var check_channels = function(amps){
+    let small_amp = 5; // arbitrary threshold
+
+    let chan_is_ok = new Uint8Array(n_c);
+    for(let c=0; c<n_c; c++){
+        for(let ii=c; ii<amps.length; ii+=n_c){
+            chan_is_ok[c] = (amps[ii] > small_amp);
+            if(chan_is_ok[c]){
+                break;
+            }
+        }
+    }
+    return chan_is_ok;
+}
+
 var get_amplitudes = function(buffer, offset_bytes, length_bytes, n_spikes){
     var old_data = new Int8Array(buffer, offset_bytes, length_bytes);
     var amps = new Uint8Array(n_spikes * n_c);
     get_amplitudes_sub(old_data, amps, n_spikes * n_c, n_w);
+
     return amps;
 }
 
@@ -1322,8 +1340,8 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true
             },
             amplitudes: {
-                type: String,
-                value: "", // typed-array-manager id
+                type: Object,
+                value: function(){return {};}, // n, chan_is_ok bool[4], amps taid
                 notify: true,
                 readOnly: true
             },
@@ -1648,7 +1666,8 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.amps = {
                 n: msg.n_spikes,
-                amps: am.store_array(arrays.data)
+                amps: am.store_array(arrays.data),
+                chan_is_ok: msg.chan_is_ok
             };
             if(msg.fkey === this.selected_files.tet){
                 this._setAmplitudes(cached.amps);

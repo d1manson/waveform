@@ -191,15 +191,6 @@ Example:
           this.target.notifyResize && this.target.notifyResize(); // TODO: this is super-hacky, I really don't get the iron-resize paradigm
           this.notifyResize();
       },
-      setSizePc: function(new_val){
-          var parent_size = parseInt(getComputedStyle(this.target.parentNode)[this.dimension]) || 0;
-          var size_px = parseFloat(new_val)/100*parent_size;
-          this.set('size', size_px + 'px');
-      },
-      getSizePc: function(){
-          var parent_size = parseInt(getComputedStyle(this.target.parentNode)[this.dimension]) || 0;
-          return (parseInt(this.size)/parent_size * 100);
-      },
       track: function (e) {
         if (this.locked) {
           return;
