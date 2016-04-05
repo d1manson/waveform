@@ -295,7 +295,7 @@ var swap_16 = function (val) {
 
 var take_2_2_swapped = function(src, offset_bytes, stride_bytes){
     // takes 4 bytes total, swapping bytes 0 and 1, and swapping bytes 2 and 3.
-    
+
     var dest = new Uint32Array( (0 | (src.length/stride_bytes)) - (0 | (offset_bytes/stride_bytes)));
 
     for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src+=stride_bytes,p_dest++){
@@ -867,7 +867,6 @@ var got_ports = function(ports){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
                 main_cached_opts.add(cached_opts);
-                fkey_in_cache = cached_opts;
                 // remove the things that are already in cache
                 if(cached_opts.times){
                     delete options.times;
