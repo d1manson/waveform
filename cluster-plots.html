@@ -328,6 +328,11 @@ font-size: 10px;
             keyboard_target: {
                 type: Object,
                 value: function(){return document.querySelector('body');}
+            },
+            want_amplitudes: {
+                type: Array,
+                notify: true,
+                observer: '_want_amplitudes_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -351,6 +356,8 @@ font-size: 10px;
             }
             this.set('cluster_plots', plots);
             // TODO: we might want to tie the plots to the cut for ease of grabbing
+        }, _want_amplitudes_set: function(){
+            this.push('want_amplitudes', 'cluster-plots');
         }, _amplitudes_modified: function(){
             if(this.amplitudes){
                 var arr = Utils.typed_array_manager.get_array_clone(this.amplitudes.amps);

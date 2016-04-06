@@ -48,7 +48,15 @@ of the wave buffers fixed as though all were in use, but only upload those that 
 be careful when building render metrics and using them.
 
 
-http://jsperf.com/looped-drawimage/5
+Notes on show-toggling....
+This is a bit messy because some of the logic is within WavesRenderer and some is in the polymer element. 
+And the WavesRenderer doesn't actually fully toggle off everything when show is off (="n").  And we use
+"yyyy"/"nnnn" in the polymer element but "y"/"n" in the WavesRenderer.  And there's a disctinction between
+want_data_for_gl and whether or not the data is actually availble.
+The WavesRenderer has a ._show property. When this is "n" no rendering will occurr, but canvases
+are still created. If voltage data is avilable for the current tetrode it will not be removed from the gpu until
+the tetrode is switched. The polymer element only provides voltage data to the WavesRenderer if show is
+on in the element ("yyyy")....TODO: clean this all up.p
 -->
 
 
@@ -357,7 +365,7 @@ var WavesRenderer = function(callback, debug){
         this._n_t_to_okeys.push(new Set()); // slightly wasteful, but probably not terrible in the grand scheme of things
     }
     this._okey_to_rendered = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
-    this.show = 'y'; // currently you cannot toggle individual channels.
+    this._show = 'n'; // currently you cannot toggle individual channels.
     this._has_voltages = false;
     this._timer = 0;
 }
@@ -632,7 +640,7 @@ WavesRenderer.prototype._options_match = function(a, group_num){
     if(!a || a.mode !== this._mode){
         return false;
     }
-    if(a._mode === 'density'){
+    if(a.mode === 'density'){
         return true;
     } else if(this._mode === 'flag' && a.group_num == group_num){
         return true;
@@ -708,8 +716,8 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
     for(let okey of okeys_to_add){
         let part = {
             n_t: 0,
-            el_canv: document.createElement('canvas'),
-            main_has_canv: true
+            el_canv: document.createElement('canvas'), // TODO: might be good to avoid creating canvas entierly when show="n"
+            main_has_canv: this._show === "y"
         }
         this._okey_to_part_rendered.set(okey, part);
         part.el_canv.width = off_canv_dt*n_c*(n_w-1);
@@ -718,7 +726,9 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
         this._n_t_to_okeys[0].add(okey);
         results.set(okey, part.el_canv);
     }
-    this._callback(results)
+    if(this._show === "y"){
+        this._callback(results);        
+    }
 
     // dealing with modifeid okey is more complicated (and we
     // also do it when render mode changes), hence it has a function...
@@ -730,13 +740,24 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
 }
 
 
+WavesRenderer.prototype.set_show = function(v){
+    this._show = v;
+    if(this._show === "n"){
+        for(let opts of this._okey_to_part_rendered.values()){
+            opts.main_has_canv = false;
+        }        
+    } else {
+        this._deal_with_modified_okeys(this._okey_to_rendered.keys());
+    }
+    this._touch_timer();
+}
 
 WavesRenderer.prototype._touch_timer = function(){
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from elsewhere to interupt
     // between ticks, we can thus cancel work as and when needed.
-    if(this._has_voltages && this._okey_to_part_rendered.size && this.show === 'y'){
+    if(this._has_voltages && this._okey_to_part_rendered.size && this._show === 'y'){
         this._timer = this._timer || setImmediate(this._timer_tick.bind(this));
     } else{
         clearImmediate(this._timer);
@@ -748,6 +769,9 @@ WavesRenderer.prototype._touch_timer = function(){
 WavesRenderer.prototype._timer_tick = function(){
     // This is the where the main render takes place.
     this._timer = 0;
+    if(this._show === "n"){
+        return;
+    }
 
     // TODO: we really don't need this mode-switching stuff here, 
     // though it's not a big deal I suppose.
@@ -935,6 +959,11 @@ Polymer({
             value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
             notify: true
         },
+        want_data_for_gl: {
+            type: Array,
+            notify: true,
+            observer: 'want_data_for_gl_set'
+        }
     },
     observers: [
         '_groups_spliced(groups.splices)',
@@ -947,19 +976,46 @@ Polymer({
         } catch (e){
             console.log("failed to create renderer....\n" + e);
         }
+        this._has_want_data_for_gl_ref = false;
+    }, want_data_for_gl_set: function(){
+        this._show_chans_changed(this.show_chans);
     }, _data_for_gl_changed: function(){
-        var am = Utils.typed_array_manager;
-        this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
-        this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
-    }, _show_chans_changed: function(){
+        // note that if gl data was avaialble and then we turned off show we will
+        // get a null-ing event the next time the tet file changes...which is good.
+        let is_null = !(this.data_for_gl && this.data_for_gl.voltages);
+        let am = Utils.typed_array_manager;
+        this._renderer_has_voltages = false;
+        if(is_null || this.show_chans === "yyyy"){ 
+            this._renderer_has_voltages = true;
+            this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
+            this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
+        } 
+    }, _show_chans_changed: function(show_chans){
+        if(!this.want_data_for_gl){
+            return;
+        }
         // note that unlike in rm/tac-plots, we let the renderer deal
         // with the complexities of show/hide, i.e. _update_okeys always
         // sends it the full update lists.  That's because sending messages
         // in this case does not invlove cloning and posting arrays.
-        if(this.show_chans === 'yyyy'){
-            this._renderer.show = 'y';
-        } else if (this.show_chans === 'nnnn'){
-            this._renderer.show = 'n';
+        if(show_chans === 'yyyy'){
+            let idx = this.want_data_for_gl.indexOf("wave-plots");
+            (idx === -1) && this.push('want_data_for_gl', "wave-plots");
+
+            this._renderer.set_show('y');
+            if(!this._renderer_has_voltages){
+                this._data_for_gl_changed(); // neccessarry if the gl data is already available, we just didnt' use it
+            }
+        } else if (show_chans === 'nnnn'){
+            let idx = this.want_data_for_gl.indexOf("wave-plots");
+            (idx > -1) && this.splice('want_data_for_gl', idx, 1);
+
+            this._renderer.set_show('n');
+            let cm = Utils.canvas_manager;
+            for(let okey of this.groups) if(okey && okey.waves){
+                cm.free_canvas(okey.waves); // the WavesRenderer will still hold a reference to this canvas in this case 
+                this.set('groups.' + okey._pkey + '.waves', null);
+            }
         } else {
             this.set('show_chans', 'yyyy');
             console.log("currently channels cannot be toggled individually");

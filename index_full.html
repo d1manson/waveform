@@ -368,7 +368,9 @@ box-shadow: inset 0 0 2px 1px #ccc;
                 <cluster-plots groups="[[cut_groups]]"
                                painter_state="{{cut_painter_state}}"
                                amplitudes="[[amplitudes]]"
-                               canvas_size="{{options.cluster_plot_size}}"></cluster-plots>                              
+                               canvas_size="{{options.cluster_plot_size}}"
+                               want_amplitudes="{{want_amplitudes}}">
+                               </cluster-plots>                              
             </div>
         
         </div-iron-resize>
@@ -425,7 +427,11 @@ box-shadow: inset 0 0 2px 1px #ccc;
         cut_box="{{cut_box}}"
         tet_header="{{tet_header}}"
         pos_header="{{pos_header}}"
-        set_header="{{set_header}}"></parsed-data>
+        set_header="{{set_header}}"
+        want_data_for_gl="{{want_data_for_gl}}"
+        want_amplitudes="{{want_amplitudes}}"
+        want_spike_times="{{want_spike_times}}"
+        ></parsed-data>
 
     <cut-object 
         groups="{{cut_groups}}"
@@ -446,19 +452,22 @@ box-shadow: inset 0 0 2px 1px #ccc;
         smoothing_spa_bins="[[options.smoothing_spa_bins]]"
         max_rate_spa="[[options.max_rate_spa]]"
         deg_per_dir_bin="[[options.deg_per_dir_bin]]"
-        smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+        smoothing_dir_bins="[[options.smoothing_dir_bins]]"
+        want_spike_times="{{want_spike_times}}"></rm-plots> 
 
     <tac-plots 
         groups="{{cut_groups}}" 
         max_delta_t="[[options.max_delta_t]]"
         spike_times="[[spike_times]]"
-        show="[[options.show_tac]]"></tac-plots> 
+        show="[[options.show_tac]]"
+        want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
     <wave-plots
         groups="{{cut_groups}}" 
         data_for_gl="[[data_for_gl]]"
         palette_mode="[[options.waves_render_mode]]"
-        show_chans="[[options.show_waves]]"></wave-plots> 
+        show_chans="[[options.show_waves]]"
+        want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -470,10 +479,15 @@ box-shadow: inset 0 0 2px 1px #ccc;
     <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane"    target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="w+only w+shift" on-keys-pressed="show_key_wav"     target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="r+only r+shift" on-keys-pressed="show_key_rm"      target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="c+only c+shift" on-keys-pressed="show_key_dir"     target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd"     target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc"      target="[[keyboard_target]]"></iron-a11y-keys>
 
      <!-- TODO: use question mark key when bug is fixed: https://github.com/PolymerElements/iron-a11y-keys-behavior/issues/27#issuecomment-184833697 --> 
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github"              target="[[keyboard_target]]"></iron-a11y-keys>
-    <iron-a11y-keys keys="¿+alt" on-keys-pressed="toggle_help_pane"              target="[[keyboard_target]]"></iron-a11y-keys>   
+    <iron-a11y-keys keys="¿+alt" on-keys-pressed="toggle_help_pane"          target="[[keyboard_target]]"></iron-a11y-keys>   
     
     
 </template>
@@ -591,12 +605,28 @@ the_app.open_github = function(){
 the_app._yn_to_bool = function(v, index){
     return (v && v[index] === 'y');
 }
-the_app.show_tap = function(e){
+
+the_app.show_key_wav = function(e){
+    the_app.toggle_show('show_wav', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_rm = function(e){
+    the_app.toggle_show('show_rm', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_dir = function(e){
+    the_app.toggle_show('show_dir', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_spd = function(e){
+    the_app.toggle_show('show_spd', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_tc = function(e){
+    the_app.toggle_show('show_tc', e.detail.keyboardEvent.shiftKey);
+}
+
+the_app.toggle_show = function(id, shiftKey){
     // This is a bit ugly sadly. We want to allow basic toggling
     // without shift, and multi-toggling with shift.
-    let id = e.target.id;
     let result;
-    if(!e.detail.sourceEvent.shiftKey){
+    if(!shiftKey){
         result = {
             waves: 'nnnn',
             tac: 'n',
@@ -674,12 +704,14 @@ the_app.show_tap = function(e){
             }
             break;
         } 
-
     }
-
     the_app.set('options.show_waves', result.waves);
     the_app.set('options.show_tac', result.tac);
     the_app.set('options.show_rms', result.rms);
+}
+
+the_app.show_tap = function(e){
+    the_app.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
     e.preventDefault(); 
 }
 

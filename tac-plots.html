@@ -260,6 +260,10 @@ var is_equal_simple = function(a, b){
                 value: function(){return [];},
                 notify: true,
                 observer: '_groups_set'
+            }, want_spike_times: {
+                type: Array,
+                notify: true,
+                observer: 'want_spike_times_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)', 
@@ -278,6 +282,8 @@ var is_equal_simple = function(a, b){
             this._worker = worker_builder.create_for(this);
             this._pkey_generation = 0;
             this._times_is_on_worker = false;
+        }, want_spike_times_set: function(){
+            this._show_changed(this.show);
         }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
@@ -324,17 +330,8 @@ var is_equal_simple = function(a, b){
             this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
         }, _options_modified: function(){
             this._options.max_delta_t = this.max_delta_t;
+            this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
-
-            // if we already have the right answer in any cases, then we must apply that now
-            // because the worker is not going to send it again
-            for(let okey of (this.groups || []))if(okey){
-                if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
-                    cm.free_canvas(okey.tac);
-                    okey.tac = okey._tac_other;
-                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
-                }
-            }
         }, _times_modified: function(){
             if(this.show === 'y'){
                 if(this.spike_times){
@@ -348,28 +345,65 @@ var is_equal_simple = function(a, b){
             } else {
                 if(!this.spike_times && this._times_is_on_worker){
                     this._worker.exec('set_spike_times', {});
-                }
+                } 
                 this._times_is_on_worker = false;
             }
-        }, _show_changed: function(){
-            if(this.show === 'y'){
-                var added = [];
-                for(let okey of (this.groups || []))if(!okey._tac_is_on_worker){
-                    added.push(okey);
+        },  _use_other_if_possible: function(okeys){
+            // The okey._tac_other stores the last canvas from the worker,
+            // with okey._tac_other_options containing the render settings used.
+            // Here we check whether the rendered options match what we currently
+            // want, and if so we set the visible okey.tac property from the
+            // okey._tac_other value. We also deal with hiding canvases on show='n'.
+            let cm = Utils.canvas_manager;
+
+            for(let okey of okeys) if(okey){
+                // are the okey.rm_x and okey._rm_x_other the same?
+                let same = okey.tac === okey._tac_other;
+
+                //0 : no-op, +1 : use _other values, -1: set to null
+                let op = this.show === 'n' ? 
+                           ( okey.tac ? -1 : 0 )
+                         : ( !same && Utils.is_equal_simple(okey._tac_other_options, this._options) ? 1  : 0 );
+
+                if(op){
+                    (!same) && cm.free_canvas(okey.tac);
+                    okey.tac = op === 1 ? okey._tac_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
                 }
-                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
+            }
+
+        }, _show_changed: function(show){
+            if(!this.want_spike_times){
+                return;
+            }
+            this._use_other_if_possible(this.groups || []);
+
+            if (show === 'n'){
+                let idx = this.want_spike_times.indexOf("tac-plots");
+                (idx > -1) && this.splice('want_spike_times', idx, 1);
+                
+            } else if(show === 'y'){
+                let idx = this.want_spike_times.indexOf("tac-plots");
+                (idx === -1) && this.push('want_spike_times', "tac-plots");
+
+                // while show was false we avoided sending times to worker...
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
-            } else if (this.show === 'n'){
-                // nothing to do here
+
+                // and we avoided sending group inds to worker...
+                let added = [];
+                for(let okey of (this.groups || []))if(okey && !okey._tac_is_on_worker){
+                    added.push(okey);
+                }
+                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
             } else {
                 console.log("invalid value for tac show");
                 this.set('show', 'y');
+                return;
             }
-            if(this._worker){
-                this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
-            }
+
+            this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
         }, plot_hist: function(data, arrays) {
             if(data.generation !== this._pkey_generation)
                 return; // pft! get with the times, dude.
@@ -378,15 +412,10 @@ var is_equal_simple = function(a, b){
                 return;
             }
             let cm = Utils.canvas_manager;
-            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
-            cm.free_canvas(okey._tac_other);
-            okey._tac_other = ckey;
+            (okey._tac_other !== okey.tac) && cm.free_canvas(okey._tac_other);
+            okey._tac_other = cm.store_from_buffer(arrays.hist.buffer, data.dims);
             okey._tac_other_options = data.render_options;
-            if(Utils.is_equal_simple(data.render_options, this._options)){
-                cm.free_canvas(okey.tac);
-                okey.tac = ckey;
-                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
-            }
+            this._use_other_if_possible([okey]);
         }
 
     });

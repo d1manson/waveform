@@ -16,8 +16,7 @@ be considered invalidated, this might be 'pos_xy', or 'cm_per_spa_bin', etc.
 
 Thirdly, there's just more inputs to the calculation, so there's more to keep track of.
 
-TODO: deal with show's impact on tick, and send data back to main. Also deal with limits
-  of xy ratemap...and possibly some other stuff too.
+TODO:  deal with limits of xy ratemap...and possibly some other stuff too.
 
 And..
 
@@ -130,7 +129,7 @@ var set_spike_times = function(timebase, arrays){
 }
 
 var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -157,7 +156,7 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
 }
 
 var set_pos_dir = function(timebase, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -171,7 +170,7 @@ var set_pos_dir = function(timebase, arrays){
 }
 
 var set_pos_speed = function(timebase, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -498,7 +497,7 @@ var make_cached_speed_bins_and_dwell = function(){
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(let i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_speed.length;i++)
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
     
@@ -845,6 +844,11 @@ var use_mask = function(vector, mask, val){
                 value: function(){return [];},
                 notify: true,
                 observer: '_groups_set'
+            },
+            want_spike_times: {
+                type: Array,
+                notify: true,
+                observer: '_want_spike_times_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -873,7 +877,9 @@ var use_mask = function(vector, mask, val){
             this._pos_xy_is_on_worker = false;
             this._pos_dir_is_on_worker = false;
             this._pos_speed_is_on_worker = false;
-        },  _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
+        }, _want_spike_times_set: function(){
+            this._show_changed(this.show);
+        }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
 
@@ -919,6 +925,56 @@ var use_mask = function(vector, mask, val){
                 generation_add: generation_add
             }, added_arrays);
 
+        }, _use_other_if_possible: function(okeys){
+            // The okey._rm_x_other stores the last canvas from the worker,
+            // with okey._rm_other_options containing the render settings used.
+            // Here we check whether the rendered options match what we currently
+            // want, and if so we set the visible okey.rm_x property from the
+            // okey._rm_x_other value. We also deal with hiding canvases on show='n'.
+            let cm = Utils.canvas_manager;
+
+            for(let okey of okeys) if(okey){
+                let op; // 0 : no-op, +1 : use _other values, -1: set to null
+                let same; // are the okey.rm_x and okey._rm_x_other the same?
+
+                // spa
+                same = okey.rm_spa === okey._rm_spa_other;
+                op = this.show[0] === 'n' ? 
+                         ( okey.rm_spa ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_spa);
+                    okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
+                    okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
+                }
+
+                // dir
+                same = okey.rm_dir === okey._rm_dir_other;
+                op = this.show[1] === 'n' ? 
+                         ( okey.rm_dir ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_dir);
+                    okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
+                    okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
+                }
+
+                // speed
+                same = okey.rm_speed === okey._rm_speed_other;
+                op = this.show[2] === 'n' ? 
+                         ( okey.rm_speed ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
+                }
+            }
+
         }, _options_modified: function(){
             let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
@@ -926,67 +982,61 @@ var use_mask = function(vector, mask, val){
             this._options.max_rate_spa = this.max_rate_spa;
             this._options.deg_per_dir_bin = this.deg_per_dir_bin;
             this._options.smoothing_dir_bins = this.smoothing_dir_bins;
+            this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
-
-            // if we already have the right answer in any cases, then we must apply that now
-            // because the worker is not going to send it again
-            for(let okey of (this.groups || []))if(okey){
-                if(okey.rm_spa !== okey._rm_spa_other && 
-                    this._options_match(okey._rm_other_options, this._options, "spa")){
-                    cm.free_canvas(okey.rm_spa);
-                    okey.rm_spa = okey._rm_spa_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);         
-                }
-                if(okey.rm_dir !== okey._rm_dir_other && 
-                    this._options_match(okey._rm_other_options, this._options, "dir")){
-                    cm.free_canvas(okey.rm_dir);
-                    okey.rm_dir = okey._rm_dir_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);            
-                }
-                if(okey.rm_speed !== okey._rm_speed_other && 
-                    this._options_match(okey._rm_other_options, this._options, "dir")){
-                    cm.free_canvas(okey.rm_speed);
-                    okey.rm_speed = okey._rm_speed_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);            
-                }
-            }
         }, _groups_set: function(new_val, old_val){
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
             this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
         }, _groups_spliced: function(splices){
             let parsed = Utils.parse_splices(splices);
             this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
-        }, _show_changed: function(){
-            // TODO: I'm not sure what state all the show-related stuff is in, review it carefully and 
-            // finish implementing it.
-            if(this.show !== 'nnn' && this.groups){  
+        }, _show_changed: function(show){
+            if(!this.want_spike_times){
+                return;
+            }
+            if (!this.show.match(/^[yn]{3}$/)){
+                console.log("bad rm show value");
+                return;
+            }
 
-                var added = [];
-                for(let okey of this.groups) if(!okey._rm_is_on_worker){
-                    added.push(okey);
-                }
-                this._update_okeys([], added, this._key_generation, this._key_generation);
+            this._use_other_if_possible(this.groups || []);
+
+            if(show === "nnn"){
+                let idx = this.want_spike_times.indexOf("rm-plots");
+                (idx > -1) && this.splice('want_spike_times', idx, 1);
+
+            } else {  
+                let idx = this.want_spike_times.indexOf("rm-plots");
+                (idx === -1) && this.push('want_spike_times', "rm-plots");
+
+                // if show was completely off we avoided sending times to worker...
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
-                if(this.show[0] === 'y' && !this._pos_xy_is_on_worker){
-                    this._pos_xy_modified();
+
+                // and we avoided sending group inds to worker...
+                let added = [];
+                for(let okey of (this.groups || [])) if(okey && !okey._rm_is_on_worker){
+                    added.push(okey);
                 }
-                if(this.show[1] === 'y' && !this._pos_dir_is_on_worker){
-                    this._pos_dir_modified();
-                }
-                if(this.show[2] === 'y' && !this._pos_speed_is_on_worker){
-                    this._pos_speed_modified();
-                }
-            } else if (this.show.match(/^[yn]{3}$/)){
-                // nothing to do here
-            } else {
-                throw "invalid value for show";
+                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
+
             }
-            if(this._worker){
-                this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
+         
+            // and we avoided sending the individual pos data types to the worker...
+            if(show[0] === 'y' && !this._pos_xy_is_on_worker){
+                this._pos_xy_modified();
             }
+            if(show[1] === 'y' && !this._pos_dir_is_on_worker){
+                this._pos_dir_modified();
+            }
+            if(show[2] === 'y' && !this._pos_speed_is_on_worker){
+                this._pos_speed_modified();
+            }
+
+            this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
+            this._setPos_path(null);
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
@@ -1051,7 +1101,7 @@ var use_mask = function(vector, mask, val){
                 }
                 this._times_is_on_worker = false;
             }
-        }, _options_match: function(a,b,kind){
+        }, _options_match: function(a, b, kind){
             if((!a && b) || (a && !b)){
                 return false;
             }
@@ -1059,16 +1109,13 @@ var use_mask = function(vector, mask, val){
                 return a.smoothing_spa_bins === b.smoothing_spa_bins
                     && a.cm_per_spa_bin == b.cm_per_spa_bin
                     && a.max_rate_spa == b.max_rate_spa;
-            }
-            if(kind === "dir"){
+            } else if(kind === "dir"){
                 return a.smoothing_dir_bins === b.smoothing_dir_bins
                     && a.deg_per_dir_bin == b.deg_per_dir_bin;
-            }
-            if(kind === "speed"){
+            } else if(kind === "speed"){
                 return a.max_speed === b.max_speed
                     && a.cps_per_speed_bin === b.cps_per_speed_bin;
             }
-            throw "what kind?";
         }, _copy_options: function(dest, src, kind){
             if(kind === "spa"){
                 dest.smoothing_spa_bins = src.smoothing_spa_bins;
@@ -1080,63 +1127,34 @@ var use_mask = function(vector, mask, val){
             } else if(kind === "speed"){
                 dest.max_speed = src.max_speed;
                 dest.cps_per_speed_bin = src.cps_per_speed_bin;
-            } else {
-                throw "what?"
             }
         }, plot_things: function(msg, arrays) {
             if(msg.generation !== this._pkey_generation){
                 return; // pft! get with the times, dude.
             }
-
             let okey = this._groups_collection.getItem(msg.pkey);
             if(!okey){
                 return;
             }
-
             let cm = Utils.canvas_manager;
-
             if(msg.spa_rm){
-                if(okey.rm_spa !== okey._rm_spa_other){
-                    cm.free_canvas(okey._rm_spa_other);
-                }
+                (okey.rm_spa !== okey._rm_spa_other) && cm.free_canvas(okey._rm_spa_other);
                 okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
-            this._copy_options(okey._rm_other_options, msg.render_options, "spa");
-                if(this._options_match(msg.render_options, this._options, 'spa')){
-                    cm.free_canvas(okey.rm_spa);
-                    okey.rm_spa = okey._rm_spa_other;
-                    okey.rm_spa_max = msg.spa_max.toFixed(1);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa); 
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
-                }
+                okey._rm_spa_max_other = msg.spa_max.toFixed(1);
+                this._copy_options(okey._rm_other_options, msg.render_options, "spa");
             }
-
             if(msg.dir_rm){
-                if(okey.rm_dir !== okey._rm_dir_other){
-                    cm.free_canvas(okey._rm_dir_other);
-                }
+                (okey.rm_dir !== okey._rm_dir_other) && cm.free_canvas(okey._rm_dir_other);
                 okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
-                okey.rm_dir_max = msg.dir_max.toFixed(1);
+                okey._rm_dir_max_other = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-                if(this._options_match(msg.render_options, this._options, 'dir')){
-                    cm.free_canvas(okey.rm_dir);
-                    okey.rm_dir = okey._rm_dir_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
-                }
             }
-
             if(msg.speed_rm){
-                 if(okey.rm_speed !== okey._rm_speed_other){
-                    cm.free_canvas(okey._rm_speed_other);
-                }
+                (okey.rm_speed !== okey._rm_speed_other) && cm.free_canvas(okey._rm_speed_other);
                 okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
-                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-                if(this._options_match(msg.render_options, this._options, 'dir')){
-                    cm.free_canvas(okey.rm_speed);
-                    okey.rm_speed = okey._rm_speed_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed); 
-                }
+                this._copy_options(okey._rm_other_options, msg.render_options, "speed");
             }
+            this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
             var cm = Utils.canvas_manager;

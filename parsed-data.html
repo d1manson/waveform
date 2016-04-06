@@ -1352,23 +1352,23 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true
             },
             want_spike_times: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             },
             want_amplitudes: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             },
             want_data_for_gl: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             }
         }, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
-            '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
+            '_tet_options_changed(want_spike_times.splices, want_data_for_gl.splices, want_amplitudes.splices)'
         ], created: function(){
             this._files = {}; // set, tet, pos, cut
             this._fkeys = {}; // set, tet, pos, cut
@@ -1577,7 +1577,7 @@ var parse_clu_file = function(full_str, fkey){
 
             var cached = this._tet_from_fkey.get(fkey) || {};
             options['tet'] = {};
-            if(this.want_amplitudes){
+            if(this.want_amplitudes.length){
                 if(cached.amps){
                     this._setAmplitudes(cached.amps);
                 } else {
@@ -1586,7 +1586,7 @@ var parse_clu_file = function(full_str, fkey){
                     options['tet']['amps'] = 1;    
                 }
             } 
-            if(this.want_spike_times){
+            if(this.want_spike_times.length){
                 if(cached.times){
                     this._setSpike_times(cached.times);
                 } else {
@@ -1595,7 +1595,7 @@ var parse_clu_file = function(full_str, fkey){
                     options['tet']['times'] = 1;
                 }
             }
-            if(this.want_data_for_gl){
+            if(this.want_data_for_gl.length){
                 if(cached.gl_data) {
                     this._setData_for_gl(cached.gl_data);
                 } else {

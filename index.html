@@ -36,7 +36,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?">
 <title>Waveform</title>
 <link rel="stylesheet" type="text/css" href="main.css">
-<script> window.Polymer = {dom: 'shadow'}</script>
+
+<script> 
+document.addEventListener('keydown', function(e){
+    if(the_app.disable_shortcuts){
+        e.stopImmediatePropagation(); // for this to be effective it needs to be the first registered listener
+        return;
+    }
+}, true);
+
+window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
+</script>
+
 <style is="custom-style">
 :root {
 --paper-toolbar-height: 40px;
@@ -50,18 +61,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 user-drag: none;
 -webkit-user-drag: none;
 }
+
 paper-button{
 min-width: 40px;
 font-size: 0.8em;
 border: 1px solid;
 }
-paper-button[active] {
+
+paper-button[selected] {
 background-color: #ffffe0;
 color: #c77;
 }
-</style>
 
-<style>
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
 }
@@ -8170,9 +8181,10 @@ this.fire('dom-change');
 
     },
 
-    registered: function() {
-      new Polymer.IronMeta({type: 'animation', key: this.is, value: this.constructor});
-    },
+    /**
+     * Can be used to determine that elements implement this behavior.
+     */
+    isNeonAnimation: true,
 
     /**
      * Do any animation configuration here.
@@ -8422,13 +8434,6 @@ this.fire('dom-change');
 
     properties: {
 
-      _animationMeta: {
-        type: Object,
-        value: function() {
-          return new Polymer.IronMeta({type: 'animation'});
-        }
-      },
-
       /** @type {?Object} */
       _player: {
         type: Object
@@ -8440,9 +8445,9 @@ this.fire('dom-change');
       var allAnimations = [];
       if (allConfigs.length > 0) {
         for (var config, index = 0; config = allConfigs[index]; index++) {
-          var animationConstructor = this._animationMeta.byKey(config.name);
-          if (animationConstructor) {
-            var animation = animationConstructor && new animationConstructor();
+          var animation = document.createElement(config.name);
+          // is this element actually a neon animation?
+          if (animation.isNeonAnimation) {
             var effect = animation.configure(config);
             if (effect) {
               allAnimations.push({
@@ -16130,7 +16135,7 @@ Palettes.time = function(){
 </script><dom-module id="tile-element" assetpath="/">
 <style>
 :host {
-display: inline-block;
+display: inline-table;
 position: relative;
 transform: rotateY(0);
 -webkit-transform: rotateY(0);
@@ -16141,6 +16146,7 @@ top: 0px;
 overflow: hidden;
 border: 1px solid #CCC;
 line-height: 0px;
+text-align: right;
 }
 .tile-over{
 /*display: none;*/
@@ -16223,11 +16229,13 @@ display: none;
 
 */
 .canvas_part_1{
-display: inline-block;
+display: table-cell;
+vertical-align: bottom;
 }
 .canvas_part_2{
-display: inline-block;
-flex-direction: column;
+display: table-cell;
+vertical-align: bottom;
+text-align: right;    
 }
 .tile-side{
 display: flex;
@@ -16398,7 +16406,7 @@ flex:2;
         observers: [
             '_update_state(active, moving, proximate, disabled)'
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
-            return val !== "" && val >= 0 ? '' : 'display:none;';
+            return val !== null && val !== "" && val >= 0 ? '' : 'display:none;';
         }, updateCanvas: function(newCanv, canvasNum){
             return;
             var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
@@ -17525,7 +17533,9 @@ cursor: default;
 
                 // private properties for use by rm-plots module, never notified
                 _rm_spa_other: null,
+                _rm_spa_max_other: null,
                 _rm_dir_other: null,
+                _rm_dir_max_other: null,
                 _rm_speed_other: null,
                 _rm_other_options: {},
                 _rm_is_on_worker: false,
@@ -19317,23 +19327,23 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true
             },
             want_spike_times: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             },
             want_amplitudes: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             },
             want_data_for_gl: {
-                type: Boolean,
-                value: true,
+                type: Array,
+                value: function(){return [];},
                 notify: true
             }
         }, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
-            '_tet_options_changed(want_spike_times, want_data_for_gl, want_amplitudes)'
+            '_tet_options_changed(want_spike_times.splices, want_data_for_gl.splices, want_amplitudes.splices)'
         ], created: function(){
             this._files = {}; // set, tet, pos, cut
             this._fkeys = {}; // set, tet, pos, cut
@@ -19542,7 +19552,7 @@ var parse_clu_file = function(full_str, fkey){
 
             var cached = this._tet_from_fkey.get(fkey) || {};
             options['tet'] = {};
-            if(this.want_amplitudes){
+            if(this.want_amplitudes.length){
                 if(cached.amps){
                     this._setAmplitudes(cached.amps);
                 } else {
@@ -19551,7 +19561,7 @@ var parse_clu_file = function(full_str, fkey){
                     options['tet']['amps'] = 1;    
                 }
             } 
-            if(this.want_spike_times){
+            if(this.want_spike_times.length){
                 if(cached.times){
                     this._setSpike_times(cached.times);
                 } else {
@@ -19560,7 +19570,7 @@ var parse_clu_file = function(full_str, fkey){
                     options['tet']['times'] = 1;
                 }
             }
-            if(this.want_data_for_gl){
+            if(this.want_data_for_gl.length){
                 if(cached.gl_data) {
                     this._setData_for_gl(cached.gl_data);
                 } else {
@@ -22277,10 +22287,10 @@ display: inline-block;
     <div class$="pane_title [[_wide(has_search)]]">
         <content select=".pane_title"></content>
         <div class="flexer"></div>
-        <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}" placeholder="[[search_placeholder]]">
+        <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}" placeholder="[[search_placeholder]]" on-focus="_search_focus" on-blur="_search_blur">
     </div>
     <div class="pane_body"><content></content></div>
-    <div class="grabber" id="grabber" hidden$="{{!space_is_down}}"></div>
+    <div class="grabber" id="grabber" hidden$="{{!grabber_mode}}"></div>
 </template>
 
 <script>
@@ -22294,11 +22304,10 @@ Polymer({
     is: 'floating-pane',
     behaviors: [Polymer.IronResizableBehavior],
     properties: {
-        space_is_down: {
+        grabber_mode: {
             type: Boolean,
             value: false,
-            notify: true,
-            readOnly: true
+            notify: true
         },
         has_search: {
             type: Boolean,
@@ -22314,6 +22323,11 @@ Polymer({
             type: String,
             value: "search",
             notify: true,   
+        },
+        disable_shortcuts: {
+            type: Boolean,
+            notify: true,
+            value: false
         }
     }, created: function(){
         // bind these methods so we can add/remove easily
@@ -22330,20 +22344,10 @@ Polymer({
         this.$.search_input.addEventListener('mousedown', function(e){
          e.stopPropagation(); // if it propagates out of the shadow dom, then it will appear to be a mousedown on the pane itself, which would lead to a drag_start
         });
-        document.addEventListener('keydown', function(e){
-            if(e.which === 32){
-                self._setSpace_is_down(true)
-            }
-        }, true);
-        document.addEventListener('keyup', function(e){
-            if(e.which === 32){
-                self._setSpace_is_down(false);
-            }
-        }, true);
         init_x += 100;
         this._translate(init_x, 400); // not sure this is that helpful, but hey
     }, _on_mouseup: function(e){
-        this.style.display = 'none';
+        this.toggle();
     }, _on_drag_start: function(e){
         // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
         var el = e.target;
@@ -22380,6 +22384,10 @@ Polymer({
             this.setAttribute('hidden', "true");            
         }
         this.notifyResize();
+    }, _search_focus: function(){
+        this.set('disable_shortcuts', true); 
+    }, _search_blur: function(){
+        this.set('disable_shortcuts', false);
     }
 });
 
@@ -22780,7 +22788,7 @@ var set_spike_times = function(timebase, arrays){
 }
 
 var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -22807,7 +22815,7 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
 }
 
 var set_pos_dir = function(timebase, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -22821,7 +22829,7 @@ var set_pos_dir = function(timebase, arrays){
 }
 
 var set_pos_speed = function(timebase, arrays){
-    if(timebase != pos_timebase){
+    if(timebase && timebase != pos_timebase){
         pos_timebase = timebase;
         pos_xy = pos_dir = pos_speed = undefined;
         clear_cache(['pos_timebase', 'pos_xy', 'pos_dir', 'pos_speed']);
@@ -23148,7 +23156,7 @@ var make_cached_speed_bins_and_dwell = function(){
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
     var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(let i=0;i<pos_dir.length;i++)
+    for(let i=0;i<pos_speed.length;i++)
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
     
@@ -23495,6 +23503,11 @@ var use_mask = function(vector, mask, val){
                 value: function(){return [];},
                 notify: true,
                 observer: '_groups_set'
+            },
+            want_spike_times: {
+                type: Array,
+                notify: true,
+                observer: '_want_spike_times_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -23523,7 +23536,9 @@ var use_mask = function(vector, mask, val){
             this._pos_xy_is_on_worker = false;
             this._pos_dir_is_on_worker = false;
             this._pos_speed_is_on_worker = false;
-        },  _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
+        }, _want_spike_times_set: function(){
+            this._show_changed(this.show);
+        }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
 
@@ -23569,6 +23584,56 @@ var use_mask = function(vector, mask, val){
                 generation_add: generation_add
             }, added_arrays);
 
+        }, _use_other_if_possible: function(okeys){
+            // The okey._rm_x_other stores the last canvas from the worker,
+            // with okey._rm_other_options containing the render settings used.
+            // Here we check whether the rendered options match what we currently
+            // want, and if so we set the visible okey.rm_x property from the
+            // okey._rm_x_other value. We also deal with hiding canvases on show='n'.
+            let cm = Utils.canvas_manager;
+
+            for(let okey of okeys) if(okey){
+                let op; // 0 : no-op, +1 : use _other values, -1: set to null
+                let same; // are the okey.rm_x and okey._rm_x_other the same?
+
+                // spa
+                same = okey.rm_spa === okey._rm_spa_other;
+                op = this.show[0] === 'n' ? 
+                         ( okey.rm_spa ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_spa);
+                    okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
+                    okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
+                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
+                }
+
+                // dir
+                same = okey.rm_dir === okey._rm_dir_other;
+                op = this.show[1] === 'n' ? 
+                         ( okey.rm_dir ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_dir);
+                    okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
+                    okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
+                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
+                }
+
+                // speed
+                same = okey.rm_speed === okey._rm_speed_other;
+                op = this.show[2] === 'n' ? 
+                         ( okey.rm_speed ? -1 : 0 )
+                       : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
+                if(op){
+                    (!same) && cm.free_canvas(okey.rm_speed);
+                    okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
+                }
+            }
+
         }, _options_modified: function(){
             let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
@@ -23576,67 +23641,61 @@ var use_mask = function(vector, mask, val){
             this._options.max_rate_spa = this.max_rate_spa;
             this._options.deg_per_dir_bin = this.deg_per_dir_bin;
             this._options.smoothing_dir_bins = this.smoothing_dir_bins;
+            this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
-
-            // if we already have the right answer in any cases, then we must apply that now
-            // because the worker is not going to send it again
-            for(let okey of (this.groups || []))if(okey){
-                if(okey.rm_spa !== okey._rm_spa_other && 
-                    this._options_match(okey._rm_other_options, this._options, "spa")){
-                    cm.free_canvas(okey.rm_spa);
-                    okey.rm_spa = okey._rm_spa_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);         
-                }
-                if(okey.rm_dir !== okey._rm_dir_other && 
-                    this._options_match(okey._rm_other_options, this._options, "dir")){
-                    cm.free_canvas(okey.rm_dir);
-                    okey.rm_dir = okey._rm_dir_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);            
-                }
-                if(okey.rm_speed !== okey._rm_speed_other && 
-                    this._options_match(okey._rm_other_options, this._options, "dir")){
-                    cm.free_canvas(okey.rm_speed);
-                    okey.rm_speed = okey._rm_speed_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);            
-                }
-            }
         }, _groups_set: function(new_val, old_val){
             this._groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);
             this._update_okeys(old_val || [], new_val || [], this._pkey_generation, ++this._pkey_generation); // added keys are for a new generation
         }, _groups_spliced: function(splices){
             let parsed = Utils.parse_splices(splices);
             this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
-        }, _show_changed: function(){
-            // TODO: I'm not sure what state all the show-related stuff is in, review it carefully and 
-            // finish implementing it.
-            if(this.show !== 'nnn' && this.groups){  
+        }, _show_changed: function(show){
+            if(!this.want_spike_times){
+                return;
+            }
+            if (!this.show.match(/^[yn]{3}$/)){
+                console.log("bad rm show value");
+                return;
+            }
 
-                var added = [];
-                for(let okey of this.groups) if(!okey._rm_is_on_worker){
-                    added.push(okey);
-                }
-                this._update_okeys([], added, this._key_generation, this._key_generation);
+            this._use_other_if_possible(this.groups || []);
+
+            if(show === "nnn"){
+                let idx = this.want_spike_times.indexOf("rm-plots");
+                (idx > -1) && this.splice('want_spike_times', idx, 1);
+
+            } else {  
+                let idx = this.want_spike_times.indexOf("rm-plots");
+                (idx === -1) && this.push('want_spike_times', "rm-plots");
+
+                // if show was completely off we avoided sending times to worker...
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
-                if(this.show[0] === 'y' && !this._pos_xy_is_on_worker){
-                    this._pos_xy_modified();
+
+                // and we avoided sending group inds to worker...
+                let added = [];
+                for(let okey of (this.groups || [])) if(okey && !okey._rm_is_on_worker){
+                    added.push(okey);
                 }
-                if(this.show[1] === 'y' && !this._pos_dir_is_on_worker){
-                    this._pos_dir_modified();
-                }
-                if(this.show[2] === 'y' && !this._pos_speed_is_on_worker){
-                    this._pos_speed_modified();
-                }
-            } else if (this.show.match(/^[yn]{3}$/)){
-                // nothing to do here
-            } else {
-                throw "invalid value for show";
+                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
+
             }
-            if(this._worker){
-                this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
+         
+            // and we avoided sending the individual pos data types to the worker...
+            if(show[0] === 'y' && !this._pos_xy_is_on_worker){
+                this._pos_xy_modified();
             }
+            if(show[1] === 'y' && !this._pos_dir_is_on_worker){
+                this._pos_dir_modified();
+            }
+            if(show[2] === 'y' && !this._pos_speed_is_on_worker){
+                this._pos_speed_modified();
+            }
+
+            this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
+            this._setPos_path(null);
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
@@ -23701,7 +23760,7 @@ var use_mask = function(vector, mask, val){
                 }
                 this._times_is_on_worker = false;
             }
-        }, _options_match: function(a,b,kind){
+        }, _options_match: function(a, b, kind){
             if((!a && b) || (a && !b)){
                 return false;
             }
@@ -23709,16 +23768,13 @@ var use_mask = function(vector, mask, val){
                 return a.smoothing_spa_bins === b.smoothing_spa_bins
                     && a.cm_per_spa_bin == b.cm_per_spa_bin
                     && a.max_rate_spa == b.max_rate_spa;
-            }
-            if(kind === "dir"){
+            } else if(kind === "dir"){
                 return a.smoothing_dir_bins === b.smoothing_dir_bins
                     && a.deg_per_dir_bin == b.deg_per_dir_bin;
-            }
-            if(kind === "speed"){
+            } else if(kind === "speed"){
                 return a.max_speed === b.max_speed
                     && a.cps_per_speed_bin === b.cps_per_speed_bin;
             }
-            throw "what kind?";
         }, _copy_options: function(dest, src, kind){
             if(kind === "spa"){
                 dest.smoothing_spa_bins = src.smoothing_spa_bins;
@@ -23730,63 +23786,34 @@ var use_mask = function(vector, mask, val){
             } else if(kind === "speed"){
                 dest.max_speed = src.max_speed;
                 dest.cps_per_speed_bin = src.cps_per_speed_bin;
-            } else {
-                throw "what?"
             }
         }, plot_things: function(msg, arrays) {
             if(msg.generation !== this._pkey_generation){
                 return; // pft! get with the times, dude.
             }
-
             let okey = this._groups_collection.getItem(msg.pkey);
             if(!okey){
                 return;
             }
-
             let cm = Utils.canvas_manager;
-
             if(msg.spa_rm){
-                if(okey.rm_spa !== okey._rm_spa_other){
-                    cm.free_canvas(okey._rm_spa_other);
-                }
+                (okey.rm_spa !== okey._rm_spa_other) && cm.free_canvas(okey._rm_spa_other);
                 okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
-            this._copy_options(okey._rm_other_options, msg.render_options, "spa");
-                if(this._options_match(msg.render_options, this._options, 'spa')){
-                    cm.free_canvas(okey.rm_spa);
-                    okey.rm_spa = okey._rm_spa_other;
-                    okey.rm_spa_max = msg.spa_max.toFixed(1);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa); 
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
-                }
+                okey._rm_spa_max_other = msg.spa_max.toFixed(1);
+                this._copy_options(okey._rm_other_options, msg.render_options, "spa");
             }
-
             if(msg.dir_rm){
-                if(okey.rm_dir !== okey._rm_dir_other){
-                    cm.free_canvas(okey._rm_dir_other);
-                }
+                (okey.rm_dir !== okey._rm_dir_other) && cm.free_canvas(okey._rm_dir_other);
                 okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
-                okey.rm_dir_max = msg.dir_max.toFixed(1);
+                okey._rm_dir_max_other = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-                if(this._options_match(msg.render_options, this._options, 'dir')){
-                    cm.free_canvas(okey.rm_dir);
-                    okey.rm_dir = okey._rm_dir_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir); 
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
-                }
             }
-
             if(msg.speed_rm){
-                 if(okey.rm_speed !== okey._rm_speed_other){
-                    cm.free_canvas(okey._rm_speed_other);
-                }
+                (okey.rm_speed !== okey._rm_speed_other) && cm.free_canvas(okey._rm_speed_other);
                 okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
-                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-                if(this._options_match(msg.render_options, this._options, 'dir')){
-                    cm.free_canvas(okey.rm_speed);
-                    okey.rm_speed = okey._rm_speed_other;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed); 
-                }
+                this._copy_options(okey._rm_other_options, msg.render_options, "speed");
             }
+            this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
             var cm = Utils.canvas_manager;
@@ -24031,6 +24058,10 @@ var is_equal_simple = function(a, b){
                 value: function(){return [];},
                 notify: true,
                 observer: '_groups_set'
+            }, want_spike_times: {
+                type: Array,
+                notify: true,
+                observer: 'want_spike_times_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)', 
@@ -24049,6 +24080,8 @@ var is_equal_simple = function(a, b){
             this._worker = worker_builder.create_for(this);
             this._pkey_generation = 0;
             this._times_is_on_worker = false;
+        }, want_spike_times_set: function(){
+            this._show_changed(this.show);
         }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
             var cm = Utils.canvas_manager;
@@ -24095,17 +24128,8 @@ var is_equal_simple = function(a, b){
             this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
         }, _options_modified: function(){
             this._options.max_delta_t = this.max_delta_t;
+            this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
-
-            // if we already have the right answer in any cases, then we must apply that now
-            // because the worker is not going to send it again
-            for(let okey of (this.groups || []))if(okey){
-                if(okey.tac !== okey._tac_other && Utils.is_equal_simple(okey._tac_other_options, this._options)){
-                    cm.free_canvas(okey.tac);
-                    okey.tac = okey._tac_other;
-                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
-                }
-            }
         }, _times_modified: function(){
             if(this.show === 'y'){
                 if(this.spike_times){
@@ -24119,28 +24143,65 @@ var is_equal_simple = function(a, b){
             } else {
                 if(!this.spike_times && this._times_is_on_worker){
                     this._worker.exec('set_spike_times', {});
-                }
+                } 
                 this._times_is_on_worker = false;
             }
-        }, _show_changed: function(){
-            if(this.show === 'y'){
-                var added = [];
-                for(let okey of (this.groups || []))if(!okey._tac_is_on_worker){
-                    added.push(okey);
+        },  _use_other_if_possible: function(okeys){
+            // The okey._tac_other stores the last canvas from the worker,
+            // with okey._tac_other_options containing the render settings used.
+            // Here we check whether the rendered options match what we currently
+            // want, and if so we set the visible okey.tac property from the
+            // okey._tac_other value. We also deal with hiding canvases on show='n'.
+            let cm = Utils.canvas_manager;
+
+            for(let okey of okeys) if(okey){
+                // are the okey.rm_x and okey._rm_x_other the same?
+                let same = okey.tac === okey._tac_other;
+
+                //0 : no-op, +1 : use _other values, -1: set to null
+                let op = this.show === 'n' ? 
+                           ( okey.tac ? -1 : 0 )
+                         : ( !same && Utils.is_equal_simple(okey._tac_other_options, this._options) ? 1  : 0 );
+
+                if(op){
+                    (!same) && cm.free_canvas(okey.tac);
+                    okey.tac = op === 1 ? okey._tac_other : null;
+                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
                 }
-                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
+            }
+
+        }, _show_changed: function(show){
+            if(!this.want_spike_times){
+                return;
+            }
+            this._use_other_if_possible(this.groups || []);
+
+            if (show === 'n'){
+                let idx = this.want_spike_times.indexOf("tac-plots");
+                (idx > -1) && this.splice('want_spike_times', idx, 1);
+                
+            } else if(show === 'y'){
+                let idx = this.want_spike_times.indexOf("tac-plots");
+                (idx === -1) && this.push('want_spike_times', "tac-plots");
+
+                // while show was false we avoided sending times to worker...
                 if(!this._times_is_on_worker){
                     this._times_modified();
                 }
-            } else if (this.show === 'n'){
-                // nothing to do here
+
+                // and we avoided sending group inds to worker...
+                let added = [];
+                for(let okey of (this.groups || []))if(okey && !okey._tac_is_on_worker){
+                    added.push(okey);
+                }
+                this._update_okeys([], added, this._pkey_generation, this._pkey_generation);
             } else {
                 console.log("invalid value for tac show");
                 this.set('show', 'y');
+                return;
             }
-            if(this._worker){
-                this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
-            }
+
+            this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
         }, plot_hist: function(data, arrays) {
             if(data.generation !== this._pkey_generation)
                 return; // pft! get with the times, dude.
@@ -24149,15 +24210,10 @@ var is_equal_simple = function(a, b){
                 return;
             }
             let cm = Utils.canvas_manager;
-            let ckey = cm.store_from_buffer(arrays.hist.buffer, data.dims);
-            cm.free_canvas(okey._tac_other);
-            okey._tac_other = ckey;
+            (okey._tac_other !== okey.tac) && cm.free_canvas(okey._tac_other);
+            okey._tac_other = cm.store_from_buffer(arrays.hist.buffer, data.dims);
             okey._tac_other_options = data.render_options;
-            if(Utils.is_equal_simple(data.render_options, this._options)){
-                cm.free_canvas(okey.tac);
-                okey.tac = ckey;
-                this.notifyPath('groups.' + data.pkey + '.tac', okey.tac); // possibly more efficient to avoid set call with array key            
-            }
+            this._use_other_if_possible([okey]);
         }
 
     });
@@ -25362,7 +25418,7 @@ var WavesRenderer = function(callback, debug){
         this._n_t_to_okeys.push(new Set()); // slightly wasteful, but probably not terrible in the grand scheme of things
     }
     this._okey_to_rendered = new Map(); // when a render completes, we send the canvas back to the polymer element, and store the settings used here
-    this.show = 'y'; // currently you cannot toggle individual channels.
+    this._show = 'n'; // currently you cannot toggle individual channels.
     this._has_voltages = false;
     this._timer = 0;
 }
@@ -25637,7 +25693,7 @@ WavesRenderer.prototype._options_match = function(a, group_num){
     if(!a || a.mode !== this._mode){
         return false;
     }
-    if(a._mode === 'density'){
+    if(a.mode === 'density'){
         return true;
     } else if(this._mode === 'flag' && a.group_num == group_num){
         return true;
@@ -25713,8 +25769,8 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
     for(let okey of okeys_to_add){
         let part = {
             n_t: 0,
-            el_canv: document.createElement('canvas'),
-            main_has_canv: true
+            el_canv: document.createElement('canvas'), // TODO: might be good to avoid creating canvas entierly when show="n"
+            main_has_canv: this._show === "y"
         }
         this._okey_to_part_rendered.set(okey, part);
         part.el_canv.width = off_canv_dt*n_c*(n_w-1);
@@ -25723,7 +25779,9 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
         this._n_t_to_okeys[0].add(okey);
         results.set(okey, part.el_canv);
     }
-    this._callback(results)
+    if(this._show === "y"){
+        this._callback(results);        
+    }
 
     // dealing with modifeid okey is more complicated (and we
     // also do it when render mode changes), hence it has a function...
@@ -25735,13 +25793,24 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
 }
 
 
+WavesRenderer.prototype.set_show = function(v){
+    this._show = v;
+    if(this._show === "n"){
+        for(let opts of this._okey_to_part_rendered.values()){
+            opts.main_has_canv = false;
+        }        
+    } else {
+        this._deal_with_modified_okeys(this._okey_to_rendered.keys());
+    }
+    this._touch_timer();
+}
 
 WavesRenderer.prototype._touch_timer = function(){
     // turns timer on if there's work to be done, otherwise stops it (if it was running)
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from elsewhere to interupt
     // between ticks, we can thus cancel work as and when needed.
-    if(this._has_voltages && this._okey_to_part_rendered.size && this.show === 'y'){
+    if(this._has_voltages && this._okey_to_part_rendered.size && this._show === 'y'){
         this._timer = this._timer || setImmediate(this._timer_tick.bind(this));
     } else{
         clearImmediate(this._timer);
@@ -25753,6 +25822,9 @@ WavesRenderer.prototype._touch_timer = function(){
 WavesRenderer.prototype._timer_tick = function(){
     // This is the where the main render takes place.
     this._timer = 0;
+    if(this._show === "n"){
+        return;
+    }
 
     // TODO: we really don't need this mode-switching stuff here, 
     // though it's not a big deal I suppose.
@@ -25940,6 +26012,11 @@ Polymer({
             value: function(){return {};}, // has n value and typed-array-manager id for gl voltages
             notify: true
         },
+        want_data_for_gl: {
+            type: Array,
+            notify: true,
+            observer: 'want_data_for_gl_set'
+        }
     },
     observers: [
         '_groups_spliced(groups.splices)',
@@ -25952,19 +26029,46 @@ Polymer({
         } catch (e){
             console.log("failed to create renderer....\n" + e);
         }
+        this._has_want_data_for_gl_ref = false;
+    }, want_data_for_gl_set: function(){
+        this._show_chans_changed(this.show_chans);
     }, _data_for_gl_changed: function(){
-        var am = Utils.typed_array_manager;
-        this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
-        this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
-    }, _show_chans_changed: function(){
+        // note that if gl data was avaialble and then we turned off show we will
+        // get a null-ing event the next time the tet file changes...which is good.
+        let is_null = !(this.data_for_gl && this.data_for_gl.voltages);
+        let am = Utils.typed_array_manager;
+        this._renderer_has_voltages = false;
+        if(is_null || this.show_chans === "yyyy"){ 
+            this._renderer_has_voltages = true;
+            this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
+            this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
+        } 
+    }, _show_chans_changed: function(show_chans){
+        if(!this.want_data_for_gl){
+            return;
+        }
         // note that unlike in rm/tac-plots, we let the renderer deal
         // with the complexities of show/hide, i.e. _update_okeys always
         // sends it the full update lists.  That's because sending messages
         // in this case does not invlove cloning and posting arrays.
-        if(this.show_chans === 'yyyy'){
-            this._renderer.show = 'y';
-        } else if (this.show_chans === 'nnnn'){
-            this._renderer.show = 'n';
+        if(show_chans === 'yyyy'){
+            let idx = this.want_data_for_gl.indexOf("wave-plots");
+            (idx === -1) && this.push('want_data_for_gl', "wave-plots");
+
+            this._renderer.set_show('y');
+            if(!this._renderer_has_voltages){
+                this._data_for_gl_changed(); // neccessarry if the gl data is already available, we just didnt' use it
+            }
+        } else if (show_chans === 'nnnn'){
+            let idx = this.want_data_for_gl.indexOf("wave-plots");
+            (idx > -1) && this.splice('want_data_for_gl', idx, 1);
+
+            this._renderer.set_show('n');
+            let cm = Utils.canvas_manager;
+            for(let okey of this.groups) if(okey && okey.waves){
+                cm.free_canvas(okey.waves); // the WavesRenderer will still hold a reference to this canvas in this case 
+                this.set('groups.' + okey._pkey + '.waves', null);
+            }
         } else {
             this.set('show_chans', 'yyyy');
             console.log("currently channels cannot be toggled individually");
@@ -26327,6 +26431,11 @@ font-size: 10px;
             keyboard_target: {
                 type: Object,
                 value: function(){return document.querySelector('body');}
+            },
+            want_amplitudes: {
+                type: Array,
+                notify: true,
+                observer: '_want_amplitudes_set'
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -26350,6 +26459,8 @@ font-size: 10px;
             }
             this.set('cluster_plots', plots);
             // TODO: we might want to tie the plots to the cut for ease of grabbing
+        }, _want_amplitudes_set: function(){
+            this.push('want_amplitudes', 'cluster-plots');
         }, _amplitudes_modified: function(){
             if(this.amplitudes){
                 var arr = Utils.typed_array_manager.get_array_clone(this.amplitudes.amps);
@@ -26483,13 +26594,13 @@ font-size: 10px;
 
     <div class="floating_layer">
             
-        <floating-pane id="action_info">
+        <floating-pane id="action_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Action List [z]</div>
             <undo-stack-view undo_stack="[[cut_undo_stack]]" redo_stack="[[cut_redo_stack]]"></undo-stack-view>
         </floating-pane>
         
 
-        <floating-pane id="tc_info" style="display: initial;">
+        <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Temporal auto correlation [t]</div>
             <p class="nodrag">
                 Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
@@ -26499,20 +26610,20 @@ font-size: 10px;
             </p>
         </floating-pane>
 
-        <floating-pane id="drift_info">
+        <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Drift [d]</div>
             Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
             <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
             So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
         </floating-pane>
         
-        <floating-pane id="help_info">
+        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Help [?]</div>
             Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"> readme - click to open in a new tab. <br><br>
             You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"> (see the button on the right hand side). You can also contribute to the code!
         </floating-pane>
             
-        <floating-pane id="shortcut_info" style="max-height: 350px;">
+        <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;">
             <div class="pane_title">Shortcuts [k]</div>
             <p>
                 For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
@@ -26555,7 +26666,7 @@ font-size: 10px;
             <p></p>                    
         </floating-pane>
         
-        <floating-pane id="speed_info">
+        <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Speed ratemap [v]</div>
             <p>
                 Bin size <span class="slider_val">4 cm/s</span><br>
@@ -26567,7 +26678,7 @@ font-size: 10px;
             </p>
         </floating-pane>
 
-        <floating-pane id="waves_info">
+        <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Waves [w]</div>
             <p>
                 There are two palette modes. 
@@ -26582,12 +26693,12 @@ font-size: 10px;
             </p>
         </floating-pane>
 
-        <floating-pane id="header_info" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers">
+        <floating-pane id="header_info" grabber_mode="[[grabber_mode]]" has_search="" search_text="{{options.header_filter}}" search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}">
             <div class="pane_title">File headers [h]</div>
             <header-view set_header="[[set_header]]" pos_header="[[pos_header]]" tet_header="[[tet_header]]" cut_header="[[_get_safe(cut_box,'header')]]" header_filter="[[options.header_filter]]"></header-view>
         </floating-pane>
 
-        <floating-pane id="rm_info">
+        <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Spatial ratemap [r]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
@@ -26607,7 +26718,7 @@ font-size: 10px;
             </p>
         </floating-pane>
         
-        <floating-pane id="dir_info">
+        <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">Directional ratemap [c]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
@@ -26623,7 +26734,7 @@ font-size: 10px;
             </p>
         </floating-pane>
 
-        <floating-pane id="pos_info">
+        <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]">
             <div class="pane_title">position post processing</div>
             <p>
                 If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
@@ -26652,7 +26763,7 @@ font-size: 10px;
 
     </div>
         
-    <paper-toolbar class="main_toolbar">
+    <paper-toolbar>
         <div>
             <paper-icon-button icon="flip-to-front"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
@@ -26689,27 +26800,27 @@ font-size: 10px;
         </div>
 
         <div>
-            <paper-button toggles="" active="{{_yn_to_bool(options.show_waves, 0)}}">wav</paper-button>
+            <paper-button selected$="{{_yn_to_bool(options.show_waves, 0)}}" on-tap="show_tap" id="show_wav">wav</paper-button>
             <paper-tooltip>waves [w]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 0)}}">rm</paper-button>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 0)}}" on-tap="show_tap" id="show_rm">rm</paper-button>
             <paper-tooltip>spatial ratemap [r]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 1)}}">dir</paper-button>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 1)}}" on-tap="show_tap" id="show_dir">dir</paper-button>
             <paper-tooltip>directional ratemap [c]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button toggles="" active="{{_yn_to_bool(options.show_rms, 2)}}">spd</paper-button>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 2)}}" on-tap="show_tap" id="show_spd">spd</paper-button>
             <paper-tooltip>speed ratemap [v]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button toggles="" active="{{_yn_to_bool(options.show_tac, 0)}}">tc</paper-button>
+            <paper-button selected$="{{_yn_to_bool(options.show_tac, 0)}}" on-tap="show_tap" id="show_tc">tc</paper-button>
             <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
         </div>
 
@@ -26740,7 +26851,8 @@ font-size: 10px;
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
             
             <div class="side_panel_row">
-                <cluster-plots groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}"></cluster-plots>                              
+                <cluster-plots groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}">
+                               </cluster-plots>                              
             </div>
         
         </div-iron-resize>
@@ -26777,15 +26889,15 @@ font-size: 10px;
         </div>
     </drop-zone>
 
-    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}"></parsed-data>
+    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}"></parsed-data>
 
     <cut-object groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]"></rm-plots> 
+    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
 
-    <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]"></tac-plots> 
+    <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]" want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
-    <wave-plots groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]"></wave-plots> 
+    <wave-plots groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]" want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -26797,6 +26909,11 @@ font-size: 10px;
     <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="w+only w+shift" on-keys-pressed="show_key_wav" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="r+only r+shift" on-keys-pressed="show_key_rm" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="c+only c+shift" on-keys-pressed="show_key_dir" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc" target="[[keyboard_target]]"></iron-a11y-keys>
 
       
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -26918,13 +27035,147 @@ the_app.open_github = function(){
 the_app._yn_to_bool = function(v, index){
     return (v && v[index] === 'y');
 }
+
+the_app.show_key_wav = function(e){
+    the_app.toggle_show('show_wav', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_rm = function(e){
+    the_app.toggle_show('show_rm', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_dir = function(e){
+    the_app.toggle_show('show_dir', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_spd = function(e){
+    the_app.toggle_show('show_spd', e.detail.keyboardEvent.shiftKey);
+}
+the_app.show_key_tc = function(e){
+    the_app.toggle_show('show_tc', e.detail.keyboardEvent.shiftKey);
+}
+
+the_app.toggle_show = function(id, shiftKey){
+    // This is a bit ugly sadly. We want to allow basic toggling
+    // without shift, and multi-toggling with shift.
+    let result;
+    if(!shiftKey){
+        result = {
+            waves: 'nnnn',
+            tac: 'n',
+            rms: 'nnn'
+        };
+        switch (id){
+            case "show_wav":
+            result.waves = 'yyyy';
+            break;
+
+            case "show_tc":
+            result.tac = 'y';
+            break;
+
+            case "show_rm":
+            result.rms = "ynn";
+            break;
+
+            case "show_dir":
+            result.rms = "nyn";
+            break;
+
+            case "show_spd":
+            result.rms = "nny";
+            break;
+        } 
+    } else {
+        result = {
+            waves: the_app.options.show_waves,
+            tac: the_app.options.show_tac,
+            rms: the_app.options.show_rms
+        };
+        let n_selected = (result.waves.indexOf('y') > -1) + 
+                       (result.tac === 'y') + 
+                       (result.rms[0] === 'y') + (result.rms[1] === 'y') + (result.rms[2] === 'y');
+
+        switch (id){
+            case "show_wav":
+            if(result.waves === "yyyy" && n_selected > 1){
+                result.waves = 'nnnn';                
+            } else {
+                result.waves = 'yyyy';
+            }
+            break;
+
+            case "show_tc":
+            if(result.tac === "y" && n_selected > 1){
+                result.tac = 'n';                
+            } else {
+                result.tac = 'y';
+            }
+            break;
+
+            case "show_rm":
+            if(result.rms[0] === "y" && n_selected > 1){
+                result.rms = "n" + result.rms.slice(1);                
+            } else {
+                result.rms = 'y' + result.rms.slice(1);
+            }
+            break;
+
+            case "show_dir":
+            if(result.rms[1] === "y" && n_selected > 1){
+                result.rms = result.rms[0] + "n" + result.rms[2];                
+            } else {
+                result.rms = result.rms[0] + 'y' + result.rms[2];
+            }
+            break;
+
+            case "show_spd":
+            if(result.rms[2] === "y" && n_selected > 1){
+                result.rms = result.rms.slice(0,-1) + "n";                
+            } else {
+                result.rms = result.rms.slice(0,-1) + 'y';
+            }
+            break;
+        } 
+    }
+    the_app.set('options.show_waves', result.waves);
+    the_app.set('options.show_tac', result.tac);
+    the_app.set('options.show_rms', result.rms);
+}
+
+the_app.show_tap = function(e){
+    the_app.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
+    e.preventDefault(); 
+}
+
 the_app.keyboard_target = document.querySelector('body');
 
-the_app.addEventListener('dom-change', function(){
-    window.c = document.getElementsByTagName('cut-object')[0]; //debug only
+// and then some stuff that doesn't sit so well with polymer...
+document.addEventListener('contextmenu', function(e){e.preventDefault();});
+document.addEventListener('keydown', function(e){
+    if(e.which === 32){//  space
+        the_app.set('grabber_mode', true);
+    }
+    if(e.which == 32){ //space
+        e.preventDefault(); // normally does things like toggle buttons and scroll divs
+    } 
+}, true);
+document.addEventListener('keyup', function(e){
+    if(e.which === 32){
+        the_app.set('grabber_mode', false);
+    }
 })
 
-document.addEventListener('contextmenu', function(e){e.preventDefault();});
+the_app.addEventListener('dom-change', function(){
+    // remove keyboard handlers from buttons. Note that ripple still shows.
+    let els =   Array.from(document.getElementsByTagName('paper-button'))
+        .concat(Array.from(document.getElementsByTagName('paper-icon-button')));
+    for(let el of els){
+        el._unlistenKeyEventListeners();
+    }
+
+
+    window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
+})
+
+
 
 </script>
 

@@ -41,7 +41,7 @@ is in null state. When another tile is moving, it cannot be active instead it is
 <dom-module id="tile-element">
 <style>
 :host {
-display: inline-block;
+display: inline-table;
 position: relative;
 transform: rotateY(0);
 -webkit-transform: rotateY(0);
@@ -52,6 +52,7 @@ top: 0px;
 overflow: hidden;
 border: 1px solid #CCC;
 line-height: 0px;
+text-align: right;
 }
 .tile-over{
 /*display: none;*/
@@ -134,11 +135,13 @@ display: none;
 
 */
 .canvas_part_1{
-display: inline-block;
+display: table-cell;
+vertical-align: bottom;
 }
 .canvas_part_2{
-display: inline-block;
-flex-direction: column;
+display: table-cell;
+vertical-align: bottom;
+text-align: right;    
 }
 .tile-side{
 display: flex;
@@ -309,7 +312,7 @@ flex:2;
         observers: [
             '_update_state(active, moving, proximate, disabled)'
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
-            return val !== "" && val >= 0 ? '' : 'display:none;';
+            return val !== null && val !== "" && val >= 0 ? '' : 'display:none;';
         }, updateCanvas: function(newCanv, canvasNum){
             return;
             var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
