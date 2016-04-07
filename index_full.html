@@ -76,6 +76,14 @@ color: #c77;
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
 }
+.grabber_signifier{
+color: #f00;
+font-weight: bold;
+border: 2px solid #f00;
+padding: 4px 6px 4px 6px;
+border-radius: 4px;
+margin-left: 10px;
+}
 </style>
 
 </head>
@@ -334,6 +342,10 @@ box-shadow: inset 0 0 2px 1px #ccc;
             <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
         </div>
 
+        <div class="grabber_signifier" style$="{{_show(grabber_mode)}}">
+        grabber mode
+        </div>
+
     </paper-toolbar>
 
     <div id="all_below_toolbar">
@@ -350,10 +362,9 @@ box-shadow: inset 0 0 2px 1px #ccc;
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div class="side_panel_row side_panel_row_flex">
-                <div class="grabbable side_panel_row_flex" id="spatial_panel">
-                    <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-                    <canvas id="posoverlay" class='poslayer' width="200" height="200"></canvas> 
-                </div>
+                <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
+                group {{_get_safe(active_group_a, 'group_num')}}
+
                 <div class="info_summary">
                     <div class="info_summary_text"></div>
                     <canvas id="speedhist" width="50" height= "84"></canvas>
@@ -369,7 +380,8 @@ box-shadow: inset 0 0 2px 1px #ccc;
                                painter_state="{{cut_painter_state}}"
                                amplitudes="[[amplitudes]]"
                                canvas_size="{{options.cluster_plot_size}}"
-                               want_amplitudes="{{want_amplitudes}}">
+                               want_amplitudes="{{want_amplitudes}}"
+                               active_group_a="{{active_group_a}}">
                                </cluster-plots>                              
             </div>
         
@@ -381,6 +393,7 @@ box-shadow: inset 0 0 2px 1px #ccc;
         <tile-wall class="tilewall"
                     groups="{{cut_groups}}"
                     options="[[options]]"
+                    active_group_a="{{active_group_a}}"
                     ></tile-wall>
 
     </div>
@@ -568,7 +581,9 @@ the_app.toggle_palette = function(){
     the_app.set('options.waves_render_mode', the_app.options.waves_render_mode === "density" ? 
                         "flag" : "density");
 }
-
+the_app._show = function(v){
+    return v ? '' : 'display: none;';
+}
 the_app.toggle_action_pane = function(){
     the_app.$.action_info.toggle();
 }
@@ -741,7 +756,7 @@ the_app.addEventListener('dom-change', function(){
         el._unlistenKeyEventListeners();
     }
 
-
+    the_app.set('grabber_mode', false);
     window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
 })
 

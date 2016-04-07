@@ -55,6 +55,9 @@ groups is an array of objects with the following properties:
             group_num="[[index]]"
             group_model="[[item]]"
             spa_rm_height="[[options.spa_rm_height]]"
+            active="{{_is_equal(item, active_group_a)}}"
+            on-mouseenter="_mouseenter_tile"
+            on-mouseleave="_mouseleave_tile"
             ></tile-element>        
     </template>
 </template>
@@ -73,6 +76,11 @@ groups is an array of objects with the following properties:
             options: {
                 type: Object,
                 value: {} // settings for plotting
+            },
+            active_group_a:{
+                type: Object,
+                value: null,
+                notify: true
             }
         },
         observers: [
@@ -82,6 +90,12 @@ groups is an array of objects with the following properties:
             
         }, _show: function(v){
             return v ? '' : 'display: none;';
+        }, _mouseenter_tile: function(e){
+            this.set('active_group_a', e.model.item);
+        }, _mouseleave_tile: function(e){
+            this.set('active_group_a', null);
+        }, _is_equal: function(a,b){
+            return a===b;
         }
     });
 </script>

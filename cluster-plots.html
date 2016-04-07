@@ -28,6 +28,7 @@ var set_palettes = function(arrays){
 var n_spikes;
 var chan_is_ok;
 var amps;
+var plot_names;
 var timer = 0;
 
 var pkey_generation = 0;
@@ -96,6 +97,15 @@ var set_amps = function(n_spikes_, chan_is_ok_, arrays){
     for(let ii=0; ii<plots.length; ii++){
         plots[ii].fill(0);
     }
+    plot_names = [];
+    if(chan_is_ok){
+        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+                let name = (c1+1) + 'Ax' + (c2+1) + 'A';
+                plot_names.push(name);
+            }
+        }        
+    }
     touch_timer();
 }
 
@@ -137,21 +147,41 @@ var timer_tick = function(){
         }
     }
 
-    // copy plots into the object to send back to main, and label each plot
+    // copy plots into the object to send back to main, labeling each plot
     // with its channel numbers.
     var arrays = {};
-    var plot_names = [];
-    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-        for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
-            let name = (c1+1) + 'Ax' + (c2+1) + 'A';
-            arrays[name] = plots[p].slice(0);
-            plot_names.push(name);
-        }
+    for(let [ii, name] of plot_names.entries()){
+        arrays[name] = plots[ii].slice(0);
     }
     exec_main_b('plot_clusters', {
         generation: pkey_generation,
         plots: plot_names
     }, arrays);
+}
+
+var get_group_at = function(msg){
+    // this is called when the user mousemoves on a canvas
+    // it's hardly worth putting this on the worker thread, but maybe on day we
+    // will do something more exciting here.
+
+    let point = msg.point;
+    let plot = plots[plot_names.indexOf(msg.plot)];
+    if(!plot){
+        return;
+    }
+    var r = 8; // square ball radius, i.e. width is 2w+1
+    var counts = new Uint32Array(256);
+    for(let ii=Math.max(0, point[0]-r); ii< Math.min(s, point[0]+r+1); ii++){
+        for(let jj=Math.max(0, point[1]-r); jj< Math.min(s, point[1]+r+1); jj++){
+            // TODO: accumulate counts at that point
+        }
+    }
+    exec_main('got_group_at', {
+        generation: pkey_generation,
+        point: point, // provide the details back to main so it can decide whether or not to use the result
+        plot: msg.plot,
+        group_num: 3
+    })
 }
 
 </script>
@@ -205,6 +235,7 @@ background-color: rgba(0,0,0,0.2);
 .bottom{
 flex: 2;
 overflow-y: scroll;
+text-align: center;
 }
 .active_stickers{
 float: left;
@@ -250,14 +281,16 @@ font-size: 10px;
     <div class="top">
         <div class="active_stickers">
             <div class="sticker_list">
-                <div class="sticker" style$="{{_sticker_style(painter_state.dest)}}">
+                <div class="sticker" style$="{{_sticker_style(painter_state.dest, active_group_a)}}" 
+                        on-mouseenter="_mouseenter_sticker_dest" on-mouseleave="_mouseleave_sticker">
                     [[painter_state.dest]] <paper-tooltip position="below">destination group [e]</paper-tooltip>
                 </div>
             </div>
             <span class="braket">&#8592;</span>
             <div class="sticker_list"><span class="braket">{</span>
                 <template is="dom-repeat" items="[[painter_state.srcs]]">
-                   <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+                   <div class="sticker" style$="{{_sticker_style(item, active_group_a)}}"
+                         on-mouseup="_sticker_click" on-mouseenter="_mouseenter_sticker" on-mouseleave="_mouseleave_sticker">[[item]]</div>
                 </template>
                 <span class="braket">}</span>
                 <paper-tooltip>source groups [e]</paper-tooltip>
@@ -268,7 +301,8 @@ font-size: 10px;
                 <paper-tooltip>new destination group [Enter]</paper-tooltip>
             </div>
             <template is="dom-repeat" items="[[other_groups]]">
-               <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+               <div class="sticker" style$="{{_sticker_style(item, active_group_a)}}"
+                    on-mouseup="_sticker_click" on-mouseenter="_mouseenter_sticker" on-mouseleave="_mouseleave_sticker">[[item]]</div>
             </template>
         </div>
     </div>
@@ -276,7 +310,8 @@ font-size: 10px;
     <div class="bottom">
         <template is="dom-repeat" items="[[cluster_plots]]">
             <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]"></managed-canvas>
+               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]" 
+                        on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
                <div class="x_axis_label">[[item.x_axis]]</div>
                <div class="y_axis_label">[[item.y_axis]]</div>
             </div>
@@ -333,6 +368,11 @@ font-size: 10px;
                 type: Array,
                 notify: true,
                 observer: '_want_amplitudes_set'
+            },
+            active_group_a:{
+                type: Object,
+                value: null,
+                notify: true
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -407,8 +447,9 @@ font-size: 10px;
                 generation_add: generation_add
             }, options, added_arrays);
 
-        }, _sticker_style: function(group_num){
-            return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
+        }, _sticker_style: function(group_num, active_group_a){
+            return "background-color:" + Palettes.flag_css[group_num] + ";color:" + Palettes.flag_css_text[group_num] + ";" +
+                    (active_group_a && active_group_a.group_num===group_num ? "box-shadow:0px 0px 5px 3px #fc0;" : "");
         }, _compute_unused_groups: function(){
             if(!this.groups){
                 this._setOther_groups([]);
@@ -474,6 +515,32 @@ font-size: 10px;
             this.set('canvas_size', Math.max(this.canvas_size-32, 32));
         }, _show: function(v){
             return v ? '' : 'display: none;';
+        }, _mousemove_canvas: function(e){
+            let plot_name = e.model.item.y_axis + 'x' + e.model.item.x_axis;
+            this._mouse_over_plot = plot_name;
+            this._worker.exec('get_group_at', {
+                plot: plot_name,
+                point: e.detail.canvas_point
+            });
+        }, _mouseleave_canvas: function(){
+            this._mouse_over_plot = null;
+            this.set('active_group_a', null);
+        }, got_group_at: function(msg){
+            if(this._mouse_over_plot !== msg.plot){
+                return; // TODO: we could check the msg.point to see if it's still close, but whatever
+            }
+            this.set('active_group_a', this._okey_from_group_num(msg.group_num));  
+        }, _mouseenter_sticker: function(e){
+            this.set('active_group_a', this._okey_from_group_num(e.model.item));  
+        }, _mouseleave_sticker: function(){
+            this.set('active_group_a', null);
+        }, _mouseenter_sticker_dest: function(){
+            this.set('active_group_a', this._okey_from_group_num(this.painter_state.dest));
+        }, _okey_from_group_num: function(num){
+            for(let okey of this.groups)if(okey && okey.group_num === num){
+                return okey
+            }
+            return null;
         }
     });
 </script>

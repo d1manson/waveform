@@ -54,15 +54,15 @@ border: 1px solid #CCC;
 line-height: 0px;
 text-align: right;
 }
-.tile-over{
-/*display: none;*/
+.over{
 position: absolute;
 top: 0px;
 left: 0px;
 right: 0px;
 bottom: 0px;
+pointer-events: none;
 }
-.tile-caption{
+.caption{
 padding-top: 2px;
 line-height: 12px;
 text-align: center;
@@ -72,13 +72,10 @@ box-shadow: -3px 0px 6px #ddc;
 :host-context(.shake){
 -webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
 -webkit-animation-duration: 1s;
-    -moz-animation-duration: 1s;
-    -ms-animation-duration: 1s;
-    -o-animation-duration: 1s;
-    animation-duration: 1s;
+animation-duration: 1s;
 }
 
-.tile-sticker{
+.sticker{
 line-height: 12px;
 width: 20px;
 height: 17px;
@@ -91,7 +88,7 @@ right: 2px;
 top: 2px;
 z-index: 10;
 }
-.tile-side{
+.side{
 position: absolute;
 right: 0px;
 top: 0px;
@@ -116,15 +113,15 @@ height:78px;
 .tc{
 height:50px;
 }
-.caption-inner{
+.caption_inner{
 border-bottom: 1px solid #000;
 padding-bottom: 1px;
 padding-top: 1px;
 }
-.caption-inner:last-of-type{
+.caption_inner:last-of-type{
 border-bottom: 0px;    
 }
-.caption-inner-label{
+.caption_inner-label{
 font-weight: bold;
 font-size: 0.8em;
 }
@@ -143,7 +140,7 @@ display: table-cell;
 vertical-align: bottom;
 text-align: right;    
 }
-.tile-side{
+.side{
 display: flex;
 flex-direction: column; 
 }
@@ -171,25 +168,25 @@ flex:2;
         </div>
         <managed-canvas canv_id="[[group_model.tac]]"></managed-canvas>
     </div>
-    <div id='sticker' class='tile-sticker' style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
-    <div id='over' class='tile-over hidden_grabbed'>
-        <div class='tile-side'>
+    <div id='sticker' class='sticker' style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
+    <div id='over' class='over' style="display:none;">
+        <div class='side'>
             <div class="flex"></div>
-            <div class='tile-caption'>
-                <div style$='[[_show(group_model.rm_spa_max)]]' class="caption-inner">
+            <div class='caption'>
+                <div style$='[[_show(group_model.rm_spa_max)]]' class="caption_inner">
                     [[group_model.rm_spa_max]]Hz
-                    <div class="caption-inner-label">spa max</div>
+                    <div class="caption_inner-label">spa max</div>
                 </div>
-                <div style$='[[_show(group_model.rm_dir_max)]]' class="caption-inner">
+                <div style$='[[_show(group_model.rm_dir_max)]]' class="caption_inner">
                     [[group_model.rm_dir_max]]Hz
-                    <div class="caption-inner-label">dir max</div>
+                    <div class="caption_inner-label">dir max</div>
                 </div>
-                <div style$='[[_show(group_model.group_mean)]]' class="caption-inner">
+                <div style$='[[_show(group_model.group_mean)]]' class="caption_inner">
                     [[group_model.group_mean]]Hz
-                    <div class="caption-inner-label">mean</div>
+                    <div class="caption_inner-label">mean</div>
                 </div>
-                <div class="caption-inner">[[group_model.n_spikes]]
-                    <div class="caption-inner-label">n spikes</div>
+                <div class="caption_inner">[[group_model.n_spikes]]
+                    <div class="caption_inner-label">n spikes</div>
                 </div>
             </div>
         </div>
@@ -206,7 +203,7 @@ flex:2;
     var ResetStyle = function(el){
         var display = el.style.display;
         el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
-        el.$.over.style.cssText = '';
+        el.$.over.style.cssText = 'display:none;';
         el.$.sticker.style.right = '';
         el.$.sticker.style.webkitAnimation = '';
         el.$.blind.style.cssText = '';
@@ -220,7 +217,7 @@ flex:2;
         ResetStyle(el);
         el.style.boxShadow = '0px 0px 5px 3px #fc0';
         el.style.backgroundColor = '#eee';
-        el.$.over.style.display = 'block';          
+        el.$.over.style.display = '';          
     }
     
     var StyleHover = function(el){

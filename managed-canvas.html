@@ -85,6 +85,8 @@ Polymer({
             value: 0,
             observer: '_height_changed'
         }
+    }, listeners: {
+        'mousemove': '_onmousemove'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
@@ -101,8 +103,22 @@ Polymer({
     }, _update_canv_style: function(el_canv){
         if(el_canv){
             el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
-            el_canv.style.imageRendering = "pixelated";            
+            el_canv.style.imageRendering = "pixelated";          
         }
+    }, _onmousemove: function(e){
+        e.canvas_point = this._get_point(e);
+        this.fire('canvas-mousemove', e);
+    }, _get_point: function(e){
+        // TODO: might be nice to cache the metrics rather than recomputing from scratch each time
+        let canv_el = Polymer.dom(this.root).firstChild;
+        if(!canv_el){
+            return;
+        }
+        let rect = canv_el.getBoundingClientRect();
+        return [
+            0 | ((e.clientY-rect.top)/rect.height*canv_el.height), 
+            0 | ((e.clientX-rect.left)/rect.width*canv_el.width)
+        ];
     }
 });
 
