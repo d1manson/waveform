@@ -368,7 +368,7 @@ background: #efefef;
 
             <div class="side_panel_row side_panel_row_flex">
                 <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-                group {{_get_safe(active_group_a, 'group_num')}}
+                group {{_get_safe(active_group_a, 'group_num')}} and group {{_get_safe(active_group_b, 'group_num')}}
 
                 <div class="info_summary">
                     <div class="info_summary_text"></div>
@@ -399,7 +399,9 @@ background: #efefef;
                     groups="{{cut_groups}}"
                     options="[[options]]"
                     active_group_a="{{active_group_a}}"
+                    active_group_b="{{active_group_b}}"
                     is_empty="[[tile_wall_is_empty]]"
+                    on-merge_groups="_merge_groups"
                     ></tile-wall>
 
     </div>
@@ -458,7 +460,7 @@ background: #efefef;
         no_groups="{{tile_wall_is_empty}}"
         ></parsed-data>
 
-    <cut-object 
+    <cut-object id="cut"
         groups="{{cut_groups}}"
         painter_state="{{cut_painter_state}}"
         cut_box="[[cut_box]]"
@@ -560,6 +562,10 @@ the_app._sanitize_options = function(stored_options) {
         }
     }
     return opts;
+}
+
+the_app._merge_groups = function(e){
+    the_app.$.cut.merge_groups(e.detail.a, e.detail.b);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
@@ -777,7 +783,6 @@ the_app.addEventListener('dom-change', function(){
     }
 
     the_app.set('grabber_mode', false);
-    window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
 })
 
 

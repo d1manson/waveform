@@ -10,9 +10,7 @@ Tiles have the following attibutes:
     group_color_1, group_color_2 - colors used for the group's sticker
     group_n - number of spikes in group
     proximate/active/moving/disabled - true/false. Changes the state as described below.
-    placeholder - a div element that should be the same size as the tile (TODO: update the placeholder when tile changes size).  You are free to insert this div into the DOM. 
-                                (Set it to a falsy value to garbage collect and reset it.)
-    
+
 And the following methods:
     updateCanvas -      the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
     updateCrossHair -   specify canvasnumber and canvas (x,y) coordiantes (in css pixels not canvas pixels) or null to remove the crosshair.
@@ -30,10 +28,14 @@ There are several boolean flags that control the tile's state:
     active,moving,proximate,disabled
 There are rules about how they can be combined, and more.  When all flags are false, the tile
 is in null state. When another tile is moving, it cannot be active instead it is hover.
+
+TODO: I think that most/all of the styling can be moved from js to css.
 -->
 
 
 <link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/neon-animation/neon-animation-runner-behavior.html">
+<link rel="import" href="custom-animations.html">
 <link rel="import" href="cross-hair.html">
 <link rel="import" href="managed-canvas.html">
 <link rel="import" href="palettes.html">
@@ -49,7 +51,6 @@ min-width: 98px;
 min-height: 128px;
 left: 0px;
 top: 0px;
-overflow: hidden;
 border: 1px solid #CCC;
 line-height: 0px;
 text-align: right;
@@ -69,8 +70,20 @@ text-align: center;
 background-color:rgba(255,255,255,0.85);
 box-shadow: -3px 0px 6px #ddc;
 }
-:host-context(.shake){
--webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
+/*shake css from daneden.me */
+@-webkit-keyframes shake {
+0%,100% {-webkit-transform:translateX(0)}
+10%,30%,50%,70%,90% {-webkit-transform:translateX(-10px)}
+20%,40%,60%,80% {-webkit-transform:translateX(10px)}
+}
+@keyframes shake {
+0%,100% {transform:translateX(0)}
+10%,30%,50%,70%,90% {transform:translateX(-10px)}
+20%,40%,60%,80%{transform:translateX(10px)}
+}
+:host(.shake){
+-webkit-animation-name:shake;
+animation-name:shake;
 -webkit-animation-duration: 1s;
 animation-duration: 1s;
 }
@@ -154,9 +167,25 @@ flex:2;
 83%   { opacity: 0;   }
 100%   { opacity: 1;   }
 }
+.placeholder{
+position: absolute;
+height: 100%;
+width: 100%;
+z-index: -1;
+text-align: center;
+}
+.placeholder_text{
+display: inline-block;
+position: relative;
+top: 45%;
+font-size: 20px;
+}
 </style>
 
 <template>
+    <div class="placeholder" id="placeholder" style="display: none;">
+        <div class="placeholder_text">[group [[group_num]]]</div> 
+    </div>
     <div class="canvas_part_1">
         <managed-canvas canv_id="[[group_model.waves]]"></managed-canvas>
         <managed-canvas canv_id="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
@@ -197,9 +226,7 @@ flex:2;
 
 <script>
     "use strict";
-    
-    var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
-    
+        
     var ResetStyle = function(el){
         var display = el.style.display;
         el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
@@ -207,7 +234,8 @@ flex:2;
         el.$.sticker.style.right = '';
         el.$.sticker.style.webkitAnimation = '';
         el.$.blind.style.cssText = '';
-        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        el.$.placeholder.style.display = 'none';
+        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
         for(var ii=0; ii<canvases.length; ii++)
             canvases[ii].style.webkitAnimation = '';
         Polymer.dom.flush();
@@ -220,10 +248,6 @@ flex:2;
         el.$.over.style.display = '';          
     }
     
-    var StyleHover = function(el){
-        ResetStyle(el);
-    }
-
     var StyleProxiamte = function(el){
         StyleMoving(el);
         el.style.backgroundColor = '';
@@ -231,7 +255,7 @@ flex:2;
         el.style.opacity = '1';
         el.$.sticker.style.right = '26px';
         el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
         for(var ii=0; ii<canvases.length; ii++)
             canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
         Polymer.dom.flush();
@@ -241,11 +265,12 @@ flex:2;
         ResetStyle(el);
         el.style.opacity = '0.5';
         el.style.borderWidth = '10px';
+        el.style.margin = '-9px';
         el.style.borderColor = '#000';
         el.style.backgroundColor = '#888';
         el.style.pointerEvents = 'none';
         el.style.zIndex = '100';
-        el.style.position = 'absolute';
+        el.$.placeholder.style.display = '';
     }
     
     var StyleDisabled = function(el){
@@ -253,10 +278,12 @@ flex:2;
         el.$.blind.style.display = 'block';
         el.style.pointerEvents = 'none';
     }
-            
+
     Polymer({
         is:'tile-element',
-        properties: {
+        behaviors: [
+            Polymer.NeonAnimationRunnerBehavior
+        ], properties: {
             group_num: {
                 type: Number,
                 notify: true,
@@ -304,6 +331,11 @@ flex:2;
                 value: 1,
                 computed: 'compute_border_width(moving)',
                 notify: true
+            }, 
+            animationConfig: { // for use with NeonAnimationRunnerBehavior
+                value: function(){
+                    return { shake: {name: 'shake-animation', node: this} };
+                }
             }
         },
         observers: [
@@ -368,34 +400,19 @@ flex:2;
         }, _update_state: function(active, moving, proximate, disabled){
             // This was preciously expressed in a much more complicated way
 
-            if(movingTile === this && !moving)
-                movingTile = null; // no longer moving
-
             if(disabled){
                 if(moving)
                     throw "cannot disable tile while moving";
                 this.set('active', false); // may have been true
                 StyleDisabled(this);
             } else if(moving){
-                if(movingTile === null){
-                    movingTile = this;
+                if(proximate){
+                    StyleProxiamte(this);
+                }else{
                     StyleMoving(this);
-                } else if(movingTile === this){
-                    if(proximate){
-                        StyleProxiamte(this);
-                    }else{
-                        StyleMoving(this);
-                    }
-                } else {
-                    throw "cannot set this tile to moving while another tile is still moving.";
                 }
             } else if(active){
-                if(movingTile === null){
-                    StyleActive(this);
-                } else {
-                    // here active actually means hover
-                    StyleHover(this);
-                }
+                StyleActive(this);
             } else {
                 ResetStyle(this);
             }
@@ -403,32 +420,10 @@ flex:2;
             if(proximate && !moving)
                 console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
         },
-
-        get placeholder(){
-            if(!this.placeholder_){
-                var p = document.createElement('div');
-                p.style.backgroundColor = '#8F8';
-                var s = getComputedStyle(this);
-                p.style.width = s.width;
-                p.style.height = s.height;
-                p.style.border = s.border;
-                p.style.display = s.display;
-                this.placeholder_ = p; //we store this here on the offchance one day we need to respond to changes in the tile's properties durign the moving.
-            }
-            return this.placeholder_;   
-        },
-        set placeholder(val){
-            if(val)
-                throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
-            this.placeholder_ = null;
-        },
         shake: function(){
-            this.classList.add('shake');
+            this.cancelAnimation();
+            this.playAnimation('shake');
         },
-        clearShake: function(){
-            this.classList.remove('shake');
-        },
-        StopProp: function(e){console.log('so, what?');e.stopPropagation();},
         getCopyOfCanvs: function(withSticker){
             var div = document.createElement('div');
             var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
@@ -453,6 +448,14 @@ flex:2;
         },
         getCanv: function(canvNum){
             return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
+        }, translate_xy: function(x,y){
+            if(x || y){
+                this.transform('translate(' + x + 'px,' + y + 'px)');
+                this.transform('translate(' + -x + 'px,' + -y + 'px)', this.$.placeholder)
+            } else {
+                this.transform('');
+                this.transform('',this.$.placeholder);
+            }
         }
     });
 </script>

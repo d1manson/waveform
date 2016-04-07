@@ -522,7 +522,9 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
 WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     // okeys is an array of objs, each with .akey property that gives a akey.
 
-    var okeys = Array.from(okeys); // if it was a set, then make it an array with well-defined order
+    var okeys = [null].concat(Array.from(okeys)); // if it was a set, then make it an array with well-defined order
+                                                  // also, make the 0th okey null, because we render the rubbish in that
+                                                  // bit of the canvas.
 
     // we want to draw all okeys to the off_canv in one go,
     // but in general we cant fit the full width of each okey on at the same time,
@@ -575,7 +577,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
     // Convert easy pixel coords to the weird [-128, 127] x [-128, 127] coordinates.
     // we will be assigning two elements at a time, so lets use 16bit view
     var render_metrics = this._render_metrics;
-    var okeys = render_metrics.okeys;
+    var okeys = render_metrics.okeys; // 0th entry is null,  because offsets are reserved for rubbish
 
     var xy_offset_gl_i8 = new Uint8Array(render_metrics.x_offset.length*2);
     var xy_offset_gl_i16 = new Uint16Array(xy_offset_gl_i8.buffer);  
@@ -593,7 +595,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i8 = new Uint8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
         var data_i16 = new Uint16Array(data_i8.buffer);
 
-        for(let ii=0; ii<okeys.length; ii++){
+        for(let ii=1; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
             for(let jj=0; jj<inds.length; jj++){
@@ -609,7 +611,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i8 = new Uint8Array(this._n*6);
         var data_i16 = new Uint16Array(data_i8.buffer);
     
-        for(let ii=0; ii<okeys.length; ii++){
+        for(let ii=1; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
             let gx = okeys[ii].group_num |  (xy << 8); 
@@ -819,7 +821,8 @@ WavesRenderer.prototype._timer_tick = function(){
     var width = (end_t - from_t) * off_canv_dt;
     var x_offsets = this._render_metrics.x_offset;
     var y_offsets = this._render_metrics.y_offset;  
-    for(let [ii, okey] of okeys.entries()){
+    for(let ii=1; ii<okeys.length; ii++){
+        let okey = okeys[ii];
         let part = this._okey_to_part_rendered.get(okey);
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
@@ -828,7 +831,8 @@ WavesRenderer.prototype._timer_tick = function(){
     // record that the okeys have now increaed their n_t
     if(end_t < n_c*(n_w-1)){
         // more work to do still...
-        for(let okey of okeys){
+        for(let ii=1; ii<okeys.length; ii++){
+            let okey = okeys[ii];
             this._okey_to_part_rendered.get(okey).n_t = end_t;
             this._n_t_to_okeys[end_t].add(okey);
         }   
@@ -836,7 +840,8 @@ WavesRenderer.prototype._timer_tick = function(){
         // finished rendering (everything). Note that the results should be absolutely up to date
         // because we're on the same thread as main and get notifications about changes to groups etc..
         let results = new Map();
-        for(let okey of okeys){
+        for(let ii=1; ii<okeys.length; ii++){
+            let okey = okeys[ii];
             let part = this._okey_to_part_rendered.get(okey);
             let item =  {
                 mode: this._mode,

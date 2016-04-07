@@ -56,14 +56,14 @@ Utils.parse_splices = function(splices, give_moved){
         }        
     }
 
-    if(removed.length || removed.size){
+    if(removed_keys.length || removed_keys.size){
         // we can't use getItem for removed items, because they're no longer in the
         // collection.
 
         // note that this bit depends on the polymer patch which sets _pkey
         let discarded_items = new Map();
         for(let s of splices.indexSplices){
-            for(let item of s.removed){
+            for(let item of s.removed)if(item){
                 discarded_items.set(item._pkey, item);  
             }
         }

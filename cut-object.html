@@ -444,7 +444,7 @@ doesn't have a worker, but it uses a similar system.
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
-                this.splice('groups', delta.b, 0, this._make_okey(new_arrs[1], delta.b));
+                this.splice('groups', delta.b, 1, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
                 break;

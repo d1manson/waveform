@@ -47,7 +47,12 @@ transform: translateX(-50%);
                 type: Object,
                 value: {} // settings for plotting
             },
-            active_group_a:{
+            active_group_a: {
+                type: Object,
+                value: null,
+                notify: true
+            },
+            active_group_b: {
                 type: Object,
                 value: null,
                 notify: true
@@ -60,16 +65,119 @@ transform: translateX(-50%);
         },
         observers: [
             'groups_modified(groups.*)'
-        ], groups_modified: function(change){
+        ], created: function(){
+            this._scroll_bound = this._scroll.bind(this);
+            this._failed_track_bound = this._failed_track.bind(this);
+        }, groups_modified: function(change){
 
         }, _show: function(v){
             return v ? '' : 'display: none;';
         }, _mouseenter_tile: function(e){
-            this.set('active_group_a', e.model.item);
+             if(this._track_state){
+                if(e.target !== this._track_state.tile_el){
+                    this.set('active_group_b', e.model.item);
+                    this._track_state.other_tile_el = e.target;
+                    this._track_state.tile_el.set('proximate', true);
+                } 
+             } else {
+                this.set('active_group_a', e.model.item);
+            }
         }, _mouseleave_tile: function(e){
-            this.set('active_group_a', null);
+            if(this._track_state){
+                this.set('active_group_b', null);
+                this._track_state.other_tile_el = null;
+                this._track_state.tile_el.set('proximate', false);
+            } else {
+                this.set('active_group_a', null);
+            }
         }, _is_equal: function(a,b){
             return a===b;
+        }, _track_tile: function(e){
+
+            if(e.detail.state === "end"){
+                if(!this._track_state){
+                    return; 
+                }
+                this.removeEventListener('scroll', this._scroll_bound);
+                this.removeEventListener('mouseup', this._failed_track_bound);
+                this._track_state.tile_el.translate_xy(null);
+                if(this.active_group_b){
+                    this.fire('merge_groups', {
+                        a: this.active_group_a.group_num,
+                        b: this.active_group_b.group_num
+                    });
+                    this.set('active_group_b', null);
+                    this._track_state.other_tile_el.shake(); // either this or...
+                }
+                this._track_state.tile_el.shake(); // ... this will remain in the tilewall after the merge
+                this._track_state.tile_el.set('proximate', false);
+                this._track_state.tile_el.set('moving', false);
+                this._track_state = null;
+                return;
+            } 
+
+            if (e.detail.state === "start"){
+                // Polymer's track doesn't do everything we need it to,
+                // so we basically reinvent it and do a bit more...
+                this._track_state = {
+                    start_scroll_top: this.scrollTop,
+                    start_client_x: e.detail.x,
+                    start_client_y: e.detail.y,
+                    last_client_x: e.detail.x,
+                    last_client_y: e.detail.y,
+                    last_transform_x: 0,
+                    last_transform_y: 0,
+                    tile_el: e.target,
+                    other_tile_el: null
+                }
+                this.addEventListener('scroll', this._scroll_bound);
+                this.addEventListener('mouseup', this._failed_track_bound);
+                e.target.set('moving', true);
+            } else {
+                this._track_state.last_client_x = e.detail.x;
+                this._track_state.last_client_y = e.detail.y;
+            }
+            let state = this._track_state;
+
+            let tx, ty;
+            if(this._track_state.other_tile_el){
+                // this is pretty ugly, but it does the job...
+                let this_rect = state.tile_el.getBoundingClientRect();
+                let other_rect = state.other_tile_el.getBoundingClientRect();
+                let border_fudge = state.tile_el.border_width - state.other_tile_el.border_width;
+                tx = other_rect.left - (this_rect.left - this._track_state.last_transform_x) - border_fudge;
+                ty = other_rect.top - (this_rect.top - this._track_state.last_transform_y) - border_fudge;
+            } else {
+                tx = e.detail.x - state.start_client_x;
+                ty = e.detail.y - state.start_client_y + (this.scrollTop - state.start_scroll_top);            
+            }
+
+            state.last_transform_x = tx;
+            state.last_transform_y = ty;
+            state.tile_el.translate_xy(tx, ty);
+
+        }, _scroll: function(e){
+            // attached during tracking
+            e.detail = {
+                state: 'scroll',
+                x: this._track_state.last_client_x,
+                y: this._track_state.last_client_y
+            };
+            this._track_tile(e);
+        }, _failed_track: function(e){
+            // attached during tracking as mouseup on tilewall itself
+            if(!this._track_state){
+                return; 
+            }
+            let my_event = {
+                detail: {
+                    state: 'end',
+                    x: this._track_state.last_client_x,
+                    y: this._track_state.last_client_y
+                },
+                target: this._track_state.tile_el
+            };
+            this._track_tile(my_event);
         }
     });
 </script>

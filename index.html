@@ -15949,7 +15949,37 @@ value. `setMax` should move the slider to the maximum value.
     }
   });
 </script>
-<dom-module id="cross-hair" assetpath="/">
+<script>
+
+// adapted from:
+// http://web-animations.github.io/web-animations-demos/#animate_css
+Polymer({
+	is: 'shake-animation',
+	behaviors: [
+		Polymer.NeonAnimationBehavior
+	],
+	configure: function(config){
+		this._effect = new KeyframeEffect(config.node, [
+          {transform: 'translate3d(0, 0, 0)', offset: 0}, 
+          {transform: 'translate3d(-10px, 0, 0)', offset: 0.1}, 
+          {transform: 'translate3d(10px, 0, 0)', offset: 0.2}, 
+          {transform: 'translate3d(-10px, 0, 0)', offset: 0.3}, 
+          {transform: 'translate3d(10px, 0, 0)', offset: 0.4}, 
+          {transform: 'translate3d(-10px, 0, 0)', offset: 0.5}, 
+          {transform: 'translate3d(10px, 0, 0)', offset: 0.6}, 
+          {transform: 'translate3d(-10px, 0, 0)', offset: 0.7}, 
+          {transform: 'translate3d(10px, 0, 0)', offset: 0.8}, 
+          {transform: 'translate3d(-10px, 0, 0)', offset: 0.9}, 
+          {transform: 'translate3d(0, 0, 0)', offset: 1}
+		], {
+			duration: 1000,  //note that we ignore any customized timing in config
+			iterations: 1
+		}); 
+		return this._effect;
+	}
+})
+
+</script><dom-module id="cross-hair" assetpath="/">
 
 <template>
 <style type="text/css">
@@ -16176,7 +16206,6 @@ min-width: 98px;
 min-height: 128px;
 left: 0px;
 top: 0px;
-overflow: hidden;
 border: 1px solid #CCC;
 line-height: 0px;
 text-align: right;
@@ -16196,8 +16225,20 @@ text-align: center;
 background-color:rgba(255,255,255,0.85);
 box-shadow: -3px 0px 6px #ddc;
 }
-:host-context(.shake){
--webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
+/*shake css from daneden.me */
+@-webkit-keyframes shake {
+0%,100% {-webkit-transform:translateX(0)}
+10%,30%,50%,70%,90% {-webkit-transform:translateX(-10px)}
+20%,40%,60%,80% {-webkit-transform:translateX(10px)}
+}
+@keyframes shake {
+0%,100% {transform:translateX(0)}
+10%,30%,50%,70%,90% {transform:translateX(-10px)}
+20%,40%,60%,80%{transform:translateX(10px)}
+}
+:host(.shake){
+-webkit-animation-name:shake;
+animation-name:shake;
 -webkit-animation-duration: 1s;
 animation-duration: 1s;
 }
@@ -16281,9 +16322,25 @@ flex:2;
 83%   { opacity: 0;   }
 100%   { opacity: 1;   }
 }
+.placeholder{
+position: absolute;
+height: 100%;
+width: 100%;
+z-index: -1;
+text-align: center;
+}
+.placeholder_text{
+display: inline-block;
+position: relative;
+top: 45%;
+font-size: 20px;
+}
 </style>
 
 <template>
+    <div class="placeholder" id="placeholder" style="display: none;">
+        <div class="placeholder_text">[group [[group_num]]]</div> 
+    </div>
     <div class="canvas_part_1">
         <managed-canvas canv_id="[[group_model.waves]]"></managed-canvas>
         <managed-canvas canv_id="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
@@ -16324,9 +16381,7 @@ flex:2;
 
 <script>
     "use strict";
-    
-    var movingTile = null; //this will hold a reference to the movingTile while one is being moved..other tiles can make use of this.
-    
+        
     var ResetStyle = function(el){
         var display = el.style.display;
         el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
@@ -16334,7 +16389,8 @@ flex:2;
         el.$.sticker.style.right = '';
         el.$.sticker.style.webkitAnimation = '';
         el.$.blind.style.cssText = '';
-        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        el.$.placeholder.style.display = 'none';
+        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
         for(var ii=0; ii<canvases.length; ii++)
             canvases[ii].style.webkitAnimation = '';
         Polymer.dom.flush();
@@ -16347,10 +16403,6 @@ flex:2;
         el.$.over.style.display = '';          
     }
     
-    var StyleHover = function(el){
-        ResetStyle(el);
-    }
-
     var StyleProxiamte = function(el){
         StyleMoving(el);
         el.style.backgroundColor = '';
@@ -16358,7 +16410,7 @@ flex:2;
         el.style.opacity = '1';
         el.$.sticker.style.right = '26px';
         el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        var canvases = Polymer.dom(el.root).querySelectorAll('canvas');
+        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
         for(var ii=0; ii<canvases.length; ii++)
             canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
         Polymer.dom.flush();
@@ -16368,11 +16420,12 @@ flex:2;
         ResetStyle(el);
         el.style.opacity = '0.5';
         el.style.borderWidth = '10px';
+        el.style.margin = '-9px';
         el.style.borderColor = '#000';
         el.style.backgroundColor = '#888';
         el.style.pointerEvents = 'none';
         el.style.zIndex = '100';
-        el.style.position = 'absolute';
+        el.$.placeholder.style.display = '';
     }
     
     var StyleDisabled = function(el){
@@ -16380,10 +16433,12 @@ flex:2;
         el.$.blind.style.display = 'block';
         el.style.pointerEvents = 'none';
     }
-            
+
     Polymer({
         is:'tile-element',
-        properties: {
+        behaviors: [
+            Polymer.NeonAnimationRunnerBehavior
+        ], properties: {
             group_num: {
                 type: Number,
                 notify: true,
@@ -16431,6 +16486,11 @@ flex:2;
                 value: 1,
                 computed: 'compute_border_width(moving)',
                 notify: true
+            }, 
+            animationConfig: { // for use with NeonAnimationRunnerBehavior
+                value: function(){
+                    return { shake: {name: 'shake-animation', node: this} };
+                }
             }
         },
         observers: [
@@ -16495,34 +16555,19 @@ flex:2;
         }, _update_state: function(active, moving, proximate, disabled){
             // This was preciously expressed in a much more complicated way
 
-            if(movingTile === this && !moving)
-                movingTile = null; // no longer moving
-
             if(disabled){
                 if(moving)
                     throw "cannot disable tile while moving";
                 this.set('active', false); // may have been true
                 StyleDisabled(this);
             } else if(moving){
-                if(movingTile === null){
-                    movingTile = this;
+                if(proximate){
+                    StyleProxiamte(this);
+                }else{
                     StyleMoving(this);
-                } else if(movingTile === this){
-                    if(proximate){
-                        StyleProxiamte(this);
-                    }else{
-                        StyleMoving(this);
-                    }
-                } else {
-                    throw "cannot set this tile to moving while another tile is still moving.";
                 }
             } else if(active){
-                if(movingTile === null){
-                    StyleActive(this);
-                } else {
-                    // here active actually means hover
-                    StyleHover(this);
-                }
+                StyleActive(this);
             } else {
                 ResetStyle(this);
             }
@@ -16530,32 +16575,10 @@ flex:2;
             if(proximate && !moving)
                 console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
         },
-
-        get placeholder(){
-            if(!this.placeholder_){
-                var p = document.createElement('div');
-                p.style.backgroundColor = '#8F8';
-                var s = getComputedStyle(this);
-                p.style.width = s.width;
-                p.style.height = s.height;
-                p.style.border = s.border;
-                p.style.display = s.display;
-                this.placeholder_ = p; //we store this here on the offchance one day we need to respond to changes in the tile's properties durign the moving.
-            }
-            return this.placeholder_;   
-        },
-        set placeholder(val){
-            if(val)
-                throw "set placeholder to falsy value to garbage collect it, you cannot set it to any other value."
-            this.placeholder_ = null;
-        },
         shake: function(){
-            this.classList.add('shake');
+            this.cancelAnimation();
+            this.playAnimation('shake');
         },
-        clearShake: function(){
-            this.classList.remove('shake');
-        },
-        StopProp: function(e){console.log('so, what?');e.stopPropagation();},
         getCopyOfCanvs: function(withSticker){
             var div = document.createElement('div');
             var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
@@ -16580,6 +16603,14 @@ flex:2;
         },
         getCanv: function(canvNum){
             return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
+        }, translate_xy: function(x,y){
+            if(x || y){
+                this.transform('translate(' + x + 'px,' + y + 'px)');
+                this.transform('translate(' + -x + 'px,' + -y + 'px)', this.$.placeholder)
+            } else {
+                this.transform('');
+                this.transform('',this.$.placeholder);
+            }
         }
     });
 </script>
@@ -16686,14 +16717,14 @@ Utils.parse_splices = function(splices, give_moved){
         }        
     }
 
-    if(removed.length || removed.size){
+    if(removed_keys.length || removed_keys.size){
         // we can't use getItem for removed items, because they're no longer in the
         // collection.
 
         // note that this bit depends on the polymer patch which sets _pkey
         let discarded_items = new Map();
         for(let s of splices.indexSplices){
-            for(let item of s.removed){
+            for(let item of s.removed)if(item){
                 discarded_items.set(item._pkey, item);  
             }
         }
@@ -16948,7 +16979,12 @@ transform: translateX(-50%);
                 type: Object,
                 value: {} // settings for plotting
             },
-            active_group_a:{
+            active_group_a: {
+                type: Object,
+                value: null,
+                notify: true
+            },
+            active_group_b: {
                 type: Object,
                 value: null,
                 notify: true
@@ -16961,16 +16997,119 @@ transform: translateX(-50%);
         },
         observers: [
             'groups_modified(groups.*)'
-        ], groups_modified: function(change){
+        ], created: function(){
+            this._scroll_bound = this._scroll.bind(this);
+            this._failed_track_bound = this._failed_track.bind(this);
+        }, groups_modified: function(change){
 
         }, _show: function(v){
             return v ? '' : 'display: none;';
         }, _mouseenter_tile: function(e){
-            this.set('active_group_a', e.model.item);
+             if(this._track_state){
+                if(e.target !== this._track_state.tile_el){
+                    this.set('active_group_b', e.model.item);
+                    this._track_state.other_tile_el = e.target;
+                    this._track_state.tile_el.set('proximate', true);
+                } 
+             } else {
+                this.set('active_group_a', e.model.item);
+            }
         }, _mouseleave_tile: function(e){
-            this.set('active_group_a', null);
+            if(this._track_state){
+                this.set('active_group_b', null);
+                this._track_state.other_tile_el = null;
+                this._track_state.tile_el.set('proximate', false);
+            } else {
+                this.set('active_group_a', null);
+            }
         }, _is_equal: function(a,b){
             return a===b;
+        }, _track_tile: function(e){
+
+            if(e.detail.state === "end"){
+                if(!this._track_state){
+                    return; 
+                }
+                this.removeEventListener('scroll', this._scroll_bound);
+                this.removeEventListener('mouseup', this._failed_track_bound);
+                this._track_state.tile_el.translate_xy(null);
+                if(this.active_group_b){
+                    this.fire('merge_groups', {
+                        a: this.active_group_a.group_num,
+                        b: this.active_group_b.group_num
+                    });
+                    this.set('active_group_b', null);
+                    this._track_state.other_tile_el.shake(); // either this or...
+                }
+                this._track_state.tile_el.shake(); // ... this will remain in the tilewall after the merge
+                this._track_state.tile_el.set('proximate', false);
+                this._track_state.tile_el.set('moving', false);
+                this._track_state = null;
+                return;
+            } 
+
+            if (e.detail.state === "start"){
+                // Polymer's track doesn't do everything we need it to,
+                // so we basically reinvent it and do a bit more...
+                this._track_state = {
+                    start_scroll_top: this.scrollTop,
+                    start_client_x: e.detail.x,
+                    start_client_y: e.detail.y,
+                    last_client_x: e.detail.x,
+                    last_client_y: e.detail.y,
+                    last_transform_x: 0,
+                    last_transform_y: 0,
+                    tile_el: e.target,
+                    other_tile_el: null
+                }
+                this.addEventListener('scroll', this._scroll_bound);
+                this.addEventListener('mouseup', this._failed_track_bound);
+                e.target.set('moving', true);
+            } else {
+                this._track_state.last_client_x = e.detail.x;
+                this._track_state.last_client_y = e.detail.y;
+            }
+            let state = this._track_state;
+
+            let tx, ty;
+            if(this._track_state.other_tile_el){
+                // this is pretty ugly, but it does the job...
+                let this_rect = state.tile_el.getBoundingClientRect();
+                let other_rect = state.other_tile_el.getBoundingClientRect();
+                let border_fudge = state.tile_el.border_width - state.other_tile_el.border_width;
+                tx = other_rect.left - (this_rect.left - this._track_state.last_transform_x) - border_fudge;
+                ty = other_rect.top - (this_rect.top - this._track_state.last_transform_y) - border_fudge;
+            } else {
+                tx = e.detail.x - state.start_client_x;
+                ty = e.detail.y - state.start_client_y + (this.scrollTop - state.start_scroll_top);            
+            }
+
+            state.last_transform_x = tx;
+            state.last_transform_y = ty;
+            state.tile_el.translate_xy(tx, ty);
+
+        }, _scroll: function(e){
+            // attached during tracking
+            e.detail = {
+                state: 'scroll',
+                x: this._track_state.last_client_x,
+                y: this._track_state.last_client_y
+            };
+            this._track_tile(e);
+        }, _failed_track: function(e){
+            // attached during tracking as mouseup on tilewall itself
+            if(!this._track_state){
+                return; 
+            }
+            let my_event = {
+                detail: {
+                    state: 'end',
+                    x: this._track_state.last_client_x,
+                    y: this._track_state.last_client_y
+                },
+                target: this._track_state.tile_el
+            };
+            this._track_tile(my_event);
         }
     });
 </script>
@@ -17787,7 +17926,7 @@ cursor: default;
                 var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
                 m.free_array(this.groups[delta.a].akey);
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
-                this.splice('groups', delta.b, 0, this._make_okey(new_arrs[1], delta.b));
+                this.splice('groups', delta.b, 1, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
                 success = true;
                 break;
@@ -25658,7 +25797,9 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
 WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     // okeys is an array of objs, each with .akey property that gives a akey.
 
-    var okeys = Array.from(okeys); // if it was a set, then make it an array with well-defined order
+    var okeys = [null].concat(Array.from(okeys)); // if it was a set, then make it an array with well-defined order
+                                                  // also, make the 0th okey null, because we render the rubbish in that
+                                                  // bit of the canvas.
 
     // we want to draw all okeys to the off_canv in one go,
     // but in general we cant fit the full width of each okey on at the same time,
@@ -25711,7 +25852,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
     // Convert easy pixel coords to the weird [-128, 127] x [-128, 127] coordinates.
     // we will be assigning two elements at a time, so lets use 16bit view
     var render_metrics = this._render_metrics;
-    var okeys = render_metrics.okeys;
+    var okeys = render_metrics.okeys; // 0th entry is null,  because offsets are reserved for rubbish
 
     var xy_offset_gl_i8 = new Uint8Array(render_metrics.x_offset.length*2);
     var xy_offset_gl_i16 = new Uint16Array(xy_offset_gl_i8.buffer);  
@@ -25729,7 +25870,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i8 = new Uint8Array(this._n*4); // TODO: it might be worth holding a reference to this permanentyl to avoid GC and realoc
         var data_i16 = new Uint16Array(data_i8.buffer);
 
-        for(let ii=0; ii<okeys.length; ii++){
+        for(let ii=1; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
             for(let jj=0; jj<inds.length; jj++){
@@ -25745,7 +25886,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i8 = new Uint8Array(this._n*6);
         var data_i16 = new Uint16Array(data_i8.buffer);
     
-        for(let ii=0; ii<okeys.length; ii++){
+        for(let ii=1; ii<okeys.length; ii++){
             let inds = m.get_array(okeys[ii].akey);
             let xy = xy_offset_gl_i16[ii];
             let gx = okeys[ii].group_num |  (xy << 8); 
@@ -25955,7 +26096,8 @@ WavesRenderer.prototype._timer_tick = function(){
     var width = (end_t - from_t) * off_canv_dt;
     var x_offsets = this._render_metrics.x_offset;
     var y_offsets = this._render_metrics.y_offset;  
-    for(let [ii, okey] of okeys.entries()){
+    for(let ii=1; ii<okeys.length; ii++){
+        let okey = okeys[ii];
         let part = this._okey_to_part_rendered.get(okey);
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
                             width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
@@ -25964,7 +26106,8 @@ WavesRenderer.prototype._timer_tick = function(){
     // record that the okeys have now increaed their n_t
     if(end_t < n_c*(n_w-1)){
         // more work to do still...
-        for(let okey of okeys){
+        for(let ii=1; ii<okeys.length; ii++){
+            let okey = okeys[ii];
             this._okey_to_part_rendered.get(okey).n_t = end_t;
             this._n_t_to_okeys[end_t].add(okey);
         }   
@@ -25972,7 +26115,8 @@ WavesRenderer.prototype._timer_tick = function(){
         // finished rendering (everything). Note that the results should be absolutely up to date
         // because we're on the same thread as main and get notifications about changes to groups etc..
         let results = new Map();
-        for(let okey of okeys){
+        for(let ii=1; ii<okeys.length; ii++){
+            let okey = okeys[ii];
             let part = this._okey_to_part_rendered.get(okey);
             let item =  {
                 mode: this._mode,
@@ -26993,7 +27137,7 @@ font-size: 10px;
 
             <div class="side_panel_row side_panel_row_flex">
                 <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-                group {{_get_safe(active_group_a, 'group_num')}}
+                group {{_get_safe(active_group_a, 'group_num')}} and group {{_get_safe(active_group_b, 'group_num')}}
 
                 <div class="info_summary">
                     <div class="info_summary_text"></div>
@@ -27015,7 +27159,7 @@ font-size: 10px;
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
         
-        <tile-wall class="tilewall" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" is_empty="[[tile_wall_is_empty]]"></tile-wall>
+        <tile-wall class="tilewall" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" is_empty="[[tile_wall_is_empty]]" on-merge_groups="_merge_groups"></tile-wall>
 
     </div>
 
@@ -27051,7 +27195,7 @@ font-size: 10px;
 
     <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
 
-    <cut-object groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
+    <cut-object id="cut" groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
     <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
 
@@ -27125,6 +27269,10 @@ the_app._sanitize_options = function(stored_options) {
         }
     }
     return opts;
+}
+
+the_app._merge_groups = function(e){
+    the_app.$.cut.merge_groups(e.detail.a, e.detail.b);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
@@ -27342,7 +27490,6 @@ the_app.addEventListener('dom-change', function(){
     }
 
     the_app.set('grabber_mode', false);
-    window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
 })
 
 
