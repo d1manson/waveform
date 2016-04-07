@@ -75,6 +75,23 @@ color: #c77;
 
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
+transition: height 1s;
+}
+.grabber_signifier{
+position: fixed;
+top: 6px;
+right: 45px;
+color: #f00;
+font-weight: bold;
+border: 2px solid #f00;
+padding: 4px 6px 4px 6px;
+border-radius: 4px;
+}
+.menu_toggle {
+position: fixed;
+top: 0px;
+right: 0px;
+background: #efefef;
 }
 </style>
 
@@ -16037,6 +16054,8 @@ Polymer({
             value: 0,
             observer: '_height_changed'
         }
+    }, listeners: {
+        'mousemove': '_onmousemove'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
@@ -16053,8 +16072,22 @@ Polymer({
     }, _update_canv_style: function(el_canv){
         if(el_canv){
             el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
-            el_canv.style.imageRendering = "pixelated";            
+            el_canv.style.imageRendering = "pixelated";          
         }
+    }, _onmousemove: function(e){
+        e.canvas_point = this._get_point(e);
+        this.fire('canvas-mousemove', e);
+    }, _get_point: function(e){
+        // TODO: might be nice to cache the metrics rather than recomputing from scratch each time
+        let canv_el = Polymer.dom(this.root).firstChild;
+        if(!canv_el){
+            return;
+        }
+        let rect = canv_el.getBoundingClientRect();
+        return [
+            0 | ((e.clientY-rect.top)/rect.height*canv_el.height), 
+            0 | ((e.clientX-rect.left)/rect.width*canv_el.width)
+        ];
     }
 });
 
@@ -16148,15 +16181,15 @@ border: 1px solid #CCC;
 line-height: 0px;
 text-align: right;
 }
-.tile-over{
-/*display: none;*/
+.over{
 position: absolute;
 top: 0px;
 left: 0px;
 right: 0px;
 bottom: 0px;
+pointer-events: none;
 }
-.tile-caption{
+.caption{
 padding-top: 2px;
 line-height: 12px;
 text-align: center;
@@ -16166,13 +16199,10 @@ box-shadow: -3px 0px 6px #ddc;
 :host-context(.shake){
 -webkit-animation-name:shake;-moz-animation-name:shake;-o-animation-name:shake;animation-name:shake;
 -webkit-animation-duration: 1s;
-    -moz-animation-duration: 1s;
-    -ms-animation-duration: 1s;
-    -o-animation-duration: 1s;
-    animation-duration: 1s;
+animation-duration: 1s;
 }
 
-.tile-sticker{
+.sticker{
 line-height: 12px;
 width: 20px;
 height: 17px;
@@ -16185,7 +16215,7 @@ right: 2px;
 top: 2px;
 z-index: 10;
 }
-.tile-side{
+.side{
 position: absolute;
 right: 0px;
 top: 0px;
@@ -16210,15 +16240,15 @@ height:78px;
 .tc{
 height:50px;
 }
-.caption-inner{
+.caption_inner{
 border-bottom: 1px solid #000;
 padding-bottom: 1px;
 padding-top: 1px;
 }
-.caption-inner:last-of-type{
+.caption_inner:last-of-type{
 border-bottom: 0px;    
 }
-.caption-inner-label{
+.caption_inner-label{
 font-weight: bold;
 font-size: 0.8em;
 }
@@ -16237,7 +16267,7 @@ display: table-cell;
 vertical-align: bottom;
 text-align: right;    
 }
-.tile-side{
+.side{
 display: flex;
 flex-direction: column; 
 }
@@ -16265,25 +16295,25 @@ flex:2;
         </div>
         <managed-canvas canv_id="[[group_model.tac]]"></managed-canvas>
     </div>
-    <div id="sticker" class="tile-sticker" style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
-    <div id="over" class="tile-over hidden_grabbed">
-        <div class="tile-side">
+    <div id="sticker" class="sticker" style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
+    <div id="over" class="over" style="display:none;">
+        <div class="side">
             <div class="flex"></div>
-            <div class="tile-caption">
-                <div style$="[[_show(group_model.rm_spa_max)]]" class="caption-inner">
+            <div class="caption">
+                <div style$="[[_show(group_model.rm_spa_max)]]" class="caption_inner">
                     [[group_model.rm_spa_max]]Hz
-                    <div class="caption-inner-label">spa max</div>
+                    <div class="caption_inner-label">spa max</div>
                 </div>
-                <div style$="[[_show(group_model.rm_dir_max)]]" class="caption-inner">
+                <div style$="[[_show(group_model.rm_dir_max)]]" class="caption_inner">
                     [[group_model.rm_dir_max]]Hz
-                    <div class="caption-inner-label">dir max</div>
+                    <div class="caption_inner-label">dir max</div>
                 </div>
-                <div style$="[[_show(group_model.group_mean)]]" class="caption-inner">
+                <div style$="[[_show(group_model.group_mean)]]" class="caption_inner">
                     [[group_model.group_mean]]Hz
-                    <div class="caption-inner-label">mean</div>
+                    <div class="caption_inner-label">mean</div>
                 </div>
-                <div class="caption-inner">[[group_model.n_spikes]]
-                    <div class="caption-inner-label">n spikes</div>
+                <div class="caption_inner">[[group_model.n_spikes]]
+                    <div class="caption_inner-label">n spikes</div>
                 </div>
             </div>
         </div>
@@ -16300,7 +16330,7 @@ flex:2;
     var ResetStyle = function(el){
         var display = el.style.display;
         el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
-        el.$.over.style.cssText = '';
+        el.$.over.style.cssText = 'display:none;';
         el.$.sticker.style.right = '';
         el.$.sticker.style.webkitAnimation = '';
         el.$.blind.style.cssText = '';
@@ -16314,7 +16344,7 @@ flex:2;
         ResetStyle(el);
         el.style.boxShadow = '0px 0px 5px 3px #fc0';
         el.style.backgroundColor = '#eee';
-        el.$.over.style.display = 'block';          
+        el.$.over.style.display = '';          
     }
     
     var StyleHover = function(el){
@@ -16883,18 +16913,23 @@ Utils.canvas_manager = (function(){
 
 })();
 </script><dom-module id="tile-wall" assetpath="/">
-
+<style>
+.blank_info {
+display: inline-block;
+position: absolute;
+left: 50%;
+top: 30%;
+transform: translateX(-50%);
+}
+</style>
 <template>
 
-    
-
-
-    
-    
-
+    <div class="blank_info" style$="{{_show(is_empty)}}">
+        No group data to be shown. Select a trial-tetrode pair with files available.
+    </div>
 
     <template is="dom-repeat" items="[[groups]]">
-        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]"></tile-element>        
+        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile"></tile-element>        
     </template>
 </template>
 
@@ -16912,15 +16947,30 @@ Utils.canvas_manager = (function(){
             options: {
                 type: Object,
                 value: {} // settings for plotting
+            },
+            active_group_a:{
+                type: Object,
+                value: null,
+                notify: true
+            },
+            is_empty: {
+                type: Boolean,
+                value: false,
+                notify: true,
             }
         },
         observers: [
             'groups_modified(groups.*)'
-        ],
-        groups_modified: function(change){
-            
+        ], groups_modified: function(change){
+
         }, _show: function(v){
             return v ? '' : 'display: none;';
+        }, _mouseenter_tile: function(e){
+            this.set('active_group_a', e.model.item);
+        }, _mouseleave_tile: function(e){
+            this.set('active_group_a', null);
+        }, _is_equal: function(a,b){
+            return a===b;
         }
     });
 </script>
@@ -19340,6 +19390,12 @@ var parse_clu_file = function(full_str, fkey){
                 type: Array,
                 value: function(){return [];},
                 notify: true
+            },
+            no_groups: { // unlike everything else, this is only updated in the second phase of a file-switch
+                type: Boolean,
+                value: true,
+                notify: true,
+                readOnly: true
             }
         }, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
@@ -19494,6 +19550,8 @@ var parse_clu_file = function(full_str, fkey){
 
             this._worker_io.exec('read_files', request, options); 
 
+            this._setNo_groups(!(new_fkeys.tet || new_fkeys.cut)); // as promissed, we only set this once during the file-change
+
         }, _pos_options_changed: function(){
             var options = this._make_pos_options();
             this._worker_io.exec('read_files', {
@@ -19584,7 +19642,8 @@ var parse_clu_file = function(full_str, fkey){
                 if(this._make_cut_from_n){
                     this._setCut_box({
                         is: 'n',
-                        n_spikes: parseInt(cached.num_spikes)
+                        n_spikes: parseInt(cached.header.num_spikes),
+                        header: null
                     });
                 }
 
@@ -19674,7 +19733,8 @@ var parse_clu_file = function(full_str, fkey){
                 if(this._make_cut_from_n){
                     this._setCut_box({
                         is: 'n',
-                        n_spikes: parseInt(header.num_spikes)
+                        n_spikes: parseInt(header.num_spikes),
+                        header: null
                     })
                 }
             }
@@ -21635,6 +21695,7 @@ Polymer({
         this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
         this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
         this._trial_from_base = new Map();
+        this._use_url_search = window.location.search;
         document.addEventListener("dragover", this._dragover.bind(this));
         document.addEventListener("drop", this._drop.bind(this));
     }, attached: function(){
@@ -21681,13 +21742,18 @@ Polymer({
         } else {
             this.set('selected_trial', new_sel.name);
         }
-    }, _update_tet_num: function(old_val, new_val){
+    }, _update_tet_num: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires
         this.debounce('_switched_selection', this._switched_selection.bind(this));
-    }, _update_trial: function(old_val, new_val){
+    }, _update_trial: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires
         this.debounce('_switched_selection', this._switched_selection.bind(this));
-    }, _update_cut: function(old_val, new_val){
+    }, _update_cut: function(new_val){
+        let trial = this._trial_from_base.get(this.selected_trial);
+        if(trial){
+            let tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
+            tet_obj && (tet_obj.last_used_cut = new_val);
+        }
         this.debounce('_switched_selection', this._switched_selection.bind(this));
     }, _tet_button_click: function(e){
         var model = e.model;
@@ -21715,7 +21781,8 @@ Polymer({
                 }
             }
         }
-        this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ? tet_obj.cuts[0].cut : "");   
+        this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ?
+                        (tet_obj.last_used_cut || tet_obj.cuts[0].cut) : null);               
     }, _dragover: function(e){
         if(this.is_dragging_out) return;
         
@@ -21738,7 +21805,7 @@ Polymer({
         var url = location.pathname + "?";
         url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
         url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
-        window.history.pushState("", title,  url);
+        (!this.no_files) && window.history.pushState("", title,  url);
         document.title = title;
         this._setSelected_files({
             set: trial && trial.set ? trial.set : 0,
@@ -21902,7 +21969,22 @@ Polymer({
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
         this._setAvailable_tets(available_tets);
-        this._reassign_trials_denovo(); // notify absolutely everything !!! 
+        this._reassign_trials_denovo(); // notify absolutely everything !!!
+
+        if(this._use_url_search){
+            // note we do this before sorting all the cuts, but whatever
+            let match = (/exp=([^&]+)/g).exec(this._use_url_search);
+            let url_trial = match && decodeURIComponent(match[1]);
+            match = (/tet=([^&]+)/g).exec(this._use_url_search);
+            let url_tet_num = match && parseInt(decodeURIComponent(match[1]));
+            if(url_trial && this._trial_from_base.has(url_trial)){
+                this.$.trial_list.selectItem(this._trial_from_base.get(url_trial));
+            }
+            if(url_tet_num && this.available_tets.indexOf(url_tet_num) > -1){
+                this.set('selected_tet_num', url_tet_num);
+            }
+        }
+        this._use_url_search = null;
     }, _new_trial: function(base){
         return {
             name: base,
@@ -21950,6 +22032,7 @@ Polymer({
         if(push_if_needed){
             var tet_obj = {
                 tet_num: tet_num,
+                last_used_cut: null,
                 cuts: []
             };
             trial.tets.push(tet_obj);
@@ -26131,6 +26214,7 @@ var set_palettes = function(arrays){
 var n_spikes;
 var chan_is_ok;
 var amps;
+var plot_names;
 var timer = 0;
 
 var pkey_generation = 0;
@@ -26199,6 +26283,15 @@ var set_amps = function(n_spikes_, chan_is_ok_, arrays){
     for(let ii=0; ii<plots.length; ii++){
         plots[ii].fill(0);
     }
+    plot_names = [];
+    if(chan_is_ok){
+        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
+                let name = (c1+1) + 'Ax' + (c2+1) + 'A';
+                plot_names.push(name);
+            }
+        }        
+    }
     touch_timer();
 }
 
@@ -26229,8 +26322,8 @@ var timer_tick = function(){
         let pkey_opts = pkey_to_desired_options.get(pkey);
         let color = palette_flag[pkey_opts.group_num];
         for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
-                let im = plots[p];
+            for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
+                let im = plots[p++];
                 for(let ii=0; ii<group_inds.length; ii++){
                     let a1 = amps[group_inds[ii]*n_c +c1];
                     let a2 = amps[group_inds[ii]*n_c +c2];
@@ -26240,21 +26333,41 @@ var timer_tick = function(){
         }
     }
 
-    // copy plots into the object to send back to main, and label each plot
+    // copy plots into the object to send back to main, labeling each plot
     // with its channel numbers.
     var arrays = {};
-    var plot_names = [];
-    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-        for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
-            let name = (c1+1) + 'Ax' + (c2+1) + 'A';
-            arrays[name] = plots[p].slice(0);
-            plot_names.push(name);
-        }
+    for(let [ii, name] of plot_names.entries()){
+        arrays[name] = plots[ii].slice(0);
     }
     exec_main_b('plot_clusters', {
         generation: pkey_generation,
         plots: plot_names
     }, arrays);
+}
+
+var get_group_at = function(msg){
+    // this is called when the user mousemoves on a canvas
+    // it's hardly worth putting this on the worker thread, but maybe on day we
+    // will do something more exciting here.
+
+    let point = msg.point;
+    let plot = plots[plot_names.indexOf(msg.plot)];
+    if(!plot){
+        return;
+    }
+    var r = 8; // square ball radius, i.e. width is 2w+1
+    var counts = new Uint32Array(256);
+    for(let ii=Math.max(0, point[0]-r); ii< Math.min(s, point[0]+r+1); ii++){
+        for(let jj=Math.max(0, point[1]-r); jj< Math.min(s, point[1]+r+1); jj++){
+            // TODO: accumulate counts at that point
+        }
+    }
+    exec_main('got_group_at', {
+        generation: pkey_generation,
+        point: point, // provide the details back to main so it can decide whether or not to use the result
+        plot: msg.plot,
+        group_num: 3
+    })
 }
 
 </script>
@@ -26308,6 +26421,7 @@ background-color: rgba(0,0,0,0.2);
 .bottom{
 flex: 2;
 overflow-y: scroll;
+text-align: center;
 }
 .active_stickers{
 float: left;
@@ -26346,6 +26460,9 @@ font-size: 10px;
 
 <template>
     <iron-a11y-keys keys="enter+only" on-keys-pressed="_new_dest" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="e+only e+shift" on-keys-pressed="_active_to_dest" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="f+only f+shift" on-keys-pressed="_active_to_src" target="[[keyboard_target]]"></iron-a11y-keys>
+
     
     <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -26353,14 +26470,14 @@ font-size: 10px;
     <div class="top">
         <div class="active_stickers">
             <div class="sticker_list">
-                <div class="sticker" style$="{{_sticker_style(painter_state.dest)}}">
+                <div class="sticker" style$="{{_sticker_style(painter_state.dest, active_group_a)}}" on-mouseenter="_mouseenter_sticker_dest" on-mouseleave="_mouseleave_sticker">
                     [[painter_state.dest]] <paper-tooltip position="below">destination group [e]</paper-tooltip>
                 </div>
             </div>
             <span class="braket">←</span>
             <div class="sticker_list"><span class="braket">{</span>
                 <template is="dom-repeat" items="[[painter_state.srcs]]">
-                   <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+                   <div class="sticker" style$="{{_sticker_style(item, active_group_a)}}" on-mouseup="_sticker_click" on-mouseenter="_mouseenter_sticker" on-mouseleave="_mouseleave_sticker">[[item]]</div>
                 </template>
                 <span class="braket">}</span>
                 <paper-tooltip>source groups [e]</paper-tooltip>
@@ -26371,7 +26488,7 @@ font-size: 10px;
                 <paper-tooltip>new destination group [Enter]</paper-tooltip>
             </div>
             <template is="dom-repeat" items="[[other_groups]]">
-               <div class="sticker" style$="{{_sticker_style(item)}}" on-mouseup="_sticker_click">[[item]]</div>
+               <div class="sticker" style$="{{_sticker_style(item, active_group_a)}}" on-mouseup="_sticker_click" on-mouseenter="_mouseenter_sticker" on-mouseleave="_mouseleave_sticker">[[item]]</div>
             </template>
         </div>
     </div>
@@ -26379,7 +26496,7 @@ font-size: 10px;
     <div class="bottom">
         <template is="dom-repeat" items="[[cluster_plots]]">
             <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]"></managed-canvas>
+               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
                <div class="x_axis_label">[[item.x_axis]]</div>
                <div class="y_axis_label">[[item.y_axis]]</div>
             </div>
@@ -26436,6 +26553,11 @@ font-size: 10px;
                 type: Array,
                 notify: true,
                 observer: '_want_amplitudes_set'
+            },
+            active_group_a:{
+                type: Object,
+                value: null,
+                notify: true
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -26510,8 +26632,9 @@ font-size: 10px;
                 generation_add: generation_add
             }, options, added_arrays);
 
-        }, _sticker_style: function(group_num){
-            return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
+        }, _sticker_style: function(group_num, active_group_a){
+            return "background-color:" + Palettes.flag_css[group_num] + ";color:" + Palettes.flag_css_text[group_num] + ";" +
+                    (active_group_a && active_group_a.group_num===group_num ? "box-shadow:0px 0px 5px 3px #fc0;" : "");
         }, _compute_unused_groups: function(){
             if(!this.groups){
                 this._setOther_groups([]);
@@ -26533,27 +26656,34 @@ font-size: 10px;
                 }
             }
             this.set('painter_state.dest', this.groups.length);
+        }, _select_dest: function(num){
+            this.set('painter_state.dest', num);
+            let index_in_src = this.painter_state.srcs.indexOf(num);
+            (index_in_src > -1) && this.splice('painter_state.srcs', index_in_src, 1);
+        }, _select_src: function(num, shift){
+            if(shift){
+                let index_in_src = this.painter_state.srcs.indexOf(num);
+                if(index_in_src > -1){
+                    this.splice('painter_state.srcs', index_in_src, 1);
+                } else {
+                    this.push('painter_state.srcs', num);
+                }
+            }else{
+                this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num); //remove all and replace with just num
+            }
+        }, _active_to_dest: function(e){
+            (this.active_group_a !== null) && this._select_dest(this.active_group_a.group_num);
+        }, _active_to_src: function(e){
+             (this.active_group_a !== null) && this._select_src(this.active_group_a.group_num, e.detail.keyboardEvent.shiftKey);
         }, _sticker_click: function(e){
             let num = e.model.item;
-            let index_in_src = this.painter_state.srcs.indexOf(num);
             if(e.button === 0){
-                // left button, select as source
-                this.set('painter_state.dest', num);
-                if(index_in_src >=0){
-                    this.splice('painter_state.srcs', index_in_src, 1);
-                }
+                // left button, select as dest
+                this._select_dest(num);
             } else {
-                // not left button, select as dest, 
+                // not left button, select as source, 
                 // splice in/out if shift down, otherwise clear array and set to just num
-                if(e.shiftKey){
-                    if(index_in_src > -1){
-                        this.splice('painter_state.srcs', index_in_src, 1);
-                    } else {
-                        this.push('painter_state.srcs', num);
-                    }
-                }else{
-                    this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num);
-                }
+                this._select_src(num, e.shiftKey);
             }
         }, plot_clusters: function(msg, arrays){
             if(msg.generation !== this._pkey_generation){
@@ -26577,6 +26707,32 @@ font-size: 10px;
             this.set('canvas_size', Math.max(this.canvas_size-32, 32));
         }, _show: function(v){
             return v ? '' : 'display: none;';
+        }, _mousemove_canvas: function(e){
+            let plot_name = e.model.item.y_axis + 'x' + e.model.item.x_axis;
+            this._mouse_over_plot = plot_name;
+            this._worker.exec('get_group_at', {
+                plot: plot_name,
+                point: e.detail.canvas_point
+            });
+        }, _mouseleave_canvas: function(){
+            this._mouse_over_plot = null;
+            this.set('active_group_a', null);
+        }, got_group_at: function(msg){
+            if(this._mouse_over_plot !== msg.plot){
+                return; // TODO: we could check the msg.point to see if it's still close, but whatever
+            }
+            this.set('active_group_a', this._okey_from_group_num(msg.group_num));  
+        }, _mouseenter_sticker: function(e){
+            this.set('active_group_a', this._okey_from_group_num(e.model.item));  
+        }, _mouseleave_sticker: function(){
+            this.set('active_group_a', null);
+        }, _mouseenter_sticker_dest: function(){
+            this.set('active_group_a', this._okey_from_group_num(this.painter_state.dest));
+        }, _okey_from_group_num: function(num){
+            for(let okey of this.groups)if(okey && okey.group_num === num){
+                return okey
+            }
+            return null;
         }
     });
 </script>
@@ -26763,9 +26919,9 @@ font-size: 10px;
 
     </div>
         
-    <paper-toolbar>
+    <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
-            <paper-icon-button icon="flip-to-front"></paper-icon-button>
+            <paper-icon-button icon="flip-to-front" on-tap="open_github"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
         </div>
 
@@ -26780,7 +26936,7 @@ font-size: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="info" id="file_headers_button"></paper-icon-button>
+            <paper-icon-button icon="info" id="file_headers_button" on-tap="toggle_header_pane"></paper-icon-button>
             <paper-tooltip>file headers [h]</paper-tooltip>
         </div>
 
@@ -26795,7 +26951,7 @@ font-size: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="settings-applications" id="pos_settings"></paper-icon-button>
+            <paper-icon-button icon="settings-applications" id="pos_settings" on-tap="toggle_pos_pane"></paper-icon-button>
             <paper-tooltip>position post processing settings [s]</paper-tooltip>
         </div>
 
@@ -26836,10 +26992,9 @@ font-size: 10px;
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div class="side_panel_row side_panel_row_flex">
-                <div class="grabbable side_panel_row_flex" id="spatial_panel">
-                    <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-                    <canvas id="posoverlay" class="poslayer" width="200" height="200"></canvas> 
-                </div>
+                <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
+                group {{_get_safe(active_group_a, 'group_num')}}
+
                 <div class="info_summary">
                     <div class="info_summary_text"></div>
                     <canvas id="speedhist" width="50" height="84"></canvas>
@@ -26851,7 +27006,7 @@ font-size: 10px;
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
             
             <div class="side_panel_row">
-                <cluster-plots groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}">
+                <cluster-plots groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}">
                                </cluster-plots>                              
             </div>
         
@@ -26860,11 +27015,16 @@ font-size: 10px;
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
         
-        <tile-wall class="tilewall" groups="{{cut_groups}}" options="[[options]]"></tile-wall>
+        <tile-wall class="tilewall" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" is_empty="[[tile_wall_is_empty]]"></tile-wall>
 
     </div>
 
-    <paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
+    <paper-icon-button icon="menu" class="menu_toggle" on-tap="_toggle_toolbar"></paper-icon-button>
+    
+    <div class="grabber_signifier" style$="{{_show(grabber_mode)}}">
+        grabber mode
+    </div>
+
 
     <drop-zone show_initial="[[no_files]]" drop_in_progress="[[drop_in_progress]]">
         <div class="primary_text">
@@ -26889,7 +27049,7 @@ font-size: 10px;
         </div>
     </drop-zone>
 
-    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}"></parsed-data>
+    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
 
     <cut-object groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
@@ -26899,6 +27059,7 @@ font-size: 10px;
                 
     <wave-plots groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]" want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
+    <iron-a11y-keys keys="esc" on-keys-pressed="_toggle_toolbar" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -26950,7 +27111,8 @@ the_app._sanitize_options = function(stored_options) {
         cluster_plot_size: 128,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
-        splitter_c_size: "350px"
+        splitter_c_size: "350px",
+        toggle_toolbar: true
     };
 
     if(!stored_options){
@@ -26998,7 +27160,9 @@ the_app.toggle_palette = function(){
     the_app.set('options.waves_render_mode', the_app.options.waves_render_mode === "density" ? 
                         "flag" : "density");
 }
-
+the_app._show = function(v){
+    return v ? '' : 'display: none;';
+}
 the_app.toggle_action_pane = function(){
     the_app.$.action_info.toggle();
 }
@@ -27031,6 +27195,12 @@ the_app.toggle_help_pane = function(){
 }
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');
+}
+the_app._style_toolbar = function(toggle_toolbar){
+    return toggle_toolbar ? '' : 'height:0px;overflow:hidden';
+}
+the_app._toggle_toolbar = function(){
+    the_app.set('options.toggle_toolbar', !the_app.options.toggle_toolbar);
 }
 the_app._yn_to_bool = function(v, index){
     return (v && v[index] === 'y');
@@ -27171,7 +27341,7 @@ the_app.addEventListener('dom-change', function(){
         el._unlistenKeyEventListeners();
     }
 
-
+    the_app.set('grabber_mode', false);
     window.the_cut = document.getElementsByTagName('cut-object')[0]; //debug only
 })
 

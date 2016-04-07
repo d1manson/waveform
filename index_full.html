@@ -75,14 +75,23 @@ color: #c77;
 
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
+transition: height 1s;
 }
 .grabber_signifier{
+position: fixed;
+top: 6px;
+right: 45px;
 color: #f00;
 font-weight: bold;
 border: 2px solid #f00;
 padding: 4px 6px 4px 6px;
 border-radius: 4px;
-margin-left: 10px;
+}
+.menu_toggle {
+position: fixed;
+top: 0px;
+right: 0px;
+background: #efefef;
 }
 </style>
 
@@ -281,9 +290,9 @@ margin-left: 10px;
 
     </div>
         
-    <paper-toolbar>
+    <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
-            <paper-icon-button icon="flip-to-front"></paper-icon-button>
+            <paper-icon-button icon="flip-to-front" on-tap="open_github"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
         </div>
 
@@ -298,7 +307,7 @@ margin-left: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="info" id='file_headers_button'></paper-icon-button>
+            <paper-icon-button icon="info" id='file_headers_button' on-tap="toggle_header_pane"></paper-icon-button>
             <paper-tooltip>file headers [h]</paper-tooltip>
         </div>
 
@@ -313,7 +322,7 @@ margin-left: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="settings-applications" id='pos_settings'></paper-icon-button>
+            <paper-icon-button icon="settings-applications" id='pos_settings' on-tap="toggle_pos_pane"></paper-icon-button>
             <paper-tooltip>position post processing settings [s]</paper-tooltip>
         </div>
 
@@ -340,10 +349,6 @@ margin-left: 10px;
         <div>
             <paper-button selected$="{{_yn_to_bool(options.show_tac, 0)}}" on-tap="show_tap" id="show_tc">tc</paper-button>
             <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
-        </div>
-
-        <div class="grabber_signifier" style$="{{_show(grabber_mode)}}">
-        grabber mode
         </div>
 
     </paper-toolbar>
@@ -394,11 +399,17 @@ margin-left: 10px;
                     groups="{{cut_groups}}"
                     options="[[options]]"
                     active_group_a="{{active_group_a}}"
+                    is_empty="[[tile_wall_is_empty]]"
                     ></tile-wall>
 
     </div>
 
-    <paper-icon-button icon="menu" class="menu_toggle"></paper-icon-button>
+    <paper-icon-button icon="menu" class="menu_toggle" on-tap="_toggle_toolbar"></paper-icon-button>
+    
+    <div class="grabber_signifier" style$="{{_show(grabber_mode)}}">
+        grabber mode
+    </div>
+
 
     <drop-zone
         show_initial="[[no_files]]"
@@ -444,6 +455,7 @@ margin-left: 10px;
         want_data_for_gl="{{want_data_for_gl}}"
         want_amplitudes="{{want_amplitudes}}"
         want_spike_times="{{want_spike_times}}"
+        no_groups="{{tile_wall_is_empty}}"
         ></parsed-data>
 
     <cut-object 
@@ -482,6 +494,7 @@ margin-left: 10px;
         show_chans="[[options.show_waves]]"
         want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
+    <iron-a11y-keys keys="esc" on-keys-pressed="_toggle_toolbar"              target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette"           target="[[keyboard_target]]"></iron-a11y-keys>
@@ -533,7 +546,8 @@ the_app._sanitize_options = function(stored_options) {
         cluster_plot_size: 128,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
-        splitter_c_size: "350px"
+        splitter_c_size: "350px",
+        toggle_toolbar: true
     };
 
     if(!stored_options){
@@ -616,6 +630,12 @@ the_app.toggle_help_pane = function(){
 }
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');
+}
+the_app._style_toolbar = function(toggle_toolbar){
+    return toggle_toolbar ? '' : 'height:0px;overflow:hidden';
+}
+the_app._toggle_toolbar = function(){
+    the_app.set('options.toggle_toolbar', !the_app.options.toggle_toolbar);
 }
 the_app._yn_to_bool = function(v, index){
     return (v && v[index] === 'y');

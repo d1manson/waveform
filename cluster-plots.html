@@ -136,8 +136,8 @@ var timer_tick = function(){
         let pkey_opts = pkey_to_desired_options.get(pkey);
         let color = palette_flag[pkey_opts.group_num];
         for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-            for(let c2=c1+1; c2<n_c; c2++, p++)if(chan_is_ok[c2]){
-                let im = plots[p];
+            for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
+                let im = plots[p++];
                 for(let ii=0; ii<group_inds.length; ii++){
                     let a1 = amps[group_inds[ii]*n_c +c1];
                     let a2 = amps[group_inds[ii]*n_c +c2];
@@ -274,6 +274,9 @@ font-size: 10px;
 
 <template>
     <iron-a11y-keys keys="enter+only" on-keys-pressed="_new_dest"  target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="e+only e+shift" on-keys-pressed="_active_to_dest"  target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="f+only f+shift" on-keys-pressed="_active_to_src"  target="[[keyboard_target]]"></iron-a11y-keys>
+
     <!-- TODO: replace the random unicode chars with plus and minus -->
     <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size"  target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size"  target="[[keyboard_target]]"></iron-a11y-keys>
@@ -471,27 +474,34 @@ font-size: 10px;
                 }
             }
             this.set('painter_state.dest', this.groups.length);
+        }, _select_dest: function(num){
+            this.set('painter_state.dest', num);
+            let index_in_src = this.painter_state.srcs.indexOf(num);
+            (index_in_src > -1) && this.splice('painter_state.srcs', index_in_src, 1);
+        }, _select_src: function(num, shift){
+            if(shift){
+                let index_in_src = this.painter_state.srcs.indexOf(num);
+                if(index_in_src > -1){
+                    this.splice('painter_state.srcs', index_in_src, 1);
+                } else {
+                    this.push('painter_state.srcs', num);
+                }
+            }else{
+                this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num); //remove all and replace with just num
+            }
+        }, _active_to_dest: function(e){
+            (this.active_group_a !== null) && this._select_dest(this.active_group_a.group_num);
+        }, _active_to_src: function(e){
+             (this.active_group_a !== null) && this._select_src(this.active_group_a.group_num, e.detail.keyboardEvent.shiftKey);
         }, _sticker_click: function(e){
             let num = e.model.item;
-            let index_in_src = this.painter_state.srcs.indexOf(num);
             if(e.button === 0){
-                // left button, select as source
-                this.set('painter_state.dest', num);
-                if(index_in_src >=0){
-                    this.splice('painter_state.srcs', index_in_src, 1);
-                }
+                // left button, select as dest
+                this._select_dest(num);
             } else {
-                // not left button, select as dest, 
+                // not left button, select as source, 
                 // splice in/out if shift down, otherwise clear array and set to just num
-                if(e.shiftKey){
-                    if(index_in_src > -1){
-                        this.splice('painter_state.srcs', index_in_src, 1);
-                    } else {
-                        this.push('painter_state.srcs', num);
-                    }
-                }else{
-                    this.splice('painter_state.srcs', 0, this.painter_state.srcs.length, num);
-                }
+                this._select_src(num, e.shiftKey);
             }
         }, plot_clusters: function(msg, arrays){
             if(msg.generation !== this._pkey_generation){

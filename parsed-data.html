@@ -1365,6 +1365,12 @@ var parse_clu_file = function(full_str, fkey){
                 type: Array,
                 value: function(){return [];},
                 notify: true
+            },
+            no_groups: { // unlike everything else, this is only updated in the second phase of a file-switch
+                type: Boolean,
+                value: true,
+                notify: true,
+                readOnly: true
             }
         }, observers: [
             '_pos_options_changed(speed_filter_mps, use_n_leds, pos_smoothing_s)',
@@ -1519,6 +1525,8 @@ var parse_clu_file = function(full_str, fkey){
 
             this._worker_io.exec('read_files', request, options); 
 
+            this._setNo_groups(!(new_fkeys.tet || new_fkeys.cut)); // as promissed, we only set this once during the file-change
+
         }, _pos_options_changed: function(){
             var options = this._make_pos_options();
             this._worker_io.exec('read_files', {
@@ -1609,7 +1617,8 @@ var parse_clu_file = function(full_str, fkey){
                 if(this._make_cut_from_n){
                     this._setCut_box({
                         is: 'n',
-                        n_spikes: parseInt(cached.num_spikes)
+                        n_spikes: parseInt(cached.header.num_spikes),
+                        header: null
                     });
                 }
 
@@ -1699,7 +1708,8 @@ var parse_clu_file = function(full_str, fkey){
                 if(this._make_cut_from_n){
                     this._setCut_box({
                         is: 'n',
-                        n_spikes: parseInt(header.num_spikes)
+                        n_spikes: parseInt(header.num_spikes),
+                        header: null
                     })
                 }
             }

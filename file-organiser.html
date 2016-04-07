@@ -287,6 +287,7 @@ Polymer({
         this._date_formatter = new Intl.DateTimeFormat({}, {month:"short", day:"numeric", year: "numeric"});
         this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
         this._trial_from_base = new Map();
+        this._use_url_search = window.location.search;
         document.addEventListener("dragover", this._dragover.bind(this));
         document.addEventListener("drop", this._drop.bind(this));
     }, attached: function(){
@@ -333,13 +334,18 @@ Polymer({
         } else {
             this.set('selected_trial', new_sel.name);
         }
-    }, _update_tet_num: function(old_val, new_val){
+    }, _update_tet_num: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires
         this.debounce('_switched_selection', this._switched_selection.bind(this));
-    }, _update_trial: function(old_val, new_val){
+    }, _update_trial: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires
         this.debounce('_switched_selection', this._switched_selection.bind(this));
-    }, _update_cut: function(old_val, new_val){
+    }, _update_cut: function(new_val){
+        let trial = this._trial_from_base.get(this.selected_trial);
+        if(trial){
+            let tet_obj = this._get_tet_obj(trial, this.selected_tet_num, false);
+            tet_obj && (tet_obj.last_used_cut = new_val);
+        }
         this.debounce('_switched_selection', this._switched_selection.bind(this));
     }, _tet_button_click: function(e){
         var model = e.model;
@@ -367,7 +373,8 @@ Polymer({
                 }
             }
         }
-        this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ? tet_obj.cuts[0].cut : "");   
+        this.set('selected_cut', trial && tet_obj && tet_obj.cuts.length ?
+                        (tet_obj.last_used_cut || tet_obj.cuts[0].cut) : null);               
     }, _dragover: function(e){
         if(this.is_dragging_out) return;
         
@@ -390,7 +397,7 @@ Polymer({
         var url = location.pathname + "?";
         url += this.selected_trial ? "exp=" + this.selected_trial + "&" : "";
         url += this.selected_tet_num > 0? "tet=" + this.selected_tet_num : "";
-        window.history.pushState("", title,  url);
+        (!this.no_files) && window.history.pushState("", title,  url);
         document.title = title;
         this._setSelected_files({
             set: trial && trial.set ? trial.set : 0,
@@ -554,7 +561,22 @@ Polymer({
         available_tets = Array.from(available_tets);
         available_tets.sort(this._numeric_sort);
         this._setAvailable_tets(available_tets);
-        this._reassign_trials_denovo(); // notify absolutely everything !!! 
+        this._reassign_trials_denovo(); // notify absolutely everything !!!
+
+        if(this._use_url_search){
+            // note we do this before sorting all the cuts, but whatever
+            let match = (/exp=([^&]+)/g).exec(this._use_url_search);
+            let url_trial = match && decodeURIComponent(match[1]);
+            match = (/tet=([^&]+)/g).exec(this._use_url_search);
+            let url_tet_num = match && parseInt(decodeURIComponent(match[1]));
+            if(url_trial && this._trial_from_base.has(url_trial)){
+                this.$.trial_list.selectItem(this._trial_from_base.get(url_trial));
+            }
+            if(url_tet_num && this.available_tets.indexOf(url_tet_num) > -1){
+                this.set('selected_tet_num', url_tet_num);
+            }
+        }
+        this._use_url_search = null;
     }, _new_trial: function(base){
         return {
             name: base,
@@ -602,6 +624,7 @@ Polymer({
         if(push_if_needed){
             var tet_obj = {
                 tet_num: tet_num,
+                last_used_cut: null,
                 cuts: []
             };
             trial.tets.push(tet_obj);

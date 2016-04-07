@@ -1,53 +1,22 @@
-<!--
-CUSTOM ELEMENT: tile-wall
-BY: DM
-
-groups is an array of objects with the following properties:
- .group_num
- .inds - id for use with typed-array-manager
- .group_n
- .canv_spa_rm - id for use with canvas-manager
- .spa_rm_bin_size
- .spa_rm_smoothing
- .canv_dir_rm - id for use with canvas-manager
- and more...
-
-
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="utils.html">
 
 <dom-module id="tile-wall">
-
+<style>
+.blank_info {
+display: inline-block;
+position: absolute;
+left: 50%;
+top: 30%;
+transform: translateX(-50%);
+}
+</style>
 <template>
 
-    <!--
-    Canvases can not directly be "bound" using Polymer, so
-    instead we bind ids that have a specific meaning within
-    canvas-manager.  A canvas is then rendered using:
-    <managed-canvas canv_id="????"></managed-canvas>
-    where "????" is an id produced by the canvas-manager.
-    Note that canavas-manager is a singleton, avaialble at
-    window.canvas_manager.
-
-    TODO: update this notes
-    -->
-
-
-    <!--
-    The following elements listen for changes in the groups array.
-    When they decide to produce a new plot they render it to a canvas
-    using canvas-manager, and then supply the canvas_id back into
-    the groups array, e.g. groups[3].dir_rm will be a canvas_id for
-    use with managed-canvas elements.
-    As well as setting canvases in the groups array, they also record
-    the settings used to produce that canvas, e.g. groups[3].dir_smoothing.
-     -->
-    
-
+    <div class="blank_info" style$="{{_show(is_empty)}}">
+        No group data to be shown. Select a trial-tetrode pair with files available.
+    </div>
 
     <template is="dom-repeat" items="[[groups]]">
         <tile-element 
@@ -58,6 +27,7 @@ groups is an array of objects with the following properties:
             active="{{_is_equal(item, active_group_a)}}"
             on-mouseenter="_mouseenter_tile"
             on-mouseleave="_mouseleave_tile"
+            on-track="_track_tile"
             ></tile-element>        
     </template>
 </template>
@@ -81,13 +51,17 @@ groups is an array of objects with the following properties:
                 type: Object,
                 value: null,
                 notify: true
+            },
+            is_empty: {
+                type: Boolean,
+                value: false,
+                notify: true,
             }
         },
         observers: [
             'groups_modified(groups.*)'
-        ],
-        groups_modified: function(change){
-            
+        ], groups_modified: function(change){
+
         }, _show: function(v){
             return v ? '' : 'display: none;';
         }, _mouseenter_tile: function(e){
