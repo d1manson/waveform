@@ -177,7 +177,7 @@ background: #efefef;
                 <li><b>esc</b> open/close the toolbar</li>
                 <li><b>p</b> toggle waveform palette</li>
                 <li><b>h</b> show header info</li>
-                <li><b>s</b> show pos settings</li>
+                <li><b>x</b> show pos settings</li>
                 <li><b>k</b> show this info ("k" is for keyboard)</li>
                 <li><b>?</b> open GitHub info in a new tab</li>
                 </ul>   
@@ -506,12 +506,13 @@ background: #efefef;
     <iron-a11y-keys keys="alt+t" on-keys-pressed="toggle_tac_pane"           target="[[keyboard_target]]"></iron-a11y-keys>    
     <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane"        target="[[keyboard_target]]"></iron-a11y-keys>
-    <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane"    target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="x+only alt+x" on-keys-pressed="toggle_pos_pane"    target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="w+only w+shift" on-keys-pressed="show_key_wav"     target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="r+only r+shift" on-keys-pressed="show_key_rm"      target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="c+only c+shift" on-keys-pressed="show_key_dir"     target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd"     target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc"      target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="s+only" on-keys-pressed="swap_groups"              target="[[keyboard_target]]"></iron-a11y-keys>
 
      <!-- TODO: use question mark key when bug is fixed: https://github.com/PolymerElements/iron-a11y-keys-behavior/issues/27#issuecomment-184833697 --> 
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github"              target="[[keyboard_target]]"></iron-a11y-keys>
@@ -565,7 +566,33 @@ the_app._sanitize_options = function(stored_options) {
 }
 
 the_app._merge_groups = function(e){
+    if(the_app.tile_wall_is_empty){
+        return;
+    }
     the_app.$.cut.merge_groups(e.detail.a, e.detail.b);
+}
+
+the_app.swap_groups = function(){
+    if(the_app.tile_wall_is_empty){
+        return;
+    }
+
+    let a, b;
+    if(!the_app.active_group_a){
+        a = parseInt(prompt("Swap two groups. Enter first group:", ""));
+        if(!(a>=0)){
+            return;
+        }
+        b = parseInt(prompt("Swap two groups. Enter second group:", ""));
+    } else {
+        a = the_app.active_group_a.group_num;
+        b = parseInt(prompt("Enter group to swap with group " + a + ":", ""));
+    }
+    if(!(b>=0)){
+        return;
+    }
+
+    the_app.$.cut.swap_groups(a, b);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877

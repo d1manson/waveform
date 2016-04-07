@@ -350,6 +350,9 @@ doesn't have a worker, but it uses a similar system.
                 a = b;
                 b = tmp;
             }
+            if(!(this.groups[a] || this.groups[b])){
+                return; // at least one of the groups should actually exist
+            }
             this._do_swap(a, b);
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear     
@@ -363,12 +366,17 @@ doesn't have a worker, but it uses a similar system.
         },
         _do_swap: function(a, b){
             // b must be greater than a
-            var group_a = this.groups[a];
-            var group_b = this.groups[b];
 
+            // b could be off beyond the end of the array as it currently stands
+            while(b>=this.groups.length){
+                this.push('groups', null);
+            }
+
+            let group_a = this.groups[a];
+            let group_b = this.groups[b];
             // update group_nums in preparation for announcing splice
-            group_a.group_num = b;
-            group_b.group_num = a;
+            group_a && (group_a.group_num = b);
+            group_b && (group_b.group_num = a);
 
             // TODO: check that this really is the correct way to do it
             // https://github.com/Polymer/polymer/issues/3377

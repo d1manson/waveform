@@ -17832,6 +17832,9 @@ cursor: default;
                 a = b;
                 b = tmp;
             }
+            if(!(this.groups[a] || this.groups[b])){
+                return; // at least one of the groups should actually exist
+            }
             this._do_swap(a, b);
 
             this.redo_stack.splice(0, this.redo_stack.length); // clear     
@@ -17845,12 +17848,17 @@ cursor: default;
         },
         _do_swap: function(a, b){
             // b must be greater than a
-            var group_a = this.groups[a];
-            var group_b = this.groups[b];
 
+            // b could be off beyond the end of the array as it currently stands
+            while(b>=this.groups.length){
+                this.push('groups', null);
+            }
+
+            let group_a = this.groups[a];
+            let group_b = this.groups[b];
             // update group_nums in preparation for announcing splice
-            group_a.group_num = b;
-            group_b.group_num = a;
+            group_a && (group_a.group_num = b);
+            group_b && (group_b.group_num = a);
 
             // TODO: check that this really is the correct way to do it
             // https://github.com/Polymer/polymer/issues/3377
@@ -26959,7 +26967,7 @@ font-size: 10px;
                 <li><b>esc</b> open/close the toolbar</li>
                 <li><b>p</b> toggle waveform palette</li>
                 <li><b>h</b> show header info</li>
-                <li><b>s</b> show pos settings</li>
+                <li><b>x</b> show pos settings</li>
                 <li><b>k</b> show this info ("k" is for keyboard)</li>
                 <li><b>?</b> open GitHub info in a new tab</li>
                 </ul>   
@@ -27213,12 +27221,13 @@ font-size: 10px;
     <iron-a11y-keys keys="alt+t" on-keys-pressed="toggle_tac_pane" target="[[keyboard_target]]"></iron-a11y-keys>    
     <iron-a11y-keys keys="k+only alt+k" on-keys-pressed="toggle_keyboard_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+z" on-keys-pressed="toggle_action_pane" target="[[keyboard_target]]"></iron-a11y-keys>
-    <iron-a11y-keys keys="s+only alt+s" on-keys-pressed="toggle_pos_pane" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="x+only alt+x" on-keys-pressed="toggle_pos_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="w+only w+shift" on-keys-pressed="show_key_wav" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="r+only r+shift" on-keys-pressed="show_key_rm" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="c+only c+shift" on-keys-pressed="show_key_dir" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="s+only" on-keys-pressed="swap_groups" target="[[keyboard_target]]"></iron-a11y-keys>
 
       
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -27272,7 +27281,33 @@ the_app._sanitize_options = function(stored_options) {
 }
 
 the_app._merge_groups = function(e){
+    if(the_app.tile_wall_is_empty){
+        return;
+    }
     the_app.$.cut.merge_groups(e.detail.a, e.detail.b);
+}
+
+the_app.swap_groups = function(){
+    if(the_app.tile_wall_is_empty){
+        return;
+    }
+
+    let a, b;
+    if(!the_app.active_group_a){
+        a = parseInt(prompt("Swap two groups. Enter first group:", ""));
+        if(!(a>=0)){
+            return;
+        }
+        b = parseInt(prompt("Swap two groups. Enter second group:", ""));
+    } else {
+        a = the_app.active_group_a.group_num;
+        b = parseInt(prompt("Enter group to swap with group " + a + ":", ""));
+    }
+    if(!(b>=0)){
+        return;
+    }
+
+    the_app.$.cut.swap_groups(a, b);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877
