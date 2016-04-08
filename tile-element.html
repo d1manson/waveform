@@ -334,12 +334,6 @@ font-size: 20px;
                 value: 120,
                 notify: true
             },
-            border_width: {
-                type: Number,
-                value: 1,
-                computed: 'compute_border_width(moving)',
-                notify: true
-            }, 
             animationConfig: { // for use with NeonAnimationRunnerBehavior
                 value: function(){
                     return { shake: {name: 'shake-animation', node: this} };
@@ -406,8 +400,6 @@ font-size: 20px;
                         top:canv.offsetTop,
                         left:canv.offsetLeft,
                         el: canv}
-        }, compute_border_width: function(moving){
-            return moving ? 10 : 1; //a bit hacky to put this here, but slightly better than doing a getComputedStyle.
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
         }, _update_state: function(active, moving, proximate, disabled){

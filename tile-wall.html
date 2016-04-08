@@ -13,7 +13,8 @@ transform: translateX(-50%);
 }
 :host{
 cursor: default;
-overflow-y: scroll !important;
+overflow-y: auto !important;
+padding: 2px;
 }
 ::-webkit-scrollbar {
 width: 10px;
@@ -148,14 +149,15 @@ background-color: rgba(0,0,0,0.2);
             if (e.detail.state === "start"){
                 // Polymer's track doesn't do everything we need it to,
                 // so we basically reinvent it and do a bit more...
+                let rect = e.target.getBoundingClientRect();
                 this._track_state = {
                     start_scroll_top: this.scrollTop,
                     start_client_x: e.detail.x,
                     start_client_y: e.detail.y,
+                    untransformed_client_x: rect.left,
+                    untransformed_client_y: rect.top,
                     last_client_x: e.detail.x,
                     last_client_y: e.detail.y,
-                    last_transform_x: 0,
-                    last_transform_y: 0,
                     tile_el: e.target,
                     other_tile_el: null
                 }
@@ -171,18 +173,15 @@ background-color: rgba(0,0,0,0.2);
             let tx, ty;
             if(this._track_state.other_tile_el){
                 // this is pretty ugly, but it does the job...
-                let this_rect = state.tile_el.getBoundingClientRect();
                 let other_rect = state.other_tile_el.getBoundingClientRect();
                 let border_fudge = state.tile_el.border_width - state.other_tile_el.border_width;
-                tx = other_rect.left - (this_rect.left - this._track_state.last_transform_x) - border_fudge;
-                ty = other_rect.top - (this_rect.top - this._track_state.last_transform_y) - border_fudge;
+                tx = other_rect.left - state.untransformed_client_x;
+                ty = other_rect.top - state.untransformed_client_y + (this.scrollTop - state.start_scroll_top);
             } else {
                 tx = e.detail.x - state.start_client_x;
                 ty = e.detail.y - state.start_client_y + (this.scrollTop - state.start_scroll_top);            
             }
 
-            state.last_transform_x = tx;
-            state.last_transform_y = ty;
             state.tile_el.translate_xy(tx, ty);
 
         }, _scroll: function(e){

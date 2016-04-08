@@ -97,7 +97,7 @@ display: inline-block;
 
 (function(){
 
-var top_x_index = 100;
+var top_z_index = 100;
 
 Polymer({
     is: 'floating-pane',
@@ -131,7 +131,7 @@ Polymer({
     }, listeners: {
         'mousedown': '_on_drag_start'
     }, attached: function(){
-
+        this.style.zIndex = ++top_z_index;
     }, _stop_propagation: function(e){
         e.stopPropagation(); 
     }, _on_drag_start: function(e){
@@ -148,7 +148,7 @@ Polymer({
         }
         var offset = this.getBoundingClientRect();
         e.preventDefault();
-        this.style.zIndex = ++top_x_index;
+        this.style.zIndex = ++top_z_index;
         this._drag_off_left = e.clientX-offset.left;
         this._drag_off_top = e.clientY-offset.top;
         if(! this._on_drag_move_bound){
@@ -169,7 +169,7 @@ Polymer({
     }, toggle: function(){
         if(this.hidden){
             this.removeAttribute('hidden');
-            this.style.zIndex = ++top_x_index;
+            this.style.zIndex = ++top_z_index;
         } else {
             this.setAttribute('hidden', "true");            
             this.fire('close')
