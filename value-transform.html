@@ -68,7 +68,12 @@ before agreeing).
             if(this._a_to_b_func){
                 this.set('value_b', this._a_to_b_func(this.value_a));
             } else {
-                this.set('value_b' + e.path.slice("value_a".length), e.value);
+                let sub_path =  e.path.slice("value_a".length);
+                if(sub_path && !this.value_b){
+                    this.set('value_b', this.value_a);
+                } else {
+                    this.set('value_b' + sub_path, e.value);
+                }
             }
             this._changing = false;
         }, _value_b_changed: function(e){
@@ -79,7 +84,12 @@ before agreeing).
             if(this._b_to_a_func){
                 this.set('value_a', this._b_to_a_func(this.value_b));
             } else {
-                this.set('value_a' + e.path.slice("value_b".length), e.value);
+                let sub_path =  e.path.slice("value_b".length);
+                if(sub_path && !this.value_a){
+                    this.set('value_a', this.value_b);
+                } else {
+                    this.set('value_a' + sub_path, e.value);
+                }
             }
             this._changing = false;
         }

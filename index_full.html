@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="en"> <!-- TODO: add manifest attribute to html tag so that app works offline -->
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?">
 <title>Waveform</title>
-<link rel="stylesheet" type="text/css" href="main.css">
 
 <script> 
 document.addEventListener('keydown', function(e){
@@ -23,13 +22,13 @@ window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
 <link rel="import" href="bower_components/paper-tooltip/paper-tooltip.html">
 <link rel="import" href="bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="bower_components/paper-slider/paper-slider.html">
-<link rel="import" href="bower_components/paper-button/paper-button.html">
+<link rel="import" href="bower_components/paper-button/paper-button.html">  
 <link rel="import" href="bower_components/paper-toggle-button/paper-toggle-button.html">
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="tile-wall.html">
-<link rel="import" href="iron-splitter.html">
+<link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
 <link rel="import" href="tile-element.html">
 <link rel="import" href="cross-hair.html">
 <link rel="import" href="undo-stack-view.html">
@@ -46,20 +45,84 @@ window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
 <link rel="import" href="tac-plots.html">
 <link rel="import" href="wave-plots.html">
 <link rel="import" href="cluster-plots.html">
-
-
+<link rel="prefetch" href="img/demo_youtube_hover.png">
 <style is="custom-style">
 :root {
+user-drag: none;
+-webkit-user-drag: none;
+user-select: none;
+-webkit-user-select: none;
 --paper-toolbar-height: 40px;
 --paper-toolbar-background: #efefef;
 --paper-toolbar-color: #000;
 --paper-tooltip-opacity: 0.96;
 --paper-icon-button: {
-    width: 38px;
-    height: 38px;
-};
-user-drag: none;
--webkit-user-drag: none;
+      width: 38px;
+      height: 38px;
+    };
+}
+p, ul, ol{
+margin-top: 6px;
+margin-bottom: 6px;
+}
+ul, ol{
+padding-left:10px;
+margin-left:10px;
+}
+canvas, img{
+vertical-align: bottom;
+}
+body{
+overflow:hidden;
+font-family: sans-serif;
+font-size: 0.8em;
+position: fixed;
+top: 0px;
+left: 0px;
+height: 100%;
+width: 100%;
+display: flex;
+flex-direction: column;
+margin: 0;
+}
+.info_summary{
+position: absolute;
+margin: 3px;
+padding: 3px;
+top: 0px;
+background: rgba(255,255,255,0.5);
+-webkit-transition: opacity 0.5s ease-in-out;
+transition: opacity 0.5s ease-in-out;
+}
+.hidden_clipboard{
+opacity: 0;
+position: absolute;
+top: -10000px;
+right: 0;
+-webkit-user-select: initial;
+-khtml-user-select: inital;
+-moz-user-select: -moz-initial;
+-o-user-select: initial;
+user-select: initial;
+}
+.slider_val{
+font-weight: bold;
+}
+.github_button_filedrop{
+cursor: pointer;
+margin: 20px 0px 0px 0px;
+border: 1px solid #999;
+display: inline-block;
+padding: 4px 10px 4px 10px;
+border-radius: 4px;
+background: #eee;
+}
+.github_button_filedrop:hover{
+background: #ddd;
+border-color: #777;
+}
+.youtube_demo_img:hover {
+content: url('img/demo_youtube_hover.png');
 }
 
 paper-button{
@@ -67,16 +130,15 @@ min-width: 40px;
 font-size: 0.8em;
 border: 1px solid;
 }
-
 paper-button[selected] {
 background-color: #ffffe0;
 color: #c77;
 }
-
 paper-toolbar{
 box-shadow: inset 0 0 2px 1px #ccc;
 transition: height 1s;
 }
+
 .grabber_signifier{
 position: fixed;
 top: 6px;
@@ -92,6 +154,26 @@ position: fixed;
 top: 0px;
 right: 0px;
 background: #efefef;
+}
+iron-splitter {
+background-image: url(img/handle.svg);
+}
+iron-splitter.horizontal{
+background-image: url(img/handle-h.svg);
+}
+
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
 }
 </style>
 
@@ -353,12 +435,12 @@ background: #efefef;
 
     </paper-toolbar>
 
-    <div id="all_below_toolbar">
+    <div style="flex: 1; display:flex; flex-direction:row; position:relative;">
         <document-focus-marker></document-focus-marker>
         
-        <div-iron-resize class="side_panel">
+        <iron-resize-notifier style="display:flex; flex-direction:column;">
 
-            <file-organiser class="side_panel_row" id="the_file_organiser"
+            <file-organiser style="flex:0 0 0%;"
                 is_dragging_in="{{drop_in_progress}}"
                 no_files="{{no_files}}"
                 selected_files="{{selected_files}}"
@@ -366,43 +448,45 @@ background: #efefef;
             
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
-            <div class="side_panel_row side_panel_row_flex">
-                <managed-canvas canv_id="[[pos_path]]"></managed-canvas>
-                group {{_get_safe(active_group_a, 'group_num')}} and group {{_get_safe(active_group_b, 'group_num')}}
-
+            <div style="flex:1 1 0%; position:relative;">
+                <managed-canvas style="position:absolute;"
+                canv_id="[[pos_path]]" ></managed-canvas>
                 <div class="info_summary">
-                    <div class="info_summary_text"></div>
+                    <div class="info_summary_text">
+                        group {{_get_safe(active_group_a, 'group_num')}}
+                        <br>and<br>
+                        group {{_get_safe(active_group_b, 'group_num')}}
+                    </div>
                     <canvas id="speedhist" width="50" height= "84"></canvas>
-                    <div id="speedhist_labels" style="display:inline;position:relative;"><div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div></div>
-                    <canvas id="eegspect" width="50" height= "84"></canvas>
+                    <div id="speedhist_labels" style="display:inline;position:relative;">
+                        <div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div>
+                    </div>
                 </div>
             </div>
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
-            
-            <div class="side_panel_row">
-                <cluster-plots groups="[[cut_groups]]"
-                               painter_state="{{cut_painter_state}}"
-                               amplitudes="[[amplitudes]]"
-                               canvas_size="{{options.cluster_plot_size}}"
-                               want_amplitudes="{{want_amplitudes}}"
-                               active_group_a="{{active_group_a}}">
-                               </cluster-plots>                              
-            </div>
-        
-        </div-iron-resize>
+                    
+            <cluster-plots style="flex:0 0 0%;"
+               groups="[[cut_groups]]"
+               painter_state="{{cut_painter_state}}"
+               amplitudes="[[amplitudes]]"
+               canvas_size="{{options.cluster_plot_size}}"
+               want_amplitudes="{{want_amplitudes}}"
+               active_group_a="{{active_group_a}}">
+               </cluster-plots>
+
+        </iron-resize-notifier>
 
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
-        
-        <tile-wall class="tilewall"
-                    groups="{{cut_groups}}"
-                    options="[[options]]"
-                    active_group_a="{{active_group_a}}"
-                    active_group_b="{{active_group_b}}"
-                    is_empty="[[tile_wall_is_empty]]"
-                    on-merge_groups="_merge_groups"
-                    ></tile-wall>
+        <tile-wall style="flex:1 1 0%; position:relative;"
+            groups="{{cut_groups}}"
+            options="[[options]]"
+            active_group_a="{{active_group_a}}"
+            active_group_b="{{active_group_b}}"
+            is_empty="[[tile_wall_is_empty]]"
+            on-merge_groups="_merge_groups"
+            ></tile-wall>
 
     </div>
 
@@ -430,11 +514,11 @@ background: #efefef;
                 Go to <b>quickstart guide</b> on GitHub
             </div><br><br>
             <a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
-                <img id="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315"/>
+                <img class="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315"/>
             </a>
         </div>
         <div class='initial_extra_bottom_right'>
-        v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
+            v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
         </div>
     </drop-zone>
 

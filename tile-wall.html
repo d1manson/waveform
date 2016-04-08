@@ -11,6 +11,23 @@ left: 50%;
 top: 30%;
 transform: translateX(-50%);
 }
+:host{
+cursor: default;
+overflow-y: scroll !important;
+}
+::-webkit-scrollbar {
+width: 10px;
+height: 10px;
+}
+::-webkit-scrollbar-button {
+width: 0;
+height: 0;
+display: none;
+}
+::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.2);
+-webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
 </style>
 <template>
 
