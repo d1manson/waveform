@@ -60,7 +60,13 @@ user-select: none;
       width: 38px;
       height: 38px;
     };
+--grabber-hover: {
+border: 3px solid red;
+background: rgba(255,0,0,0.2);
+cursor: pointer;    
+};
 }
+
 p, ul, ol{
 margin-top: 6px;
 margin-bottom: 6px;
@@ -190,9 +196,9 @@ background-color: rgba(0,0,0,0.2);
 
     <div class="hidden_clipboard"></div>
 
-    <div class="floating_layer">
+    <div style="position: absolute;" id="floating_layer">
             
-        <floating-pane id="action_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="action_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Action List [z]</div>
             <undo-stack-view 
                     undo_stack="[[cut_undo_stack]]"
@@ -200,7 +206,7 @@ background-color: rgba(0,0,0,0.2);
         </floating-pane>
         
 
-        <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Temporal auto correlation [t]</div>
             <p class="nodrag">
                 Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
@@ -210,20 +216,20 @@ background-color: rgba(0,0,0,0.2);
             </p>
         </floating-pane>
 
-        <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Drift [d]</div>
             Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
             <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
             So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
         </floating-pane>
         
-        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Help [?]</div>
             Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
             You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
         </floating-pane>
             
-        <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;">
+        <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;" hidden>
             <div class='pane_title'>Shortcuts [k]</div>
             <p>
                 For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
@@ -266,7 +272,7 @@ background-color: rgba(0,0,0,0.2);
             </p>                    
         </floating-pane>
         
-        <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Speed ratemap [v]</div>
             <p>
                 Bin size <span class="slider_val">4 cm/s</span><br>
@@ -278,7 +284,7 @@ background-color: rgba(0,0,0,0.2);
             </p>
         </floating-pane>
 
-        <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Waves [w]</div>
             <p>
                 There are two palette modes. 
@@ -296,7 +302,7 @@ background-color: rgba(0,0,0,0.2);
         </floating-pane>
 
         <floating-pane id='header_info' grabber_mode="[[grabber_mode]]" has_search search_text="{{options.header_filter}}" 
-                    search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}">
+                    search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}" hidden>
             <div class='pane_title'>File headers [h]</div>
             <header-view 
             set_header="[[set_header]]"
@@ -307,7 +313,7 @@ background-color: rgba(0,0,0,0.2);
             ></header-view>
         </floating-pane>
 
-        <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Spatial ratemap [r]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
@@ -327,7 +333,7 @@ background-color: rgba(0,0,0,0.2);
             </p>
         </floating-pane>
         
-        <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Directional ratemap [c]</div>
             <p class="nodrag">
                 Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
@@ -343,7 +349,7 @@ background-color: rgba(0,0,0,0.2);
             </p>
         </floating-pane>
 
-        <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]">
+        <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>position post processing</div>
             <p>
                 If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
@@ -369,6 +375,15 @@ background-color: rgba(0,0,0,0.2);
                 Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
             </p>
         </floating-pane>
+
+        <template is="dom-repeat" items="[[grabbed_tiles]]">
+            <floating-pane grabber_mode="[[grabber_mode]]" on-close="_close_grabbed_tile"
+                          style="max-width:initial;">
+                <div class='pane_title'>[[item.title]]</div>
+                <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]'
+                    class="noborder"></tile-element>
+            </floating-pane>
+        </template>
 
     </div>
         
@@ -444,6 +459,8 @@ background-color: rgba(0,0,0,0.2);
                 is_dragging_in="{{drop_in_progress}}"
                 no_files="{{no_files}}"
                 selected_files="{{selected_files}}"
+                selected_trial="{{selected_trial}}"
+                selected_tet_num="{{selected_tet_num}}"
             ></file-organiser>
             
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
@@ -484,8 +501,10 @@ background-color: rgba(0,0,0,0.2);
             options="[[options]]"
             active_group_a="{{active_group_a}}"
             active_group_b="{{active_group_b}}"
+            grabber_mode="[[grabber_mode]]"
             is_empty="[[tile_wall_is_empty]]"
             on-merge_groups="_merge_groups"
+            on-grab_group="_grab_group"
             ></tile-wall>
 
     </div>
@@ -865,6 +884,43 @@ the_app.toggle_show = function(id, shiftKey){
 the_app.show_tap = function(e){
     the_app.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
     e.preventDefault(); 
+}
+
+the_app._grab_group = function(e){
+    if(!the_app.grabbed_tiles){
+        this.set('grabbed_tiles', []);
+    }
+
+    // for simplicity we make new canvases for this tile
+    // note that they will evenutally be freed within _close_grabbed_tile.
+    let cm = Utils.canvas_manager;
+    this.push('grabbed_tiles', {
+        title: the_app.selected_trial +
+               " t" + the_app.selected_tet_num + 
+                "c" + e.detail.group_num + " [Grabbed]",
+        group_num: e.detail.group_num,
+        group: {
+            waves: cm.store_copy(e.detail.waves),
+            tac: cm.store_copy(e.detail.tac),
+            rm_spa: cm.store_copy(e.detail.rm_spa),
+            rm_dir: cm.store_copy(e.detail.rm_dir),
+            rm_speed: cm.store_copy(e.detail.rm_speed)
+        }
+    });
+}
+
+the_app._close_grabbed_tile = function(e){
+    // the grabbed tile "owned" these canvases, so free them now..
+    let cm = Utils.canvas_manager;
+    let group = e.model.item.group;
+    cm.free_canvas(group.waves);
+    cm.free_canvas(group.tac);
+    cm.free_canvas(group.rm_spa);
+    cm.free_canvas(group.rm_dir);
+    cm.free_canvas(group.rm_speed);
+
+    // remove the grabbed tile from the list
+    the_app.splice('grabbed_tiles', the_app.grabbed_tiles.indexOf(e.model.item), 1);
 }
 
 the_app.keyboard_target = document.querySelector('body');

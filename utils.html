@@ -262,6 +262,19 @@ Utils.canvas_manager = (function(){
             store.set(++last_ckey, c);
             return last_ckey + suffix;
         },
+        store_copy: function(id){
+            // if we were really sensible this may never be needed...but we're not
+            let old_canv = id && validate_id(id) && store.get(parseInt(id));
+            if(!old_canv){
+                return;
+            }
+            let new_canv = document.createElement("canvas");
+            new_canv.width = old_canv.width;
+            new_canv.height = old_canv.height;
+            new_canv.getContext('2d').drawImage(old_canv, 0, 0);
+            store.set(++last_ckey, new_canv);
+            return last_ckey + suffix;
+        },
         get_canvas: function(id){
             return id && validate_id(id) && store.get(parseInt(id));
         },

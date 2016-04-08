@@ -55,6 +55,9 @@ border: 1px solid #CCC;
 line-height: 0px;
 text-align: right;
 }
+:host(.noborder){
+border: none;
+}
 .over{
 position: absolute;
 top: 0px;
@@ -138,12 +141,16 @@ border-bottom: 0px;
 font-weight: bold;
 font-size: 0.8em;
 }
-/*
-.grabbed_info .tile-buttons{
-display: none;
+.grabber{
+position: absolute;
+top: 0px;
+left: 0px;
+right: 0px;
+bottom: 0px;
 }
-
-*/
+.grabber:hover{
+@apply(--grabber-hover);
+}
 .canvas_part_1{
 display: table-cell;
 vertical-align: bottom;
@@ -220,7 +227,8 @@ font-size: 20px;
             </div>
         </div>
     </div>
-    <div id='blind' class='blind'>
+    <div id='blind' class='blind'></div>
+    <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="_grab"></div>
 </template>
 
 
@@ -336,6 +344,11 @@ font-size: 20px;
                 value: function(){
                     return { shake: {name: 'shake-animation', node: this} };
                 }
+            },
+            grabber_mode: {
+                type: Boolean,
+                value: false,
+                notify: true
             }
         },
         observers: [
@@ -456,6 +469,8 @@ font-size: 20px;
                 this.transform('');
                 this.transform('',this.$.placeholder);
             }
+        }, _grab: function(){
+            this.fire('grab_group', this.group_model);
         }
     });
 </script>

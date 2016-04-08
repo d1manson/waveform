@@ -42,6 +42,7 @@ background-color: rgba(0,0,0,0.2);
             group_model="[[item]]"
             spa_rm_height="[[options.spa_rm_height]]"
             active="{{_is_equal(item, active_group_a)}}"
+            grabber_mode="[[grabber_mode]]"
             on-mouseenter="_mouseenter_tile"
             on-mouseleave="_mouseleave_tile"
             on-track="_track_tile"
@@ -78,6 +79,11 @@ background-color: rgba(0,0,0,0.2);
                 type: Boolean,
                 value: false,
                 notify: true,
+            },
+            grabber_mode: {
+                type: Boolean,
+                value: false,
+                notify: true
             }
         },
         observers: [
@@ -90,6 +96,9 @@ background-color: rgba(0,0,0,0.2);
         }, _show: function(v){
             return v ? '' : 'display: none;';
         }, _mouseenter_tile: function(e){
+            if(this.grabber_mode){
+                return
+            }
              if(this._track_state){
                 if(e.target !== this._track_state.tile_el){
                     this.set('active_group_b', e.model.item);
@@ -100,6 +109,9 @@ background-color: rgba(0,0,0,0.2);
                 this.set('active_group_a', e.model.item);
             }
         }, _mouseleave_tile: function(e){
+            if(this.grabber_mode){
+                return
+            }
             if(this._track_state){
                 this.set('active_group_b', null);
                 this._track_state.other_tile_el = null;

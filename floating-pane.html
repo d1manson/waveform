@@ -66,8 +66,7 @@ right: 0px;
 bottom: 0px;
 }
 .grabber:hover{
-border: 3px solid red;
-background: rgba(255,0,0,0.2);
+@apply(--grabber-hover);
 }
 ::content > .nodrag{
 cursor: default;
@@ -88,10 +87,10 @@ display: inline-block;
         <content select=".pane_title"></content>
         <div class="flexer"></div>
         <input id="search_input" type="search" hidden$="{{!has_search}}" value="{{search_text::input}}"
-            placeholder="[[search_placeholder]]" on-focus="_search_focus" on-blur="_search_blur">
+            placeholder="[[search_placeholder]]" on-focus="_search_focus" on-blur="_search_blur" on-mousedown="_stop_propagation">
     </div>
     <div class="pane_body"><content></content></div>
-    <div class="grabber" id="grabber" hidden$="{{!grabber_mode}}"></div>
+    <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="toggle"></div>
 </template>
 
 <script>
@@ -99,7 +98,6 @@ display: inline-block;
 (function(){
 
 var top_x_index = 100;
-var init_x = 100;
 
 Polymer({
     is: 'floating-pane',
@@ -130,27 +128,15 @@ Polymer({
             notify: true,
             value: false
         }
-    }, created: function(){
-        // bind these methods so we can add/remove easily
-        this._on_drag_move_bound = this._on_drag_move.bind(this);
-        this._on_drag_end_bound = this._on_drag_end.bind(this);
-
+    }, listeners: {
+        'mousedown': '_on_drag_start'
     }, attached: function(){
-        var self = this;
-        this.setAttribute('hidden',true);
 
-        // I don't get Polymer's listener thing..or maybe I do, but this works fine..
-        this.$.grabber.addEventListener('mouseup', this._on_mouseup.bind(this));
-        this.addEventListener('mousedown', this._on_drag_start.bind(this));
-        this.$.search_input.addEventListener('mousedown', function(e){
-         e.stopPropagation(); // if it propagates out of the shadow dom, then it will appear to be a mousedown on the pane itself, which would lead to a drag_start
-        });
-        init_x += 100;
-        this._translate(init_x, 400); // not sure this is that helpful, but hey
-    }, _on_mouseup: function(e){
-        this.toggle();
+    }, _stop_propagation: function(e){
+        e.stopPropagation(); 
     }, _on_drag_start: function(e){
         // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
+        // TODO: switch to using Polymer's tap event
         var el = e.target;
         while(el !== e.currentTarget){
             for(let c of el.classList){
@@ -165,9 +151,12 @@ Polymer({
         this.style.zIndex = ++top_x_index;
         this._drag_off_left = e.clientX-offset.left;
         this._drag_off_top = e.clientY-offset.top;
+        if(! this._on_drag_move_bound){
+            this._on_drag_move_bound = this._on_drag_move.bind(this);
+            this._on_drag_end_bound = this._on_drag_end.bind(this);
+        }        
         document.addEventListener('mousemove', this._on_drag_move_bound, true);
         document.addEventListener('mouseup', this._on_drag_end_bound, true); 
-
     }, _on_drag_move: function(e) {
         this._translate(e.clientX - this._drag_off_left, e.clientY - this._drag_off_top);
     }, _on_drag_end: function(e){
@@ -178,11 +167,12 @@ Polymer({
     }, _wide: function(v){
         return v ? "wide" : "";
     }, toggle: function(){
-        if(this.getAttribute('hidden')){
+        if(this.hidden){
             this.removeAttribute('hidden');
             this.style.zIndex = ++top_x_index;
         } else {
             this.setAttribute('hidden', "true");            
+            this.fire('close')
         }
         this.notifyResize();
     }, _search_focus: function(){
