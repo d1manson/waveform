@@ -127,10 +127,20 @@ Polymer({
             type: Boolean,
             notify: true,
             value: false
+        },
+        initial_x:{
+            type: Number,
+            notify: true,
+        },
+        initial_y:{
+            type: Number,
+            notify: true,
         }
     }, listeners: {
         'mousedown': '_on_drag_start'
-    }, attached: function(){
+    }, observers: [
+        '_set_initial_position(initial_x, initial_y)'
+    ], attached: function(){
         this.style.zIndex = ++top_z_index;
     }, _stop_propagation: function(e){
         e.stopPropagation(); 
@@ -179,6 +189,8 @@ Polymer({
         this.set('disable_shortcuts', true); 
     }, _search_blur: function(){
         this.set('disable_shortcuts', false);
+    }, _set_initial_position: function(x, y){
+        this._translate(x, y);
     }
 });
 

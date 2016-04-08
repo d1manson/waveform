@@ -377,11 +377,13 @@ background-color: rgba(0,0,0,0.2);
         </floating-pane>
 
         <template is="dom-repeat" items="[[grabbed_tiles]]">
-            <floating-pane grabber_mode="[[grabber_mode]]" on-close="_close_grabbed_tile"
-                          style="max-width:initial;">
+            <floating-pane 
+                  grabber_mode="[[grabber_mode]]"
+                  initial_x='[[item.x]]'
+                  initial_y='[[item.y]]'
+                  on-close="_close_grabbed_tile" style="max-width:initial;" >
                 <div class='pane_title'>[[item.title]]</div>
-                <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]'
-                    class="noborder"></tile-element>
+                <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]' class="noborder"></tile-element>
             </floating-pane>
         </template>
 
@@ -894,18 +896,21 @@ the_app._grab_group = function(e){
     // for simplicity we make new canvases for this tile
     // note that they will evenutally be freed within _close_grabbed_tile.
     let cm = Utils.canvas_manager;
+    let group = e.detail.group;
     this.push('grabbed_tiles', {
         title: the_app.selected_trial +
                " t" + the_app.selected_tet_num + 
-                "c" + e.detail.group_num + " [Grabbed]",
-        group_num: e.detail.group_num,
+                "c" + group.group_num + " [Grabbed]",
+        group_num: group.group_num,
         group: {
-            waves: cm.store_copy(e.detail.waves),
-            tac: cm.store_copy(e.detail.tac),
-            rm_spa: cm.store_copy(e.detail.rm_spa),
-            rm_dir: cm.store_copy(e.detail.rm_dir),
-            rm_speed: cm.store_copy(e.detail.rm_speed)
-        }
+            waves: cm.store_copy(group.waves),
+            tac: cm.store_copy(group.tac),
+            rm_spa: cm.store_copy(group.rm_spa),
+            rm_dir: cm.store_copy(group.rm_dir),
+            rm_speed: cm.store_copy(group.rm_speed)
+        },
+        x: e.detail.src_client_x + 20,
+        y: e.detail.src_client_y + 20
     });
 }
 

@@ -16318,24 +16318,6 @@ text-align: center;
 background-color:rgba(255,255,255,0.85);
 box-shadow: -3px 0px 6px #ddc;
 }
-/*shake css from daneden.me */
-@-webkit-keyframes shake {
-0%,100% {-webkit-transform:translateX(0)}
-10%,30%,50%,70%,90% {-webkit-transform:translateX(-10px)}
-20%,40%,60%,80% {-webkit-transform:translateX(10px)}
-}
-@keyframes shake {
-0%,100% {transform:translateX(0)}
-10%,30%,50%,70%,90% {transform:translateX(-10px)}
-20%,40%,60%,80%{transform:translateX(10px)}
-}
-:host(.shake){
--webkit-animation-name:shake;
-animation-name:shake;
--webkit-animation-duration: 1s;
-animation-duration: 1s;
-}
-
 .sticker{
 line-height: 12px;
 width: 20px;
@@ -16549,11 +16531,6 @@ font-size: 20px;
                 value: function(){return {};},
                 notify: true
             },
-            state: {
-                notify: true,
-                value: null,
-                readOnly: true
-            },
             moving: {
                 type: Boolean,
                 value: false,
@@ -16594,14 +16571,7 @@ font-size: 20px;
             '_update_state(active, moving, proximate, disabled)'
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
             return val !== null && val !== "" && val >= 0 ? '' : 'display:none;';
-        }, updateCanvas: function(newCanv, canvasNum){
-            return;
-            var oldCanv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-            for(var i=0;i <oldCanv.classList.length; i++)
-                newCanv.classList.add(oldCanv.classList[i]);
-            Polymer.dom(oldCanv.parentNode).insertBefore(newCanv, oldCanv);
-            Polymer.dom(oldCanv.parentNode).removeChild(oldCanv);  
-        }, updateCrossHair: function(canvasNum,x,y){
+        }, update_cross_hair: function(canvasNum,x,y){
             /* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
                 if x is null/undefined, any existing crosshair will be removed.     */
             var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
@@ -16619,37 +16589,10 @@ font-size: 20px;
                 }
                 xh.setXY(x,y);
             }
-        },
-        getCanvInfo: function(canvasNum,pageX,pageY){
-            //TODO: if no pageX and pageY then life should be more simple...
-            var canv =  Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-            var totalOffsetX = 0;
-            var totalOffsetY = 0;
-            var el = canv;
-            do{
-                totalOffsetX += el.offsetLeft - el.scrollLeft;
-                totalOffsetY += el.offsetTop - el.scrollTop;
-            }while(el = el.offsetParent)
-            
-            var canvX = pageX - totalOffsetX;
-            var canvY = pageY - totalOffsetY;
-            
-            var canvProps = getComputedStyle(canv); //TODO: we don't need to do this because we can track any changes since we (largely) have control over the canvases.
-            var w = parseInt(canvProps.width), h = parseInt(canvProps.height);
-            if(canvX < 0 || canvY < 0 || canvX > w|| canvY > h)
-                return null;
-            else
-                return {x:canvX, y:canvY, 
-                        w:w,
-                        h:h,
-                        top:canv.offsetTop,
-                        left:canv.offsetLeft,
-                        el: canv}
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
         }, _update_state: function(active, moving, proximate, disabled){
-            // This was preciously expressed in a much more complicated way
-
+            // TODO: this can all be converted to css classes now I think
             if(disabled){
                 if(moving)
                     throw "cannot disable tile while moving";
@@ -16669,35 +16612,9 @@ font-size: 20px;
 
             if(proximate && !moving)
                 console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
-        },
-        shake: function(){
+        }, shake: function(){
             this.cancelAnimation();
             this.playAnimation('shake');
-        },
-        getCopyOfCanvs: function(withSticker){
-            var div = document.createElement('div');
-            var oldCanvs = Polymer.dom(this.root).querySelectorAll('canvas');
-            for(var i = 0;i<oldCanvs.length;i++){
-                var img = document.createElement('img');
-                if(oldCanvs[i].style.display == 'none' || oldCanvs[i].width == 0)
-                    continue;
-                img.setAttribute('width',oldCanvs[i].style.width); //this allows us to put the 'px' which makes a difference to google docs though not to gmail for some reason.
-                img.setAttribute('height',oldCanvs[i].style.height); 
-                img.src = oldCanvs[i].toDataURL();
-                img.style.imageRendering = 'pixelated';
-                div.appendChild(img);
-            }
-            if(withSticker){
-                var sticker = this.$.sticker.cloneNode(true);
-                sticker.style.cssText =  "width: 20px;height: 17px;border: 1px solid;text-align: center;padding-top: 3px;position: absolute;right: 0px;top: 0px;font-size:0.8em;" 
-                                        + sticker.style.cssText; //this is a bit lame, but doing it properly would be a big complicated job I think
-                div.appendChild(sticker);
-            }
-            div.style.position = 'relative';
-            return div;
-        },
-        getCanv: function(canvNum){
-            return Polymer.dom(this.root).querySelectorAll('canvas')[canvNum];
         }, translate_xy: function(x,y){
             if(x || y){
                 this.transform('translate(' + x + 'px,' + y + 'px)');
@@ -16707,7 +16624,12 @@ font-size: 20px;
                 this.transform('',this.$.placeholder);
             }
         }, _grab: function(){
-            this.fire('grab_group', this.group_model);
+            let rect = this.getBoundingClientRect();
+            this.fire('grab_group', {
+                src_client_x: rect.left,
+                src_client_y: rect.top,
+                group: this.group_model
+            });
         }
     });
 </script>
@@ -22674,10 +22596,20 @@ Polymer({
             type: Boolean,
             notify: true,
             value: false
+        },
+        initial_x:{
+            type: Number,
+            notify: true,
+        },
+        initial_y:{
+            type: Number,
+            notify: true,
         }
     }, listeners: {
         'mousedown': '_on_drag_start'
-    }, attached: function(){
+    }, observers: [
+        '_set_initial_position(initial_x, initial_y)'
+    ], attached: function(){
         this.style.zIndex = ++top_z_index;
     }, _stop_propagation: function(e){
         e.stopPropagation(); 
@@ -22726,6 +22658,8 @@ Polymer({
         this.set('disable_shortcuts', true); 
     }, _search_blur: function(){
         this.set('disable_shortcuts', false);
+    }, _set_initial_position: function(x, y){
+        this._translate(x, y);
     }
 });
 
@@ -27188,7 +27122,7 @@ font-size: 10px;
         </floating-pane>
 
         <template is="dom-repeat" items="[[grabbed_tiles]]">
-            <floating-pane grabber_mode="[[grabber_mode]]" on-close="_close_grabbed_tile" style="max-width:initial;">
+            <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" on-close="_close_grabbed_tile" style="max-width:initial;">
                 <div class="pane_title">[[item.title]]</div>
                 <tile-element group_model="[[item.group]]" group_num="[[item.group_num]]" class="noborder"></tile-element>
             </floating-pane>
@@ -27631,18 +27565,21 @@ the_app._grab_group = function(e){
     // for simplicity we make new canvases for this tile
     // note that they will evenutally be freed within _close_grabbed_tile.
     let cm = Utils.canvas_manager;
+    let group = e.detail.group;
     this.push('grabbed_tiles', {
         title: the_app.selected_trial +
                " t" + the_app.selected_tet_num + 
-                "c" + e.detail.group_num + " [Grabbed]",
-        group_num: e.detail.group_num,
+                "c" + group.group_num + " [Grabbed]",
+        group_num: group.group_num,
         group: {
-            waves: cm.store_copy(e.detail.waves),
-            tac: cm.store_copy(e.detail.tac),
-            rm_spa: cm.store_copy(e.detail.rm_spa),
-            rm_dir: cm.store_copy(e.detail.rm_dir),
-            rm_speed: cm.store_copy(e.detail.rm_speed)
-        }
+            waves: cm.store_copy(group.waves),
+            tac: cm.store_copy(group.tac),
+            rm_spa: cm.store_copy(group.rm_spa),
+            rm_dir: cm.store_copy(group.rm_dir),
+            rm_speed: cm.store_copy(group.rm_speed)
+        },
+        x: e.detail.src_client_x + 20,
+        y: e.detail.src_client_y + 20
     });
 }
 
