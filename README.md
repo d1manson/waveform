@@ -102,14 +102,14 @@ TODO: finish giving the intro, including something like the following...
 
 There are a bunch of things called "keys", used for refering to specific objects in specific ways:
 
-* pkey - Polymer.Collection assigns a key to each unique item that it encounters, whether that item is an object or string/number (I actually don't know the full details of this despite having stared at the code for a while).  Here we have monkey-patched `Polymer.Collection` so that objects with a `._pkey` property will have that property set to the collection's key value when added to the collection. We sometimes request and use this key in our own code, particularlly when communicating between worker and main thread.  It always refers to a particular "box" arround and immutable list of cut indices, or rather to the immutable cut indices themselves.  Note that the key is only unique within the cut array..two different cut arrays will (in general) reuse the same key names for entirely different data.  We thus often qualify the "key" with a "generation" number.  See cut-obj or tac-plots for details.
+* okey - each immutable list of cut group indicies exists within an object that we refer to as an "okey", and the term is reserved for such objects. When only working on the main thread we often use this okey as the key in an ES6 `Map`, but when dealing with worker threads we have to resort to talking abou the "pkey"...
 
-* okey - when only working on the main thread (i.e. in wave-plots), we can use the object itself as a key (when using Map/WeakMap rather than basic JS objects).  okey refers to the same "box" as does "key", but here it is the actual box rather than a string name for it.
+* pkey - Polymer.Collection assigns a key to each unique item that it encounters, whether that item is an object or string/number (I actually don't know the full details of this despite having stared at the code for a while).  Here we have monkey-patched `Polymer.Collection` so that objects with a `._pkey` property will have that property set to the collection's key value when added to the collection. We sometimes request and use this key in our own code, particularlly when communicating between worker and main thread.  It always refers to a particular "box" arround an immutable list of cut indices, or rather to the immutable cut indices themselves.  Note that the key is only unique within the cut array..two different cut arrays will (in general) reuse the same key names for entirely different data.  We thus often qualify the "key" with a "generation" number.  See cut-obj or tac-plots for details.
 
 * akey - when we store typed arrays as polymer component properties, we do not use the array directly, but instead store the array with the "typed-array-manager", which then gives us an "akey" with which to refer to it. These akeys are strings with the prefix " (ta-manager)".  They are fully unique.
 
-* ckey - this is similar to the akey, but is for canvases rather than arrays.  See canvas-manger. TODO: actually apply this nomenclature.
+* ckey - a box around an actual dom `canvas` element.
 
-* fkey - again, similar to akey, but is for files.  managed by file-organiser. a simple counter, starting at 1.
+* fkey - a box around a `File` instance. Also includes an `id`, which counts up from 1 at the start of the program. On worker threads, it is the `id` which is refered to as an `fkey` rather than the obejct itself.
 
 

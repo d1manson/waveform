@@ -141,8 +141,6 @@ doesn't have a worker, but it uses a similar system.
     CutStackState.prototype.get_blob_url = function(experiment_name){
         // This methods is called by file-organiser when dragging starts
 
-        var am = Utils.typed_array_manager;
-
         // build the 1d array that gives the group number for each spike...
 
         // I'm not sure if total n_spikes is already avialble somehwere, but hey...
@@ -157,7 +155,7 @@ doesn't have a worker, but it uses a similar system.
             if(!gg){
                 continue;
             }
-            let inds = am.get_array(gg.akey);
+            let inds = gg.akey.array;
             for(let jj=0; jj<inds.length; jj++){
                 the_cut[inds[jj]] = ii;
             }
@@ -222,7 +220,7 @@ doesn't have a worker, but it uses a similar system.
                 group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
-                akey: Utils.typed_array_manager.store_array(inds),
+                akey: Utils.typed_array_manager.to_akey(inds),
 
                 // Theses properties are visualized by the tile element
                 n_spikes: inds.length,
@@ -253,11 +251,9 @@ doesn't have a worker, but it uses a similar system.
             };
         },
         _use_cut_box: function(){
-            var m = Utils.typed_array_manager;
-
             if (this.cut_box && this.cut_box.is === "file"){
                 // construct from file
-                let akey = m.get_array(this.cut_box.akey);
+                let akey = this.cut_box.akey.array;
 
                 // find out how many indices for each group
                 let group_n = bin_count(akey, 255);
@@ -338,7 +334,7 @@ doesn't have a worker, but it uses a similar system.
                 // cause any changes as all the values will be the same.
 
                 // we could hold the reference directly, but it complciates matters when doing bulk updates of trials
-                let new_cut = Utils.file_manager.store_file(new CutStackState(this)); 
+                let new_cut = new CutStackState(this); 
                 this.fire('fork', new_cut);
             }
         }, swap_groups: function(a, b){
@@ -392,10 +388,8 @@ doesn't have a worker, but it uses a similar system.
         },
         split_group: function(a, mask){
             this._fork_if_needed();
-            var m = Utils.typed_array_manager;
 
-            var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
-            m.free_array(this.groups[a].akey);
+            var new_arrs = mask_split(this.groups[a].akey.array, mask);
             // update group_nums in preparation for announcing splice
             for(let ii=a+1; ii<this.groups.length; ii++){
                 this.groups[ii] && (this.groups[ii].group_num = ii+1);
@@ -413,7 +407,6 @@ doesn't have a worker, but it uses a similar system.
         merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
             this._fork_if_needed();
-            var m = Utils.typed_array_manager;
 
             // make life easier, fix b>a
             if(a>b){
@@ -422,12 +415,9 @@ doesn't have a worker, but it uses a similar system.
                 b = tmp;
             }
 
-            var packed = merge_sorted(m.get_array(this.groups[a].akey), 
-                                   m.get_array(this.groups[b].akey))
+            var packed = merge_sorted(this.groups[a].akey.array, 
+                                      this.groups[b].akey.array)
             var inds = packed[0], mask = packed[1];
-
-            m.free_array(this.groups[a].akey);
-            m.free_array(this.groups[b].akey);
 
             this.splice('groups', b, 1, null);
             this.splice('groups', a, 1, this._make_okey(inds, a));
@@ -443,15 +433,13 @@ doesn't have a worker, but it uses a similar system.
             this.push('undo_stack_descriptions', 'merge groups ' + a + ' and ' + b);
         },
         undo: function(){
-            var m = Utils.typed_array_manager;
             var delta = this.undo_stack[this.undo_stack.length-1];
             var success = false;
 
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
-                m.free_array(this.groups[delta.a].akey);
+                var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
                 this.splice('groups', delta.b, 1, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
@@ -460,11 +448,9 @@ doesn't have a worker, but it uses a similar system.
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
-                                          m.get_array(this.groups[delta.a+1].akey))
+                var packed = merge_sorted(this.groups[delta.a].akey.array, 
+                                          this.groups[delta.a+1].akey.array)
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].akey);
-                m.free_array(this.groups[delta.a+1].akey);
                 // update group_nums in preparation for announcing splice
                 for(let ii=delta.a+1; a<this.groups.length; ii++){
                     this.groups[ii] && (this.groups[ii].group_num = ii-1);
@@ -491,7 +477,6 @@ doesn't have a worker, but it uses a similar system.
 
         },
         redo: function(){
-            var m = Utils.typed_array_manager;
             var delta = this.redo_stack[this.redo_stack.length-1];
             if(!delta)
                 return;
@@ -500,11 +485,9 @@ doesn't have a worker, but it uses a similar system.
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
-                                          m.get_array(this.groups[delta.b].akey));
+                var packed = merge_sorted(this.groups[delta.a].akey.array, 
+                                          this.groups[delta.b].akey.array);
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].akey);
-                m.free_array(this.groups[delta.b].akey);
                 this.splice('groups', delta.b, 1, null);
                 this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
@@ -513,9 +496,8 @@ doesn't have a worker, but it uses a similar system.
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
+                var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 delete delta['mask'];
-                m.free_array(this.groups[delta.a].akey);
                 for(let ii=delta.a+1; ii<this.groups.length; i++){
                     this.groups[ii] && (groups[ii].group_num = ii+1);
                 }

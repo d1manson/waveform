@@ -192,35 +192,15 @@ Utils.regex_from_list = function(a){
 Utils.typed_array_manager = (function(){
     // This is a thin wrapper around a map
 
-    var store = new Map();
-    var last_akey = 0;
-    var suffix = " (ta-manager)"; // can drop suffix using parseInt
-    var validate_akey = function(akey){
-        if((akey + "").indexOf(suffix) === -1)
-            throw "typed-array-manager was passed invalid akey";
-        return true;
-    }
-
     return {
-        store_array: function(arr){
-            store.set(++last_akey, arr);
-            return last_akey + suffix;
-        },
-        get_array: function(akey){
-            if(!akey) return
-            return validate_akey(akey) && store.get(parseInt(akey));
+        to_akey: function(arr){
+            return {array: arr};
         },
         get_array_clone: function(akey){
             // note that the clone is not put in the store. It is
             // inteded to be used when dealing with workers, and needing to 
             // transfer an array in its intereity to another thread.
-            if(!akey) return
-            var a = this.get_array(akey);
-            return a && new a.constructor(a);
-        },
-        free_array: function(akey){
-            validate_akey(akey);
-            store.delete(parseInt(akey));
+            return akey && akey.array && new akey.array.constructor(akey.array);
         }
     };
 

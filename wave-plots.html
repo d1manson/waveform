@@ -587,8 +587,6 @@ WavesRenderer.prototype._upload_okey_data = function(){
         xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256;
     }
 
-    var m = Utils.typed_array_manager;
-
     if(this._mode === 'density'){
         // just need to provide x and y
 
@@ -596,7 +594,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i16 = new Uint16Array(data_i8.buffer);
 
         for(let ii=1; ii<okeys.length; ii++){
-            let inds = m.get_array(okeys[ii].akey);
+            let inds = okeys[ii].akey.array;
             let xy = xy_offset_gl_i16[ii];
             for(let jj=0; jj<inds.length; jj++){
                 data_i16[(inds[jj]<<1) +0] = xy;
@@ -612,7 +610,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i16 = new Uint16Array(data_i8.buffer);
     
         for(let ii=1; ii<okeys.length; ii++){
-            let inds = m.get_array(okeys[ii].akey);
+            let inds = okeys[ii].akey.array;
             let xy = xy_offset_gl_i16[ii];
             let gx = okeys[ii].group_num |  (xy << 8); 
             let yg = ((0xff00 & xy) >>> 8) | (okeys[ii].group_num << 8);
@@ -988,12 +986,11 @@ Polymer({
         // note that if gl data was avaialble and then we turned off show we will
         // get a null-ing event the next time the tet file changes...which is good.
         let is_null = !(this.data_for_gl && this.data_for_gl.voltages);
-        let am = Utils.typed_array_manager;
         this._renderer_has_voltages = false;
         if(is_null || this.show_chans === "yyyy"){ 
             this._renderer_has_voltages = true;
             this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
-            this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
+            this._renderer.set_voltage_data(this.data_for_gl && this.data_for_gl.voltages && this.data_for_gl.voltages.array);   
         } 
     }, _show_chans_changed: function(show_chans){
         if(!this.want_data_for_gl){
