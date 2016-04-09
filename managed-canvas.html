@@ -1,68 +1,3 @@
-<!--
-CUSTOM ELEMENT: canvas-manager
-BY: DM
-
-polymer doesn't allow you to use dom elements within a property, so if you want a canvas to be
-a part of a property you have to something more complicated...
-
-Note that elements can only be inserted into the dom in one place, if you insert in multiple places,
-only the element will only appear at the final location.
-
-Use one of the following methods to create a new canvas:
-    create_from_buffer(buffer, [dim_0, dim_1])
-    create_from_dims([dim_0, dim_1])
-They return an id for use with the following methods:
-    get_canvas(id)
-    get_2d_ctx(id)
-    free_canvas(id)
-Note you must free canvases when you no longer want them, otherwise there will be a memory leak.
-
-You can use it as follows, note that canvas-manger must come before any managed-canvas elements.
-The canvas-manger is a singleton, i.e. all instances share the same state:
-
-    <canvas-manager></canvas-manager> 
-    <managed-canvas></managed-canvas>
-    <managed-canvas></managed-canvas>
-
-    <script>
-    var m = window.canvas_manager;
-    var c_ids = [m.create_from_dims([100,150]), m.create_from_dims([100,20]), m.create_from_dims([20,100])];
-
-    var els = document.getElementsByTagName('managed-canvas');
-    els[0].ckey = c_ids[0];
-    els[1].ckey = c_ids[1];
-
-    var ctx = m.get_2d_ctx[c_ids[0]];
-    // ....
-    // do some drawing on the ctx. 
-    // the canvas is currently in the dom, so you will see the changes
-    // ...
-
-    els[0].ckey = c_ids[2]; 
-    // Note how the original canvas is displaced from els[0]. You can insert it again 
-    // to either of the els, and it will still have the drawings.  Note that when you are
-    // completely finished with that canvas you *must* do the following:
-    m.free_canvas(c_ids[0]);
-    // otherwise it will be a memory leak
-    
-    // If you are using a managed-canvas within a dom-module, you can use declarative binding with ckey:
-    // <managed-canvas ckey="[[plot_canv_id]]"></managed_canvas>
-
-    </script>
-
-TODO: it may possibly be worth using an object pool, free list type thing.
-      it may also be possible to use a WeakMap somehow, to avoid leaks entirely, but I'm 
-      not sure how that plays with polymer's bindings.
-
-      It might be nice to reuse the typed-array-manager element here because they both do
-      similar things at heart, they just store different data, and the canavas-manger offers
-      some extra helper methods on top of the basic storage (ie. create canvas stuff).
-
-TODO: update comments
-
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 
 <dom-module id="managed-canvas">
@@ -84,11 +19,17 @@ Polymer({
             type: Number,
             value: 0,
             observer: '_height_changed'
+        },
+        stretch_height: {
+            type: Boolean,
+            value: false,
+            observer: '_height_changed'
         }
     }, listeners: {
         'mousemove': '_onmousemove',
         'mousedown': '_onmousedown',
-        'mouseup': '_onmouseup'
+        'mouseup': '_onmouseup',
+        'iron-resize': '_height_changed'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
@@ -106,8 +47,23 @@ Polymer({
         let el_canv = this.ckey.canvas;
         this._update_canv_style(el_canv);
     }, _update_canv_style: function(el_canv){
+        if(this.fix_height && this.stretch_height){
+            console.warn('managed-canvas cannot stretch and fix height')
+        }
         if(el_canv){
-            el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
+            el_canv.style.cssText = "";
+            if(this.stretch_height){
+                // this does what is needed for now, but it's not pretty...
+                el_canv.style.height = "100%";
+                el_canv.style.margin = "0 auto";
+                el_canv.style.left = "0";
+                el_canv.style.right = "0";
+                el_canv.style.position = "absolute";
+            } else if (this.fix_height){
+                el_canv.style.height = this.fix_height + "px";
+            } else {
+                el_canv.style.height = "";
+            }
             el_canv.style.imageRendering = "pixelated";          
         }
     }, _onmousemove: function(e){

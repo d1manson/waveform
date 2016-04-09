@@ -93,9 +93,9 @@ margin: 0;
 }
 .info_summary{
 position: absolute;
-margin: 3px;
 padding: 3px;
 top: 0px;
+left: 0px;
 background: rgba(255,255,255,0.5);
 -webkit-transition: opacity 0.5s ease-in-out;
 transition: opacity 0.5s ease-in-out;
@@ -467,9 +467,8 @@ background-color: rgba(0,0,0,0.2);
             
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
-            <div style="flex:1 1 0%; position:relative;">
-                <managed-canvas style="position:absolute;"
-                ckey="[[pos_path]]" ></managed-canvas>
+            <div style="flex:1 1 0%; position:relative;display: flex; flex-direction: row;">
+                <managed-canvas style="margin:0 auto;" stretch_height ckey="[[pos_path]]" ></managed-canvas>
                 <div class="info_summary">
                     <div class="info_summary_text">
                     </div>
