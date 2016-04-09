@@ -498,6 +498,7 @@ WavesRenderer.prototype.set_mode = function(mode){
 
 WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
     var gl = this.gl;
+    this._voltage_data = prepared_voltage_data;
     // the voltage data is pre-prepared exactly the way we wanted by the parse-data module.
 
      // The prepared_voltage data is really a concatenated list of many separate arrays,
@@ -921,6 +922,18 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
     this._run_density_2_prog();
 }
 
+WavesRenderer.prototype.mask_at_vt = function(inds, point){
+    let t = 0 | (point[1] / off_canv_dt);
+    let v = 0 | (127 - (point[0] /off_canv_wave_h)*255);
+    let m = new Uint8Array(inds.length);
+    let vdata = new Int8Array(this._voltage_data.buffer);
+    let n = this._n;
+    for(let ii=0; ii<inds.length; ii++){
+        m[ii] = vdata[n*t*2 + inds[ii]*2] > v ? 1 : 0;
+    }
+    return m;
+}
+
 WavesRenderer.prototype.debug_show_off_canv = function(){
     this.el_off_canv.style.position = 'fixed';
     this.el_off_canv.style.right = "0px";
@@ -1052,6 +1065,8 @@ Polymer({
                 this.notifyPath('groups.' + key + '.waves', okey.waves);            
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
+    }, mask_at_vt: function(inds, point){
+        return this._renderer.mask_at_vt(inds, point);
     }
 });
 

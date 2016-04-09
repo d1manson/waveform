@@ -16070,20 +16070,20 @@ Polymer({
 })
 
 </script><dom-module id="cross-hair" assetpath="/">
-
-<template>
 <style type="text/css">
-	:host {
-		position: absolute;
-		top: 0px;
-		left: 0px;
-		height: 100%;
-		width: 100%;
-		overflow: hidden;
-	}
+:host {
+position: absolute;
+top: 0px;
+left: 0px;
+height: 100%;
+width: 100%;
+overflow: hidden;
+}
 </style>
-<svg></svg></template>
+<template><svg></svg></template>
 <script>
+"use strict";
+
 Polymer({
 	is: 'cross-hair',
 	properties:{
@@ -16115,42 +16115,42 @@ Polymer({
 		r: {
 			type: Number,
 			value: 6,
-			notify: true,
-			reflectToAttribute: true
+			notify: true
 		},
-		showBars: {
+		show_bars: {
 			type: Number,
 			value: 1,  //1=horizontal, 2=vertical 3=both (only 1 is implemented)
-			notify: true,
-			reflectToAttribute: true
+			notify: true
 		},
 	},
 	observers: [
-		'_updateSVG(x,y,w,left,top,r,showBars)'
+		'_update_svg(x, y, w, left, top, r, show_bars)'
 	],
-	setXY: function(x,y){ 
-		//better than setting x and y separately, well not really...
-		this.set('x', x);
-		this.set('y', y);
-	},
-	setLeftTop: function(left,top){
-		//better than setting left and top separately, well not really...
-		this.set('left', left);
-		this.set('top', top);
-	},
-	_updateSVG: function(x,y,w,left,top,r,showBars){
-		var svg = "<svg style='pointer-events:none;position:absolute;left:" + left + "px;top:" + top + "px;width:" + (showBars & 1 ? w : x+r+2 )+ "px;height:" + (y+r+2) + "px' xmlns='http://www.w3.org/2000/svg' version='1.1'>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='black' stroke-width='1' fill='none'/>"
-				+ "<circle cx='" + x + "' cy='" + y + "' r='" + r + "' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>"
-				+ (showBars & 1 ?
-					  "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-r) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-					+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+r) + "' y2='" + y + "' stroke='black' stroke-width='1'/>"
-					+ "<line x1='" + 0 + "' y1='" + y + "' x2='" + (x-r) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
-					+ "<line x1='" + w + "' y1='" + y + "' x2='" + (x+r) + "' y2='" + y + "' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>"
-				  : "")
-				+ "</svg>";
-		Polymer.dom(this.root).innerHTML = svg;
-		Polymer.dom.flush();
+	_update_svg: function(x, y , w, left, top, r, show_bars){
+		this.debounce('update', function(){
+			let width = show_bars & 1 ? w : x+r+2;
+			let height = y+r+2;
+			let x_minus_r = x-r;
+			let x_plus_r = x+r;
+
+			let bars_1 = "";
+			if(show_bars & 1){
+				 bars_1 = `<line x1='0'    y1='${y}' x2='${x_minus_r}' y2='${y}' stroke='black' stroke-width='1'/>
+						   <line x1='${w}' y1='${y}' x2='${x_plus_r}'  y2='${y}' stroke='black' stroke-width='1'/>
+						   <line x1='0'    y1='${y}' x2='${x_minus_r}' y2='${y}' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>
+						   <line x1='${w}' y1='${y}' x2='${x_plus_r}'  y2='${y}' stroke='white' stroke-dasharray='2,2' stroke-width='1'/>`
+			}
+
+			// TODO: add show_bars & 2
+
+			let svg = `<svg style='pointer-events:none;position:absolute;left:${left}px;top:${top}px;width:${width};height:${height}px;'
+						 xmlns='http://www.w3.org/2000/svg' version='1.1'>
+								<circle cx='${x}' cy='${y}' r='${r}' stroke='black' stroke-width='1' fill='none'/>
+							    <circle cx='${x}' cy='${y}' r='${r}' stroke='white' stroke-dasharray='2,2' stroke-width='1' fill='none'/>
+							    ${bars_1}</svg>`;
+			Polymer.dom(this.root).innerHTML = svg;
+			Polymer.dom.flush();
+		});
 	}
 });
 </script>
@@ -16175,7 +16175,9 @@ Polymer({
             observer: '_height_changed'
         }
     }, listeners: {
-        'mousemove': '_onmousemove'
+        'mousemove': '_onmousemove',
+        'mousedown': '_onmousedown',
+        'mouseup': '_onmouseup'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
@@ -16198,19 +16200,27 @@ Polymer({
             el_canv.style.imageRendering = "pixelated";          
         }
     }, _onmousemove: function(e){
-        e.canvas_point = this._get_point(e);
-        this.fire('canvas-mousemove', e);
-    }, _get_point: function(e){
+        this._fire_pointer_event(e, 'canvas-mousemove');
+    }, _onmouseup: function(e){
+        this._fire_pointer_event(e, 'canvas-mouseup');
+    }, _onmousedown: function(e){
+        this._fire_pointer_event(e, 'canvas-mousedown');
+    }, _fire_pointer_event: function(e, name){
         // TODO: might be nice to cache the metrics rather than recomputing from scratch each time
         let canv_el = Polymer.dom(this.root).firstChild;
         if(!canv_el){
             return;
         }
         let rect = canv_el.getBoundingClientRect();
-        return [
-            0 | ((e.clientY-rect.top)/rect.height*canv_el.height), 
-            0 | ((e.clientX-rect.left)/rect.width*canv_el.width)
+        e.offset_x = e.clientX-rect.left;
+        e.offset_y = e.clientY-rect.top;
+        e.canvas_width = rect.width;
+        e.canvas_height = rect.height;
+        e.canvas_point = [
+            0 | (e.offset_y/rect.height*canv_el.height), 
+            0 | (e.offset_x/rect.width*canv_el.width)
         ];
+        this.fire(name, e);
     }
 });
 
@@ -16420,14 +16430,67 @@ position: relative;
 top: 45%;
 font-size: 20px;
 }
+:host(.active.moving){
+opacity: 0.5;
+border-width: 10px;
+margin: -9px;
+border-color: #000;
+background-color: #888;
+pointer-events: none;
+z-index: 100;
+box-shadow: initial;
+}
+.placeholder{
+display: none;
+}
+:host(.active.moving) .placeholder{
+display: block;
+}
+:host(.active){
+box-shadow: 0px 0px 5px 3px #fc0;
+background-color: #eee;
+}
+.over {
+display: none;
+}
+:host(.active) .over{
+display: block;
+pointer-events: none;
+}
+:host(.active.moving.proximate){
+background-color: initial;
+opacity: 1;
+}
+
+:host(.active.moving.proximate) .sticker{
+right: 26px;
+}
+
+:host(.active.moving.proximate) .sticker,
+:host(.active.moving.proximate) managed-canvas {
+-webkit-animation: fadeout 1.5s linear infinite;
+}
+
+:host(.disabled) .blind{
+display: block;
+};
+:host(.disabled){
+pointer-events: none;
+}
+:host(.active.splitting){
+/* cursor: none; */ /* TODO: this doesn't seem to update until after you mouseup, and anyway we actually do want the mouse when the mouse is up */;
+}
 </style>
 
 <template>
-    <div class="placeholder" id="placeholder" style="display: none;">
+    <div class="placeholder" id="placeholder">
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
-        <managed-canvas ckey="[[group_model.waves]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter"></managed-canvas>
+        <template is="dom-if" if="[[splitter_metrics]]">
+            <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
+        </template>
         <managed-canvas ckey="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
@@ -16438,7 +16501,7 @@ font-size: 20px;
         <managed-canvas ckey="[[group_model.tac]]"></managed-canvas>
     </div>
     <div id="sticker" class="sticker" style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
-    <div id="over" class="over" style="display:none;">
+    <div id="over" class="over">
         <div class="side">
             <div class="flex"></div>
             <div class="caption">
@@ -16468,58 +16531,6 @@ font-size: 20px;
 <script>
     "use strict";
         
-    var ResetStyle = function(el){
-        var display = el.style.display;
-        el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
-        el.$.over.style.cssText = 'display:none;';
-        el.$.sticker.style.right = '';
-        el.$.sticker.style.webkitAnimation = '';
-        el.$.blind.style.cssText = '';
-        el.$.placeholder.style.display = 'none';
-        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
-        for(var ii=0; ii<canvases.length; ii++)
-            canvases[ii].style.webkitAnimation = '';
-        Polymer.dom.flush();
-    }
-    
-    var StyleActive = function(el){
-        ResetStyle(el);
-        el.style.boxShadow = '0px 0px 5px 3px #fc0';
-        el.style.backgroundColor = '#eee';
-        el.$.over.style.display = '';          
-    }
-    
-    var StyleProxiamte = function(el){
-        StyleMoving(el);
-        el.style.backgroundColor = '';
-        //TODO: need to deal with animation prefixing
-        el.style.opacity = '1';
-        el.$.sticker.style.right = '26px';
-        el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
-        for(var ii=0; ii<canvases.length; ii++)
-            canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        Polymer.dom.flush();
-    }
-    
-    var StyleMoving = function(el){
-        ResetStyle(el);
-        el.style.opacity = '0.5';
-        el.style.borderWidth = '10px';
-        el.style.margin = '-9px';
-        el.style.borderColor = '#000';
-        el.style.backgroundColor = '#888';
-        el.style.pointerEvents = 'none';
-        el.style.zIndex = '100';
-        el.$.placeholder.style.display = '';
-    }
-    
-    var StyleDisabled = function(el){
-        ResetStyle(el);
-        el.$.blind.style.display = 'block';
-        el.style.pointerEvents = 'none';
-    }
-
     Polymer({
         is:'tile-element',
         behaviors: [
@@ -16571,53 +16582,39 @@ font-size: 20px;
                 type: Boolean,
                 value: false,
                 notify: true
+            },
+            splitter_metrics: {
+                type: Object,
+                value: null,
+                notify: true
             }
         },
         observers: [
-            '_update_state(active, moving, proximate, disabled)'
+            '_update_state(active, moving, proximate, disabled, splitter_metrics)',
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
             return val !== null && val !== "" && val >= 0 ? '' : 'display:none;';
-        }, update_cross_hair: function(canvasNum,x,y){
-            /* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
-                if x is null/undefined, any existing crosshair will be removed.     */
-            var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-            var xh = canv.nextElementSibling
-            xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
-            
-            if (xh && !(x==0 || x>0)){
-                xh.remove();
-            }else{
-                if(!xh){
-                    xh = document.createElement('cross-hair');
-                    xh.w = parseInt(getComputedStyle(canv).width);
-                    xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
-                    Polymer.dom(canv.parentNode).insertBefore(xh, canv.nextElementSibling)//insert after the canvas
-                }
-                xh.setXY(x,y);
-            }
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
-        }, _update_state: function(active, moving, proximate, disabled){
-            // TODO: this can all be converted to css classes now I think
+        }, _update_state: function(active, moving, proximate, disabled, splitter_metrics){
+            // TODO: the various states may be entirely separable now (it was much, much worse in the past!)
+            if(disabled && moving){
+                throw "cannot disable tile while moving";
+            }
+                
             if(disabled){
-                if(moving)
-                    throw "cannot disable tile while moving";
-                this.set('active', false); // may have been true
-                StyleDisabled(this);
-            } else if(moving){
-                if(proximate){
-                    StyleProxiamte(this);
-                }else{
-                    StyleMoving(this);
-                }
-            } else if(active){
-                StyleActive(this);
-            } else {
-                ResetStyle(this);
+                this.set('active', false); // may have been true. TODO: really?
+            } 
+
+            if(proximate && !moving){
+                console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
             }
 
-            if(proximate && !moving)
-                console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
+            moving ? this.classList.add('moving') : this.classList.remove('moving');
+            proximate ? this.classList.add('proximate') : this.classList.remove('proximate');
+            splitter_metrics ? this.classList.add('splitting') : this.classList.remove('splitting');
+            disabled ? this.classList.add('disabled') : this.classList.remove('disabled');
+            active ? this.classList.add('active') : this.classList.remove('active');
+
         }, shake: function(){
             this.cancelAnimation();
             this.playAnimation('shake');
@@ -16635,6 +16632,53 @@ font-size: 20px;
                 src_client_x: rect.left,
                 src_client_y: rect.top,
                 group: this.group_model
+            });
+        }, _mousedown_splitter: function(e){
+            if(e.detail.button === 0){
+                return; // left click either irrelevant or handled by tile-wall itself
+            }
+
+            let detail = {
+                state: '',
+                group: this.group_model,
+                point: e.detail.canvas_point,
+                x: e.detail.offset_x,
+                y: e.detail.offset_y,
+                w: e.detail.canvas_width
+            };
+
+            e.detail.stopPropagation(); // a bit hacky, but prevents raw mouse-down event from propagating to tile-wall
+            detail.state = this.splitter_metrics ? 'move' : 'start';
+            this.fire('splitter', detail);
+            this._splitter_el = e.target;
+            if(!this._mousemove_splitter_bound){
+                this._mousemove_splitter_bound = this._mousemove_splitter.bind(this);
+                this._mouseup_splitter_bound = this._mouseup_splitter.bind(this)
+            }
+            this._splitter_el.addEventListener('canvas-mousemove', this._mousemove_splitter_bound);
+            this._splitter_el.addEventListener('canvas-mouseup', this._mousemove_splitter_bound);  // this just goes to mousemove, and then ...
+            document.addEventListener('mouseup', this._mouseup_splitter_bound); // we actually process the up on the document
+
+        }, _mouseup_splitter: function(e){
+            document.removeEventListener('mouseup', this._mouseup_splitter_bound);
+            this._splitter_el.removeEventListener('canvas-mousemove', this._mousemove_splitter_bound);
+            this._splitter_el.removeEventListener('canvas-mouseup', this._mousemove_splitter_bound);
+            this.fire('splitter', {
+                state: 'update',
+                group: this.group_model,
+                point: null,
+                x: null,
+                y: null,
+                w: null
+            });
+        }, _mousemove_splitter: function(e){
+            this.fire('splitter', {
+                state: 'move',
+                group: this.group_model,
+                point: e.detail.canvas_point,
+                x: e.detail.offset_x,
+                y: e.detail.offset_y,
+                w: e.detail.canvas_width
             });
         }
     });
@@ -16980,7 +17024,7 @@ background-color: rgba(0,0,0,0.2);
     </div>
 
     <template is="dom-repeat" items="[[groups]]">
-        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile"></tile-element>        
+        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}" disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile"></tile-element>        
     </template>
 </template>
 
@@ -17018,11 +17062,17 @@ background-color: rgba(0,0,0,0.2);
                 type: Boolean,
                 value: false,
                 notify: true
+            }, 
+            splitter_state: {
+                type: Object,
+                notify: true
             }
         },
         observers: [
             'groups_modified(groups.*)'
-        ], created: function(){
+        ], listeners: {
+            'mousedown': '_mousedown_splitter'
+        }, created: function(){
             this._scroll_bound = this._scroll.bind(this);
             this._failed_track_bound = this._failed_track.bind(this);
         }, groups_modified: function(change){
@@ -17139,6 +17189,17 @@ background-color: rgba(0,0,0,0.2);
                 target: this._track_state.tile_el
             };
             this._track_tile(my_event);
+        }, _metrics_if_splitting: function(group, state){
+            return (group === state.base.group_a || group === state.base.group_b) ? state.base.metrics : null;
+        }, _disabled_if_not_splitting: function(group, state){
+            return state.base.group_a && !(group === state.base.group_a || group === state.base.group_b);
+        }, _mousedown_splitter: function(e){
+            if(!this.splitter_state.metrics){
+                return;
+            }
+            this.fire('splitter', {
+                state: e.button === 0 ? 'finalize' : 'cancel'
+            });
         }
     });
 </script>
@@ -17944,7 +18005,7 @@ cursor: default;
                                           this.groups[delta.a+1].akey.array)
                 var inds = packed[0];
                 // update group_nums in preparation for announcing splice
-                for(let ii=delta.a+1; a<this.groups.length; ii++){
+                for(let ii=delta.a+1; ii<this.groups.length; ii++){
                     this.groups[ii] && (this.groups[ii].group_num = ii-1);
                 }
                 this.splice('groups', delta.a, 2, this._make_okey(inds, delta.a));
@@ -17990,8 +18051,8 @@ cursor: default;
                 // we could have kept the mask originally, but we didn't
                 var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 delete delta['mask'];
-                for(let ii=delta.a+1; ii<this.groups.length; i++){
-                    this.groups[ii] && (groups[ii].group_num = ii+1);
+                for(let ii=delta.a+1; ii<this.groups.length; ii++){
+                    this.groups[ii] && (this.groups[ii].group_num = ii+1);
                 }
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a), this._make_okey(new_arrs[1], delta.a+1));
                 success = true;
@@ -21878,6 +21939,7 @@ Polymer({
                 });
         
         this.set('selected_cut', new_cut);
+        this.$.trial_list.notifyResize();
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;
         var old_sel = this._trial_from_base.get(this.selected_trial);
@@ -25879,6 +25941,7 @@ WavesRenderer.prototype.set_mode = function(mode){
 
 WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
     var gl = this.gl;
+    this._voltage_data = prepared_voltage_data;
     // the voltage data is pre-prepared exactly the way we wanted by the parse-data module.
 
      // The prepared_voltage data is really a concatenated list of many separate arrays,
@@ -26302,6 +26365,18 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
     this._run_density_2_prog();
 }
 
+WavesRenderer.prototype.mask_at_vt = function(inds, point){
+    let t = 0 | (point[1] / off_canv_dt);
+    let v = 0 | (127 - (point[0] /off_canv_wave_h)*255);
+    let m = new Uint8Array(inds.length);
+    let vdata = new Int8Array(this._voltage_data.buffer);
+    let n = this._n;
+    for(let ii=0; ii<inds.length; ii++){
+        m[ii] = vdata[n*t*2 + inds[ii]*2] > v ? 1 : 0;
+    }
+    return m;
+}
+
 WavesRenderer.prototype.debug_show_off_canv = function(){
     this.el_off_canv.style.position = 'fixed';
     this.el_off_canv.style.right = "0px";
@@ -26433,6 +26508,8 @@ Polymer({
                 this.notifyPath('groups.' + key + '.waves', okey.waves);            
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
+    }, mask_at_vt: function(inds, point){
+        return this._renderer.mask_at_vt(inds, point);
     }
 });
 
@@ -27260,7 +27337,7 @@ font-size: 10px;
 
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
-        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group"></tile-wall>
+        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" splitter_state="[[splitter_state]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group" on-splitter="_splitter"></tile-wall>
 
     </div>
 
@@ -27302,7 +27379,7 @@ font-size: 10px;
 
     <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]" want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
-    <wave-plots groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]" want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
+    <wave-plots id="wave_plots" groups="{{cut_groups}}" data_for_gl="[[data_for_gl]]" palette_mode="[[options.waves_render_mode]]" show_chans="[[options.show_waves]]" want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
     <iron-a11y-keys keys="esc" on-keys-pressed="_toggle_toolbar" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -27372,6 +27449,47 @@ the_app._sanitize_options = function(stored_options) {
     }
     return opts;
 }
+
+the_app._splitter = function(e){
+    if(e.detail.state === "finalize" || e.detail.state === "cancel"){
+        if(e.detail.state === "cancel"){
+            if(the_app.splitter_state.group_b){
+                the_app.$.cut.undo();
+            }
+        }
+        the_app.splitter_state._akey_full = null;
+        the_app.set('splitter_state.group_a', null);
+        the_app.set('splitter_state.group_b', null);
+        the_app.set('splitter_state.metrics', null);
+        this.set('disable_shortcuts', false);
+        return;
+    }
+
+    if(e.detail.state === "start"){
+        the_app.splitter_state._akey_full = e.detail.group.akey;
+        the_app.set('splitter_state.group_a', e.detail.group);
+        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts or else have a mechanism for reseting the split.
+    } 
+    if(e.detail.point !== null){
+        the_app.splitter_state._point = e.detail.point;
+        the_app.set('splitter_state.metrics', {
+            x: e.detail.x,
+            y: e.detail.y,
+            w: e.detail.w
+        });       
+    }
+    if(e.detail.state === "update"){
+        if(the_app.splitter_state.group_b){
+            the_app.$.cut.undo();
+        }
+        let m = this.$.wave_plots.mask_at_vt(the_app.splitter_state._akey_full.array, the_app.splitter_state._point);
+        let group_num_a = the_app.splitter_state.group_a.group_num;
+        the_app.$.cut.split_group(group_num_a, m);
+        the_app.set('splitter_state.group_a', the_app.cut_groups[group_num_a]);
+        the_app.set('splitter_state.group_b', the_app.cut_groups[group_num_a + 1]);
+    }
+}
+
 
 the_app._merge_groups = function(e){
     if(the_app.tile_wall_is_empty){
@@ -27597,7 +27715,6 @@ the_app._grab_group = function(e){
     }
 
     // for simplicity we make new canvases for this tile
-    // note that they will evenutally be freed within _close_grabbed_tile.
     let cm = Utils.canvas_manager;
     let group = e.detail.group;
     this.push('grabbed_tiles', {
@@ -27648,6 +27765,13 @@ the_app.addEventListener('dom-change', function(){
         el._unlistenKeyEventListeners();
     }
 
+    the_app.set('splitter_state', {
+        group_a: null,
+        group_b: null,
+        metrics: null,
+        _akey_full: null,
+        _point: null
+    });
     the_app.set('grabber_mode', false);
 })
 

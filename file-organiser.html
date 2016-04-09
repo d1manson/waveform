@@ -324,6 +324,7 @@ Polymer({
                 });
         
         this.set('selected_cut', new_cut);
+        this.$.trial_list.notifyResize();
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;
         var old_sel = this._trial_from_base.get(this.selected_trial);

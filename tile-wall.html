@@ -44,6 +44,8 @@ background-color: rgba(0,0,0,0.2);
             spa_rm_height="[[options.spa_rm_height]]"
             active="{{_is_equal(item, active_group_a)}}"
             grabber_mode="[[grabber_mode]]"
+            splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}"
+            disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}"
             on-mouseenter="_mouseenter_tile"
             on-mouseleave="_mouseleave_tile"
             on-track="_track_tile"
@@ -85,11 +87,17 @@ background-color: rgba(0,0,0,0.2);
                 type: Boolean,
                 value: false,
                 notify: true
+            }, 
+            splitter_state: {
+                type: Object,
+                notify: true
             }
         },
         observers: [
             'groups_modified(groups.*)'
-        ], created: function(){
+        ], listeners: {
+            'mousedown': '_mousedown_splitter'
+        }, created: function(){
             this._scroll_bound = this._scroll.bind(this);
             this._failed_track_bound = this._failed_track.bind(this);
         }, groups_modified: function(change){
@@ -206,6 +214,17 @@ background-color: rgba(0,0,0,0.2);
                 target: this._track_state.tile_el
             };
             this._track_tile(my_event);
+        }, _metrics_if_splitting: function(group, state){
+            return (group === state.base.group_a || group === state.base.group_b) ? state.base.metrics : null;
+        }, _disabled_if_not_splitting: function(group, state){
+            return state.base.group_a && !(group === state.base.group_a || group === state.base.group_b);
+        }, _mousedown_splitter: function(e){
+            if(!this.splitter_state.metrics){
+                return;
+            }
+            this.fire('splitter', {
+                state: e.button === 0 ? 'finalize' : 'cancel'
+            });
         }
     });
 </script>

@@ -86,7 +86,9 @@ Polymer({
             observer: '_height_changed'
         }
     }, listeners: {
-        'mousemove': '_onmousemove'
+        'mousemove': '_onmousemove',
+        'mousedown': '_onmousedown',
+        'mouseup': '_onmouseup'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
@@ -109,19 +111,27 @@ Polymer({
             el_canv.style.imageRendering = "pixelated";          
         }
     }, _onmousemove: function(e){
-        e.canvas_point = this._get_point(e);
-        this.fire('canvas-mousemove', e);
-    }, _get_point: function(e){
+        this._fire_pointer_event(e, 'canvas-mousemove');
+    }, _onmouseup: function(e){
+        this._fire_pointer_event(e, 'canvas-mouseup');
+    }, _onmousedown: function(e){
+        this._fire_pointer_event(e, 'canvas-mousedown');
+    }, _fire_pointer_event: function(e, name){
         // TODO: might be nice to cache the metrics rather than recomputing from scratch each time
         let canv_el = Polymer.dom(this.root).firstChild;
         if(!canv_el){
             return;
         }
         let rect = canv_el.getBoundingClientRect();
-        return [
-            0 | ((e.clientY-rect.top)/rect.height*canv_el.height), 
-            0 | ((e.clientX-rect.left)/rect.width*canv_el.width)
+        e.offset_x = e.clientX-rect.left;
+        e.offset_y = e.clientY-rect.top;
+        e.canvas_width = rect.width;
+        e.canvas_height = rect.height;
+        e.canvas_point = [
+            0 | (e.offset_y/rect.height*canv_el.height), 
+            0 | (e.offset_x/rect.width*canv_el.width)
         ];
+        this.fire(name, e);
     }
 });
 

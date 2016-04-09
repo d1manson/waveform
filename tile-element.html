@@ -159,6 +159,7 @@ display: none;
 }
 :host(.active) .over{
 display: block;
+pointer-events: none;
 }
 :host(.active.moving.proximate){
 background-color: initial;
@@ -180,7 +181,9 @@ display: block;
 :host(.disabled){
 pointer-events: none;
 }
-
+:host(.active.splitting){
+/* cursor: none; */ /* TODO: this doesn't seem to update until after you mouseup, and anyway we actually do want the mouse when the mouse is up */;
+}
 </style>
 
 <template>
@@ -188,7 +191,10 @@ pointer-events: none;
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
-        <managed-canvas ckey="[[group_model.waves]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter"></managed-canvas>
+        <template is="dom-if" if="[[splitter_metrics]]">
+            <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
+        </template>
         <managed-canvas ckey="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
@@ -280,60 +286,39 @@ pointer-events: none;
                 type: Boolean,
                 value: false,
                 notify: true
+            },
+            splitter_metrics: {
+                type: Object,
+                value: null,
+                notify: true
             }
         },
         observers: [
-            '_update_state(active, moving, proximate, disabled)'
+            '_update_state(active, moving, proximate, disabled, splitter_metrics)',
         ], _show: function(val){ // for use in binding as style$='display:_show(val)', truthy vals are shown, falsey are hidden
             return val !== null && val !== "" && val >= 0 ? '' : 'display:none;';
-        }, update_cross_hair: function(canvasNum,x,y){
-            /* specify the x and y coordinates of the cross hair in canvas (css not pixel) coordinates.
-                if x is null/undefined, any existing crosshair will be removed.     */
-            var canv = Polymer.dom(this.root).querySelectorAll('canvas')[canvasNum];
-            var xh = canv.nextElementSibling
-            xh = xh && xh.tagName.toLowerCase() == "cross-hair" ? xh : null; //xh must be the cross-hair following the requested canvas or null if there isnt one
-            
-            if (xh && !(x==0 || x>0)){
-                xh.remove();
-            }else{
-                if(!xh){
-                    xh = document.createElement('cross-hair');
-                    xh.w = parseInt(getComputedStyle(canv).width);
-                    xh.setLeftTop(canv.offsetLeft,canv.offsetTop);
-                    Polymer.dom(canv.parentNode).insertBefore(xh, canv.nextElementSibling)//insert after the canvas
-                }
-                xh.setXY(x,y);
-            }
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
-        }, _update_state: function(active, moving, proximate, disabled){
+        }, _update_state: function(active, moving, proximate, disabled, splitter_metrics){
             // TODO: the various states may be entirely separable now (it was much, much worse in the past!)
+            if(disabled && moving){
+                throw "cannot disable tile while moving";
+            }
+                
             if(disabled){
-                if(moving)
-                    throw "cannot disable tile while moving";
-                this.set('active', false); // may have been true
-                this.classList.add('disabled');
-            } else if(moving){
-                this.classList.add('moving');
-                if(proximate){
-                    this.classList.add('proximate');
-                }else{
-                    this.classList.remove('proximate');
-                }
-            } else if(active){
-                this.classList.add('active');
-                this.classList.remove('disabled');
-                this.classList.remove('moving');
-                this.classList.remove('proximate');
-            } else {
-                this.classList.remove('active');
-                this.classList.remove('disabled');
-                this.classList.remove('moving');
-                this.classList.remove('proximate');
+                this.set('active', false); // may have been true. TODO: really?
+            } 
+
+            if(proximate && !moving){
+                console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
             }
 
-            if(proximate && !moving)
-                console.warn("tile for group " + this.group_num + " cannot be proximate unless it is moving");
+            moving ? this.classList.add('moving') : this.classList.remove('moving');
+            proximate ? this.classList.add('proximate') : this.classList.remove('proximate');
+            splitter_metrics ? this.classList.add('splitting') : this.classList.remove('splitting');
+            disabled ? this.classList.add('disabled') : this.classList.remove('disabled');
+            active ? this.classList.add('active') : this.classList.remove('active');
+
         }, shake: function(){
             this.cancelAnimation();
             this.playAnimation('shake');
@@ -351,6 +336,53 @@ pointer-events: none;
                 src_client_x: rect.left,
                 src_client_y: rect.top,
                 group: this.group_model
+            });
+        }, _mousedown_splitter: function(e){
+            if(e.detail.button === 0){
+                return; // left click either irrelevant or handled by tile-wall itself
+            }
+
+            let detail = {
+                state: '',
+                group: this.group_model,
+                point: e.detail.canvas_point,
+                x: e.detail.offset_x,
+                y: e.detail.offset_y,
+                w: e.detail.canvas_width
+            };
+
+            e.detail.stopPropagation(); // a bit hacky, but prevents raw mouse-down event from propagating to tile-wall
+            detail.state = this.splitter_metrics ? 'move' : 'start';
+            this.fire('splitter', detail);
+            this._splitter_el = e.target;
+            if(!this._mousemove_splitter_bound){
+                this._mousemove_splitter_bound = this._mousemove_splitter.bind(this);
+                this._mouseup_splitter_bound = this._mouseup_splitter.bind(this)
+            }
+            this._splitter_el.addEventListener('canvas-mousemove', this._mousemove_splitter_bound);
+            this._splitter_el.addEventListener('canvas-mouseup', this._mousemove_splitter_bound);  // this just goes to mousemove, and then ...
+            document.addEventListener('mouseup', this._mouseup_splitter_bound); // we actually process the up on the document
+
+        }, _mouseup_splitter: function(e){
+            document.removeEventListener('mouseup', this._mouseup_splitter_bound);
+            this._splitter_el.removeEventListener('canvas-mousemove', this._mousemove_splitter_bound);
+            this._splitter_el.removeEventListener('canvas-mouseup', this._mousemove_splitter_bound);
+            this.fire('splitter', {
+                state: 'update',
+                group: this.group_model,
+                point: null,
+                x: null,
+                y: null,
+                w: null
+            });
+        }, _mousemove_splitter: function(e){
+            this.fire('splitter', {
+                state: 'move',
+                group: this.group_model,
+                point: e.detail.canvas_point,
+                x: e.detail.offset_x,
+                y: e.detail.offset_y,
+                w: e.detail.canvas_width
             });
         }
     });

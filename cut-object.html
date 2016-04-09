@@ -452,7 +452,7 @@ doesn't have a worker, but it uses a similar system.
                                           this.groups[delta.a+1].akey.array)
                 var inds = packed[0];
                 // update group_nums in preparation for announcing splice
-                for(let ii=delta.a+1; a<this.groups.length; ii++){
+                for(let ii=delta.a+1; ii<this.groups.length; ii++){
                     this.groups[ii] && (this.groups[ii].group_num = ii-1);
                 }
                 this.splice('groups', delta.a, 2, this._make_okey(inds, delta.a));
@@ -498,8 +498,8 @@ doesn't have a worker, but it uses a similar system.
                 // we could have kept the mask originally, but we didn't
                 var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 delete delta['mask'];
-                for(let ii=delta.a+1; ii<this.groups.length; i++){
-                    this.groups[ii] && (groups[ii].group_num = ii+1);
+                for(let ii=delta.a+1; ii<this.groups.length; ii++){
+                    this.groups[ii] && (this.groups[ii].group_num = ii+1);
                 }
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a), this._make_okey(new_arrs[1], delta.a+1));
                 success = true;

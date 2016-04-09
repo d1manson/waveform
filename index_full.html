@@ -502,8 +502,10 @@ background-color: rgba(0,0,0,0.2);
             active_group_b="{{active_group_b}}"
             grabber_mode="[[grabber_mode]]"
             is_empty="[[tile_wall_is_empty]]"
+            splitter_state="[[splitter_state]]"
             on-merge_groups="_merge_groups"
             on-grab_group="_grab_group"
+            on-splitter="_splitter"
             ></tile-wall>
 
     </div>
@@ -593,7 +595,7 @@ background-color: rgba(0,0,0,0.2);
         show="[[options.show_tac]]"
         want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
-    <wave-plots
+    <wave-plots id="wave_plots"
         groups="{{cut_groups}}" 
         data_for_gl="[[data_for_gl]]"
         palette_mode="[[options.waves_render_mode]]"
@@ -668,6 +670,47 @@ the_app._sanitize_options = function(stored_options) {
     }
     return opts;
 }
+
+the_app._splitter = function(e){
+    if(e.detail.state === "finalize" || e.detail.state === "cancel"){
+        if(e.detail.state === "cancel"){
+            if(the_app.splitter_state.group_b){
+                the_app.$.cut.undo();
+            }
+        }
+        the_app.splitter_state._akey_full = null;
+        the_app.set('splitter_state.group_a', null);
+        the_app.set('splitter_state.group_b', null);
+        the_app.set('splitter_state.metrics', null);
+        this.set('disable_shortcuts', false);
+        return;
+    }
+
+    if(e.detail.state === "start"){
+        the_app.splitter_state._akey_full = e.detail.group.akey;
+        the_app.set('splitter_state.group_a', e.detail.group);
+        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts or else have a mechanism for reseting the split.
+    } 
+    if(e.detail.point !== null){
+        the_app.splitter_state._point = e.detail.point;
+        the_app.set('splitter_state.metrics', {
+            x: e.detail.x,
+            y: e.detail.y,
+            w: e.detail.w
+        });       
+    }
+    if(e.detail.state === "update"){
+        if(the_app.splitter_state.group_b){
+            the_app.$.cut.undo();
+        }
+        let m = this.$.wave_plots.mask_at_vt(the_app.splitter_state._akey_full.array, the_app.splitter_state._point);
+        let group_num_a = the_app.splitter_state.group_a.group_num;
+        the_app.$.cut.split_group(group_num_a, m);
+        the_app.set('splitter_state.group_a', the_app.cut_groups[group_num_a]);
+        the_app.set('splitter_state.group_b', the_app.cut_groups[group_num_a + 1]);
+    }
+}
+
 
 the_app._merge_groups = function(e){
     if(the_app.tile_wall_is_empty){
@@ -943,6 +986,13 @@ the_app.addEventListener('dom-change', function(){
         el._unlistenKeyEventListeners();
     }
 
+    the_app.set('splitter_state', {
+        group_a: null,
+        group_b: null,
+        metrics: null,
+        _akey_full: null,
+        _point: null
+    });
     the_app.set('grabber_mode', false);
 })
 

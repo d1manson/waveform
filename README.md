@@ -125,4 +125,8 @@ Using events as a means of mutating state is un-Polymeric, and we avoid using th
 
 * `floating-pane.close` - issued when a floating pane is `toggled` into the close state.  This is used by `index.html` to splice out grabbed tiles from `the_app.grabbed_tiles` array when they are closed.
 
+* `managed-canvas.canvas-mouseup` and `-mousedown` and `-mousemove` - has a `canvas_point` property which is a 2-element array giving the position of the cursor in canvas pixels (i.e. not css pixels).
+
+* `tile-wall.splitter` (from self and from child `tile-element`s) - the splittler tool is a bit complicated because its implementation is spread over many files.  There is a `splitter_state` property on `the_app` which is modified in `index.html` in response to the `splitter` events from the `tile-wall`, and this state value is not modified anywhere else, i.e. the `tile-wall` and `tile-element` only read it.  There are several stages to the splitting process: `start`, several `moves` and `update`s, and then `finalize` or `cancel`.  The first three classes are produced by the `tile-element` whereas the latter two are produced by the `tile-wall`, but this distinction is not visible to `index.html`. 
+
 
