@@ -1013,7 +1013,6 @@ Polymer({
             (idx > -1) && this.splice('want_data_for_gl', idx, 1);
 
             this._renderer.set_show('n');
-            let cm = Utils.canvas_manager;
             for(let okey of this.groups) if(okey && okey.waves){
                 this.set('groups.' + okey._pkey + '.waves', null);
             }
@@ -1024,8 +1023,6 @@ Polymer({
     }, _palette_mode_changed: function(){
         this._renderer.set_mode(this.palette_mode);
     }, _update_okeys: function(okeys_to_remove, okeys_to_add){
-        var cm = Utils.canvas_manager;
-
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
         for(let okey of okeys_to_remove) if(okey && okey.waves){

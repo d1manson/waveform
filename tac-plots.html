@@ -153,7 +153,7 @@ var get_group_hist = function(pkey){
                         render_options.max_delta_t/1000*timebase/render_options.n_bins);
     
     hist = plot_histogram(hist, render_options.height);
-    let opts = clone_simple(render_options);
+    let opts = Object.assign({}, render_options);
     pkey_to_rendered_options.set(pkey, opts);
     exec_main_b('plot_hist', {
         pkey: pkey,
@@ -210,9 +210,6 @@ var pick = function(from, indices){
     return result;
 }
 
-var clone_simple = function(obj){
-    return JSON.parse(JSON.stringify(obj));
-}
 
 var is_equal_simple = function(a, b){
     // very simple....
@@ -352,8 +349,6 @@ var is_equal_simple = function(a, b){
             // Here we check whether the rendered options match what we currently
             // want, and if so we set the visible okey.tac property from the
             // okey._tac_other value. We also deal with hiding canvases on show='n'.
-            let cm = Utils.canvas_manager;
-
             for(let okey of okeys) if(okey){
                 // are the okey.rm_x and okey._rm_x_other the same?
                 let same = okey.tac === okey._tac_other;

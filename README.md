@@ -100,16 +100,29 @@ Before we dive into all the details of the cut, note that the `file-organiser` e
 
 TODO: finish giving the intro, including something like the following...
 
-There are a bunch of things called "keys", used for refering to specific objects in specific ways:
+There are a bunch of things called "keys", used for refering to specific objects in specific ways. Some of these could perhaps be encapsualted as classes, but as it stands they are all simple objects/strings which makes life easier (in particular I'm not sure how good Polymer's support is for non-basic objects):
 
-* okey - each immutable list of cut group indicies exists within an object that we refer to as an "okey", and the term is reserved for such objects. When only working on the main thread we often use this okey as the key in an ES6 `Map`, but when dealing with worker threads we have to resort to talking abou the "pkey"...
+* okey - each immutable list of cut group indicies exists within an object box that we refer to as an "okey", and the term is reserved for such objects. When only working on the main thread we often use this okey as the key in an ES6 `Map`/`Set`, but when dealing with worker threads we have to resort to talking about the "pkey"...
 
-* pkey - Polymer.Collection assigns a key to each unique item that it encounters, whether that item is an object or string/number (I actually don't know the full details of this despite having stared at the code for a while).  Here we have monkey-patched `Polymer.Collection` so that objects with a `._pkey` property will have that property set to the collection's key value when added to the collection. We sometimes request and use this key in our own code, particularlly when communicating between worker and main thread.  It always refers to a particular "box" arround an immutable list of cut indices, or rather to the immutable cut indices themselves.  Note that the key is only unique within the cut array..two different cut arrays will (in general) reuse the same key names for entirely different data.  We thus often qualify the "key" with a "generation" number.  See cut-obj or tac-plots for details.
+* pkey - `Polymer.Collection` assigns a key to each unique item that it encounters, whether that item is an object or string/number (I actually don't know the full details of this despite having stared at the code for a while).  Here we have monkey-patched `Polymer.Collection` so that objects with a `._pkey` property will have that property set to the collection's key value when added to the collection. We sometimes request and use this key in our own code, particularlly when communicating between worker and main thread.  It always refers to a particular "box" arround an immutable list of cut indices, or rather to the immutable cut indices themselves.  Note that the key is only unique within the cut array..two different cut arrays will (in general) reuse the same key names for entirely different data.  We thus often qualify the "key" with a "generation" number.  See cut-obj or tac-plots for details.
 
-* akey - when we store typed arrays as polymer component properties, we do not use the array directly, but instead store the array with the "typed-array-manager", which then gives us an "akey" with which to refer to it. These akeys are strings with the prefix " (ta-manager)".  They are fully unique.
+* akey - a box around an `array`, which is a `TypedArray`.  `Utils.typed_array_manager` offers some methods for working with these.
 
-* ckey - a box around an actual dom `canvas` element.
+* ckey - a box around an actual dom `canvas` element. `Utils.canvas_manager` offers some methods for working with these, and the `managed-canvas` element provides an easy way of inserting the canvas into the dom. Note that a dom element can only be in one place in the dom at any given time.
 
-* fkey - a box around a `File` instance. Also includes an `id`, which counts up from 1 at the start of the program. On worker threads, it is the `id` which is refered to as an `fkey` rather than the obejct itself.
+* fkey - a box around a `File` instance. Also includes an `id`, which counts up from 1 at the start of the program. On worker threads, it is the `id` which is refered to as an `fkey` rather than the object itself, although the distinction isn't always correctly made in variable names (specfically in the `parsed-data` main thread code).  `Utils.file_manager` offers some methods for working with these.
+
+
+### Custom Events
+
+Using events as a means of mutating state is un-Polymeric, and we avoid using them as much as possible. However there are a few cases where they seem to be the cleanest solution:
+
+* `cut-object.fork` - issued when a cut file/null-cut is mutated by the user, so that it now has an actual stack of changes and constitues something that can be saved by dragging back to the desktop.  The main listener of this event is the `file-organiser` as it needs to create a new psuedo-file in its list of files.  But `parsed-data` also listens to the event so that it knows to treat the `file-organiser`'s new object as in fact the same as the original un-forked version.
+
+* `tile-wall.merge_groups` - issued when the user has performed an action requiring two groups to be merged. The actual change is not implemented by the `tile-wall`, rather the event and its detail are passed to the `cut-object` element via a listener in `index.html`.
+
+* `tile-wall.grab_group` - issued when the user has performed an action requring a group's tile to be "grabbed". The actual copying etc. is done by `index.html`.
+
+* `floating-pane.close` - issued when a floating pane is `toggled` into the close state.  This is used by `index.html` to splice out grabbed tiles from `the_app.grabbed_tiles` array when they are closed.
 
 

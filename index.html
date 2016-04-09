@@ -16774,17 +16774,6 @@ Utils.parse_splices = function(splices, give_moved){
 }
 
 
-
-// simplel clone is for when there's nothing complicated to think about
-Utils.simple_clone = function(a){
-    var b = {};
-    for(aa in a){
-        b[aa] = a[aa];
-    }
-    return b;
-};
-
-
 Utils.deep_clone = function(obj){
     // this doesn't bother realing with self-referential things, but it
     // does tolerate things that wouldn't work with JSON.parse(JSON.stringify)
@@ -16878,35 +16867,15 @@ Utils.regex_from_list = function(a){
 Utils.typed_array_manager = (function(){
     // This is a thin wrapper around a map
 
-    var store = new Map();
-    var last_akey = 0;
-    var suffix = " (ta-manager)"; // can drop suffix using parseInt
-    var validate_akey = function(akey){
-        if((akey + "").indexOf(suffix) === -1)
-            throw "typed-array-manager was passed invalid akey";
-        return true;
-    }
-
     return {
-        store_array: function(arr){
-            store.set(++last_akey, arr);
-            return last_akey + suffix;
-        },
-        get_array: function(akey){
-            if(!akey) return
-            return validate_akey(akey) && store.get(parseInt(akey));
+        to_akey: function(arr){
+            return {array: arr};
         },
         get_array_clone: function(akey){
             // note that the clone is not put in the store. It is
             // inteded to be used when dealing with workers, and needing to 
             // transfer an array in its intereity to another thread.
-            if(!akey) return
-            var a = this.get_array(akey);
-            return a && new a.constructor(a);
-        },
-        free_array: function(akey){
-            validate_akey(akey);
-            store.delete(parseInt(akey));
+            return akey && akey.array && new akey.array.constructor(akey.array);
         }
     };
 
@@ -17664,8 +17633,6 @@ cursor: default;
     CutStackState.prototype.get_blob_url = function(experiment_name){
         // This methods is called by file-organiser when dragging starts
 
-        var am = Utils.typed_array_manager;
-
         // build the 1d array that gives the group number for each spike...
 
         // I'm not sure if total n_spikes is already avialble somehwere, but hey...
@@ -17680,7 +17647,7 @@ cursor: default;
             if(!gg){
                 continue;
             }
-            let inds = am.get_array(gg.akey);
+            let inds = gg.akey.array;
             for(let jj=0; jj<inds.length; jj++){
                 the_cut[inds[jj]] = ii;
             }
@@ -17745,7 +17712,7 @@ cursor: default;
                 group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
-                akey: Utils.typed_array_manager.store_array(inds),
+                akey: Utils.typed_array_manager.to_akey(inds),
 
                 // Theses properties are visualized by the tile element
                 n_spikes: inds.length,
@@ -17776,11 +17743,9 @@ cursor: default;
             };
         },
         _use_cut_box: function(){
-            var m = Utils.typed_array_manager;
-
             if (this.cut_box && this.cut_box.is === "file"){
                 // construct from file
-                let akey = m.get_array(this.cut_box.akey);
+                let akey = this.cut_box.akey.array;
 
                 // find out how many indices for each group
                 let group_n = bin_count(akey, 255);
@@ -17861,7 +17826,7 @@ cursor: default;
                 // cause any changes as all the values will be the same.
 
                 // we could hold the reference directly, but it complciates matters when doing bulk updates of trials
-                let new_cut = Utils.file_manager.store_file(new CutStackState(this)); 
+                let new_cut = new CutStackState(this); 
                 this.fire('fork', new_cut);
             }
         }, swap_groups: function(a, b){
@@ -17915,10 +17880,8 @@ cursor: default;
         },
         split_group: function(a, mask){
             this._fork_if_needed();
-            var m = Utils.typed_array_manager;
 
-            var new_arrs = mask_split(m.get_array(this.groups[a].akey), mask);
-            m.free_array(this.groups[a].akey);
+            var new_arrs = mask_split(this.groups[a].akey.array, mask);
             // update group_nums in preparation for announcing splice
             for(let ii=a+1; ii<this.groups.length; ii++){
                 this.groups[ii] && (this.groups[ii].group_num = ii+1);
@@ -17936,7 +17899,6 @@ cursor: default;
         merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
             this._fork_if_needed();
-            var m = Utils.typed_array_manager;
 
             // make life easier, fix b>a
             if(a>b){
@@ -17945,12 +17907,9 @@ cursor: default;
                 b = tmp;
             }
 
-            var packed = merge_sorted(m.get_array(this.groups[a].akey), 
-                                   m.get_array(this.groups[b].akey))
+            var packed = merge_sorted(this.groups[a].akey.array, 
+                                      this.groups[b].akey.array)
             var inds = packed[0], mask = packed[1];
-
-            m.free_array(this.groups[a].akey);
-            m.free_array(this.groups[b].akey);
 
             this.splice('groups', b, 1, null);
             this.splice('groups', a, 1, this._make_okey(inds, a));
@@ -17966,15 +17925,13 @@ cursor: default;
             this.push('undo_stack_descriptions', 'merge groups ' + a + ' and ' + b);
         },
         undo: function(){
-            var m = Utils.typed_array_manager;
             var delta = this.undo_stack[this.undo_stack.length-1];
             var success = false;
 
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
-                m.free_array(this.groups[delta.a].akey);
+                var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 this.splice('groups', delta.a, 1, this._make_okey(new_arrs[0], delta.a));
                 this.splice('groups', delta.b, 1, this._make_okey(new_arrs[1], delta.b));
                 delete delta['mask']; // not absolutely neccessary, but we don't need it now
@@ -17983,11 +17940,9 @@ cursor: default;
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
-                                          m.get_array(this.groups[delta.a+1].akey))
+                var packed = merge_sorted(this.groups[delta.a].akey.array, 
+                                          this.groups[delta.a+1].akey.array)
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].akey);
-                m.free_array(this.groups[delta.a+1].akey);
                 // update group_nums in preparation for announcing splice
                 for(let ii=delta.a+1; a<this.groups.length; ii++){
                     this.groups[ii] && (this.groups[ii].group_num = ii-1);
@@ -18014,7 +17969,6 @@ cursor: default;
 
         },
         redo: function(){
-            var m = Utils.typed_array_manager;
             var delta = this.redo_stack[this.redo_stack.length-1];
             if(!delta)
                 return;
@@ -18023,11 +17977,9 @@ cursor: default;
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var packed = merge_sorted(m.get_array(this.groups[delta.a].akey), 
-                                          m.get_array(this.groups[delta.b].akey));
+                var packed = merge_sorted(this.groups[delta.a].akey.array, 
+                                          this.groups[delta.b].akey.array);
                 var inds = packed[0];
-                m.free_array(this.groups[delta.a].akey);
-                m.free_array(this.groups[delta.b].akey);
                 this.splice('groups', delta.b, 1, null);
                 this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
                 delta.mask = packed[1];
@@ -18036,9 +17988,8 @@ cursor: default;
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var new_arrs = mask_split(m.get_array(this.groups[delta.a].akey), delta.mask);
+                var new_arrs = mask_split(this.groups[delta.a].akey.array, delta.mask);
                 delete delta['mask'];
-                m.free_array(this.groups[delta.a].akey);
                 for(let ii=delta.a+1; ii<this.groups.length; i++){
                     this.groups[ii] && (groups[ii].group_num = ii+1);
                 }
@@ -18472,7 +18423,7 @@ var got_ports = function(ports){
         }
         
         // pre-emptively add to the record of main cache and decide what, if anything, to remove
-        main_cached_opts.add(options);
+        main_cached_opts.add(Object.assign({}, options));
         var delete_from_cache;
         if(main_cached_opts.size > max_cache_size){
             delete_from_cache = main_cached_opts.keys().next().value;
@@ -19076,7 +19027,8 @@ var got_ports = function(ports){
         // check to see if main cache actually holds any of the requested data 
         var options = e.data.options;       
         options.fkey = fkey;
-        for(var cached_opts of main_cached_opts){
+        let cached_opts;
+        for(cached_opts of main_cached_opts){
             if(cached_opts.fkey === fkey){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
@@ -19104,8 +19056,8 @@ var got_ports = function(ports){
             cached_opts = {fkey: fkey};
             main_cached_opts.add(cached_opts);
             if(main_cached_opts.size > max_cache_size){
-                var delete_from_cache = main_cached_opts.keys().next().value;
-                exec_main('delete_from_tet_cache', delete_from_cache);
+                let delete_from_cache = main_cached_opts.keys().next().value;
+                exec_main('delete_from_tet_cache', delete_from_cache.fkey);
                 main_cached_opts.delete(delete_from_cache);
             }
         }
@@ -19757,9 +19709,9 @@ var parse_clu_file = function(full_str, fkey){
         }, got_pos: function(msg, arrays){
             var am = Utils.typed_array_manager;
             var result = {
-                xy: am.store_array(arrays['xy']),
-                dir: am.store_array(arrays['dir']),
-                speed: am.store_array(arrays['speed']),
+                xy: am.to_akey(arrays['xy']),
+                dir: am.to_akey(arrays['dir']),
+                speed: am.to_akey(arrays['speed']),
                 header: msg.header
             };
             msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
@@ -19851,7 +19803,7 @@ var parse_clu_file = function(full_str, fkey){
             var am = Utils.typed_array_manager;
             this._cut_from_fkey.set(msg.fkey,{
                 header: msg.header,
-                cut: am.store_array(arrays['cut'])
+                cut: am.to_akey(arrays['cut'])
             });
             if(this._fkey_ids.cut === msg.fkey){
                 this._setCut_box({
@@ -19880,7 +19832,7 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.gl_data = {
                 n: msg.n_spikes,
-                voltages: am.store_array(arrays.data)
+                voltages: am.to_akey(arrays.data)
             };
             if(msg.fkey === this._fkey_ids.tet){
                 this._setData_for_gl(cached.gl_data);
@@ -19894,7 +19846,7 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.amps = {
                 n: msg.n_spikes,
-                amps: am.store_array(arrays.data),
+                amps: am.to_akey(arrays.data),
                 chan_is_ok: msg.chan_is_ok
             };
             if(msg.fkey === this._fkey_ids.tet){
@@ -19910,7 +19862,7 @@ var parse_clu_file = function(full_str, fkey){
             cached.times = {
                 n: msg.n_spikes,
                 timebase: msg.timebase,
-                times: am.store_array(arrays.data)
+                times: am.to_akey(arrays.data)
             };
             if(msg.fkey === this._fkey_ids.tet){
                 this._setSpike_times(cached.times);
@@ -23721,10 +23673,6 @@ var pick = function(from, indices){
     return result;
 }
 
-var clone_simple = function(obj){
-    return JSON.parse(JSON.stringify(obj));
-}
-
 var is_equal_simple = function(a, b){
     // very simple....
     if((a && !b) || (!a && b)){
@@ -23922,8 +23870,6 @@ var use_mask = function(vector, mask, val){
             this._show_changed(this.show);
         }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
-            var cm = Utils.canvas_manager;
-
             var added_arrays = {};
             var pkeys_to_add = []; 
             if (this.show.indexOf('y') > -1){
@@ -23965,8 +23911,6 @@ var use_mask = function(vector, mask, val){
             // Here we check whether the rendered options match what we currently
             // want, and if so we set the visible okey.rm_x property from the
             // okey._rm_x_other value. We also deal with hiding canvases on show='n'.
-            let cm = Utils.canvas_manager;
-
             for(let okey of okeys) if(okey){
                 let op; // 0 : no-op, +1 : use _other values, -1: set to null
                 let same; // are the okey.rm_x and okey._rm_x_other the same?
@@ -24007,7 +23951,6 @@ var use_mask = function(vector, mask, val){
             }
 
         }, _options_modified: function(){
-            let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
             this._options.smoothing_spa_bins = this.smoothing_spa_bins;
             this._options.max_rate_spa = this.max_rate_spa;
@@ -24067,9 +24010,8 @@ var use_mask = function(vector, mask, val){
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
-            let cm = Utils.canvas_manager;
             this._blank_pos_path = null;
-            this._setPos_path(null);
+            this._setPos_path(null); // TODO: might want to dealy this somehwo to avoid flash of null when changing settings
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);
@@ -24346,7 +24288,7 @@ var get_group_hist = function(pkey){
                         render_options.max_delta_t/1000*timebase/render_options.n_bins);
     
     hist = plot_histogram(hist, render_options.height);
-    let opts = clone_simple(render_options);
+    let opts = Object.assign({}, render_options);
     pkey_to_rendered_options.set(pkey, opts);
     exec_main_b('plot_hist', {
         pkey: pkey,
@@ -24403,9 +24345,6 @@ var pick = function(from, indices){
     return result;
 }
 
-var clone_simple = function(obj){
-    return JSON.parse(JSON.stringify(obj));
-}
 
 var is_equal_simple = function(a, b){
     // very simple....
@@ -24545,8 +24484,6 @@ var is_equal_simple = function(a, b){
             // Here we check whether the rendered options match what we currently
             // want, and if so we set the visible okey.tac property from the
             // okey._tac_other value. We also deal with hiding canvases on show='n'.
-            let cm = Utils.canvas_manager;
-
             for(let okey of okeys) if(okey){
                 // are the okey.rm_x and okey._rm_x_other the same?
                 let same = okey.tac === okey._tac_other;
@@ -26031,8 +25968,6 @@ WavesRenderer.prototype._upload_okey_data = function(){
         xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256;
     }
 
-    var m = Utils.typed_array_manager;
-
     if(this._mode === 'density'){
         // just need to provide x and y
 
@@ -26040,7 +25975,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i16 = new Uint16Array(data_i8.buffer);
 
         for(let ii=1; ii<okeys.length; ii++){
-            let inds = m.get_array(okeys[ii].akey);
+            let inds = okeys[ii].akey.array;
             let xy = xy_offset_gl_i16[ii];
             for(let jj=0; jj<inds.length; jj++){
                 data_i16[(inds[jj]<<1) +0] = xy;
@@ -26056,7 +25991,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
         var data_i16 = new Uint16Array(data_i8.buffer);
     
         for(let ii=1; ii<okeys.length; ii++){
-            let inds = m.get_array(okeys[ii].akey);
+            let inds = okeys[ii].akey.array;
             let xy = xy_offset_gl_i16[ii];
             let gx = okeys[ii].group_num |  (xy << 8); 
             let yg = ((0xff00 & xy) >>> 8) | (okeys[ii].group_num << 8);
@@ -26432,12 +26367,11 @@ Polymer({
         // note that if gl data was avaialble and then we turned off show we will
         // get a null-ing event the next time the tet file changes...which is good.
         let is_null = !(this.data_for_gl && this.data_for_gl.voltages);
-        let am = Utils.typed_array_manager;
         this._renderer_has_voltages = false;
         if(is_null || this.show_chans === "yyyy"){ 
             this._renderer_has_voltages = true;
             this._renderer.set_n(this.data_for_gl && this.data_for_gl.n);
-            this._renderer.set_voltage_data(am.get_array(this.data_for_gl && this.data_for_gl.voltages));   
+            this._renderer.set_voltage_data(this.data_for_gl && this.data_for_gl.voltages && this.data_for_gl.voltages.array);   
         } 
     }, _show_chans_changed: function(show_chans){
         if(!this.want_data_for_gl){
@@ -26460,7 +26394,6 @@ Polymer({
             (idx > -1) && this.splice('want_data_for_gl', idx, 1);
 
             this._renderer.set_show('n');
-            let cm = Utils.canvas_manager;
             for(let okey of this.groups) if(okey && okey.waves){
                 this.set('groups.' + okey._pkey + '.waves', null);
             }
@@ -26471,8 +26404,6 @@ Polymer({
     }, _palette_mode_changed: function(){
         this._renderer.set_mode(this.palette_mode);
     }, _update_okeys: function(okeys_to_remove, okeys_to_add){
-        var cm = Utils.canvas_manager;
-
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
         for(let okey of okeys_to_remove) if(okey && okey.waves){

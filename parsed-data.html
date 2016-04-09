@@ -258,7 +258,7 @@ var got_ports = function(ports){
         }
         
         // pre-emptively add to the record of main cache and decide what, if anything, to remove
-        main_cached_opts.add(options);
+        main_cached_opts.add(Object.assign({}, options));
         var delete_from_cache;
         if(main_cached_opts.size > max_cache_size){
             delete_from_cache = main_cached_opts.keys().next().value;
@@ -862,7 +862,8 @@ var got_ports = function(ports){
         // check to see if main cache actually holds any of the requested data 
         var options = e.data.options;       
         options.fkey = fkey;
-        for(var cached_opts of main_cached_opts){
+        let cached_opts;
+        for(cached_opts of main_cached_opts){
             if(cached_opts.fkey === fkey){
                 // bump in FIFO
                 main_cached_opts.delete(cached_opts);
@@ -890,8 +891,8 @@ var got_ports = function(ports){
             cached_opts = {fkey: fkey};
             main_cached_opts.add(cached_opts);
             if(main_cached_opts.size > max_cache_size){
-                var delete_from_cache = main_cached_opts.keys().next().value;
-                exec_main('delete_from_tet_cache', delete_from_cache);
+                let delete_from_cache = main_cached_opts.keys().next().value;
+                exec_main('delete_from_tet_cache', delete_from_cache.fkey);
                 main_cached_opts.delete(delete_from_cache);
             }
         }
@@ -1263,7 +1264,7 @@ var parse_clu_file = function(full_str, fkey){
         properties: {
             selected_files: {
                 type: Object,
-                value: function(){return {set: 0, pos: 0, tet: 0, cut: 0}},
+                value: function(){return {set: null, pos: null, tet: null, cut: null}}, //fkeys
                 notify: true,
                 observer: '_change_to_files'
             },
@@ -1377,7 +1378,7 @@ var parse_clu_file = function(full_str, fkey){
             '_tet_options_changed(want_spike_times.splices, want_data_for_gl.splices, want_amplitudes.splices)'
         ], created: function(){
             this._files = {}; // set, tet, pos, cut
-            this._fkeys = {}; // set, tet, pos, cut
+            this._fkey_ids = {}; // set, tet, pos, cut
             this._cut_from_fkey = new Map();
             this._set_from_fkey = new Map();
             this._pos_from_options = new Map(); // key=options object giving fkey and parse options; value= {header, xy, dir, speed}
@@ -1422,22 +1423,27 @@ var parse_clu_file = function(full_str, fkey){
             // cut object will find that each inidvidual property is the same as before, so will not actually do anything.
             // Another thing to note is that file_selection is updated from within a debounce in file-organiser, which ensures
             // that this event handler is called before the file-organiser notifies us of the change.
-            this._fkeys.cut = e.detail;
-            this._files.cut = Utils.file_manager.get_file(this._fkeys.cut);
+            this._fkey_ids.cut = null;
+            this._files.cut = e.detail;
             this._setCut_box(this._files.cut);
         }, _change_to_files: function(new_fkeys){
-            // nullify things that are changing... (note we this._fkeys rather than 2nd argument, old_fkeys due to _cut_forked)
+            // nullify things that are changing... (note we use this._fkey_ids rather than 2nd argument, old_fkeys due to _cut_forked)
             var changing = new Set();
             for(let k of ['tet','cut','pos','set']){
-                if(!this._fkeys[k] || this._fkeys[k] !== new_fkeys[k]){
+                if(!this._files[k] || !new_fkeys[k] || this._fkey_ids[k] !== new_fkeys[k].id){
                     changing.add(k);
-                    this._files[k] = Utils.file_manager.get_file(new_fkeys[k]) || null;
+                    if(new_fkeys[k]){
+                        this._files[k] = new_fkeys[k].file || new_fkeys[k]; // cut sometimes isn't an fkey but a CutStackState
+                        this._fkey_ids[k] = new_fkeys[k].id;       
+                    } else {
+                        this._files[k] = null;
+                        this._fkey_ids[k] = null;      
+                    }
                 }
             }
-            if(changing.has('tet') && this._fkeys.cut && this._fkeys.cut.is === "n"){
+            if(changing.has('tet') && this._files.cut && this._files.cut.is === "n"){
                 changing.add('cut');
             }
-            this._fkeys = Utils.simple_clone(new_fkeys);
             
             if(changing.has('set')){
                 this._setDuration(null);
@@ -1465,45 +1471,45 @@ var parse_clu_file = function(full_str, fkey){
 
             if(changing.has('set')){
                 request['set'] = null;
-                if(new_fkeys.set && this._set_from_fkey.has(new_fkeys.set)){
-                    this._use_set(this._set_from_fkey.get(new_fkeys.set));
+                if(this._files.set && this._set_from_fkey.has(this._fkey_ids.set)){
+                    this._use_set(this._set_from_fkey.get(this._fkey_ids.set));
                 } else {
                     request['set'] = this._files.set;
-                    request['set_fkey'] = new_fkeys.set;
+                    request['set_fkey'] = this._fkey_ids.set;
                 }
             }
 
             if(changing.has('cut')){
                 this._make_cut_from_n = false;
                 request['cut'] = null;
-                if(!new_fkeys.cut){
+                if(!this._files.cut){
                     this._make_cut_from_n = true; // we have already guaranteed that changing has 'tet'
                                                   // though if there's no tet file we will never get to make the cut
                 } else if(this._files.cut.is === "stack"){
                     // new_values.cut is an fkey for a "fake" file, which is actually a cut "stack" object
                     this._setCut_box(this._files.cut); //easy
                 } else {
-                    // new_fkeys.cut is an fkey for a proper file
-                    if(this._cut_from_fkey.has(new_fkeys.cut)){
+                    // this._files.cut is an fkey for a proper file
+                    if(this._cut_from_fkey.has(this._fkey_ids.cut)){
                         // create box from cached inds and header
                         this._setCut_box({
                             is: 'file',
-                            akey: this._cut_from_fkey.get(new_fkeys.cut).cut,
-                            header: this._cut_from_fkey.get(new_fkeys.cut).header
+                            akey: this._cut_from_fkey.get(this._fkey_ids.cut).cut,
+                            header: this._cut_from_fkey.get(this._fkey_ids.cut).header
                         });
                     } else {
                         request['cut'] = this._files.cut;
-                        request['cut_fkey'] = new_fkeys.cut;
+                        request['cut_fkey'] = this._fkey_ids.cut;
                     }
                 }
             }
 
             if(changing.has('pos')){
                 request['pos'] = null;
-                if(new_fkeys.pos){
+                if(this._files.pos){
                     var in_cache = false;
                     var pos_options = this._make_pos_options();
-                    pos_options.fkey = new_fkeys.pos;
+                    pos_options.fkey = this._fkey_ids.pos;
                     for(let [cached_opts, data] of this._pos_from_options){
                         if(Utils.is_equal_simple(cached_opts, pos_options)){
                             this._use_pos(data);
@@ -1514,13 +1520,13 @@ var parse_clu_file = function(full_str, fkey){
                     if(!in_cache){
                         request['pos'] = this._files.pos;
                         options['pos'] = this._make_pos_options();
-                        request['pos_fkey'] = new_fkeys.pos;
+                        request['pos_fkey'] = this._fkey_ids.pos;
                     }
                 }
             }
 
             if(changing.has('tet')){
-                this._make_tet_request(new_fkeys.tet, this._files.tet, request, options);
+                this._make_tet_request(this._fkey_ids.tet, this._files.tet, request, options);
             }
 
             this._worker_io.exec('read_files', request, options); 
@@ -1531,16 +1537,16 @@ var parse_clu_file = function(full_str, fkey){
             var options = this._make_pos_options();
             this._worker_io.exec('read_files', {
                 pos: this._files.pos,
-                pos_fkey: this.selected_files.pos
+                pos_fkey: this._fkey_ids.pos
             }, {
                 pos: options
             });
         }, got_pos: function(msg, arrays){
             var am = Utils.typed_array_manager;
             var result = {
-                xy: am.store_array(arrays['xy']),
-                dir: am.store_array(arrays['dir']),
-                speed: am.store_array(arrays['speed']),
+                xy: am.to_akey(arrays['xy']),
+                dir: am.to_akey(arrays['dir']),
+                speed: am.to_akey(arrays['speed']),
                 header: msg.header
             };
             msg.options.fkey = msg.fkey; // needed both for adding to cache (on next line) and for delete_from_cache loop
@@ -1553,7 +1559,7 @@ var parse_clu_file = function(full_str, fkey){
                 }
             }
             var opts =  this._make_pos_options();
-            opts.fkey = this.selected_files.pos;
+            opts.fkey = this._fkey_ids.pos;
             if(Utils.is_equal_simple(msg.options, opts)){
                 this._use_pos(result);
             }            
@@ -1626,15 +1632,15 @@ var parse_clu_file = function(full_str, fkey){
 
         }, _tet_options_changed: function(){
             var request = {}, options = {};
-            this._make_tet_request(this.selected_files.tet, this._files.tet, request, options);
+            this._make_tet_request(this._fkey_ids.tet, this._files.tet, request, options);
             this._worker_io.exec('read_files', request, options); 
         }, cut_file_parsed: function(msg, arrays){
             var am = Utils.typed_array_manager;
             this._cut_from_fkey.set(msg.fkey,{
                 header: msg.header,
-                cut: am.store_array(arrays['cut'])
+                cut: am.to_akey(arrays['cut'])
             });
-            if(this.selected_files.cut === msg.fkey){
+            if(this._fkey_ids.cut === msg.fkey){
                 this._setCut_box({
                     is: 'file',
                     akey: this._cut_from_fkey.get(msg.fkey).cut,
@@ -1661,9 +1667,9 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.gl_data = {
                 n: msg.n_spikes,
-                voltages: am.store_array(arrays.data)
+                voltages: am.to_akey(arrays.data)
             };
-            if(msg.fkey === this.selected_files.tet){
+            if(msg.fkey === this._fkey_ids.tet){
                 this._setData_for_gl(cached.gl_data);
             }
         }, got_amplitudes: function(msg, arrays){
@@ -1675,10 +1681,10 @@ var parse_clu_file = function(full_str, fkey){
             }
             cached.amps = {
                 n: msg.n_spikes,
-                amps: am.store_array(arrays.data),
+                amps: am.to_akey(arrays.data),
                 chan_is_ok: msg.chan_is_ok
             };
-            if(msg.fkey === this.selected_files.tet){
+            if(msg.fkey === this._fkey_ids.tet){
                 this._setAmplitudes(cached.amps);
             }
         }, got_times: function(msg, arrays){
@@ -1691,9 +1697,9 @@ var parse_clu_file = function(full_str, fkey){
             cached.times = {
                 n: msg.n_spikes,
                 timebase: msg.timebase,
-                times: am.store_array(arrays.data)
+                times: am.to_akey(arrays.data)
             };
-            if(msg.fkey === this.selected_files.tet){
+            if(msg.fkey === this._fkey_ids.tet){
                 this._setSpike_times(cached.times);
             }
         }, got_tet_header: function(fkey, header){
@@ -1703,7 +1709,7 @@ var parse_clu_file = function(full_str, fkey){
                 this._tet_from_fkey.set(fkey, cached);
             }
             cached.header = header;
-            if(fkey === this.selected_files.tet){
+            if(fkey === this._fkey_ids.tet){
                 this._setTet_header(header);
                 if(this._make_cut_from_n){
                     this._setCut_box({
@@ -1716,7 +1722,7 @@ var parse_clu_file = function(full_str, fkey){
         }, delete_from_tet_cache: function(fkey){
             this._tet_from_fkey.delete(fkey);
         }, set_file_parsed: function(msg) {
-            if(this.selected_files.set === msg.fkey){
+            if(this._fkey_ids.set === msg.fkey){
                 this._use_set(msg.header);
             }
             this._set_from_fkey.set(msg.fkey, msg.header);

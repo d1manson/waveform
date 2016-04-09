@@ -773,10 +773,6 @@ var pick = function(from, indices){
     return result;
 }
 
-var clone_simple = function(obj){
-    return JSON.parse(JSON.stringify(obj));
-}
-
 var is_equal_simple = function(a, b){
     // very simple....
     if((a && !b) || (!a && b)){
@@ -974,8 +970,6 @@ var use_mask = function(vector, mask, val){
             this._show_changed(this.show);
         }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
-            var cm = Utils.canvas_manager;
-
             var added_arrays = {};
             var pkeys_to_add = []; 
             if (this.show.indexOf('y') > -1){
@@ -1017,8 +1011,6 @@ var use_mask = function(vector, mask, val){
             // Here we check whether the rendered options match what we currently
             // want, and if so we set the visible okey.rm_x property from the
             // okey._rm_x_other value. We also deal with hiding canvases on show='n'.
-            let cm = Utils.canvas_manager;
-
             for(let okey of okeys) if(okey){
                 let op; // 0 : no-op, +1 : use _other values, -1: set to null
                 let same; // are the okey.rm_x and okey._rm_x_other the same?
@@ -1059,7 +1051,6 @@ var use_mask = function(vector, mask, val){
             }
 
         }, _options_modified: function(){
-            let cm = Utils.canvas_manager;
             this._options.cm_per_spa_bin = this.cm_per_spa_bin;
             this._options.smoothing_spa_bins = this.smoothing_spa_bins;
             this._options.max_rate_spa = this.max_rate_spa;
@@ -1119,9 +1110,8 @@ var use_mask = function(vector, mask, val){
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
-            let cm = Utils.canvas_manager;
             this._blank_pos_path = null;
-            this._setPos_path(null);
+            this._setPos_path(null); // TODO: might want to dealy this somehwo to avoid flash of null when changing settings
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_xy.xy);

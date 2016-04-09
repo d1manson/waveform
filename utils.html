@@ -88,17 +88,6 @@ Utils.parse_splices = function(splices, give_moved){
 }
 
 
-
-// simplel clone is for when there's nothing complicated to think about
-Utils.simple_clone = function(a){
-    var b = {};
-    for(aa in a){
-        b[aa] = a[aa];
-    }
-    return b;
-};
-
-
 Utils.deep_clone = function(obj){
     // this doesn't bother realing with self-referential things, but it
     // does tolerate things that wouldn't work with JSON.parse(JSON.stringify)

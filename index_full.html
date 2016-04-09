@@ -893,7 +893,6 @@ the_app._grab_group = function(e){
     }
 
     // for simplicity we make new canvases for this tile
-    // note that they will evenutally be freed within _close_grabbed_tile.
     let cm = Utils.canvas_manager;
     let group = e.detail.group;
     this.push('grabbed_tiles', {
