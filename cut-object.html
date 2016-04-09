@@ -128,6 +128,7 @@ doesn't have a worker, but it uses a similar system.
 
     var CutStackState = function(that){
         this.is = "stack";
+        this.id = null; // a kind of invalid fkey
         this.undo_stack_descriptions = that.undo_stack_descriptions;
         this.redo_stack_descriptions = that.redo_stack_descriptions;
         this.groups = that.groups;

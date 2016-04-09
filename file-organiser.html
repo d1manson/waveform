@@ -453,7 +453,7 @@ Polymer({
                 }
 
                 // store permanent reference to the file
-                let fkey = Utils.file_manager.store_file(files[ii]);
+                let fkey = Utils.file_manager.to_fkey(files[ii]);
                 if(base){
                     // unless it was a cut, we now know the base ok...
                     let trial_files = files_for_base.get(base);
@@ -487,7 +487,7 @@ Polymer({
                         trial_files = new Set();
                         files_for_base.set(match, trial_files);
                     }
-                    let fkey = Utils.file_manager.store_file(ff);
+                    let fkey = Utils.file_manager.to_fkey(ff);
                     trial_files.add(fkey);
                 } else {
                     let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
@@ -515,7 +515,7 @@ Polymer({
                 trials.push(trial);
             }
             for(let fkey of trial_files){
-                let ff = Utils.file_manager.get_file(fkey);
+                let ff = fkey.file;
                 let ext = regex_file_ext.exec(ff.name)[1].toLowerCase();
                 if(ext === "set"){
                     trial.set = fkey;
@@ -599,7 +599,7 @@ Polymer({
                 let name_and_time_strs = new Set()
                 for(let jj=0; jj<tet_obj.cuts.length; jj++) {
                     if(!tet_obj.cuts[jj].date_name_str){
-                        let ff = Utils.file_manager.get_file(tet_obj.cuts[jj].cut);
+                        let ff = tet_obj.cuts[jj].cut.file;
                         let d = tet_obj.cuts[jj].date = ff.lastModified;
                         tet_obj.cuts[jj].date_name_str = d + " " + ff.name;
                     }
@@ -646,19 +646,19 @@ Polymer({
     }, _make_trial_captions: function(e){
         var model = e.model;
         if(!model.trial.set_caption && model.trial.set){
-            model.set('trial.set_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.set)));
+            model.set('trial.set_caption', this._caption_from_file(model.trial.set.file));
         }
         if(!model.trial.pos_caption && model.trial.pos){
-            model.set('trial.pos_caption', this._caption_from_file(Utils.file_manager.get_file(model.trial.pos)));
+            model.set('trial.pos_caption', this._caption_from_file(model.trial.pos.file));
         }
     }, _make_tet_captions: function(e){
         var model = e.model;
         if(!model.tet_block.tet_caption && model.tet_block.tet){
-            model.set('tet_block.tet_caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.tet)));  
+            model.set('tet_block.tet_caption', this._caption_from_file(model.tet_block.tet.file));  
         }
         for(let ii=0; ii<model.tet_block.cuts.length; ii++){
             if(!model.tet_block.cuts[ii].caption){
-                model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(Utils.file_manager.get_file(model.tet_block.cuts[ii].cut)));         
+                model.set('tet_block.cuts.' + ii + '.caption', this._caption_from_file(model.tet_block.cuts[ii].cut.file));   
             }
         }
     }, _caption_from_file: function(file){
@@ -671,7 +671,8 @@ Polymer({
         return a-b; 
     }, _reassign_trials_denovo: function(){
         // TODO: see https://github.com/Polymer/polymer/issues/2279
-        this._setTrials(JSON.parse(JSON.stringify(this.trials)));
+
+        this._setTrials(Utils.deep_clone(this.trials));
         this._trial_from_base.clear();
         for(let trial of this.trials){
             this._trial_from_base.set(trial.name, trial);
@@ -696,7 +697,7 @@ Polymer({
                 num = parseInt(num[1]);
                 tet_obj = this._get_tet_obj(trial, num, true);
                 available_tets.add(num);
-                let fkey = Utils.file_manager.store_file(ff);
+                let fkey = Utils.file_manager.to_fkey(ff);
                 tet_obj.cuts.push({
                     cut: fkey,
                     cut_type: 'cut',
@@ -722,7 +723,7 @@ Polymer({
         let model = e.model;
         let trial_base = model.dataHost.dataHost.dataHost.dataHost.trial.name; // https://github.com/Polymer/polymer/issues/1919
         let tet_num = model.dataHost.dataHost.tet_block.tet_num;
-        let cut = Utils.file_manager.get_file(model.cut.cut);
+        let cut = model.cut.cut.file;
         let filename = trial_base + "_" + tet_num + ".cut";
         let blob_url = cut.get_blob_url(trial_base);
 

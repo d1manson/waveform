@@ -99,6 +99,27 @@ Utils.simple_clone = function(a){
 };
 
 
+Utils.deep_clone = function(obj){
+    // this doesn't bother realing with self-referential things, but it
+    // does tolerate things that wouldn't work with JSON.parse(JSON.stringify)
+    // in particular typed arrays (which are *not* cloned, but end up in both
+    // src and dest), files, and dom elements likewise.
+
+    if (!obj) {
+        return obj;
+    } else if(obj.constructor === Object || obj.constructor === Array){
+        let dest = new obj.constructor();
+        for(let key in obj)if(Object.hasOwnProperty.call(obj, key)){
+            dest[key] = Utils.deep_clone(obj[key]);
+        }
+        return dest;
+    } else {
+        return obj; // string, numbers, and other strange things
+    }
+
+
+}
+
 Utils.get_key = function(arr, item){
     // don't use this in a tight loop..lift the get(arr) out of the loop.
     return Polymer.Collection.get(arr).getKey(item); 
@@ -207,19 +228,14 @@ Utils.typed_array_manager = (function(){
 
 
 Utils.file_manager = (function(){
-    // This is a thin wrapper around an array, note that you can never remove files once added
-    // Note also that we actually store more than just files in the array, we also store cut "stack" objects
-    var store = [undefined];
-    
+    let counter = 0;
     return {
-        store_file: function(file){
-            store.push(file);
-            return store.length -1;
+        to_fkey: function(file){
+            return {
+                file: file,
+                id: ++counter // useful when disscussing things with workers
+            };
         },
-        get_file: function(fkey){
-            if(!fkey) return
-            return store[fkey];
-        }
     };
 
 })();
@@ -227,7 +243,6 @@ Utils.file_manager = (function(){
 
 
 Utils.canvas_manager = (function(){
-    
     
    return {
         buffer_to_ckey: function(buffer, dims){
