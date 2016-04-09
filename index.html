@@ -16164,7 +16164,7 @@ Polymer({
 Polymer({
     is:'managed-canvas',
     properties: {
-        canv_id: {
+        ckey: {
             type: String,
             value: "",
             observer: '_update'
@@ -16181,14 +16181,17 @@ Polymer({
         if(old){
             Polymer.dom(this.root).removeChild(old);
         }
-        if(Utils.canvas_manager && this.canv_id){
-            let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
-            this._update_canv_style(el_canv);
+        if(Utils.canvas_manager && this.ckey){
+            let el_canv = this.ckey.canvas;
+            el_canv && this._update_canv_style(el_canv);
             Polymer.dom(this.root).appendChild(el_canv);
         }
     }, _height_changed: function(){
-        let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
-        this._update_canv_style(el_canv)
+        if(!this.ckey){
+            return;
+        }
+        let el_canv = this.ckey.canvas;
+        this._update_canv_style(el_canv);
     }, _update_canv_style: function(el_canv){
         if(el_canv){
             el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
@@ -16256,6 +16259,9 @@ Palettes.flag =  function(){
     data[30*4+0] = 250; data[30*4+1] = 128; data[30*4+2] = 114;
     return data;
 }();
+
+Palettes.flag8 = Palettes.flag;
+Palettes.flag32 = new Uint32Array(Palettes.flag.buffer);
 
 Palettes.flag_css = function(){
     var ret = [];
@@ -16421,15 +16427,15 @@ font-size: 20px;
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
-        <managed-canvas canv_id="[[group_model.waves]]"></managed-canvas>
-        <managed-canvas canv_id="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.waves]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
         <div>
-            <managed-canvas canv_id="[[group_model.rm_dir]]"></managed-canvas>
-            <managed-canvas canv_id="[[group_model.rm_speed]]"></managed-canvas>
+            <managed-canvas ckey="[[group_model.rm_dir]]"></managed-canvas>
+            <managed-canvas ckey="[[group_model.rm_speed]]"></managed-canvas>
         </div>
-        <managed-canvas canv_id="[[group_model.tac]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.tac]]"></managed-canvas>
     </div>
     <div id="sticker" class="sticker" style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
     <div id="over" class="over" style="display:none;">
@@ -16907,19 +16913,10 @@ Utils.file_manager = (function(){
 
 
 Utils.canvas_manager = (function(){
-    // This is a little bit more than a thin wrapper around a Map
-
-    var store = new Map(); // store of canvas els
-    var last_ckey = 0;
-    var suffix = " (canvas-manager)"; // can drop suffix using parseInt
-    var validate_id = function(id){
-        if((id + "").indexOf(suffix) === -1)
-            throw "canvas-manager was passed invalid id";
-        return true;
-    }
-
+    
+    
    return {
-        store_from_buffer: function(buffer, dims){
+        buffer_to_ckey: function(buffer, dims){
             var el = document.createElement("canvas");
             el.width = dims[0];
             el.height = dims[1];
@@ -16928,23 +16925,20 @@ Utils.canvas_manager = (function(){
             var im_data = ctx.createImageData(dims[0], dims[1]);
             im_data.data.set(new Uint8ClampedArray(buffer));
             ctx.putImageData(im_data, 0, 0);
-            store.set(++last_ckey, el);
-            return last_ckey + suffix;
+            return {canvas: el};
         },
-        store_from_dims: function(dims){
+        dims_to_ckey: function(dims){
             var el = document.createElement("canvas");
             el.width = dims[0];
             el.height = dims[1];
-            store.set(++last_ckey, el);
-            return last_ckey + suffix;
+            return {canvas: el};
         },
-        store_canvas: function(c){
-            store.set(++last_ckey, c);
-            return last_ckey + suffix;
+        to_ckey: function(c){
+            return {canvas: c};
         },
-        store_copy: function(id){
+        clone_ckey: function(ckey){
             // if we were really sensible this may never be needed...but we're not
-            let old_canv = id && validate_id(id) && store.get(parseInt(id));
+            let old_canv = ckey && ckey.canvas;
             if(!old_canv){
                 return;
             }
@@ -16952,21 +16946,13 @@ Utils.canvas_manager = (function(){
             new_canv.width = old_canv.width;
             new_canv.height = old_canv.height;
             new_canv.getContext('2d').drawImage(old_canv, 0, 0);
-            store.set(++last_ckey, new_canv);
-            return last_ckey + suffix;
+            return {canvas: new_canv};
         },
-        get_canvas: function(id){
-            return id && validate_id(id) && store.get(parseInt(id));
+        get_2d_ctx: function(ckey){
+            return ckey && ckey.canvas && ckey.canvas.getContext('2d');
         },
-        get_2d_ctx: function(id){
-            return validate_id(id) && store.get(parseInt(id)).getContext('2d');
-        },
-        free_canvas: function(id){
-            id && validate_id(id);
-            store.delete(parseInt(id));
-        },
-        update_from_buffer: function(id, buffer){
-            let el = validate_id(id) && store.get(parseInt(id));
+        update_from_buffer: function(ckey, buffer){
+            let el = ckey && ckey.canvas;
             let ctx = el.getContext('2d');
             var im_data = ctx.createImageData(el.width, el.height);
             im_data.data.set(new Uint8ClampedArray(buffer));
@@ -18250,7 +18236,7 @@ self.created && self.created();
             this._listener[foo].apply(this._listener, e.data.args);
         }catch(err){
             if(foo === "console.log"){
-                console.log(e.data.args);
+                console.log.apply(console, e.data.args);
             } else if(foo === "set_array_on_main_window"){
                 window[e.data.args[1]] = new window[e.data.args[2]](e.data.args[0]);
             } else {
@@ -23003,6 +22989,7 @@ var pkey_to_rendered_options = new Map();
 var pkeys_pending_render = [];
 var timer;
 var pkey_generation = 0;
+var pending_path_plot = null;
 
 // cached stuff.... see clear_cache for logic for cleaning the cache
 var cached_spike_pos_ind;
@@ -23016,9 +23003,10 @@ var cached_speed_dwell;
 var cached_spike_xy_bins;
 var cached_spike_dir_bins;
 var cached_spike_speed_bins;
+var cached_path;
 
-var n_bins_xy_0; //these are cached as well, but they are managed as a "side effect" of xy_bins
-var n_bins_xy_1; 
+var n_bins_xy_0, n_bins_xy_1; //these are cached as well, but they are managed as a "side effect" of xy_bins
+var cached_spike_xy_raw; // and this is managed as a "side effect" of cached_spike_xy_bins
 
 var palette = function(){
     var p_colors = 5;
@@ -23080,20 +23068,11 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
     xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
+
     build_cache();
     make_all_pkeys_pending();
     touch_timer();
 
-    // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
-    if(pos_xy){
-       let im = draw_lines(pos_xy, 256, 256, 256/Math.max(max_x, max_y));
-       exec_main_b('plot_path', {
-        path: 'path',
-        dims: [256, 256]
-       }, {
-        path: im
-       });
-    }
 }
 
 var set_pos_dir = function(timebase, arrays){
@@ -23155,6 +23134,7 @@ var update_pkeys = function(changes, arrays){
     if(changes.generation_add !== changes.generation_remove){
         pkeys_pending_render = [];
         pkey_generation = changes.generation_add;
+        pending_path_plot = null;
     }
 
     var add_pkeys = changes.add || [];
@@ -23172,9 +23152,13 @@ var touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && pkeys_pending_render.length && show && show !== 'nnn' &&
-        (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
-            && (show[2] === 'n' || cached_speed_bins)){
+
+    if((spike_times && pkeys_pending_render.length && 
+            show && show !== 'nnn' &&
+            (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
+            && (show[2] === 'n' || cached_speed_bins)) || 
+        (pending_path_plot && can_process_plot_path())){
+        
         timer = timer || setImmediate(timer_tick);
     } else {
         clearImmediate(timer);
@@ -23222,6 +23206,10 @@ var copy_options = function(dest, src, kind){
 
 var timer_tick = function(){
     timer = 0;
+
+    if(pending_path_plot && can_process_plot_path()){
+        process_plot_path();
+    } 
 
     // find one valid thing to render...
     // this is somewhat ugly, but whatever.
@@ -23288,12 +23276,14 @@ var clear_cache = function(names){
     if(names.has('spikes_timebase') || names.has('pos_timebase') || names.has('spike_times')){
         cached_spike_pos_ind = undefined;
         cached_spike_xy_bins = undefined;
+        cached_spike_xy_raw = undefined;
         cached_spike_dir_bins = undefined;
         cached_spike_speed_bins = undefined;
         pkey_to_rendered_options.clear(); //whatever we had is now irrelevant
     }
 
     if(names.has('pos_xy')){
+        cached_path = undefined;
         let null_opts = {};
         for(let opts of pkey_to_rendered_options.values()){
             copy_options(opts, null_opts, "spa");
@@ -23304,6 +23294,7 @@ var clear_cache = function(names){
         cached_xy_dwell = undefined;
         cached_xy_no_dwell = undefined;
         cached_spike_xy_bins = undefined;
+        cached_spike_xy_raw = undefined;
     } else if(names.has('smoothing_spa_bins')){
         cached_xy_dwell = undefined;
     }
@@ -23338,6 +23329,16 @@ var clear_cache = function(names){
 
 }
 
+var make_cached_path = function(){
+    cached_path = draw_lines(pos_xy, 256, 256, 256/Math.max(xy_max[0], xy_max[1]));
+     exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256],
+    }, {
+        path: new Uint32Array(cached_path)
+    });
+}
+
 var build_cache = function(){
     // this is called when we change xy/dir/speed/times/options/show
     // clear_cached will have been called immediately before hand.
@@ -23351,6 +23352,7 @@ var build_cache = function(){
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
         make_cached_xy_bins_and_dwell();
+        make_cached_path();
     }
 
     if(show && show[1] === 'y'
@@ -23395,6 +23397,8 @@ var make_cached_xy_bins_and_dwell = function(){
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
                 
+    cached_spike_xy_raw = pick(new Uint32Array(pos_xy.buffer), cached_spike_pos_ind); // the _raw version if for plotting spikes on the path
+
     n_bins_xy_1 = Math.ceil(xy_max[1]*factor) + 1; // +1 is because of zero indexing
     n_bins_xy_0 = Math.ceil(xy_max[0]*factor) + 1;   
 
@@ -23569,6 +23573,57 @@ var plot_histogram = function(w, h, vals){
     return im;
 }
 
+
+var can_process_plot_path = function(){
+    return cached_path && 
+           (!pending_path_plot.a || pkey_to_array.has(pending_path_plot.a)) &&
+           (!pending_path_plot.b || pkey_to_array.has(pending_path_plot.b));
+}
+
+var process_plot_path = function(){
+    let im = new Uint32Array(cached_path);
+
+    if(pending_path_plot.a){
+      //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
+      let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.a)); 
+            
+      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+                   im, pending_path_plot.color_a, 1);
+    }
+
+    if(pending_path_plot.b){
+      //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
+      let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.b)); 
+            
+      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+                  im, pending_path_plot.color_b, 1);
+    }
+   
+    exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256],
+        generation: pkey_generation,
+        a: pending_path_plot.a,
+        b: pending_path_plot.b,
+        color_a: pending_path_plot.color_a,
+        color_b: pending_path_plot.color_b
+    }, {
+        path: im
+    });
+   pending_path_plot = null;
+}
+
+
+var plot_path = function(pkey_a, pkey_b, color_a, color_b){
+    pending_path_plot = {
+        a: pkey_a,
+        b: pkey_b,
+        color_a: color_a,
+        color_b: color_b
+    };
+    touch_timer();
+}
+
 // TODO: come with a better method than copy-pasting utility functions ....
 
 var hist_1 = function(inds, n_bins){
@@ -23664,6 +23719,20 @@ var is_equal_simple = function(a, b){
         }
     }
     return true;
+}
+
+var draw_points = function(xy, w, h, scale, im, color, k){
+    for(let ii=0; ii<xy.length; ii+=2){
+        let start_0 = Math.max(0, xy[ii+0]*scale-k) | 0;
+        let end_0 = Math.min(w, xy[ii+0]*scale+k+1) | 0;
+        let start_1 = Math.max(0, xy[ii+1]*scale-k) | 0;
+        let end_1 = Math.min(h, xy[ii+1]*scale+k+1) | 0;
+        for(let p0=start_0; p0<end_0; p0++){
+            for(let p1=start_1; p1<end_1; p1++){
+                im[p1*w + p0] = color;
+            }
+        }
+    }
 }
 
 var draw_lines = function(xy, w, h, scale, im, color){
@@ -23790,6 +23859,14 @@ var use_mask = function(vector, mask, val){
                 type: Array,
                 notify: true,
                 observer: '_want_spike_times_set'
+            },
+            active_group_a: {
+                type: Object,
+                notify: true
+            },
+            active_group_b: {
+                type: Object,
+                notify: true
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -23798,7 +23875,8 @@ var use_mask = function(vector, mask, val){
             '_pos_xy_modified(pos_xy)',
             '_pos_dir_modified(pos_dir)',
             '_pos_speed_modified(pos_speed)',
-            '_times_modified(spike_times)'
+            '_times_modified(spike_times)',
+            '_update_pos_path(active_group_a, active_group_b)'
         ], created: function(){
             // copy-paste defaults from worker code above (could implement
             // something  more complicated, but hey this works and is easy).
@@ -23836,18 +23914,11 @@ var use_mask = function(vector, mask, val){
                 }
             }
 
-            // free canvases, it's our responsiblity to do this, whereas 
-            // freeing the inds arrays was the responsibility of cut-obj.
+            // free canvases
             var pkeys_to_remove = [];
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                cm.free_canvas(okey.rm_spa);
-                cm.free_canvas(okey.rm_dir);
-                cm.free_canvas(okey.rm_speed);
-                cm.free_canvas(okey._rm_spa_other);
-                cm.free_canvas(okey._rm_dir_other);
-                cm.free_canvas(okey._rm_speed_other);
                 okey.rm_spa = null;
                 okey.rm_dir = null;
                 okey.rm_speed = null;
@@ -23884,7 +23955,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_spa ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_spa);
                     okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
                     okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
@@ -23897,7 +23967,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_dir ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
                     okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
@@ -23910,7 +23979,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_speed ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_speed);
                     okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
                 }
@@ -23977,6 +24045,8 @@ var use_mask = function(vector, mask, val){
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
+            let cm = Utils.canvas_manager;
+            this._blank_pos_path = null;
             this._setPos_path(null);
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
@@ -24079,28 +24149,49 @@ var use_mask = function(vector, mask, val){
             }
             let cm = Utils.canvas_manager;
             if(msg.spa_rm){
-                (okey.rm_spa !== okey._rm_spa_other) && cm.free_canvas(okey._rm_spa_other);
-                okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
+                okey._rm_spa_other = cm.buffer_to_ckey(arrays.spa_rm.buffer, msg.spa_rm_dims);
                 okey._rm_spa_max_other = msg.spa_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "spa");
             }
             if(msg.dir_rm){
-                (okey.rm_dir !== okey._rm_dir_other) && cm.free_canvas(okey._rm_dir_other);
-                okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                okey._rm_dir_other = cm.buffer_to_ckey(arrays.dir_rm.buffer, msg.dir_rm_dims);
                 okey._rm_dir_max_other = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
             }
             if(msg.speed_rm){
-                (okey.rm_speed !== okey._rm_speed_other) && cm.free_canvas(okey._rm_speed_other);
-                okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
+                okey._rm_speed_other = cm.buffer_to_ckey(arrays.speed_rm.buffer, msg.speed_rm_dims);
                 this._copy_options(okey._rm_other_options, msg.render_options, "speed");
             }
             this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
-            var cm = Utils.canvas_manager;
-            cm.free_canvas(this.pos_path);
-            this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))
+            let cm = Utils.canvas_manager;
+
+            if(msg.a && this._pkey_generation == msg.generation &&
+                (this.active_group_a && this.active_group_a._pkey == msg.a) && 
+                ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))
+                && this.show && this.show[0]==='y'){
+                // plot is of current a (and b), and generation is current and we want spa plots
+                this._setPos_path(cm.buffer_to_ckey(arrays.path.buffer, msg.dims))    
+            } else if(!msg.a){
+                // plot has null a and b, so store it as the blank path and set it now
+                this._blank_pos_path = cm.buffer_to_ckey(arrays.path.buffer, msg.dims);
+                this._setPos_path(this._blank_pos_path);
+            }
+            
+        }, _update_pos_path: function(){
+            if(this.active_group_a && this.show && this.show[0]==='y'){
+                // note we are slightly lazy in so far as we don't watch for changes of group_num
+                // while current active groups are unchanged..this is difficult/impossible to
+                // actually cause you use the console or something.
+                this._worker.exec('plot_path', 
+                                   this.active_group_a._pkey,
+                                   this.active_group_b  && this.active_group_b._pkey,
+                                   Palettes.flag32[this.active_group_a.group_num],
+                                   this.active_group_b && Palettes.flag32[this.active_group_b.group_num]);
+            } else {
+                this._setPos_path(this._blank_pos_path);
+            }
         }
     });
 </script>
@@ -24386,8 +24477,6 @@ var is_equal_simple = function(a, b){
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                cm.free_canvas(okey.tac);
-                cm.free_canvas(okey._tac_other);
                 okey.tac = null;
                 okey._tac_other = null;
                 okey._tac_other_options = {};
@@ -24446,7 +24535,6 @@ var is_equal_simple = function(a, b){
                          : ( !same && Utils.is_equal_simple(okey._tac_other_options, this._options) ? 1  : 0 );
 
                 if(op){
-                    (!same) && cm.free_canvas(okey.tac);
                     okey.tac = op === 1 ? okey._tac_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
                 }
@@ -24461,7 +24549,7 @@ var is_equal_simple = function(a, b){
             if (show === 'n'){
                 let idx = this.want_spike_times.indexOf("tac-plots");
                 (idx > -1) && this.splice('want_spike_times', idx, 1);
-                
+
             } else if(show === 'y'){
                 let idx = this.want_spike_times.indexOf("tac-plots");
                 (idx === -1) && this.push('want_spike_times', "tac-plots");
@@ -24492,8 +24580,7 @@ var is_equal_simple = function(a, b){
                 return;
             }
             let cm = Utils.canvas_manager;
-            (okey._tac_other !== okey.tac) && cm.free_canvas(okey._tac_other);
-            okey._tac_other = cm.store_from_buffer(arrays.hist.buffer, data.dims);
+            okey._tac_other = cm.buffer_to_ckey(arrays.hist.buffer, data.dims);
             okey._tac_other_options = data.render_options;
             this._use_other_if_possible([okey]);
         }
@@ -26353,7 +26440,6 @@ Polymer({
             this._renderer.set_show('n');
             let cm = Utils.canvas_manager;
             for(let okey of this.groups) if(okey && okey.waves){
-                cm.free_canvas(okey.waves); // the WavesRenderer will still hold a reference to this canvas in this case 
                 this.set('groups.' + okey._pkey + '.waves', null);
             }
         } else {
@@ -26368,7 +26454,6 @@ Polymer({
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
         for(let okey of okeys_to_remove) if(okey && okey.waves){
-            cm.free_canvas(okey.waves);
             okey.waves = null; // Note we don't both to use the Polymer .set machienery, because the okey is being (at least temporarily) discarded
         }
         okeys_to_add = okeys_to_add.filter(function(okey){
@@ -26390,9 +26475,8 @@ Polymer({
             if(!key){
                 throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
             }
-            if(cm.get_canvas(okey.waves) !== el_canvas){
-                cm.free_canvas(okey.waves);  // if there was an old canvas, free it, because there's a new one now
-                okey.waves = cm.store_canvas(el_canvas);
+            if(!okey.waves || okey.waves.canvas !== el_canvas){
+                okey.waves = cm.to_ckey(el_canvas);
                 this.notifyPath('groups.' + key + '.waves', okey.waves);            
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
@@ -26700,7 +26784,7 @@ font-size: 10px;
     <div class="bottom">
         <template is="dom-repeat" items="[[cluster_plots]]">
             <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
+               <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
                <div class="x_axis_label">[[item.x_axis]]</div>
                <div class="y_axis_label">[[item.y_axis]]</div>
             </div>
@@ -26779,7 +26863,7 @@ font-size: 10px;
             let plots = [];
             for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
                 plots.push({
-                    ckey: cm.store_from_dims([s,s]),
+                    ckey: cm.dims_to_ckey([s,s]),
                     is_used: false
                 });
             }
@@ -27203,12 +27287,9 @@ font-size: 10px;
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div style="flex:1 1 0%; position:relative;">
-                <managed-canvas style="position:absolute;" canv_id="[[pos_path]]"></managed-canvas>
+                <managed-canvas style="position:absolute;" ckey="[[pos_path]]"></managed-canvas>
                 <div class="info_summary">
                     <div class="info_summary_text">
-                        group {{_get_safe(active_group_a, 'group_num')}}
-                        <br>and<br>
-                        group {{_get_safe(active_group_b, 'group_num')}}
                     </div>
                     <canvas id="speedhist" width="50" height="84"></canvas>
                     <div id="speedhist_labels" style="display:inline;position:relative;">
@@ -27264,7 +27345,7 @@ font-size: 10px;
 
     <cut-object id="cut" groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
+    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
 
     <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]" want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
@@ -27572,11 +27653,11 @@ the_app._grab_group = function(e){
                 "c" + group.group_num + " [Grabbed]",
         group_num: group.group_num,
         group: {
-            waves: cm.store_copy(group.waves),
-            tac: cm.store_copy(group.tac),
-            rm_spa: cm.store_copy(group.rm_spa),
-            rm_dir: cm.store_copy(group.rm_dir),
-            rm_speed: cm.store_copy(group.rm_speed)
+            waves: cm.clone_ckey(group.waves),
+            tac: cm.clone_ckey(group.tac),
+            rm_spa: cm.clone_ckey(group.rm_spa),
+            rm_dir: cm.clone_ckey(group.rm_dir),
+            rm_speed: cm.clone_ckey(group.rm_speed)
         },
         x: e.detail.src_client_x + 20,
         y: e.detail.src_client_y + 20
@@ -27584,15 +27665,6 @@ the_app._grab_group = function(e){
 }
 
 the_app._close_grabbed_tile = function(e){
-    // the grabbed tile "owned" these canvases, so free them now..
-    let cm = Utils.canvas_manager;
-    let group = e.model.item.group;
-    cm.free_canvas(group.waves);
-    cm.free_canvas(group.tac);
-    cm.free_canvas(group.rm_spa);
-    cm.free_canvas(group.rm_dir);
-    cm.free_canvas(group.rm_speed);
-
     // remove the grabbed tile from the list
     the_app.splice('grabbed_tiles', the_app.grabbed_tiles.indexOf(e.model.item), 1);
 }

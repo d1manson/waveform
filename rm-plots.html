@@ -143,9 +143,6 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
 
-    if(!pending_path_plot){
-        pending_path_plot = {a: null, b: null};
-    }
     build_cache();
     make_all_pkeys_pending();
     touch_timer();
@@ -406,6 +403,16 @@ var clear_cache = function(names){
 
 }
 
+var make_cached_path = function(){
+    cached_path = draw_lines(pos_xy, 256, 256, 256/Math.max(xy_max[0], xy_max[1]));
+     exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256],
+    }, {
+        path: new Uint32Array(cached_path)
+    });
+}
+
 var build_cache = function(){
     // this is called when we change xy/dir/speed/times/options/show
     // clear_cached will have been called immediately before hand.
@@ -419,7 +426,7 @@ var build_cache = function(){
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
         make_cached_xy_bins_and_dwell();
-        cached_path = draw_lines(pos_xy, 256, 256, 256/Math.max(xy_max[0], xy_max[1]));
+        make_cached_path();
     }
 
     if(show && show[1] === 'y'
@@ -1236,8 +1243,9 @@ var use_mask = function(vector, mask, val){
 
             if(msg.a && this._pkey_generation == msg.generation &&
                 (this.active_group_a && this.active_group_a._pkey == msg.a) && 
-                ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))){
-                // plot is of current a (and b), and generation is current
+                ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))
+                && this.show && this.show[0]==='y'){
+                // plot is of current a (and b), and generation is current and we want spa plots
                 this._setPos_path(cm.buffer_to_ckey(arrays.path.buffer, msg.dims))    
             } else if(!msg.a){
                 // plot has null a and b, so store it as the blank path and set it now
@@ -1246,7 +1254,7 @@ var use_mask = function(vector, mask, val){
             }
             
         }, _update_pos_path: function(){
-            if(this.active_group_a){
+            if(this.active_group_a && this.show && this.show[0]==='y'){
                 // note we are slightly lazy in so far as we don't watch for changes of group_num
                 // while current active groups are unchanged..this is difficult/impossible to
                 // actually cause you use the console or something.
