@@ -324,7 +324,6 @@ Polymer({
                 });
         
         this.set('selected_cut', new_cut);
-        this.$.trial_list.notifyResize();
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;
         var old_sel = this._trial_from_base.get(this.selected_trial);
@@ -406,6 +405,7 @@ Polymer({
             tet: tet_obj && tet_obj.tet ? tet_obj.tet : 0,
             cut: cut ? cut : 0
         });
+        this.$.trial_list.notifyResize();
     }, _drop: function(e){
         e.stopPropagation();
         e.preventDefault();
@@ -678,7 +678,7 @@ Polymer({
         for(let trial of this.trials){
             this._trial_from_base.set(trial.name, trial);
         }
-        this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
+        this.$.trial_list.notifyResize();
     }, got_base_for_cuts: function(results){
         // TODO: there is a lot of copy-paste from main drop function, should fix that really.
         var trials = this.trials;

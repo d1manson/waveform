@@ -650,7 +650,7 @@ var plot_histogram = function(w, h, vals){
 
 var can_process_plot_path = function(){
     return cached_path && 
-           (!pending_path_plot.a || pkey_to_array.has(pending_path_plot.a)) &&
+           (!pending_path_plot.a || (cached_spike_xy_raw && pkey_to_array.has(pending_path_plot.a))) &&
            (!pending_path_plot.b || pkey_to_array.has(pending_path_plot.b));
 }
 
