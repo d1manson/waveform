@@ -306,8 +306,6 @@ var is_equal_simple = function(a, b){
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                cm.free_canvas(okey.tac);
-                cm.free_canvas(okey._tac_other);
                 okey.tac = null;
                 okey._tac_other = null;
                 okey._tac_other_options = {};
@@ -366,7 +364,6 @@ var is_equal_simple = function(a, b){
                          : ( !same && Utils.is_equal_simple(okey._tac_other_options, this._options) ? 1  : 0 );
 
                 if(op){
-                    (!same) && cm.free_canvas(okey.tac);
                     okey.tac = op === 1 ? okey._tac_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
                 }
@@ -381,7 +378,7 @@ var is_equal_simple = function(a, b){
             if (show === 'n'){
                 let idx = this.want_spike_times.indexOf("tac-plots");
                 (idx > -1) && this.splice('want_spike_times', idx, 1);
-                
+
             } else if(show === 'y'){
                 let idx = this.want_spike_times.indexOf("tac-plots");
                 (idx === -1) && this.push('want_spike_times', "tac-plots");
@@ -412,8 +409,7 @@ var is_equal_simple = function(a, b){
                 return;
             }
             let cm = Utils.canvas_manager;
-            (okey._tac_other !== okey.tac) && cm.free_canvas(okey._tac_other);
-            okey._tac_other = cm.store_from_buffer(arrays.hist.buffer, data.dims);
+            okey._tac_other = cm.buffer_to_ckey(arrays.hist.buffer, data.dims);
             okey._tac_other_options = data.render_options;
             this._use_other_if_possible([okey]);
         }

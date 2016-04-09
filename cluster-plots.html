@@ -313,7 +313,7 @@ font-size: 10px;
     <div class="bottom">
         <template is="dom-repeat" items="[[cluster_plots]]">
             <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas canv_id="[[item.ckey]]" fix_height="[[canvas_size]]" 
+               <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" 
                         on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
                <div class="x_axis_label">[[item.x_axis]]</div>
                <div class="y_axis_label">[[item.y_axis]]</div>
@@ -393,7 +393,7 @@ font-size: 10px;
             let plots = [];
             for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
                 plots.push({
-                    ckey: cm.store_from_dims([s,s]),
+                    ckey: cm.dims_to_ckey([s,s]),
                     is_used: false
                 });
             }

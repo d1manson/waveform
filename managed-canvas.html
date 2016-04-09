@@ -29,8 +29,8 @@ The canvas-manger is a singleton, i.e. all instances share the same state:
     var c_ids = [m.create_from_dims([100,150]), m.create_from_dims([100,20]), m.create_from_dims([20,100])];
 
     var els = document.getElementsByTagName('managed-canvas');
-    els[0].canv_id = c_ids[0];
-    els[1].canv_id = c_ids[1];
+    els[0].ckey = c_ids[0];
+    els[1].ckey = c_ids[1];
 
     var ctx = m.get_2d_ctx[c_ids[0]];
     // ....
@@ -38,15 +38,15 @@ The canvas-manger is a singleton, i.e. all instances share the same state:
     // the canvas is currently in the dom, so you will see the changes
     // ...
 
-    els[0].canv_id = c_ids[2]; 
+    els[0].ckey = c_ids[2]; 
     // Note how the original canvas is displaced from els[0]. You can insert it again 
     // to either of the els, and it will still have the drawings.  Note that when you are
     // completely finished with that canvas you *must* do the following:
     m.free_canvas(c_ids[0]);
     // otherwise it will be a memory leak
     
-    // If you are using a managed-canvas within a dom-module, you can use declarative binding with canv_id:
-    // <managed-canvas canv_id="[[plot_canv_id]]"></managed_canvas>
+    // If you are using a managed-canvas within a dom-module, you can use declarative binding with ckey:
+    // <managed-canvas ckey="[[plot_canv_id]]"></managed_canvas>
 
     </script>
 
@@ -75,7 +75,7 @@ TODO: update comments
 Polymer({
     is:'managed-canvas',
     properties: {
-        canv_id: {
+        ckey: {
             type: String,
             value: "",
             observer: '_update'
@@ -92,14 +92,17 @@ Polymer({
         if(old){
             Polymer.dom(this.root).removeChild(old);
         }
-        if(Utils.canvas_manager && this.canv_id){
-            let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
-            this._update_canv_style(el_canv);
+        if(Utils.canvas_manager && this.ckey){
+            let el_canv = this.ckey.canvas;
+            el_canv && this._update_canv_style(el_canv);
             Polymer.dom(this.root).appendChild(el_canv);
         }
     }, _height_changed: function(){
-        let el_canv = Utils.canvas_manager.get_canvas(this.canv_id);
-        this._update_canv_style(el_canv)
+        if(!this.ckey){
+            return;
+        }
+        let el_canv = this.ckey.canvas;
+        this._update_canv_style(el_canv);
     }, _update_canv_style: function(el_canv){
         if(el_canv){
             el_canv.style.height = this.fix_height? this.fix_height + "px" : "";

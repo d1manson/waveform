@@ -981,18 +981,11 @@ var use_mask = function(vector, mask, val){
                 }
             }
 
-            // free canvases, it's our responsiblity to do this, whereas 
-            // freeing the inds arrays was the responsibility of cut-obj.
+            // free canvases
             var pkeys_to_remove = [];
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                cm.free_canvas(okey.rm_spa);
-                cm.free_canvas(okey.rm_dir);
-                cm.free_canvas(okey.rm_speed);
-                cm.free_canvas(okey._rm_spa_other);
-                cm.free_canvas(okey._rm_dir_other);
-                cm.free_canvas(okey._rm_speed_other);
                 okey.rm_spa = null;
                 okey.rm_dir = null;
                 okey.rm_speed = null;
@@ -1029,7 +1022,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_spa ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_spa);
                     okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
                     okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
@@ -1042,7 +1034,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_dir ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_dir);
                     okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
                     okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
@@ -1055,7 +1046,6 @@ var use_mask = function(vector, mask, val){
                          ( okey.rm_speed ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
                 if(op){
-                    (!same) && cm.free_canvas(okey.rm_speed);
                     okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
                     this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
                 }
@@ -1123,8 +1113,6 @@ var use_mask = function(vector, mask, val){
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
             let cm = Utils.canvas_manager;
-            cm.free_canvas(this.pos_path);
-            cm.free_canvas(this._blank_pos_path);
             this._blank_pos_path = null;
             this._setPos_path(null);
             if(this.show && this.show[0] === 'y'){
@@ -1228,20 +1216,17 @@ var use_mask = function(vector, mask, val){
             }
             let cm = Utils.canvas_manager;
             if(msg.spa_rm){
-                (okey.rm_spa !== okey._rm_spa_other) && cm.free_canvas(okey._rm_spa_other);
-                okey._rm_spa_other = cm.store_from_buffer(arrays.spa_rm.buffer, msg.spa_rm_dims);
+                okey._rm_spa_other = cm.buffer_to_ckey(arrays.spa_rm.buffer, msg.spa_rm_dims);
                 okey._rm_spa_max_other = msg.spa_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "spa");
             }
             if(msg.dir_rm){
-                (okey.rm_dir !== okey._rm_dir_other) && cm.free_canvas(okey._rm_dir_other);
-                okey._rm_dir_other = cm.store_from_buffer(arrays.dir_rm.buffer, msg.dir_rm_dims);
+                okey._rm_dir_other = cm.buffer_to_ckey(arrays.dir_rm.buffer, msg.dir_rm_dims);
                 okey._rm_dir_max_other = msg.dir_max.toFixed(1);
                 this._copy_options(okey._rm_other_options, msg.render_options, "dir");
             }
             if(msg.speed_rm){
-                (okey.rm_speed !== okey._rm_speed_other) && cm.free_canvas(okey._rm_speed_other);
-                okey._rm_speed_other = cm.store_from_buffer(arrays.speed_rm.buffer, msg.speed_rm_dims);
+                okey._rm_speed_other = cm.buffer_to_ckey(arrays.speed_rm.buffer, msg.speed_rm_dims);
                 this._copy_options(okey._rm_other_options, msg.render_options, "speed");
             }
             this._use_other_if_possible([okey]);
@@ -1253,13 +1238,10 @@ var use_mask = function(vector, mask, val){
                 (this.active_group_a && this.active_group_a._pkey == msg.a) && 
                 ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))){
                 // plot is of current a (and b), and generation is current
-                (this.pos_path !== this._blank_pos_path) && cm.free_canvas(this.pos_path);
-                this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))    
+                this._setPos_path(cm.buffer_to_ckey(arrays.path.buffer, msg.dims))    
             } else if(!msg.a){
                 // plot has null a and b, so store it as the blank path and set it now
-                cm.free_canvas(this.pos_path);
-                cm.free_canvas(this._blank_pos_path);
-                this._blank_pos_path = cm.store_from_buffer(arrays.path.buffer, msg.dims);
+                this._blank_pos_path = cm.buffer_to_ckey(arrays.path.buffer, msg.dims);
                 this._setPos_path(this._blank_pos_path);
             }
             
@@ -1274,8 +1256,6 @@ var use_mask = function(vector, mask, val){
                                    Palettes.flag32[this.active_group_a.group_num],
                                    this.active_group_b && Palettes.flag32[this.active_group_b.group_num]);
             } else {
-                let cm = Utils.canvas_manager;
-                (this.pos_path !== this._blank_pos_path) && cm.free_canvas(this.pos_path);
                 this._setPos_path(this._blank_pos_path);
             }
         }

@@ -469,7 +469,7 @@ background-color: rgba(0,0,0,0.2);
 
             <div style="flex:1 1 0%; position:relative;">
                 <managed-canvas style="position:absolute;"
-                canv_id="[[pos_path]]" ></managed-canvas>
+                ckey="[[pos_path]]" ></managed-canvas>
                 <div class="info_summary">
                     <div class="info_summary_text">
                         group {{_get_safe(active_group_a, 'group_num')}}
@@ -905,11 +905,11 @@ the_app._grab_group = function(e){
                 "c" + group.group_num + " [Grabbed]",
         group_num: group.group_num,
         group: {
-            waves: cm.store_copy(group.waves),
-            tac: cm.store_copy(group.tac),
-            rm_spa: cm.store_copy(group.rm_spa),
-            rm_dir: cm.store_copy(group.rm_dir),
-            rm_speed: cm.store_copy(group.rm_speed)
+            waves: cm.clone_ckey(group.waves),
+            tac: cm.clone_ckey(group.tac),
+            rm_spa: cm.clone_ckey(group.rm_spa),
+            rm_dir: cm.clone_ckey(group.rm_dir),
+            rm_speed: cm.clone_ckey(group.rm_speed)
         },
         x: e.detail.src_client_x + 20,
         y: e.detail.src_client_y + 20
@@ -917,15 +917,6 @@ the_app._grab_group = function(e){
 }
 
 the_app._close_grabbed_tile = function(e){
-    // the grabbed tile "owned" these canvases, so free them now..
-    let cm = Utils.canvas_manager;
-    let group = e.model.item.group;
-    cm.free_canvas(group.waves);
-    cm.free_canvas(group.tac);
-    cm.free_canvas(group.rm_spa);
-    cm.free_canvas(group.rm_dir);
-    cm.free_canvas(group.rm_speed);
-
     // remove the grabbed tile from the list
     the_app.splice('grabbed_tiles', the_app.grabbed_tiles.indexOf(e.model.item), 1);
 }

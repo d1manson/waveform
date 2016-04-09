@@ -1018,7 +1018,6 @@ Polymer({
             this._renderer.set_show('n');
             let cm = Utils.canvas_manager;
             for(let okey of this.groups) if(okey && okey.waves){
-                cm.free_canvas(okey.waves); // the WavesRenderer will still hold a reference to this canvas in this case 
                 this.set('groups.' + okey._pkey + '.waves', null);
             }
         } else {
@@ -1033,7 +1032,6 @@ Polymer({
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
         for(let okey of okeys_to_remove) if(okey && okey.waves){
-            cm.free_canvas(okey.waves);
             okey.waves = null; // Note we don't both to use the Polymer .set machienery, because the okey is being (at least temporarily) discarded
         }
         okeys_to_add = okeys_to_add.filter(function(okey){
@@ -1055,9 +1053,8 @@ Polymer({
             if(!key){
                 throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
             }
-            if(cm.get_canvas(okey.waves) !== el_canvas){
-                cm.free_canvas(okey.waves);  // if there was an old canvas, free it, because there's a new one now
-                okey.waves = cm.store_canvas(el_canvas);
+            if(!okey.waves || okey.waves.canvas !== el_canvas){
+                okey.waves = cm.to_ckey(el_canvas);
                 this.notifyPath('groups.' + key + '.waves', okey.waves);            
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
