@@ -1,38 +1,3 @@
-<!--
-CUSTOM ELEMENT: tile-element 
-BY: DM
-
-The tile element is designed for use within the tilewall. The idea is to encapsulate as much of the gory DOM-ish work as possible here but
-alow the main program to do all the more interesting interactivity...it's a bit of a blurred line unfortunately.
-
-Tiles have the following attibutes:
-    group_num - a number
-    group_color_1, group_color_2 - colors used for the group's sticker
-    group_n - number of spikes in group
-    proximate/active/moving/disabled - true/false. Changes the state as described below.
-
-And the following methods:
-    updateCanvas -      the tile contains a fixed number of canvases, each of which is supposed to serve a particular purpose. Use this function to swap in new canvases.
-    updateCrossHair -   specify canvasnumber and canvas (x,y) coordiantes (in css pixels not canvas pixels) or null to remove the crosshair.
-    shake/clearShake - the way this works is a bit naff - it adds a shake class to the tile, but that relies on a shake keyframes being defined 
-                        in the main index.html...perhaps there is a better way of doing this?
-    getCanvInfo -       provide a canvas number and get canvas width/height,left top. If you also provide pageX and pageY values (found in mouse event objects) you will get back the 
-                        coordinates within the canvas or null if it's outside the canvas.  TODO: actually only the more pageX/Y implementation has be written.
-    getCopyOfCanvs -    provides a div containing images that are the same as the canvases.  Confusingly, when you use this for copying to the clipboard, you will get different results
-                        depenedning on where you paste.  In gmail, you will get the ratemaps stretched to the size they appear in the GUI, but in google docs, it ignores the width/height 
-                        attributes if only one of the two is provided, though it does honour them when both are provided. This means that the ratemaps end up not being stretched in 
-                        google docs - the size of the image is dictated by the number of bins. (The waveforms have both height and width specified so they are the expected size).  That's helpful in a way
-                        but rather consfusing to say the least.
-
-There are several boolean flags that control the tile's state:
-    active,moving,proximate,disabled
-There are rules about how they can be combined, and more.  When all flags are false, the tile
-is in null state. When another tile is moving, it cannot be active instead it is hover.
-
-TODO: I think that most/all of the styling can be moved from js to css.
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/neon-animation/neon-animation-runner-behavior.html">
 <link rel="import" href="custom-animations.html">
@@ -169,10 +134,57 @@ position: relative;
 top: 45%;
 font-size: 20px;
 }
+:host(.active.moving){
+opacity: 0.5;
+border-width: 10px;
+margin: -9px;
+border-color: #000;
+background-color: #888;
+pointer-events: none;
+z-index: 100;
+box-shadow: initial;
+}
+.placeholder{
+display: none;
+}
+:host(.active.moving) .placeholder{
+display: block;
+}
+:host(.active){
+box-shadow: 0px 0px 5px 3px #fc0;
+background-color: #eee;
+}
+.over {
+display: none;
+}
+:host(.active) .over{
+display: block;
+}
+:host(.active.moving.proximate){
+background-color: initial;
+opacity: 1;
+}
+
+:host(.active.moving.proximate) .sticker{
+right: 26px;
+}
+
+:host(.active.moving.proximate) .sticker,
+:host(.active.moving.proximate) managed-canvas {
+-webkit-animation: fadeout 1.5s linear infinite;
+}
+
+:host(.disabled) .blind{
+display: block;
+};
+:host(.disabled){
+pointer-events: none;
+}
+
 </style>
 
 <template>
-    <div class="placeholder" id="placeholder" style="display: none;">
+    <div class="placeholder" id="placeholder">
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
@@ -187,7 +199,7 @@ font-size: 20px;
         <managed-canvas ckey="[[group_model.tac]]"></managed-canvas>
     </div>
     <div id='sticker' class='sticker' style$="[[_sticker_style(group_num)]]">[[group_num]]</div>
-    <div id='over' class='over' style="display:none;">
+    <div id='over' class='over'>
         <div class='side'>
             <div class="flex"></div>
             <div class='caption'>
@@ -217,58 +229,6 @@ font-size: 20px;
 <script>
     "use strict";
         
-    var ResetStyle = function(el){
-        var display = el.style.display;
-        el.style.cssText = display ? 'display:' + display : '';//if it's hidden, then keep it hidden
-        el.$.over.style.cssText = 'display:none;';
-        el.$.sticker.style.right = '';
-        el.$.sticker.style.webkitAnimation = '';
-        el.$.blind.style.cssText = '';
-        el.$.placeholder.style.display = 'none';
-        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
-        for(var ii=0; ii<canvases.length; ii++)
-            canvases[ii].style.webkitAnimation = '';
-        Polymer.dom.flush();
-    }
-    
-    var StyleActive = function(el){
-        ResetStyle(el);
-        el.style.boxShadow = '0px 0px 5px 3px #fc0';
-        el.style.backgroundColor = '#eee';
-        el.$.over.style.display = '';          
-    }
-    
-    var StyleProxiamte = function(el){
-        StyleMoving(el);
-        el.style.backgroundColor = '';
-        //TODO: need to deal with animation prefixing
-        el.style.opacity = '1';
-        el.$.sticker.style.right = '26px';
-        el.$.sticker.style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        var canvases = Polymer.dom(el.root).querySelectorAll('managed-canvas');
-        for(var ii=0; ii<canvases.length; ii++)
-            canvases[ii].style.webkitAnimation = 'fadeout 1.5s linear infinite';
-        Polymer.dom.flush();
-    }
-    
-    var StyleMoving = function(el){
-        ResetStyle(el);
-        el.style.opacity = '0.5';
-        el.style.borderWidth = '10px';
-        el.style.margin = '-9px';
-        el.style.borderColor = '#000';
-        el.style.backgroundColor = '#888';
-        el.style.pointerEvents = 'none';
-        el.style.zIndex = '100';
-        el.$.placeholder.style.display = '';
-    }
-    
-    var StyleDisabled = function(el){
-        ResetStyle(el);
-        el.$.blind.style.display = 'block';
-        el.style.pointerEvents = 'none';
-    }
-
     Polymer({
         is:'tile-element',
         behaviors: [
@@ -347,22 +307,29 @@ font-size: 20px;
         }, _sticker_style: function(group_num){
             return "background-color:" + Palettes.flag_css[group_num] + "; color:" + Palettes.flag_css_text[group_num] + ";";
         }, _update_state: function(active, moving, proximate, disabled){
-            // TODO: this can all be converted to css classes now I think
+            // TODO: the various states may be entirely separable now (it was much, much worse in the past!)
             if(disabled){
                 if(moving)
                     throw "cannot disable tile while moving";
                 this.set('active', false); // may have been true
-                StyleDisabled(this);
+                this.classList.add('disabled');
             } else if(moving){
+                this.classList.add('moving');
                 if(proximate){
-                    StyleProxiamte(this);
+                    this.classList.add('proximate');
                 }else{
-                    StyleMoving(this);
+                    this.classList.remove('proximate');
                 }
             } else if(active){
-                StyleActive(this);
+                this.classList.add('active');
+                this.classList.remove('disabled');
+                this.classList.remove('moving');
+                this.classList.remove('proximate');
             } else {
-                ResetStyle(this);
+                this.classList.remove('active');
+                this.classList.remove('disabled');
+                this.classList.remove('moving');
+                this.classList.remove('proximate');
             }
 
             if(proximate && !moving)
