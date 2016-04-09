@@ -42,6 +42,9 @@ Palettes.flag =  function(){
     return data;
 }();
 
+Palettes.flag8 = Palettes.flag;
+Palettes.flag32 = new Uint32Array(Palettes.flag.buffer);
+
 Palettes.flag_css = function(){
     var ret = [];
     for(var i=0;i<Palettes.flag.length;i+=4){

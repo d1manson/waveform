@@ -28,6 +28,7 @@ TODO: produce spike pos plots on demand
 <link rel="import" href="worker-builder.html">
 <link rel="import" href="managed-canvas.html">
 <link rel="import" href="utils.html">
+<link rel="import" href="palettes.html">
 
 <dom-module id="rm-plots">
 
@@ -62,6 +63,7 @@ var pkey_to_rendered_options = new Map();
 var pkeys_pending_render = [];
 var timer;
 var pkey_generation = 0;
+var pending_path_plot = null;
 
 // cached stuff.... see clear_cache for logic for cleaning the cache
 var cached_spike_pos_ind;
@@ -75,9 +77,10 @@ var cached_speed_dwell;
 var cached_spike_xy_bins;
 var cached_spike_dir_bins;
 var cached_spike_speed_bins;
+var cached_path;
 
-var n_bins_xy_0; //these are cached as well, but they are managed as a "side effect" of xy_bins
-var n_bins_xy_1; 
+var n_bins_xy_0, n_bins_xy_1; //these are cached as well, but they are managed as a "side effect" of xy_bins
+var cached_spike_xy_raw; // and this is managed as a "side effect" of cached_spike_xy_bins
 
 var palette = function(){
     var p_colors = 5;
@@ -139,20 +142,14 @@ var set_pos_xy = function(timebase, units_per_cm, max_x, max_y, arrays){
     pos_units_per_cm = units_per_cm; // note that dir and speed are already in their final units
     xy_max = [max_x, max_y];
     pos_xy = arrays && arrays.data;
+
+    if(!pending_path_plot){
+        pending_path_plot = {a: null, b: null};
+    }
     build_cache();
     make_all_pkeys_pending();
     touch_timer();
 
-    // TODO: do this using timer, and give more options etc. and maybe need a generation counter too.
-    if(pos_xy){
-       let im = draw_lines(pos_xy, 256, 256, 256/Math.max(max_x, max_y));
-       exec_main_b('plot_path', {
-        path: 'path',
-        dims: [256, 256]
-       }, {
-        path: im
-       });
-    }
 }
 
 var set_pos_dir = function(timebase, arrays){
@@ -214,6 +211,7 @@ var update_pkeys = function(changes, arrays){
     if(changes.generation_add !== changes.generation_remove){
         pkeys_pending_render = [];
         pkey_generation = changes.generation_add;
+        pending_path_plot = null;
     }
 
     var add_pkeys = changes.add || [];
@@ -231,9 +229,13 @@ var touch_timer = function(){
     // note it's not actually a timer, because the interval is zero!
     // the point of using this is that it enables messages from main thread to interupt
     // between ticks, we can thus cancel work as an when needed.
-    if(spike_times && pkeys_pending_render.length && show && show !== 'nnn' &&
-        (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
-            && (show[2] === 'n' || cached_speed_bins)){
+
+    if((spike_times && pkeys_pending_render.length && 
+            show && show !== 'nnn' &&
+            (show[0] === 'n' || cached_xy_bins) && (show[1] === 'n' || cached_dir_bins) 
+            && (show[2] === 'n' || cached_speed_bins)) || 
+        (pending_path_plot && can_process_plot_path())){
+        
         timer = timer || setImmediate(timer_tick);
     } else {
         clearImmediate(timer);
@@ -281,6 +283,10 @@ var copy_options = function(dest, src, kind){
 
 var timer_tick = function(){
     timer = 0;
+
+    if(pending_path_plot && can_process_plot_path()){
+        process_plot_path();
+    } 
 
     // find one valid thing to render...
     // this is somewhat ugly, but whatever.
@@ -347,12 +353,14 @@ var clear_cache = function(names){
     if(names.has('spikes_timebase') || names.has('pos_timebase') || names.has('spike_times')){
         cached_spike_pos_ind = undefined;
         cached_spike_xy_bins = undefined;
+        cached_spike_xy_raw = undefined;
         cached_spike_dir_bins = undefined;
         cached_spike_speed_bins = undefined;
         pkey_to_rendered_options.clear(); //whatever we had is now irrelevant
     }
 
     if(names.has('pos_xy')){
+        cached_path = undefined;
         let null_opts = {};
         for(let opts of pkey_to_rendered_options.values()){
             copy_options(opts, null_opts, "spa");
@@ -363,6 +371,7 @@ var clear_cache = function(names){
         cached_xy_dwell = undefined;
         cached_xy_no_dwell = undefined;
         cached_spike_xy_bins = undefined;
+        cached_spike_xy_raw = undefined;
     } else if(names.has('smoothing_spa_bins')){
         cached_xy_dwell = undefined;
     }
@@ -410,6 +419,7 @@ var build_cache = function(){
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
         make_cached_xy_bins_and_dwell();
+        cached_path = draw_lines(pos_xy, 256, 256, 256/Math.max(xy_max[0], xy_max[1]));
     }
 
     if(show && show[1] === 'y'
@@ -454,6 +464,8 @@ var make_cached_xy_bins_and_dwell = function(){
     //same form as cached_xy_bins, but we store it as 2byte blocks for easy picking
     cached_spike_xy_bins = pick(new Uint16Array(cached_xy_bins.buffer), cached_spike_pos_ind); 
                 
+    cached_spike_xy_raw = pick(new Uint32Array(pos_xy.buffer), cached_spike_pos_ind); // the _raw version if for plotting spikes on the path
+
     n_bins_xy_1 = Math.ceil(xy_max[1]*factor) + 1; // +1 is because of zero indexing
     n_bins_xy_0 = Math.ceil(xy_max[0]*factor) + 1;   
 
@@ -628,6 +640,57 @@ var plot_histogram = function(w, h, vals){
     return im;
 }
 
+
+var can_process_plot_path = function(){
+    return cached_path && 
+           (!pending_path_plot.a || pkey_to_array.has(pending_path_plot.a)) &&
+           (!pending_path_plot.b || pkey_to_array.has(pending_path_plot.b));
+}
+
+var process_plot_path = function(){
+    let im = new Uint32Array(cached_path);
+
+    if(pending_path_plot.a){
+      //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
+      let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.a)); 
+            
+      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+                   im, pending_path_plot.color_a, 1);
+    }
+
+    if(pending_path_plot.b){
+      //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
+      let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.b)); 
+            
+      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+                  im, pending_path_plot.color_b, 1);
+    }
+   
+    exec_main_b('plot_path', {
+        path: 'path',
+        dims: [256, 256],
+        generation: pkey_generation,
+        a: pending_path_plot.a,
+        b: pending_path_plot.b,
+        color_a: pending_path_plot.color_a,
+        color_b: pending_path_plot.color_b
+    }, {
+        path: im
+    });
+   pending_path_plot = null;
+}
+
+
+var plot_path = function(pkey_a, pkey_b, color_a, color_b){
+    pending_path_plot = {
+        a: pkey_a,
+        b: pkey_b,
+        color_a: color_a,
+        color_b: color_b
+    };
+    touch_timer();
+}
+
 // TODO: come with a better method than copy-pasting utility functions ....
 
 var hist_1 = function(inds, n_bins){
@@ -723,6 +786,20 @@ var is_equal_simple = function(a, b){
         }
     }
     return true;
+}
+
+var draw_points = function(xy, w, h, scale, im, color, k){
+    for(let ii=0; ii<xy.length; ii+=2){
+        let start_0 = Math.max(0, xy[ii+0]*scale-k) | 0;
+        let end_0 = Math.min(w, xy[ii+0]*scale+k+1) | 0;
+        let start_1 = Math.max(0, xy[ii+1]*scale-k) | 0;
+        let end_1 = Math.min(h, xy[ii+1]*scale+k+1) | 0;
+        for(let p0=start_0; p0<end_0; p0++){
+            for(let p1=start_1; p1<end_1; p1++){
+                im[p1*w + p0] = color;
+            }
+        }
+    }
 }
 
 var draw_lines = function(xy, w, h, scale, im, color){
@@ -849,6 +926,14 @@ var use_mask = function(vector, mask, val){
                 type: Array,
                 notify: true,
                 observer: '_want_spike_times_set'
+            },
+            active_group_a: {
+                type: Object,
+                notify: true
+            },
+            active_group_b: {
+                type: Object,
+                notify: true
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -857,7 +942,8 @@ var use_mask = function(vector, mask, val){
             '_pos_xy_modified(pos_xy)',
             '_pos_dir_modified(pos_dir)',
             '_pos_speed_modified(pos_speed)',
-            '_times_modified(spike_times)'
+            '_times_modified(spike_times)',
+            '_update_pos_path(active_group_a, active_group_b)'
         ], created: function(){
             // copy-paste defaults from worker code above (could implement
             // something  more complicated, but hey this works and is easy).
@@ -1036,6 +1122,10 @@ var use_mask = function(vector, mask, val){
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'nnn', because then it won't bother doing anything.
         }, _pos_xy_modified: function(){
+            let cm = Utils.canvas_manager;
+            cm.free_canvas(this.pos_path);
+            cm.free_canvas(this._blank_pos_path);
+            this._blank_pos_path = null;
             this._setPos_path(null);
             if(this.show && this.show[0] === 'y'){
                 if(this.pos_xy){
@@ -1157,9 +1247,37 @@ var use_mask = function(vector, mask, val){
             this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
-            var cm = Utils.canvas_manager;
-            cm.free_canvas(this.pos_path);
-            this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))
+            let cm = Utils.canvas_manager;
+
+            if(msg.a && this._pkey_generation == msg.generation &&
+                (this.active_group_a && this.active_group_a._pkey == msg.a) && 
+                ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))){
+                // plot is of current a (and b), and generation is current
+                (this.pos_path !== this._blank_pos_path) && cm.free_canvas(this.pos_path);
+                this._setPos_path(cm.store_from_buffer(arrays.path.buffer, msg.dims))    
+            } else if(!msg.a){
+                // plot has null a and b, so store it as the blank path and set it now
+                cm.free_canvas(this.pos_path);
+                cm.free_canvas(this._blank_pos_path);
+                this._blank_pos_path = cm.store_from_buffer(arrays.path.buffer, msg.dims);
+                this._setPos_path(this._blank_pos_path);
+            }
+            
+        }, _update_pos_path: function(){
+            if(this.active_group_a){
+                // note we are slightly lazy in so far as we don't watch for changes of group_num
+                // while current active groups are unchanged..this is difficult/impossible to
+                // actually cause you use the console or something.
+                this._worker.exec('plot_path', 
+                                   this.active_group_a._pkey,
+                                   this.active_group_b  && this.active_group_b._pkey,
+                                   Palettes.flag32[this.active_group_a.group_num],
+                                   this.active_group_b && Palettes.flag32[this.active_group_b.group_num]);
+            } else {
+                let cm = Utils.canvas_manager;
+                (this.pos_path !== this._blank_pos_path) && cm.free_canvas(this.pos_path);
+                this._setPos_path(this._blank_pos_path);
+            }
         }
     });
 </script>

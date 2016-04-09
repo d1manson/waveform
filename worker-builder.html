@@ -279,7 +279,7 @@ self.created && self.created();
             this._listener[foo].apply(this._listener, e.data.args);
         }catch(err){
             if(foo === "console.log"){
-                console.log(e.data.args);
+                console.log.apply(console, e.data.args);
             } else if(foo === "set_array_on_main_window"){
                 window[e.data.args[1]] = new window[e.data.args[2]](e.data.args[0]);
             } else {
