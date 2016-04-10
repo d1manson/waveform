@@ -13,6 +13,102 @@ Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off
 <link rel="import" href="palettes.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 
+
+<dom-module id="paint-tool">
+<style>
+:host{
+display: inline-block;
+opacity: 0.4;
+}
+</style>
+<template>
+    <canvas id="canv" width="[[width]]" height="[[height]]"></canvas>
+</template>
+
+<script>
+"use strict";
+
+Polymer({
+    is: 'paint-tool',
+    properties: {
+        width: {
+            type: Number,
+            notify: true
+        },
+        height: {
+            type: Number,
+            notify: true
+        },
+        negative: {
+            type: Boolean
+        },
+        r: {
+            type: Number,
+            notify: true
+        },
+        active: {
+            type: Boolean,
+            notify: true,
+            value: false
+        },
+        color: {
+            type: String,
+            value: '#003300'
+        }
+    }, observers: [
+        '_set_state(active, negative, color, width, height)'
+    ], _set_state : function(active, negative, color, width, height){
+        this._ctx = this.$.canv.getContext('2d');
+        if(active){
+            (!this._mousemove_bound) && (this._mousemove_bound = this._mousemove.bind(this));
+            (!this._bound) && document.addEventListener('mousemove', this._mousemove_bound);
+            this._bound = true;
+
+            this._old_x = null;
+            this._old_y = null;
+
+            if(this.negative){
+                this._ctx.fillStyle = color;
+                this._ctx.globalCompositeOperation = "source-over";  
+                this._ctx.fillRect(0, 0, width, height);
+                this._ctx.globalCompositeOperation = "destination-out";
+            } else {
+                this._ctx.globalCompositeOperation = "source-over";         
+                this._ctx.clearRect(0, 0, width, height);
+            }
+        } else {
+            this._bound && document.removeEventListener('mousemove', this._mousemove_bound);
+            this._bound = false;
+            this._ctx.clearRect(0, 0, width, height);
+        }
+    }, _mousemove: function(e){
+
+        let rect = this.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+        if(this._old_x === null){
+            this._old_x = x-0.0001;
+            this._old_y = y;
+        }
+
+        this._ctx.beginPath();
+        this._ctx.lineWidth = this.r*2;
+        this._ctx.strokeStyle = this.color;
+        this._ctx.lineCap = 'round';
+        this._ctx.moveTo(this._old_x, this._old_y);
+        this._ctx.lineTo(x, y);
+        this._ctx.stroke();
+        this._ctx.closePath();
+
+        this._old_x = x;
+        this._old_y = y;
+    }
+});
+
+
+</script>
+</dom-module>
+
 <dom-module id="cluster-plots">
 
 <script is='worker-builder' id="worker" title="cluster-plots" type='javascript/worker'>
@@ -234,8 +330,9 @@ background-color: rgba(0,0,0,0.2);
 }
 .bottom{
 flex: 2;
-overflow-y: scroll;
 text-align: center;
+position: relative;
+cursor: none;
 }
 .active_stickers{
 float: left;
@@ -281,7 +378,7 @@ font-size: 10px;
     <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size"  target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size"  target="[[keyboard_target]]"></iron-a11y-keys>
 
-    <div class="top">
+    <div class="top" style$="[[_scroll_shadow(scrolled_down)]]">
         <div class="active_stickers">
             <div class="sticker_list">
                 <div class="sticker" style$="{{_sticker_style(painter_state.dest, active_group_a)}}" 
@@ -310,15 +407,19 @@ font-size: 10px;
         </div>
     </div>
 
-    <div class="bottom">
-        <template is="dom-repeat" items="[[cluster_plots]]">
-            <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" 
-                        on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
-               <div class="x_axis_label">[[item.x_axis]]</div>
-               <div class="y_axis_label">[[item.y_axis]]</div>
-            </div>
-        </template>
+    <div class="bottom" id="bottom" on-mousedown="_start_paint" on-mousemove="_mousemove">
+        <div style="position: absolute; top:0; left:0; right:0; bottom: 0;overflow-y: scroll;" on-scroll="_update_scrolled_down">
+            <template is="dom-repeat" items="[[cluster_plots]]">
+                <div class="plot" style$="{{_show(item.is_used)}}">
+                   <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" 
+                            on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
+                   <div class="x_axis_label">[[item.x_axis]]</div>
+                   <div class="y_axis_label">[[item.y_axis]]</div>
+                </div>
+            </template>
+        </div>
+        <cross-hair r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
+        </div>
     </div>
 
 </template>
@@ -331,57 +432,68 @@ font-size: 10px;
                 type: Number,
                 notify: true,
                 value: 128
-            },
-            amplitudes: {
+            }, amplitudes: {
                 type: Object,
                 notify: true,
                 value: function(){return {};}
-            },
-            cluster_plots: {
+            }, cluster_plots: {
                 type: Array,
                 notify: true,
                 value: function(){return [];}
-            },
-            groups: {
+            }, groups: {
                 type: Array,
                 notify: true,
                 value: function(){return [];},
                 observer: '_groups_set'
-            },
-            painter_state: {
+            }, painter_state: {
                 type: Object,
                 notify: true,
                 value: function(){return {
                     srcs: [0],
                     dest: 0
                 }}
-            },
-            other_groups:{
+            }, other_groups:{
                 type: Array,
                 notify: true,
                 value: function(){return [];},
                 readOnly: true // TODO: this is really a computed-property, but I couldn't get it to work with .splices
                                 // instead we use observers
-            },
-            keyboard_target: {
+            }, keyboard_target: {
                 type: Object,
                 value: function(){return document.querySelector('body');}
-            },
-            want_amplitudes: {
+            }, want_amplitudes: {
                 type: Array,
                 notify: true,
                 observer: '_want_amplitudes_set'
-            },
-            active_group_a:{
+            }, active_group_a:{
                 type: Object,
                 value: null,
                 notify: true
-            }
+            }, painter_r: {
+                type: Number,
+                notify: true,
+                observer: '_painter_r_changed'
+            }, mouse_x: {
+                type: Number,
+                notify: true,
+                readOnly: true
+            }, mouse_y: {
+                type: Number,
+                notify: true,
+                readOnly: true
+            }, scrolled_down: {
+                type: Boolean,
+                value: false,
+                notify: true,
+                readOnly: true
+            },
         }, observers: [
             '_groups_spliced(groups.splices)',
             '_compute_unused_groups(painter_state.*)',
             '_amplitudes_modified(amplitudes)'
-        ], created: function(){
+        ], listeners: {
+            'mousewheel': '_scroll'
+        }, created: function(){
             var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
             this._worker = worker_builder.create_for(this);
             this._worker.exec_b('set_palettes', {flag: Palettes.flag.slice(0)});
@@ -551,6 +663,75 @@ font-size: 10px;
                 return okey
             }
             return null;
+        }, _start_paint: function(e){
+            this._painter_el = document.createElement('paint-tool');
+            this._painter_el.set('width', this.canvas_size);
+            this._painter_el.set('height', this.canvas_size);
+            this._painter_el.set('r', this.painter_r);
+            this._painter_el.style.position = 'absolute';
+            this._painter_el.style.top = '1px';
+            this._painter_el.style.left = '1px';
+            this._painter_el.set('negative', e.button !== 0);
+            this._painter_el.set('active', true);
+
+            // work out which plot is closest (or underneath) the click location...
+            let plots = Polymer.dom(this.root).querySelectorAll('.plot');
+            let min_dist = Infinity;
+            let best_ii;
+            for(let [ii, plot] of plots.entries()){
+                let rect = plot.getBoundingClientRect();
+                let x_dist = e.clientX < rect.left ? 
+                                 e.clientX - rect.left
+                             : e.clientX > rect.left + rect.width ?
+                                 e.clientX - (rect.left + rect.width)
+                             : 0;
+                let y_dist = e.clientY < rect.top ? 
+                                 e.clientY - rect.top
+                             : e.clientY > rect.top + rect.height ?
+                                 e.clientY - (rect.top + rect.height)
+                             : 0;
+                let dist = Math.hypot(x_dist, y_dist);
+                if(dist === 0){
+                    best_ii = ii;
+                    break;
+                } else if(dist< min_dist){
+                    best_ii = ii;
+                    min_dist = dist;
+                }
+            }
+
+            plots[best_ii].appendChild(this._painter_el);
+            (!this._end_paint_bound) && (this._end_paint_bound = this._end_paint.bind(this));
+            document.addEventListener('mouseup', this._end_paint_bound, true);
+            Polymer.dom.flush();
+            this.fire('paint',{
+                state: 'start'
+            });
+            this._painter_el._mousemove(e);
+        }, _end_paint: function(){
+            document.removeEventListener('mouseup', this._end_paint_bound, true);
+            this._painter_el.set('active', false);
+            this._painter_el.parentNode.removeChild(this._painter_el);
+            this._painter_el = null;
+            this.fire('paint',{
+                state: 'end'
+            });
+        }, _scroll: function(e){
+            let inc = e.wheelDelta > 0 ? 5 : -5;
+            this.set('painter_r', Math.max(Math.min(this.painter_r + inc, 80), 5));
+            e.preventDefault();
+        }, _mousemove: function(e){
+            let rect = this.$.bottom.getBoundingClientRect();
+            this._setMouse_x(e.clientX - rect.left);
+            this._setMouse_y(e.clientY - rect.top);
+        }, _painter_r_changed: function(){
+            if(this._painter_el){
+                this._painter_el.set('r', this.painter_r);
+            }
+        }, _update_scrolled_down: function(e){
+            this._setScrolled_down(e.target.scrollTop > 0);
+        }, _scroll_shadow: function(v){
+            return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
         }
     });
 </script>

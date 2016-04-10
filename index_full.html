@@ -487,7 +487,9 @@ background-color: rgba(0,0,0,0.2);
                amplitudes="[[amplitudes]]"
                canvas_size="{{options.cluster_plot_size}}"
                want_amplitudes="{{want_amplitudes}}"
-               active_group_a="{{active_group_a}}">
+               active_group_a="{{active_group_a}}"
+               painter_r="{{options.cluster_painter_r}}"
+               on-paint="_paint">
                </cluster-plots>
 
         </iron-resize-notifier>
@@ -652,6 +654,7 @@ the_app._sanitize_options = function(stored_options) {
         header_filter: '',
         spa_rm_height: 120,
         cluster_plot_size: 128,
+        cluster_painter_r: 15,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
         splitter_c_size: "350px",
@@ -710,6 +713,15 @@ the_app._splitter = function(e){
     }
 }
 
+the_app._paint = function(e){
+    if(e.detail.state === "start"){
+        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+    }
+
+    if(e.detail.state === "end"){
+        this.set('disable_shortcuts', false);
+    }
+}
 
 the_app._merge_groups = function(e){
     if(the_app.tile_wall_is_empty){

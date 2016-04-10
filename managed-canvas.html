@@ -28,8 +28,7 @@ Polymer({
     }, listeners: {
         'mousemove': '_onmousemove',
         'mousedown': '_onmousedown',
-        'mouseup': '_onmouseup',
-        'iron-resize': '_height_changed'
+        'mouseup': '_onmouseup'
     }, _update: function(){
         var old = Polymer.dom(this.root).firstChild;
         if(old){
