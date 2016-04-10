@@ -475,7 +475,7 @@ background-color: rgba(0,0,0,0.2);
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots style="flex:0 0 0%;"
+            <cluster-plots id="cluster_plots"  style="flex:0 0 0%;"
                groups="[[cut_groups]]"
                painter_state="{{cut_painter_state}}"
                amplitudes="[[amplitudes]]"
@@ -501,6 +501,7 @@ background-color: rgba(0,0,0,0.2);
             on-merge_groups="_merge_groups"
             on-grab_group="_grab_group"
             on-splitter="_splitter"
+            on-tap_group="_highlight_group"
             ></tile-wall>
 
     </div>
@@ -746,6 +747,10 @@ the_app.swap_groups = function(){
     }
 
     the_app.$.cut.swap_groups(a, b);
+}
+
+the_app._highlight_group = function(e){
+    the_app.$.cluster_plots.highlight_group(e.detail.group_num);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877

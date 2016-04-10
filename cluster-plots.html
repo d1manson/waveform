@@ -147,36 +147,40 @@ var plots = (function(){
 
 var update_pkeys = function(changes, options, arrays){
 
-    if(changes.generation_remove !== pkey_generation){
-        changes.remove = [];
-        pkey_to_array.clear();
-        pkey_to_rendered_options.clear();
-        pkeys_pending_render = [];
-        console.log("tac-plots worker: key generation mismatch");
+    if(changes){
+        if(changes.generation_remove !== pkey_generation){
+            changes.remove = [];
+            pkey_to_array.clear();
+            pkey_to_desired_options.clear();
+            pkeys_pending_render = [];
+            console.log("tac-plots worker: key generation mismatch");
+        }
+
+        // note we don't both to remove keys from the pending list
+        // unless we change key generation, in which case we drop 
+        // everything that's pending. This is ensures that when we
+        // attempt a render we can be sure that if we do find the
+        // array for the given key we know it's for the relevant 
+        // generation and that it's still wanted.
+
+        var remove_pkeys = changes.remove || [];
+        for(let pkey of remove_pkeys){
+            pkey_to_array.delete(pkey);
+            pkey_to_desired_options.delete(pkey);
+        }
+
+        if(changes.generation_add !== changes.generation_remove){
+            pkeys_pending_render = [];
+            pkey_generation = changes.generation_add;
+        }
+
+        let add_pkeys = changes.add || [];
+        for(let pkey of add_pkeys){
+            pkey_to_array.set(pkey, arrays[pkey]);
+        }
+
     }
 
-    // note we don't both to remove keys from the pending list
-    // unless we change key generation, in which case we drop 
-    // everything that's pending. This is ensures that when we
-    // attempt a render we can be sure that if we do find the
-    // array for the given key we know it's for the relevant 
-    // generation and that it's still wanted.
-
-    var remove_pkeys = changes.remove || [];
-    for(let pkey of remove_pkeys){
-        pkey_to_array.delete(pkey);
-        pkey_to_desired_options.delete(pkey);
-    }
-
-    if(changes.generation_add !== changes.generation_remove){
-        pkeys_pending_render = [];
-        pkey_generation = changes.generation_add;
-    }
-
-    var add_pkeys = changes.add || [];
-    for(let pkey of add_pkeys){
-        pkey_to_array.set(pkey, arrays[pkey]);
-    }
 
     for(let item of options){
         pkey_to_desired_options.set(item.pkey, item);
@@ -815,6 +819,15 @@ font-size: 10px;
             return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
         }, _show: function(v){
             return v>=0 ? '' : 'display: none;';
+        }, highlight_group: function(group_num){
+             let okey = this.groups[group_num];
+             if(!okey){
+                return;
+             }
+             this._worker.exec('update_pkeys',null,[{
+                pkey: okey._pkey,
+                group_num: group_num
+                }]);
         }
     });
 </script>

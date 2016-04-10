@@ -49,6 +49,7 @@ background-color: rgba(0,0,0,0.2);
             on-mouseenter="_mouseenter_tile"
             on-mouseleave="_mouseleave_tile"
             on-track="_track_tile"
+            on-tap="_tap_tile"
             ></tile-element>        
     </template>
 </template>
@@ -222,6 +223,8 @@ background-color: rgba(0,0,0,0.2);
             this.fire('splitter', {
                 state: e.button === 0 ? 'finalize' : 'cancel'
             });
+        }, _tap_tile: function(e){
+            this.fire('tap_group', e.model.item);
         }
     });
 </script>
