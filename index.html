@@ -16514,12 +16514,12 @@ pointer-events: none;
         <template is="dom-if" if="[[splitter_metrics]]">
             <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
         </template>
-        <managed-canvas ckey="[[group_model.rm_spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
+        <managed-canvas ckey="[[group_model.rm.spa]]" fix_height="[[spa_rm_height]]"></managed-canvas>
     </div>
     <div class="canvas_part_2">
         <div>
-            <managed-canvas ckey="[[group_model.rm_dir]]"></managed-canvas>
-            <managed-canvas ckey="[[group_model.rm_speed]]"></managed-canvas>
+            <managed-canvas ckey="[[group_model.rm.dir]]"></managed-canvas>
+            <managed-canvas ckey="[[group_model.rm.speed]]"></managed-canvas>
         </div>
         <managed-canvas ckey="[[group_model.tac]]"></managed-canvas>
     </div>
@@ -16528,17 +16528,13 @@ pointer-events: none;
         <div class="side">
             <div class="flex"></div>
             <div class="caption">
-                <div style$="[[_show(group_model.rm_spa_max)]]" class="caption_inner">
-                    [[group_model.rm_spa_max]]Hz
+                <div style$="[[_show(group_model.rm.spa_max)]]" class="caption_inner">
+                    [[group_model.rm.spa_max]]Hz
                     <div class="caption_inner-label">spa max</div>
                 </div>
-                <div style$="[[_show(group_model.rm_dir_max)]]" class="caption_inner">
-                    [[group_model.rm_dir_max]]Hz
+                <div style$="[[_show(group_model.rm.dir_max)]]" class="caption_inner">
+                    [[group_model.rm.dir_max]]Hz
                     <div class="caption_inner-label">dir max</div>
-                </div>
-                <div style$="[[_show(group_model.group_mean)]]" class="caption_inner">
-                    [[group_model.group_mean]]Hz
-                    <div class="caption_inner-label">mean</div>
                 </div>
                 <div class="caption_inner">[[group_model.n_spikes]]
                     <div class="caption_inner-label">n spikes</div>
@@ -16750,6 +16746,20 @@ Polymer.Collection.prototype.initMap = function() {
     }
   }
 }
+
+
+
+/* Optimize bad perf func, this was getting deopt'ed by Chrome.
+   For some reason this doesn't monkey-patch all uses.
+*/
+Polymer.Bind._modelApi._clearPath = function (path) {
+  let keys = Object.keys(this.__data__);
+  path = path + ".";
+  for(let key of keys){
+    (key.substring(0, path.length) === path) && (this.__data__[key] = undefined);
+  }
+}
+
 </script><script>
 
 var Utils = {}
@@ -17042,7 +17052,7 @@ background-color: rgba(0,0,0,0.2);
     </div>
 
     <template is="dom-repeat" items="[[groups]]">
-        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}" disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile"></tile-element>        
+        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}" disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile" on-tap="_tap_tile"></tile-element>        
     </template>
 </template>
 
@@ -17215,6 +17225,8 @@ background-color: rgba(0,0,0,0.2);
             this.fire('splitter', {
                 state: e.button === 0 ? 'finalize' : 'cancel'
             });
+        }, _tap_tile: function(e){
+            this.fire('tap_group', e.model.item);
         }
     });
 </script>
@@ -17944,20 +17956,26 @@ cursor: default;
             }
         }, _make_okey: function(inds, num){
             return {
+
                 group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
                 akey: Utils.typed_array_manager.to_akey(inds),
 
-                // Theses properties are visualized by the tile element
+                // The following properties are visualized by the tile element
+                // and must thus be notified when changes are made.  Note that
+                // for efficiency of notification, the rm is always changed in
+                // its entirerity, i.e. a new object is assigned.
                 n_spikes: inds.length,
-                rm_spa_max: "",
-                rm_dir_max: "",
-                rm_dir: "",
-                rm_spa: "",
-                rm_speed: "",
                 tac: "",
                 waves: "",
+                rm: { 
+                    spa_max: "",
+                    dir_max: "",
+                    dir: null,
+                    spa: null,
+                    speed: null
+                },
 
                 // private properties for use by tac-plots module, never notified
                 _tac_other: null,
@@ -18183,7 +18201,7 @@ cursor: default;
                                                     (src_nums.length > 1? 's [' + src_nums.join(",")  +']' : ' ' + src_nums[0]));
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.redo_stack.splice(0, this.redo_stack.length); // clear
-            
+
         }, _do_transplant: function(delta){
             let dest_group = this.groups[delta.dest];
             // we need to do a merge-sort on all the masked srcs and dest indicies
@@ -23505,9 +23523,13 @@ var timer_tick = function(){
         process_plot_path();
     } 
 
-    // find one valid thing to render...
+    let batch_limit = 5; // a bit arbitrary
+    let arrays={};
+    let msgs = [];
+
+    // find batch_limit things to render...
     // this is somewhat ugly, but whatever.
-    while(pkeys_pending_render.length > 0){
+    while(pkeys_pending_render.length > 0 && msgs.length < batch_limit){
         let pkey = pkeys_pending_render.shift();
         let pkey_rendered_options = pkey_to_rendered_options.get(pkey)
         let inds =  pkey_to_array.get(pkey);
@@ -23521,37 +23543,38 @@ var timer_tick = function(){
                 generation: pkey_generation,
                 render_options: render_options // note we send all options regardless of show 'n'
             }
-            let arrays={};
-
+            msgs.push(msg);
             if(show[0] === 'y' && !options_match(pkey_rendered_options, render_options, "spa")){
                     let res = get_group_xy_rm(inds);
-                    msg.spa_rm = 'spa_rm';
+                    msg.spa_rm = pkey + ' spa_rm';
                     msg.spa_max = res.max;
                     msg.spa_rm_dims = [n_bins_xy_1, n_bins_xy_0];
-                    arrays.spa_rm = res.im;
+                    arrays[msg.spa_rm] = res.im;
                     copy_options(pkey_rendered_options, render_options, "spa");
             }
 
             if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
                     let res = get_group_dir_rm(inds);
-                    msg.dir_rm = 'dir_rm';
+                    msg.dir_rm = pkey + ' dir_rm';
                     msg.dir_max = res.max;
                     msg.dir_rm_dims = [dir_plot_size, dir_plot_size];
-                    arrays.dir_rm = res.im;
+                    arrays[msg.dir_rm] = res.im;
                     copy_options(pkey_rendered_options, render_options, "dir");
             }
 
             if(show[2] === 'y' && !options_match(pkey_rendered_options, render_options, "speed")){
                 let im = get_group_speed_rm(inds);
-                msg.speed_rm = 'speed_rm';
+                msg.speed_rm = pkey + ' speed_rm';
                 msg.speed_rm_dims = speed_plot_size;
-                arrays.speed_rm = im;
+                arrays[msg.speed_rm] = im;
                 copy_options(pkey_rendered_options, render_options, "speed");
             }
 
-            exec_main_b('plot_things', msg, arrays);
-            break;
         }
+    }
+
+    if(msgs.length){
+        exec_main_b('plot_things', msgs, arrays);        
     }
 
     touch_timer();
@@ -24207,9 +24230,9 @@ var use_mask = function(vector, mask, val){
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                okey.rm_spa = null;
-                okey.rm_dir = null;
-                okey.rm_speed = null;
+                okey.rm.spa = null;
+                okey.rm.dir = null;
+                okey.rm.speed = null;
                 okey._rm_spa_other = null;
                 okey._rm_dir_other = null;
                 okey._rm_speed_other = null;
@@ -24234,40 +24257,38 @@ var use_mask = function(vector, mask, val){
             for(let okey of okeys) if(okey){
                 let op; // 0 : no-op, +1 : use _other values, -1: set to null
                 let same; // are the okey.rm_x and okey._rm_x_other the same?
+                let rm = okey.rm = Object.assign({}, okey.rm); // assign a copy so we can notify once for multiple changes (notify at end of iteration)
 
                 // spa
-                same = okey.rm_spa === okey._rm_spa_other;
+                same = rm.spa === okey._rm_spa_other;
                 op = this.show[0] === 'n' ? 
-                         ( okey.rm_spa ? -1 : 0 )
+                         ( rm.spa ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
                 if(op){
-                    okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
-                    okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
+                    okey.rm.spa = op === 1 ? okey._rm_spa_other : null;
+                    rm.spa_max = op === 1 ? okey._rm_spa_max_other : null;
                 }
 
                 // dir
-                same = okey.rm_dir === okey._rm_dir_other;
+                same = rm.dir === okey._rm_dir_other;
                 op = this.show[1] === 'n' ? 
-                         ( okey.rm_dir ? -1 : 0 )
+                         ( rm.dir ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
                 if(op){
-                    okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
-                    okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
+                    rm.dir = op === 1 ? okey._rm_dir_other : null;
+                    rm.dir_max = op === 1 ? okey._rm_dir_max_other : null;
                 }
 
                 // speed
-                same = okey.rm_speed === okey._rm_speed_other;
+                same = rm.speed === okey._rm_speed_other;
                 op = this.show[2] === 'n' ? 
-                         ( okey.rm_speed ? -1 : 0 )
+                         ( rm.speed ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
                 if(op){
-                    okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
+                    rm.speed = op === 1 ? okey._rm_speed_other : null;
                 }
+
+                this.notifyPath('groups.' + okey._pkey + '.rm', rm);
             }
 
         }, _options_modified: function(){
@@ -24423,30 +24444,32 @@ var use_mask = function(vector, mask, val){
                 dest.max_speed = src.max_speed;
                 dest.cps_per_speed_bin = src.cps_per_speed_bin;
             }
-        }, plot_things: function(msg, arrays) {
-            if(msg.generation !== this._pkey_generation){
-                return; // pft! get with the times, dude.
+        }, plot_things: function(msgs, arrays) {
+            for (let msg of msgs){
+                if(msg.generation !== this._pkey_generation){
+                    return; // pft! get with the times, dude.
+                }
+                let okey = this._groups_collection.getItem(msg.pkey);
+                if(!okey){
+                    return;
+                }
+                let cm = Utils.canvas_manager;
+                if(msg.spa_rm){
+                    okey._rm_spa_other = cm.buffer_to_ckey(arrays[msg.spa_rm].buffer, msg.spa_rm_dims);
+                    okey._rm_spa_max_other = msg.spa_max.toFixed(1);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "spa");
+                }
+                if(msg.dir_rm){
+                    okey._rm_dir_other = cm.buffer_to_ckey(arrays[msg.dir_rm].buffer, msg.dir_rm_dims);
+                    okey._rm_dir_max_other = msg.dir_max.toFixed(1);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                }
+                if(msg.speed_rm){
+                    okey._rm_speed_other = cm.buffer_to_ckey(arrays[msg.speed_rm].buffer, msg.speed_rm_dims);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "speed");
+                }
+                this._use_other_if_possible([okey]);
             }
-            let okey = this._groups_collection.getItem(msg.pkey);
-            if(!okey){
-                return;
-            }
-            let cm = Utils.canvas_manager;
-            if(msg.spa_rm){
-                okey._rm_spa_other = cm.buffer_to_ckey(arrays.spa_rm.buffer, msg.spa_rm_dims);
-                okey._rm_spa_max_other = msg.spa_max.toFixed(1);
-                this._copy_options(okey._rm_other_options, msg.render_options, "spa");
-            }
-            if(msg.dir_rm){
-                okey._rm_dir_other = cm.buffer_to_ckey(arrays.dir_rm.buffer, msg.dir_rm_dims);
-                okey._rm_dir_max_other = msg.dir_max.toFixed(1);
-                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-            }
-            if(msg.speed_rm){
-                okey._rm_speed_other = cm.buffer_to_ckey(arrays.speed_rm.buffer, msg.speed_rm_dims);
-                this._copy_options(okey._rm_other_options, msg.render_options, "speed");
-            }
-            this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
             let cm = Utils.canvas_manager;
@@ -26909,36 +26932,40 @@ var plots = (function(){
 
 var update_pkeys = function(changes, options, arrays){
 
-    if(changes.generation_remove !== pkey_generation){
-        changes.remove = [];
-        pkey_to_array.clear();
-        pkey_to_rendered_options.clear();
-        pkeys_pending_render = [];
-        console.log("tac-plots worker: key generation mismatch");
+    if(changes){
+        if(changes.generation_remove !== pkey_generation){
+            changes.remove = [];
+            pkey_to_array.clear();
+            pkey_to_desired_options.clear();
+            pkeys_pending_render = [];
+            console.log("tac-plots worker: key generation mismatch");
+        }
+
+        // note we don't both to remove keys from the pending list
+        // unless we change key generation, in which case we drop 
+        // everything that's pending. This is ensures that when we
+        // attempt a render we can be sure that if we do find the
+        // array for the given key we know it's for the relevant 
+        // generation and that it's still wanted.
+
+        var remove_pkeys = changes.remove || [];
+        for(let pkey of remove_pkeys){
+            pkey_to_array.delete(pkey);
+            pkey_to_desired_options.delete(pkey);
+        }
+
+        if(changes.generation_add !== changes.generation_remove){
+            pkeys_pending_render = [];
+            pkey_generation = changes.generation_add;
+        }
+
+        let add_pkeys = changes.add || [];
+        for(let pkey of add_pkeys){
+            pkey_to_array.set(pkey, arrays[pkey]);
+        }
+
     }
 
-    // note we don't both to remove keys from the pending list
-    // unless we change key generation, in which case we drop 
-    // everything that's pending. This is ensures that when we
-    // attempt a render we can be sure that if we do find the
-    // array for the given key we know it's for the relevant 
-    // generation and that it's still wanted.
-
-    var remove_pkeys = changes.remove || [];
-    for(let pkey of remove_pkeys){
-        pkey_to_array.delete(pkey);
-        pkey_to_desired_options.delete(pkey);
-    }
-
-    if(changes.generation_add !== changes.generation_remove){
-        pkeys_pending_render = [];
-        pkey_generation = changes.generation_add;
-    }
-
-    var add_pkeys = changes.add || [];
-    for(let pkey of add_pkeys){
-        pkey_to_array.set(pkey, arrays[pkey]);
-    }
 
     for(let item of options){
         pkey_to_desired_options.set(item.pkey, item);
@@ -27572,7 +27599,16 @@ font-size: 10px;
         }, _scroll_shadow: function(v){
             return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
         }, _show: function(v){
-            return v>=0 ? '' : 'display: none;';
+            return v !== false && v>=0 ? '' : 'display: none;';
+        }, highlight_group: function(group_num){
+             let okey = this.groups[group_num];
+             if(!okey){
+                return;
+             }
+             this._worker.exec('update_pkeys',null,[{
+                pkey: okey._pkey,
+                group_num: group_num
+                }]);
         }
     });
 </script>
@@ -27846,14 +27882,14 @@ font-size: 10px;
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" on-paint="_paint">
+            <cluster-plots id="cluster_plots" style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" on-paint="_paint">
                </cluster-plots>
 
         </iron-resize-notifier>
 
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
-        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" splitter_state="[[splitter_state]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group" on-splitter="_splitter"></tile-wall>
+        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" splitter_state="[[splitter_state]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group" on-splitter="_splitter" on-tap_group="_highlight_group"></tile-wall>
 
     </div>
 
@@ -28046,6 +28082,10 @@ the_app.swap_groups = function(){
     }
 
     the_app.$.cut.swap_groups(a, b);
+}
+
+the_app._highlight_group = function(e){
+    the_app.$.cluster_plots.highlight_group(e.detail.group_num);
 }
 
 // see https://github.com/Polymer/polymer/issues/1877

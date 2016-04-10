@@ -376,20 +376,26 @@ doesn't have a worker, but it uses a similar system.
             }
         }, _make_okey: function(inds, num){
             return {
+
                 group_num: num,
                 
                 // The indices are immutable for the lifetime of this object
                 akey: Utils.typed_array_manager.to_akey(inds),
 
-                // Theses properties are visualized by the tile element
+                // The following properties are visualized by the tile element
+                // and must thus be notified when changes are made.  Note that
+                // for efficiency of notification, the rm is always changed in
+                // its entirerity, i.e. a new object is assigned.
                 n_spikes: inds.length,
-                rm_spa_max: "",
-                rm_dir_max: "",
-                rm_dir: "",
-                rm_spa: "",
-                rm_speed: "",
                 tac: "",
                 waves: "",
+                rm: { 
+                    spa_max: "",
+                    dir_max: "",
+                    dir: null,
+                    spa: null,
+                    speed: null
+                },
 
                 // private properties for use by tac-plots module, never notified
                 _tac_other: null,
@@ -615,7 +621,7 @@ doesn't have a worker, but it uses a similar system.
                                                     (src_nums.length > 1? 's [' + src_nums.join(",")  +']' : ' ' + src_nums[0]));
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.redo_stack.splice(0, this.redo_stack.length); // clear
-            
+
         }, _do_transplant: function(delta){
             let dest_group = this.groups[delta.dest];
             // we need to do a merge-sort on all the masked srcs and dest indicies

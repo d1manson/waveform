@@ -992,9 +992,9 @@ var use_mask = function(vector, mask, val){
             for(let okey of okeys_to_remove){
                 if(!okey) continue;
                 pkeys_to_remove.push(okey._pkey);
-                okey.rm_spa = null;
-                okey.rm_dir = null;
-                okey.rm_speed = null;
+                okey.rm.spa = null;
+                okey.rm.dir = null;
+                okey.rm.speed = null;
                 okey._rm_spa_other = null;
                 okey._rm_dir_other = null;
                 okey._rm_speed_other = null;
@@ -1019,40 +1019,38 @@ var use_mask = function(vector, mask, val){
             for(let okey of okeys) if(okey){
                 let op; // 0 : no-op, +1 : use _other values, -1: set to null
                 let same; // are the okey.rm_x and okey._rm_x_other the same?
+                let rm = okey.rm = Object.assign({}, okey.rm); // assign a copy so we can notify once for multiple changes (notify at end of iteration)
 
                 // spa
-                same = okey.rm_spa === okey._rm_spa_other;
+                same = rm.spa === okey._rm_spa_other;
                 op = this.show[0] === 'n' ? 
-                         ( okey.rm_spa ? -1 : 0 )
+                         ( rm.spa ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "spa") ? 1  : 0 );
                 if(op){
-                    okey.rm_spa = op === 1 ? okey._rm_spa_other : null;
-                    okey.rm_spa_max = op === 1 ? okey._rm_spa_max_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa', okey.rm_spa);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_spa_max', okey.rm_spa_max); 
+                    okey.rm.spa = op === 1 ? okey._rm_spa_other : null;
+                    rm.spa_max = op === 1 ? okey._rm_spa_max_other : null;
                 }
 
                 // dir
-                same = okey.rm_dir === okey._rm_dir_other;
+                same = rm.dir === okey._rm_dir_other;
                 op = this.show[1] === 'n' ? 
-                         ( okey.rm_dir ? -1 : 0 )
+                         ( rm.dir ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "dir") ? 1  : 0 );
                 if(op){
-                    okey.rm_dir = op === 1 ? okey._rm_dir_other : null;
-                    okey.rm_dir_max = op === 1 ? okey._rm_dir_max_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir', okey.rm_dir);
-                    this.notifyPath('groups.' + okey._pkey + '.rm_dir_max', okey.rm_dir_max); 
+                    rm.dir = op === 1 ? okey._rm_dir_other : null;
+                    rm.dir_max = op === 1 ? okey._rm_dir_max_other : null;
                 }
 
                 // speed
-                same = okey.rm_speed === okey._rm_speed_other;
+                same = rm.speed === okey._rm_speed_other;
                 op = this.show[2] === 'n' ? 
-                         ( okey.rm_speed ? -1 : 0 )
+                         ( rm.speed ? -1 : 0 )
                        : ( !same && this._options_match(okey._rm_other_options, this._options, "speed") ? 1  : 0 );
                 if(op){
-                    okey.rm_speed = op === 1 ? okey._rm_speed_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.rm_speed', okey.rm_speed);
+                    rm.speed = op === 1 ? okey._rm_speed_other : null;
                 }
+
+                this.notifyPath('groups.' + okey._pkey + '.rm', rm);
             }
 
         }, _options_modified: function(){
