@@ -99,26 +99,186 @@ doesn't have a worker, but it uses a similar system.
         }
         return [a0, a1];
     };
-        
-    var merge_sorted = function(a, b){
-        // a and b are sorted separetly, we combine them into a sorted new array
-        // and create a mask saying which elements were from b
-        var res = new Uint32Array(a.length+b.length)
-        var mask = new Uint8Array(res.length);
-        for(var p_a=0, p_b=0, p_r=0; p_a<a.length; p_a++, p_r++){
-            for(;b[p_b]<=a[p_a];p_b++, p_r++){
-                res[p_r] = b[p_b];
-                mask[p_r] = 1;
+
+    var merge_sorted = function(x){
+        // x is a list of arrays, each of which is internally sorted in ascending order.
+        // We combine them into a sorted new array and create an accompanying array saying
+        // for each element which of the source arrays was used.
+
+        // we fill in the result in reverse, i.e. start at n-1 and go back to 0.
+        let x_len = x.length;
+        let n = 0;
+        let p = new Uint32Array(x_len); // this will hold the index of the last used element in each array
+        for(let [ii, xx] of x.entries()){
+            n += xx.length;
+            p[ii] = xx.length;
+        }
+
+        let dest = new Uint32Array(n);
+        let src = new Uint8Array(n);
+        for(let ii=n-1; ii>=0; ii--){
+            // find the array with the next highest value
+            let kk_choice, v=Number.MIN_SAFE_INTEGER;
+            for(let kk=0; kk<x_len; kk++){
+                if (p[kk] && x[kk][p[kk]-1] > v) {
+                    kk_choice = kk;
+                    v = x[kk][p[kk]-1];
+                } 
             }
-            res[p_r] = a[p_a];
+
+            // use it
+            dest[ii] = v;
+            src[ii] = kk_choice;
+            p[kk_choice]--;
         }
-        // add any final b's after the end of a
-        for(;p_b<b.length;p_b++, p_r++){
-            res[p_r] = b[p_b];
-            mask[p_r] = 1;
-        }
-        return [res, mask];
+        return [dest, src];
     }
+
+    var merge_sorted_masked = function(x, m){
+        // this is the same as merge_sorted, but each array now (may) have a mask
+        // which is true where we want to pick and false where we should ignore entries
+
+        // we fill in the result in reverse, i.e. start at n-1 and go back to 0.
+        let x_len = x.length;
+        let n = 0;
+        let p = new Uint32Array(x_len); // this will hold the index of the (1+the_next_to_use) element in each array, i.e. 0=used all
+        for(let [ii, xx] of x.entries()){
+            let m_ii = m[ii];
+            if(m_ii){
+                // x[ii] is masked, so find out how many true elements there are and
+                // record the index_of_final_true+1 in p[ii].
+                p[ii] = 0;
+                for(let jj=0; jj<m_ii.length; jj++){
+                    m_ii[jj] && ( n++ && (p[ii] = jj+1));
+                }
+            } else {
+                // no mask, so use full length of src
+                n += xx.length;
+                p[ii] = xx.length;
+            }
+        }
+
+        let dest = new Uint32Array(n);
+        let src = new Uint8Array(n);
+        for(let ii=n-1; ii>=0; ii--){
+            // find the array with the next highest value
+            let kk_choice, v=Number.MIN_SAFE_INTEGER;
+            for(let kk=0; kk<x_len; kk++){
+                if (p[kk] && x[kk][p[kk]-1] > v) {
+                    kk_choice = kk;
+                    v = x[kk][p[kk]-1];
+                } 
+            }
+
+            // use it
+            dest[ii] = v;
+            src[ii] = kk_choice;
+            let m_choice = m[kk_choice];
+            if(m_choice){
+                // mask, so decrement until we are *about* to hit the next true element
+                while(--p[kk_choice] && !m_choice[p[kk_choice] - 1]);
+            } else {
+                // no mask, so just decrement
+                p[kk_choice]--; 
+            }
+
+        }
+        return [dest, src];
+    }
+
+    var labeled_split = function(src, labels, dests_in){
+        // this is the inverse of merge_sorted_masked...and it's even more complicated...
+        //
+        // labels is an array of the same length as src, saying where to put
+        // each element. dests_in is a list of pre-existing arrays into which to
+        // insert the values from src, maintaining ascending-order sort in each
+        // dest array.  One or more of dests_in may be null, in which case we
+        // simply accumalte the relevant values from src in a new array.
+        // In addition to the augmented dests arrays, this returns an equally
+        // long list giving a mask for each array (or null), giving true
+        // for elements that were originally in src.
+
+        let dest_len = dests_in.length;
+
+        // work out the length of each array in dests_out
+        let dests_out = [];
+        let masks_out = [];
+        let n = new Uint32Array(dest_len);
+        for(let ii=0; ii<src.length; ii++){
+            n[labels[ii]]++;
+        }
+        for(let [ii, dd] of dests_in.entries()){
+            n[ii] += dd ? dd.length : 0;
+            dests_out.push(new Uint32Array(n[ii]));
+            masks_out.push(dd ? new Uint8Array(n[ii]) : null);
+        }
+
+        // unlike merge_sorted_masked we do this in the forward dircetion 
+        // (becuase it's complicated enough already!)
+
+        n.fill(0); // we repurpose it...
+        let p_in = n;
+        let p_out = new Uint32Array(dest_len);
+        for(let ii=0; ii<src.length; ii++){
+            let v = src[ii];
+            let k = labels[ii];
+            let dest_in = dests_in[k];
+            let dest_out = dests_out[k];
+            if(dest_in){
+                // merge-sort into existing dest_in
+                while(p_in[k] < dest_in.length && dest_in[p_in[k]]<v){
+                    dest_out[p_out[k]++] = dest_in[p_in[k]++]; 
+                    // mask is left as 0
+                }
+                masks_out[k][p_out[k]] = 1; 
+                dest_out[p_out[k]++] = v;
+            } else {
+                // creating dest_out from scratch...
+                dest_out[p_out[k]++] = v;                
+            }
+        }
+
+        // use up any final values in dests_in..
+        for(let ii=0; ii<dest_len; ii++){
+            let dest_in = dests_in[ii];
+            if(!dest_in){
+                continue;
+            }
+            let dest_out = dests_out[ii];
+            for(let p=p_in[ii]; p<dest_in.length; p++){
+                dest_out[p_out[ii]++] = dest_in[p]; 
+                // mask is left as 0
+            }
+        }
+        return [dests_out, masks_out];
+    }  
+
+    var take_masked = function(x, m, take_true){
+        // returns the elements of x where m is true, unless take_true if falsy in which
+        // case it's the false elements of m that are taken from x.
+        if(take_true){
+            let n = 0;
+            for(let ii=0; ii<x.length; ii++) {
+                (m[ii]) && (n++); 
+            }
+            let res = new Uint32Array(n);
+            for(let ii=0, p=0; ii<x.length; ii++) {
+                (m[ii]) && (res[p++] = x[ii]);
+            }
+            return res;
+        } else {
+            let n = 0;
+            for(let ii=0; ii<x.length; ii++) {
+                (!m[ii]) && (n++); 
+            }
+            let res = new Uint32Array(n);
+            for(let ii=0, p=0; ii<x.length; ii++) {
+                (!m[ii]) && (res[p++] = x[ii]);
+            }
+            return res;
+        }
+    }
+
     var arange = function(n){
         var ret = new Uint32Array(n);
         for(var ii=0; ii<n; ii++)
@@ -214,8 +374,7 @@ doesn't have a worker, but it uses a similar system.
                 type: Object,
                 value: function(){return document.querySelector('body');}
             }
-        },
-        _make_okey: function(inds, num){
+        }, _make_okey: function(inds, num){
             return {
                 group_num: num,
                 
@@ -249,8 +408,7 @@ doesn't have a worker, but it uses a similar system.
                 // property set by Polymer.Collection
                 _pkey: null 
             };
-        },
-        _use_cut_box: function(){
+        }, _use_cut_box: function(){
             if (this.cut_box && this.cut_box.is === "file"){
                 // construct from file
                 let akey = this.cut_box.akey.array;
@@ -326,8 +484,7 @@ doesn't have a worker, but it uses a similar system.
                     srcs: [0]
                 });
             }
-        },
-        _fork_if_needed: function(){
+        }, _fork_if_needed: function(){
             if(this.cut_box.is !== "stack"){
                 // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
                 // note that the new "cut box" will be applied to this element as its cut_box, but this will not
@@ -360,8 +517,7 @@ doesn't have a worker, but it uses a similar system.
             });
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'swap groups ' + a + " and " + b);
-        },
-        _do_swap: function(a, b){
+        }, _do_swap: function(a, b){
             // b must be greater than a
 
             // b could be off beyond the end of the array as it currently stands
@@ -385,8 +541,7 @@ doesn't have a worker, but it uses a similar system.
                 {index: a, removed: [], addedCount: 1, object: this.groups, type:'splice'},
                 {index: b, removed: [], addedCount: 1, object: this.groups, type:'splice'}
             ]); 
-        },
-        split_group: function(a, mask){
+        }, split_group: function(a, mask){
             this._fork_if_needed();
 
             var new_arrs = mask_split(this.groups[a].akey.array, mask);
@@ -403,8 +558,7 @@ doesn't have a worker, but it uses a similar system.
 
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'split group ' + a + ' in two');
-        },
-        merge_groups: function(a, b){
+        }, merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
             this._fork_if_needed();
 
@@ -415,8 +569,8 @@ doesn't have a worker, but it uses a similar system.
                 b = tmp;
             }
 
-            var packed = merge_sorted(this.groups[a].akey.array, 
-                                      this.groups[b].akey.array)
+            var packed = merge_sorted([this.groups[a].akey.array, 
+                                       this.groups[b].akey.array])
             var inds = packed[0], mask = packed[1];
 
             this.splice('groups', b, 1, null);
@@ -431,8 +585,91 @@ doesn't have a worker, but it uses a similar system.
             });
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'merge groups ' + a + ' and ' + b);
-        },
-        undo: function(){
+        }, transplant_groups: function(dest, src_masks){
+            let src_nums = [];
+            for(let num in src_masks){
+                src_nums.push(num);
+            }
+            if(!src_nums.length){
+                return;
+            }
+
+            this._fork_if_needed();
+
+            while(dest >= this.groups.length){
+                this.push('groups', null);
+            }
+
+            let delta = {
+                action: 'transplant',
+                dest: dest,
+                src_masks: src_masks 
+            }
+
+            this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            this.undo_stack.push(delta);
+
+
+            // TODO: sort src_nums
+            this.push('undo_stack_descriptions', 'paint into group ' + dest + ' from group' +
+                                                    (src_nums.length > 1? 's [' + src_nums.join(",")  +']' : ' ' + src_nums[0]));
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
+            this.redo_stack.splice(0, this.redo_stack.length); // clear
+            
+        }, _do_transplant: function(delta){
+            let dest_group = this.groups[delta.dest];
+            // we need to do a merge-sort on all the masked srcs and dest indicies
+
+            // we prepare two lists, one of indices and one of masks for those indices.
+            // we also splice out the src groups and replace with their diminished verions
+            let x = [(dest_group && dest_group.akey.array) || new Uint32Array(0)];
+            let x_mask = [null];
+            let src_nums = []; // used in undo delta and in undo description
+            for(let group_num in delta.src_masks){
+                group_num = parseInt(group_num);
+                let g = this.groups[group_num];
+                if(!g){
+                    throw "transplant: src 'group " + group_num + "' doesn't exist.";
+                }
+                x.push(g.akey.array)
+                x_mask.push(delta.src_masks[group_num]);
+
+                let new_inds = delta.src_masks[group_num] ? 
+                                    take_masked(g.akey.array, delta.src_masks[group_num], false)
+                                   : null;
+                this.splice('groups', group_num, 1, new_inds && new_inds.length ? 
+                                this._make_okey(new_inds, group_num) : null); // if group is empty we delete it
+                src_nums.push(group_num); 
+            }
+            let res = merge_sorted_masked(x, x_mask); // this combines everything
+            
+            // and now we can update the dest group
+            this.splice('groups', delta.dest, 1, this._make_okey(res[0], delta.dest));
+
+            delta.src = res[1]; // remember that src[ii]=0 means element ii was originally in dest group,
+                               // and src[ii]=v means that element ii was oritinally in src_nums[v+1] group.
+            delta.src_nums = src_nums;
+            delete delta['src_masks']; // don't need this any more
+           
+        }, _undo_transplant: function(delta){
+            let src_inds = [null];
+            for(let group_num of delta.src_nums){
+                src_inds.push(this.groups[group_num] && this.groups[group_num].akey.array);
+            }
+            let res = labeled_split(this.groups[delta.dest].akey.array, delta.src, src_inds);
+
+            this.splice('groups', delta.dest, 1, this._make_okey(res[0][0], delta.dest));
+
+            let src_masks = {}; // this will be the same as originally povided to transplant
+            for(let [ii, group_num] of delta.src_nums.entries()){
+                src_masks[group_num] = res[1][ii+1]; // +1 because the 0th entry is the dest
+                this.splice('groups', group_num, 1, this._make_okey(res[0][ii+1], group_num))
+            }
+            delta.src_masks = src_masks;
+            delete delta['src']; //we don't need these any more..
+            delete delta['src_nums'];
+
+        }, undo: function(){
             var delta = this.undo_stack[this.undo_stack.length-1];
             var success = false;
 
@@ -448,8 +685,8 @@ doesn't have a worker, but it uses a similar system.
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var packed = merge_sorted(this.groups[delta.a].akey.array, 
-                                          this.groups[delta.a+1].akey.array)
+                var packed = merge_sorted([this.groups[delta.a].akey.array, 
+                                           this.groups[delta.a+1].akey.array])
                 var inds = packed[0];
                 // update group_nums in preparation for announcing splice
                 for(let ii=delta.a+1; ii<this.groups.length; ii++){
@@ -465,6 +702,11 @@ doesn't have a worker, but it uses a similar system.
                 success = true;
                 break;
 
+                case "transplant":
+                this._undo_transplant(delta); // it's complicated so it gets its own function
+                success = true;
+                break;
+
                 default:
                 console.log("attempted undo of unknown or invalid delta");
             }
@@ -475,8 +717,7 @@ doesn't have a worker, but it uses a similar system.
                 this.push('redo_stack_descriptions', this.pop('undo_stack_descriptions'));
             }
 
-        },
-        redo: function(){
+        }, redo: function(){
             var delta = this.redo_stack[this.redo_stack.length-1];
             if(!delta)
                 return;
@@ -485,8 +726,8 @@ doesn't have a worker, but it uses a similar system.
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var packed = merge_sorted(this.groups[delta.a].akey.array, 
-                                          this.groups[delta.b].akey.array);
+                var packed = merge_sorted([this.groups[delta.a].akey.array, 
+                                           this.groups[delta.b].akey.array]);
                 var inds = packed[0];
                 this.splice('groups', delta.b, 1, null);
                 this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
@@ -507,6 +748,11 @@ doesn't have a worker, but it uses a similar system.
 
                 case "swap":
                 this._do_swap(delta.a, delta.b);
+                success = true;
+                break;
+
+                case "transplant":
+                this._do_transplant(delta); // it's complicated so it gets its own function
                 success = true;
                 break;
 

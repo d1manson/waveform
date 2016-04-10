@@ -594,7 +594,7 @@ var get_group_speed_rm = function(group_inds){
     spike = spike.subarray(0, spike.length-1);
 
     var ratemap = divide_float(spike, cached_speed_dwell);
-                    
+    // TODO: need to normalize to max
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
 
@@ -879,7 +879,7 @@ var use_mask = function(vector, mask, val){
                 value: function(){ return {};},
                 notify: true
             },
-            pos_speed: {
+        pos_speed: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};},
                 notify: true

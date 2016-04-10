@@ -196,7 +196,7 @@ background-color: rgba(0,0,0,0.2);
 
     <div class="hidden_clipboard"></div>
 
-    <div style="position: absolute;" id="floating_layer">
+    <div style="position: absolute;">
             
         <floating-pane id="action_info" grabber_mode="[[grabber_mode]]" hidden>
             <div class='pane_title'>Action List [z]</div>
@@ -222,22 +222,16 @@ background-color: rgba(0,0,0,0.2);
             <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
             So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
         </floating-pane>
-        
-        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Help [?]</div>
-            Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"/> readme - click to open in a new tab. <br><br>
-            You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"/> (see the button on the right hand side). You can also contribute to the code!
-        </floating-pane>
-            
+                    
         <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;" hidden>
             <div class='pane_title'>Shortcuts [k]</div>
             <p>
                 For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
-                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <alt>r</alt> 
+                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <b>r</b> 
                 by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
                 the only action linked to the shortcut.)
             </p><p>
-                 Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+                 Shorcuts for the plots shown for each group; use <b>shift</b> to select multiple:
                 <ul>
                 <li><b>w</b> waveforms</li>
                 <li><b>r</b> spatial ratemap</li>
@@ -396,7 +390,7 @@ background-color: rgba(0,0,0,0.2);
         </div>
 
         <div>
-            <paper-icon-button icon="list"></paper-icon-button>
+            <paper-icon-button icon="list" on-tap="toggle_shorcut_pane"></paper-icon-button>
             <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
         </div>
 
@@ -422,7 +416,7 @@ background-color: rgba(0,0,0,0.2);
 
         <div>
             <paper-icon-button icon="settings-applications" id='pos_settings' on-tap="toggle_pos_pane"></paper-icon-button>
-            <paper-tooltip>position post processing settings [s]</paper-tooltip>
+            <paper-tooltip>position post processing settings [x]</paper-tooltip>
         </div>
 
         <div>
@@ -531,15 +525,15 @@ background-color: rgba(0,0,0,0.2);
             other file types will be ignored
         </div>
         <div class="initial_extra_under_secondary">
-            <div class="github_button github_button_filedrop">
-                Go to <b>quickstart guide</b> on GitHub
+            <div class="github_button github_button_filedrop" on-tap="open_github">
+                goto <b>readme, code, and issues</b> on github
             </div><br><br>
             <a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
                 <img class="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315"/>
             </a>
         </div>
         <div class='initial_extra_bottom_right'>
-            v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px"/>
+            Waveform v1.0, by DM<br> Tested with Chrome 49 <img src="img/chromelogo.png" width="15px" style="float:right;margin-left:2px;"/>
         </div>
     </drop-zone>
 
@@ -715,11 +709,12 @@ the_app._splitter = function(e){
 
 the_app._paint = function(e){
     if(e.detail.state === "start"){
-        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+        the_app.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
     }
 
     if(e.detail.state === "end"){
-        this.set('disable_shortcuts', false);
+        the_app.set('disable_shortcuts', false);
+        the_app.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
     }
 }
 
@@ -818,6 +813,9 @@ the_app.toggle_header_pane = function(){
 }
 the_app.toggle_help_pane = function(){
     the_app.$.help_info.toggle();
+}
+the_app.toggle_shorcut_pane = function(){
+    the_app.$.shortcut_info.toggle()
 }
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');

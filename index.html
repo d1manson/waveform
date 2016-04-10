@@ -95,9 +95,9 @@ margin: 0;
 }
 .info_summary{
 position: absolute;
-margin: 3px;
 padding: 3px;
 top: 0px;
+left: 0px;
 background: rgba(255,255,255,0.5);
 -webkit-transition: opacity 0.5s ease-in-out;
 transition: opacity 0.5s ease-in-out;
@@ -16173,6 +16173,11 @@ Polymer({
             type: Number,
             value: 0,
             observer: '_height_changed'
+        },
+        stretch_height: {
+            type: Boolean,
+            value: false,
+            observer: '_height_changed'
         }
     }, listeners: {
         'mousemove': '_onmousemove',
@@ -16195,8 +16200,23 @@ Polymer({
         let el_canv = this.ckey.canvas;
         this._update_canv_style(el_canv);
     }, _update_canv_style: function(el_canv){
+        if(this.fix_height && this.stretch_height){
+            console.warn('managed-canvas cannot stretch and fix height')
+        }
         if(el_canv){
-            el_canv.style.height = this.fix_height? this.fix_height + "px" : "";
+            el_canv.style.cssText = "";
+            if(this.stretch_height){
+                // this does what is needed for now, but it's not pretty...
+                el_canv.style.height = "100%";
+                el_canv.style.margin = "0 auto";
+                el_canv.style.left = "0";
+                el_canv.style.right = "0";
+                el_canv.style.position = "absolute";
+            } else if (this.fix_height){
+                el_canv.style.height = this.fix_height + "px";
+            } else {
+                el_canv.style.height = "";
+            }
             el_canv.style.imageRendering = "pixelated";          
         }
     }, _onmousemove: function(e){
@@ -16457,6 +16477,9 @@ display: none;
 display: block;
 pointer-events: none;
 }
+:host(.active.moving) .over{
+display: none;
+}
 :host(.active.moving.proximate){
 background-color: initial;
 opacity: 1;
@@ -16651,18 +16674,15 @@ pointer-events: none;
             detail.state = this.splitter_metrics ? 'move' : 'start';
             this.fire('splitter', detail);
             this._splitter_el = e.target;
-            if(!this._mousemove_splitter_bound){
-                this._mousemove_splitter_bound = this._mousemove_splitter.bind(this);
-                this._mouseup_splitter_bound = this._mouseup_splitter.bind(this)
-            }
-            this._splitter_el.addEventListener('canvas-mousemove', this._mousemove_splitter_bound);
-            this._splitter_el.addEventListener('canvas-mouseup', this._mousemove_splitter_bound);  // this just goes to mousemove, and then ...
-            document.addEventListener('mouseup', this._mouseup_splitter_bound); // we actually process the up on the document
+
+            this.listen(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
+            this.listen(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter'); // this just goes to mousemove, and then ...
+            this.listen(document, 'mouseup', '_mouseup_splitter'); // we actually process the up on the document
 
         }, _mouseup_splitter: function(e){
-            document.removeEventListener('mouseup', this._mouseup_splitter_bound);
-            this._splitter_el.removeEventListener('canvas-mousemove', this._mousemove_splitter_bound);
-            this._splitter_el.removeEventListener('canvas-mouseup', this._mousemove_splitter_bound);
+            this.unlisten(document, 'mouseup', '_mouseup_splitter');
+            this.unlisten(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
+            this.unlisten(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter');
             this.fire('splitter', {
                 state: 'update',
                 group: this.group_model,
@@ -16909,8 +16929,6 @@ Utils.regex_from_list = function(a){
 
 
 Utils.typed_array_manager = (function(){
-    // This is a thin wrapper around a map
-
     return {
         to_akey: function(arr){
             return {array: arr};
@@ -17072,9 +17090,6 @@ background-color: rgba(0,0,0,0.2);
             'groups_modified(groups.*)'
         ], listeners: {
             'mousedown': '_mousedown_splitter'
-        }, created: function(){
-            this._scroll_bound = this._scroll.bind(this);
-            this._failed_track_bound = this._failed_track.bind(this);
         }, groups_modified: function(change){
 
         }, _show: function(v){
@@ -17111,8 +17126,8 @@ background-color: rgba(0,0,0,0.2);
                 if(!this._track_state){
                     return; 
                 }
-                this.removeEventListener('scroll', this._scroll_bound);
-                this.removeEventListener('mouseup', this._failed_track_bound);
+                this.unlisten(this, 'scroll', '_scroll');
+                this.unlisten(this, 'mouseup', '_failed_track');
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
@@ -17144,8 +17159,8 @@ background-color: rgba(0,0,0,0.2);
                     tile_el: e.target,
                     other_tile_el: null
                 }
-                this.addEventListener('scroll', this._scroll_bound);
-                this.addEventListener('mouseup', this._failed_track_bound);
+                this.listen(this, 'scroll', '_scroll');
+                this.listen(this, 'mouseup', '_failed_track');
                 e.target.set('moving', true);
             } else {
                 this._track_state.last_client_x = e.detail.x;
@@ -17652,26 +17667,186 @@ cursor: default;
         }
         return [a0, a1];
     };
-        
-    var merge_sorted = function(a, b){
-        // a and b are sorted separetly, we combine them into a sorted new array
-        // and create a mask saying which elements were from b
-        var res = new Uint32Array(a.length+b.length)
-        var mask = new Uint8Array(res.length);
-        for(var p_a=0, p_b=0, p_r=0; p_a<a.length; p_a++, p_r++){
-            for(;b[p_b]<=a[p_a];p_b++, p_r++){
-                res[p_r] = b[p_b];
-                mask[p_r] = 1;
+
+    var merge_sorted = function(x){
+        // x is a list of arrays, each of which is internally sorted in ascending order.
+        // We combine them into a sorted new array and create an accompanying array saying
+        // for each element which of the source arrays was used.
+
+        // we fill in the result in reverse, i.e. start at n-1 and go back to 0.
+        let x_len = x.length;
+        let n = 0;
+        let p = new Uint32Array(x_len); // this will hold the index of the last used element in each array
+        for(let [ii, xx] of x.entries()){
+            n += xx.length;
+            p[ii] = xx.length;
+        }
+
+        let dest = new Uint32Array(n);
+        let src = new Uint8Array(n);
+        for(let ii=n-1; ii>=0; ii--){
+            // find the array with the next highest value
+            let kk_choice, v=Number.MIN_SAFE_INTEGER;
+            for(let kk=0; kk<x_len; kk++){
+                if (p[kk] && x[kk][p[kk]-1] > v) {
+                    kk_choice = kk;
+                    v = x[kk][p[kk]-1];
+                } 
             }
-            res[p_r] = a[p_a];
+
+            // use it
+            dest[ii] = v;
+            src[ii] = kk_choice;
+            p[kk_choice]--;
         }
-        // add any final b's after the end of a
-        for(;p_b<b.length;p_b++, p_r++){
-            res[p_r] = b[p_b];
-            mask[p_r] = 1;
-        }
-        return [res, mask];
+        return [dest, src];
     }
+
+    var merge_sorted_masked = function(x, m){
+        // this is the same as merge_sorted, but each array now (may) have a mask
+        // which is true where we want to pick and false where we should ignore entries
+
+        // we fill in the result in reverse, i.e. start at n-1 and go back to 0.
+        let x_len = x.length;
+        let n = 0;
+        let p = new Uint32Array(x_len); // this will hold the index of the (1+the_next_to_use) element in each array, i.e. 0=used all
+        for(let [ii, xx] of x.entries()){
+            let m_ii = m[ii];
+            if(m_ii){
+                // x[ii] is masked, so find out how many true elements there are and
+                // record the index_of_final_true+1 in p[ii].
+                p[ii] = 0;
+                for(let jj=0; jj<m_ii.length; jj++){
+                    m_ii[jj] && ( n++ && (p[ii] = jj+1));
+                }
+            } else {
+                // no mask, so use full length of src
+                n += xx.length;
+                p[ii] = xx.length;
+            }
+        }
+
+        let dest = new Uint32Array(n);
+        let src = new Uint8Array(n);
+        for(let ii=n-1; ii>=0; ii--){
+            // find the array with the next highest value
+            let kk_choice, v=Number.MIN_SAFE_INTEGER;
+            for(let kk=0; kk<x_len; kk++){
+                if (p[kk] && x[kk][p[kk]-1] > v) {
+                    kk_choice = kk;
+                    v = x[kk][p[kk]-1];
+                } 
+            }
+
+            // use it
+            dest[ii] = v;
+            src[ii] = kk_choice;
+            let m_choice = m[kk_choice];
+            if(m_choice){
+                // mask, so decrement until we are *about* to hit the next true element
+                while(--p[kk_choice] && !m_choice[p[kk_choice] - 1]);
+            } else {
+                // no mask, so just decrement
+                p[kk_choice]--; 
+            }
+
+        }
+        return [dest, src];
+    }
+
+    var labeled_split = function(src, labels, dests_in){
+        // this is the inverse of merge_sorted_masked...and it's even more complicated...
+        //
+        // labels is an array of the same length as src, saying where to put
+        // each element. dests_in is a list of pre-existing arrays into which to
+        // insert the values from src, maintaining ascending-order sort in each
+        // dest array.  One or more of dests_in may be null, in which case we
+        // simply accumalte the relevant values from src in a new array.
+        // In addition to the augmented dests arrays, this returns an equally
+        // long list giving a mask for each array (or null), giving true
+        // for elements that were originally in src.
+
+        let dest_len = dests_in.length;
+
+        // work out the length of each array in dests_out
+        let dests_out = [];
+        let masks_out = [];
+        let n = new Uint32Array(dest_len);
+        for(let ii=0; ii<src.length; ii++){
+            n[labels[ii]]++;
+        }
+        for(let [ii, dd] of dests_in.entries()){
+            n[ii] += dd ? dd.length : 0;
+            dests_out.push(new Uint32Array(n[ii]));
+            masks_out.push(dd ? new Uint8Array(n[ii]) : null);
+        }
+
+        // unlike merge_sorted_masked we do this in the forward dircetion 
+        // (becuase it's complicated enough already!)
+
+        n.fill(0); // we repurpose it...
+        let p_in = n;
+        let p_out = new Uint32Array(dest_len);
+        for(let ii=0; ii<src.length; ii++){
+            let v = src[ii];
+            let k = labels[ii];
+            let dest_in = dests_in[k];
+            let dest_out = dests_out[k];
+            if(dest_in){
+                // merge-sort into existing dest_in
+                while(p_in[k] < dest_in.length && dest_in[p_in[k]]<v){
+                    dest_out[p_out[k]++] = dest_in[p_in[k]++]; 
+                    // mask is left as 0
+                }
+                masks_out[k][p_out[k]] = 1; 
+                dest_out[p_out[k]++] = v;
+            } else {
+                // creating dest_out from scratch...
+                dest_out[p_out[k]++] = v;                
+            }
+        }
+
+        // use up any final values in dests_in..
+        for(let ii=0; ii<dest_len; ii++){
+            let dest_in = dests_in[ii];
+            if(!dest_in){
+                continue;
+            }
+            let dest_out = dests_out[ii];
+            for(let p=p_in[ii]; p<dest_in.length; p++){
+                dest_out[p_out[ii]++] = dest_in[p]; 
+                // mask is left as 0
+            }
+        }
+        return [dests_out, masks_out];
+    }  
+
+    var take_masked = function(x, m, take_true){
+        // returns the elements of x where m is true, unless take_true if falsy in which
+        // case it's the false elements of m that are taken from x.
+        if(take_true){
+            let n = 0;
+            for(let ii=0; ii<x.length; ii++) {
+                (m[ii]) && (n++); 
+            }
+            let res = new Uint32Array(n);
+            for(let ii=0, p=0; ii<x.length; ii++) {
+                (m[ii]) && (res[p++] = x[ii]);
+            }
+            return res;
+        } else {
+            let n = 0;
+            for(let ii=0; ii<x.length; ii++) {
+                (!m[ii]) && (n++); 
+            }
+            let res = new Uint32Array(n);
+            for(let ii=0, p=0; ii<x.length; ii++) {
+                (!m[ii]) && (res[p++] = x[ii]);
+            }
+            return res;
+        }
+    }
+
     var arange = function(n){
         var ret = new Uint32Array(n);
         for(var ii=0; ii<n; ii++)
@@ -17767,8 +17942,7 @@ cursor: default;
                 type: Object,
                 value: function(){return document.querySelector('body');}
             }
-        },
-        _make_okey: function(inds, num){
+        }, _make_okey: function(inds, num){
             return {
                 group_num: num,
                 
@@ -17802,8 +17976,7 @@ cursor: default;
                 // property set by Polymer.Collection
                 _pkey: null 
             };
-        },
-        _use_cut_box: function(){
+        }, _use_cut_box: function(){
             if (this.cut_box && this.cut_box.is === "file"){
                 // construct from file
                 let akey = this.cut_box.akey.array;
@@ -17879,8 +18052,7 @@ cursor: default;
                     srcs: [0]
                 });
             }
-        },
-        _fork_if_needed: function(){
+        }, _fork_if_needed: function(){
             if(this.cut_box.is !== "stack"){
                 // tell the file-organiser to construct a new "cut box" from the preservable state of this element.
                 // note that the new "cut box" will be applied to this element as its cut_box, but this will not
@@ -17913,8 +18085,7 @@ cursor: default;
             });
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'swap groups ' + a + " and " + b);
-        },
-        _do_swap: function(a, b){
+        }, _do_swap: function(a, b){
             // b must be greater than a
 
             // b could be off beyond the end of the array as it currently stands
@@ -17938,8 +18109,7 @@ cursor: default;
                 {index: a, removed: [], addedCount: 1, object: this.groups, type:'splice'},
                 {index: b, removed: [], addedCount: 1, object: this.groups, type:'splice'}
             ]); 
-        },
-        split_group: function(a, mask){
+        }, split_group: function(a, mask){
             this._fork_if_needed();
 
             var new_arrs = mask_split(this.groups[a].akey.array, mask);
@@ -17956,8 +18126,7 @@ cursor: default;
 
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'split group ' + a + ' in two');
-        },
-        merge_groups: function(a, b){
+        }, merge_groups: function(a, b){
             // the higher-numbered group is merged into the lower number
             this._fork_if_needed();
 
@@ -17968,8 +18137,8 @@ cursor: default;
                 b = tmp;
             }
 
-            var packed = merge_sorted(this.groups[a].akey.array, 
-                                      this.groups[b].akey.array)
+            var packed = merge_sorted([this.groups[a].akey.array, 
+                                       this.groups[b].akey.array])
             var inds = packed[0], mask = packed[1];
 
             this.splice('groups', b, 1, null);
@@ -17984,8 +18153,91 @@ cursor: default;
             });
             this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
             this.push('undo_stack_descriptions', 'merge groups ' + a + ' and ' + b);
-        },
-        undo: function(){
+        }, transplant_groups: function(dest, src_masks){
+            let src_nums = [];
+            for(let num in src_masks){
+                src_nums.push(num);
+            }
+            if(!src_nums.length){
+                return;
+            }
+
+            this._fork_if_needed();
+
+            while(dest >= this.groups.length){
+                this.push('groups', null);
+            }
+
+            let delta = {
+                action: 'transplant',
+                dest: dest,
+                src_masks: src_masks 
+            }
+
+            this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            this.undo_stack.push(delta);
+
+
+            // TODO: sort src_nums
+            this.push('undo_stack_descriptions', 'paint into group ' + dest + ' from group' +
+                                                    (src_nums.length > 1? 's [' + src_nums.join(",")  +']' : ' ' + src_nums[0]));
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
+            this.redo_stack.splice(0, this.redo_stack.length); // clear
+            
+        }, _do_transplant: function(delta){
+            let dest_group = this.groups[delta.dest];
+            // we need to do a merge-sort on all the masked srcs and dest indicies
+
+            // we prepare two lists, one of indices and one of masks for those indices.
+            // we also splice out the src groups and replace with their diminished verions
+            let x = [(dest_group && dest_group.akey.array) || new Uint32Array(0)];
+            let x_mask = [null];
+            let src_nums = []; // used in undo delta and in undo description
+            for(let group_num in delta.src_masks){
+                group_num = parseInt(group_num);
+                let g = this.groups[group_num];
+                if(!g){
+                    throw "transplant: src 'group " + group_num + "' doesn't exist.";
+                }
+                x.push(g.akey.array)
+                x_mask.push(delta.src_masks[group_num]);
+
+                let new_inds = delta.src_masks[group_num] ? 
+                                    take_masked(g.akey.array, delta.src_masks[group_num], false)
+                                   : null;
+                this.splice('groups', group_num, 1, new_inds && new_inds.length ? 
+                                this._make_okey(new_inds, group_num) : null); // if group is empty we delete it
+                src_nums.push(group_num); 
+            }
+            let res = merge_sorted_masked(x, x_mask); // this combines everything
+            
+            // and now we can update the dest group
+            this.splice('groups', delta.dest, 1, this._make_okey(res[0], delta.dest));
+
+            delta.src = res[1]; // remember that src[ii]=0 means element ii was originally in dest group,
+                               // and src[ii]=v means that element ii was oritinally in src_nums[v+1] group.
+            delta.src_nums = src_nums;
+            delete delta['src_masks']; // don't need this any more
+           
+        }, _undo_transplant: function(delta){
+            let src_inds = [null];
+            for(let group_num of delta.src_nums){
+                src_inds.push(this.groups[group_num] && this.groups[group_num].akey.array);
+            }
+            let res = labeled_split(this.groups[delta.dest].akey.array, delta.src, src_inds);
+
+            this.splice('groups', delta.dest, 1, this._make_okey(res[0][0], delta.dest));
+
+            let src_masks = {}; // this will be the same as originally povided to transplant
+            for(let [ii, group_num] of delta.src_nums.entries()){
+                src_masks[group_num] = res[1][ii+1]; // +1 because the 0th entry is the dest
+                this.splice('groups', group_num, 1, this._make_okey(res[0][ii+1], group_num))
+            }
+            delta.src_masks = src_masks;
+            delete delta['src']; //we don't need these any more..
+            delete delta['src_nums'];
+
+        }, undo: function(){
             var delta = this.undo_stack[this.undo_stack.length-1];
             var success = false;
 
@@ -18001,8 +18253,8 @@ cursor: default;
 
                 case "split":
                 // we could have kept the mask originally, but we didn't
-                var packed = merge_sorted(this.groups[delta.a].akey.array, 
-                                          this.groups[delta.a+1].akey.array)
+                var packed = merge_sorted([this.groups[delta.a].akey.array, 
+                                           this.groups[delta.a+1].akey.array])
                 var inds = packed[0];
                 // update group_nums in preparation for announcing splice
                 for(let ii=delta.a+1; ii<this.groups.length; ii++){
@@ -18018,6 +18270,11 @@ cursor: default;
                 success = true;
                 break;
 
+                case "transplant":
+                this._undo_transplant(delta); // it's complicated so it gets its own function
+                success = true;
+                break;
+
                 default:
                 console.log("attempted undo of unknown or invalid delta");
             }
@@ -18028,8 +18285,7 @@ cursor: default;
                 this.push('redo_stack_descriptions', this.pop('undo_stack_descriptions'));
             }
 
-        },
-        redo: function(){
+        }, redo: function(){
             var delta = this.redo_stack[this.redo_stack.length-1];
             if(!delta)
                 return;
@@ -18038,8 +18294,8 @@ cursor: default;
             // note that b will always be greater than a...
             switch(delta.action){
                 case "merge":
-                var packed = merge_sorted(this.groups[delta.a].akey.array, 
-                                          this.groups[delta.b].akey.array);
+                var packed = merge_sorted([this.groups[delta.a].akey.array, 
+                                           this.groups[delta.b].akey.array]);
                 var inds = packed[0];
                 this.splice('groups', delta.b, 1, null);
                 this.splice('groups', delta.a, 1, this._make_okey(inds, delta.a));
@@ -18060,6 +18316,11 @@ cursor: default;
 
                 case "swap":
                 this._do_swap(delta.a, delta.b);
+                success = true;
+                break;
+
+                case "transplant":
+                this._do_transplant(delta); // it's complicated so it gets its own function
                 success = true;
                 break;
 
@@ -19640,7 +19901,7 @@ var parse_clu_file = function(full_str, fkey){
         }, attached: function(){
             var els = document.getElementsByTagName('cut-object');
             for(let ii=0; ii<els.length; ii++){
-                els[ii].addEventListener('fork', this._cut_forked.bind(this));
+                this.listen(els[ii], 'fork', '_cut_forked');
             }
         }, _cut_forked: function(e){
             // We catch this signal from the cut-obj directly, in addition to the file-organiser catching it.
@@ -21806,7 +22067,7 @@ font-size: 10px;
         <div class$="tet_button [[_selected_equality(item, selected_tet_num)]]" on-click="_tet_button_click">[[item]]</div>
     </template>
   </div>
-  <iron-list items="[[trials]]" as="trial" id="trial_list" selection-enabled="">
+  <iron-list items="[[trials]]" as="trial" id="trial_list" on-scroll="_update_scrolled_down" on-selected-item-changed="_update_trial_selection_debounce" selection-enabled="">
     <template><div><div class$="trial [[_selected(selected)]]">
         <div class="trial_top" on-mouseenter="_make_trial_captions">
             <div class="trial_title">trial '[[trial.name]]'</div>
@@ -21903,19 +22164,16 @@ Polymer({
         this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
         this._trial_from_base = new Map();
         this._use_url_search = window.location.search;
-        document.addEventListener("dragover", this._dragover.bind(this));
-        document.addEventListener("drop", this._drop.bind(this));
+        this.listen(document, "dragover", '_dragover');
+        this.listen(document, "drop", '_drop');
+    }, _update_scrolled_down: function(e){
+        this._setScrolled_down(e.target.scrollTop > 0);
+    }, _update_trial_selection_debounce: function(e){
+        this.debounce('update_trial_selection', this._update_trial_selection);
     }, attached: function(){
-        var self = this;
-        this.$.trial_list.addEventListener('scroll', function(){
-            self._setScrolled_down(this.scrollTop > 0);
-        });
-        this.$.trial_list.addEventListener('selected-item-changed', function(e){
-            self.debounce('update_trial_selection', self._update_trial_selection.bind(self));
-        });
-        var els = document.getElementsByTagName('cut-object');
+        let els = document.getElementsByTagName('cut-object');
         for(let ii=0; ii<els.length; ii++){
-            els[ii].addEventListener('fork', this._cut_forked.bind(this));
+            this.listen(els[ii], 'fork', '_cut_forked');
         }
     }, _cut_forked: function(e){
         let new_cut = e.detail
@@ -21939,7 +22197,6 @@ Polymer({
                 });
         
         this.set('selected_cut', new_cut);
-        this.$.trial_list.notifyResize();
     }, _update_trial_selection: function(){
         var new_sel = this.$.trial_list.selectedItem;
         var old_sel = this._trial_from_base.get(this.selected_trial);
@@ -21948,7 +22205,7 @@ Polymer({
         } else if(new_sel === old_sel){
             // nothing changed after all
         } else {
-            this.set('selected_trial', new_sel.name);
+            this.set('selected_trial', new_sel && new_sel.name);
         }
     }, _update_tet_num: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires
@@ -22021,6 +22278,7 @@ Polymer({
             tet: tet_obj && tet_obj.tet ? tet_obj.tet : 0,
             cut: cut ? cut : 0
         });
+        this.$.trial_list.notifyResize();
     }, _drop: function(e){
         e.stopPropagation();
         e.preventDefault();
@@ -22293,7 +22551,7 @@ Polymer({
         for(let trial of this.trials){
             this._trial_from_base.set(trial.name, trial);
         }
-        this.$.trial_list.notifyResize(); // TODO: this is hacky, there should be a better way
+        this.$.trial_list.notifyResize();
     }, got_base_for_cuts: function(results){
         // TODO: there is a lot of copy-paste from main drop function, should fix that really.
         var trials = this.trials;
@@ -23556,7 +23814,7 @@ var get_group_speed_rm = function(group_inds){
     spike = spike.subarray(0, spike.length-1);
 
     var ratemap = divide_float(spike, cached_speed_dwell);
-                    
+    // TODO: need to normalize to max
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
 
@@ -23612,7 +23870,7 @@ var plot_histogram = function(w, h, vals){
 
 var can_process_plot_path = function(){
     return cached_path && 
-           (!pending_path_plot.a || pkey_to_array.has(pending_path_plot.a)) &&
+           (!pending_path_plot.a || (cached_spike_xy_raw && pkey_to_array.has(pending_path_plot.a))) &&
            (!pending_path_plot.b || pkey_to_array.has(pending_path_plot.b));
 }
 
@@ -23841,7 +24099,7 @@ var use_mask = function(vector, mask, val){
                 value: function(){ return {};},
                 notify: true
             },
-            pos_speed: {
+        pos_speed: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};},
                 notify: true
@@ -26517,7 +26775,103 @@ Polymer({
 </script>
 
   
-</dom-module><dom-module id="cluster-plots" assetpath="/">
+</dom-module><dom-module id="paint-tool" assetpath="/">
+<style>
+:host{
+display: inline-block;
+opacity: 0.4;
+}
+</style>
+<template>
+    <canvas id="canv" width="[[width]]" height="[[height]]"></canvas>
+</template>
+
+<script>
+"use strict";
+
+Polymer({
+    is: 'paint-tool',
+    properties: {
+        width: {
+            type: Number,
+            notify: true
+        },
+        height: {
+            type: Number,
+            notify: true
+        },
+        negative: {
+            type: Boolean
+        },
+        r: {
+            type: Number,
+            notify: true
+        },
+        active: {
+            type: Boolean,
+            notify: true,
+            value: false
+        },
+        color: {
+            type: String,
+            value: '#003300'
+        }
+    }, observers: [
+        '_set_state(active, negative, color, width, height)'
+    ], _set_state : function(active, negative, color, width, height){
+        this._ctx = this.$.canv.getContext('2d');
+        if(active){
+            (!this._bound) && this.listen(document, 'mousemove', '_mousemove');
+            this._bound = true;
+
+            this._old_x = null;
+            this._old_y = null;
+
+            if(this.negative){
+                this._ctx.fillStyle = color;
+                this._ctx.globalCompositeOperation = "source-over";  
+                this._ctx.fillRect(0, 0, width, height);
+                this._ctx.globalCompositeOperation = "destination-out";
+            } else {
+                this._ctx.globalCompositeOperation = "source-over";         
+                this._ctx.clearRect(0, 0, width, height);
+            }
+        } else {
+            this._bound && this.unlisten(document, 'mousemove', '_mousemove');
+            this._bound = false;
+            this._ctx.clearRect(0, 0, width, height);
+        }
+    }, _mousemove: function(e){
+
+        let rect = this.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+        if(this._old_x === null){
+            this._old_x = x-0.0001;
+            this._old_y = y;
+        }
+
+        this._ctx.beginPath();
+        this._ctx.lineWidth = this.r*2;
+        this._ctx.strokeStyle = this.color;
+        this._ctx.lineCap = 'round';
+        this._ctx.moveTo(this._old_x, this._old_y);
+        this._ctx.lineTo(x, y);
+        this._ctx.stroke();
+        this._ctx.closePath();
+
+        this._old_x = x;
+        this._old_y = y;
+    }, get_data: function(){
+        return this._ctx && this._ctx.getImageData(0, 0, this.width, this.height); // object with width, height and data 
+    }
+});
+
+
+</script>
+</dom-module>
+
+<dom-module id="cluster-plots" assetpath="/">
 
 <script is="worker-builder" id="worker" title="cluster-plots" type="javascript/worker">
 "use strict";
@@ -26526,7 +26880,7 @@ Polymer({
 var palette_flag;
 
 var set_palettes = function(arrays){
-    palette_flag = new Uint32Array(arrays.flag.buffer);
+    palette_flag = arrays.flag;
 }
 
 var n_spikes;
@@ -26673,21 +27027,70 @@ var get_group_at = function(msg){
     if(!plot){
         return;
     }
-    var r = 8; // square ball radius, i.e. width is 2w+1
-    var counts = new Uint32Array(256);
+
+    // we do something a bit dodgy, which is to look at the color and lookup the
+    // original value in the inverse of the palette, so first build the inverse map...
+    let palette_flag_inverse = {};
+    for(let ii=0; ii< palette_flag.length; ii++){
+        palette_flag_inverse[palette_flag[ii]] = ii;
+    }
+
+    // now we can count the occurance of each group
+    let r = 4; // square ball radius, i.e. width is 2w+1
+    let group_counts = new Uint32Array(256);
     for(let ii=Math.max(0, point[0]-r); ii< Math.min(s, point[0]+r+1); ii++){
         for(let jj=Math.max(0, point[1]-r); jj< Math.min(s, point[1]+r+1); jj++){
-            // TODO: accumulate counts at that point
+            let color = plot[ii*s + jj];
+            let group_num = palette_flag_inverse[color];
+            group_num >=0 && group_counts[group_num]++;
         }
     }
+
+    // find the argmax of group_counts
+    let max_group=null;
+    let max_val=0;
+    for(let ii=0; ii<group_counts.length; ii++) if(group_counts[ii] > max_val){
+        max_group = ii;
+        max_val = group_counts[ii];
+    }
+
     exec_main('got_group_at', {
         generation: pkey_generation,
         point: point, // provide the details back to main so it can decide whether or not to use the result
         plot: msg.plot,
-        group_num: 3
+        group_num: max_group
     })
 }
 
+var compute_paint_masks = function(msg, arrays){
+    // This is called on the mouseup of a paint event
+    let im = arrays.mask;
+    let [c1, c2] = msg.plot.split('x');
+    c1 = parseInt(c1) - 1;
+    c2 = parseInt(c2) - 1;
+    let pkeys = msg.pkeys;
+
+    let f = msg.mask_width/s; 
+    let h = msg.mask_height; //should be eq to mask_width
+    let arrays_out = {};
+    for(let pkey of msg.pkeys){
+        let inds = pkey_to_array.get(pkey);
+        if(!inds || !inds.length){
+            continue;
+        }
+        let m = new Uint8Array(inds.length);
+        for(let ii=0; ii<m.length; ii++){
+            let a1 = amps[inds[ii]*n_c + c1];
+            let a2 = amps[inds[ii]*n_c + c2];
+            m[ii] = !!im[0 | ((s-1-a1)*f*h + a2*f)];
+        }
+        arrays_out[pkey] = m;
+    }
+    exec_main_b('computed_paint_masks', {
+        generation: pkey_generation,
+        pkeys: msg.pkeys
+    }, arrays_out);
+}
 </script>
 
 
@@ -26738,8 +27141,9 @@ background-color: rgba(0,0,0,0.2);
 }
 .bottom{
 flex: 2;
-overflow-y: scroll;
 text-align: center;
+position: relative;
+cursor: none;
 }
 .active_stickers{
 float: left;
@@ -26785,7 +27189,7 @@ font-size: 10px;
     <iron-a11y-keys keys="»+only" on-keys-pressed="_inc_size" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="½+only" on-keys-pressed="_dec_size" target="[[keyboard_target]]"></iron-a11y-keys>
 
-    <div class="top">
+    <div class="top" style$="[[_scroll_shadow(scrolled_down)]]">
         <div class="active_stickers">
             <div class="sticker_list">
                 <div class="sticker" style$="{{_sticker_style(painter_state.dest, active_group_a)}}" on-mouseenter="_mouseenter_sticker_dest" on-mouseleave="_mouseleave_sticker">
@@ -26811,15 +27215,19 @@ font-size: 10px;
         </div>
     </div>
 
-    <div class="bottom">
-        <template is="dom-repeat" items="[[cluster_plots]]">
-            <div class="plot" style$="{{_show(item.is_used)}}">
-               <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
-               <div class="x_axis_label">[[item.x_axis]]</div>
-               <div class="y_axis_label">[[item.y_axis]]</div>
-            </div>
-        </template>
-    </div>
+    <div class="bottom" id="bottom" on-mousedown="_start_paint" on-mousemove="_mousemove" on-mouseleave="_mouseleave">
+        <div style="position: absolute; top:0; left:0; right:0; bottom: 0;overflow-y: scroll;" on-scroll="_update_scrolled_down">
+            <template is="dom-repeat" items="[[cluster_plots]]">
+                <div class="plot" style$="{{_show(item.is_used)}}">
+                   <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
+                   <div class="x_axis_label">[[item.x_axis]]</div>
+                   <div class="y_axis_label">[[item.y_axis]]</div>
+                </div>
+            </template>
+        </div>
+        <cross-hair style$="{{_show(mouse_x)}}" r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
+        </div>
+    
 
 </template>
 <script>
@@ -26831,60 +27239,73 @@ font-size: 10px;
                 type: Number,
                 notify: true,
                 value: 128
-            },
-            amplitudes: {
+            }, amplitudes: {
                 type: Object,
                 notify: true,
                 value: function(){return {};}
-            },
-            cluster_plots: {
+            }, cluster_plots: {
                 type: Array,
                 notify: true,
                 value: function(){return [];}
-            },
-            groups: {
+            }, groups: {
                 type: Array,
                 notify: true,
                 value: function(){return [];},
                 observer: '_groups_set'
-            },
-            painter_state: {
+            }, painter_state: {
                 type: Object,
                 notify: true,
                 value: function(){return {
                     srcs: [0],
                     dest: 0
                 }}
-            },
-            other_groups:{
+            }, other_groups:{
                 type: Array,
                 notify: true,
                 value: function(){return [];},
                 readOnly: true // TODO: this is really a computed-property, but I couldn't get it to work with .splices
                                 // instead we use observers
-            },
-            keyboard_target: {
+            }, keyboard_target: {
                 type: Object,
                 value: function(){return document.querySelector('body');}
-            },
-            want_amplitudes: {
+            }, want_amplitudes: {
                 type: Array,
                 notify: true,
                 observer: '_want_amplitudes_set'
-            },
-            active_group_a:{
+            }, active_group_a:{
                 type: Object,
                 value: null,
                 notify: true
-            }
+            }, painter_r: {
+                type: Number,
+                notify: true,
+                observer: '_painter_r_changed'
+            }, mouse_x: {
+                type: Number,
+                value: -1,
+                notify: true,
+                readOnly: true
+            }, mouse_y: {
+                type: Number,
+                value: -1,
+                notify: true,
+                readOnly: true
+            }, scrolled_down: {
+                type: Boolean,
+                value: false,
+                notify: true,
+                readOnly: true
+            },
         }, observers: [
             '_groups_spliced(groups.splices)',
             '_compute_unused_groups(painter_state.*)',
             '_amplitudes_modified(amplitudes)'
-        ], created: function(){
+        ], listeners: {
+            'mousewheel': '_scroll'
+        }, created: function(){
             var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
             this._worker = worker_builder.create_for(this);
-            this._worker.exec_b('set_palettes', {flag: Palettes.flag.slice(0)});
+            this._worker.exec_b('set_palettes', {flag: Palettes.flag32.slice(0)});
             this._pkey_generation = 0;
         }, ready: function(){
             let n_c = 4; // TODO: get this from parsed-data
@@ -27051,6 +27472,107 @@ font-size: 10px;
                 return okey
             }
             return null;
+        }, _start_paint: function(e){
+            this._painter_el = document.createElement('paint-tool');
+            this._painter_el.set('width', this.canvas_size);
+            this._painter_el.set('height', this.canvas_size);
+            this._painter_el.set('r', this.painter_r);
+            this._painter_el.style.position = 'absolute';
+            this._painter_el.style.top = '1px';
+            this._painter_el.style.left = '1px';
+            this._painter_el.set('negative', e.button !== 0);
+            this._painter_el.set('active', true);
+
+            // work out which plot is closest (or underneath) the click location...
+            let plots = Polymer.dom(this.root).querySelectorAll('.plot');
+            let min_dist = Infinity;
+            this._paint_ii = null;
+            for(let [ii, plot] of plots.entries()){
+                let rect = plot.getBoundingClientRect();
+                let x_dist = e.clientX < rect.left ? 
+                                 e.clientX - rect.left
+                             : e.clientX > rect.left + rect.width ?
+                                 e.clientX - (rect.left + rect.width)
+                             : 0;
+                let y_dist = e.clientY < rect.top ? 
+                                 e.clientY - rect.top
+                             : e.clientY > rect.top + rect.height ?
+                                 e.clientY - (rect.top + rect.height)
+                             : 0;
+                let dist = Math.hypot(x_dist, y_dist);
+                if(dist === 0){
+                    this._paint_ii = ii;
+                    break;
+                } else if(dist< min_dist){
+                    this._paint_ii = ii;
+                    min_dist = dist;
+                }
+            }
+
+            plots[this._paint_ii].appendChild(this._painter_el);
+            this.listen(document, 'mouseup', '_end_paint');
+            Polymer.dom.flush();
+            this.fire('paint',{
+                state: 'start'
+            });
+            this._painter_el._mousemove(e);
+        }, _end_paint: function(){
+            this.unlisten(document, 'mouseup', '_end_paint');
+            let result = this._painter_el.get_data();
+
+            this._worker.exec_b('compute_paint_masks', {
+                plot: this.cluster_plots[this._paint_ii].y_axis + 'x' +
+                      this.cluster_plots[this._paint_ii].x_axis,
+                mask: 'mask',
+                mask_width: result.width,
+                mask_height: result.height,
+                pkeys: this.painter_state.srcs.map(function(num){
+                    return num != this.painter_state.dest && this.groups[num] && this.groups[num]._pkey
+                }, this)
+            }, {
+                mask: new Uint32Array(result.data.buffer)
+            });
+
+            this._painter_el.set('active', false);
+            this._painter_el.parentNode.removeChild(this._painter_el);
+            this._painter_el = null;
+
+        }, computed_paint_masks: function(msg, arrays){
+            // convert from pkeys to group_nums, which is the reverse of what we did
+            // when sending to the worker.  Note that we basically assume that nothing 
+            // has changed in the interim.
+            let coll =  Polymer.Collection.get(this.groups);
+            let masks = {};
+            for(let pkey of msg.pkeys){
+                let g = coll.getItem(pkey);
+                g && (masks[g.group_num] = arrays[pkey]);
+            }
+            this.fire('paint', {
+                state: 'end',
+                src_masks: masks,
+                dest: this.painter_state.dest
+            });
+        }, _scroll: function(e){
+            let inc = e.wheelDelta > 0 ? 5 : -5;
+            this.set('painter_r', Math.max(Math.min(this.painter_r + inc, 80), 5));
+            e.preventDefault();
+        }, _mousemove: function(e){
+            let rect = this.$.bottom.getBoundingClientRect();
+            this._setMouse_x(e.clientX - rect.left);
+            this._setMouse_y(e.clientY - rect.top);
+        }, _mouseleave: function(e){
+            this._setMouse_x(-1);
+            this._setMouse_y(-1);
+        }, _painter_r_changed: function(){
+            if(this._painter_el){
+                this._painter_el.set('r', this.painter_r);
+            }
+        }, _update_scrolled_down: function(e){
+            this._setScrolled_down(e.target.scrollTop > 0);
+        }, _scroll_shadow: function(v){
+            return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
+        }, _show: function(v){
+            return v>=0 ? '' : 'display: none;';
         }
     });
 </script>
@@ -27066,7 +27588,7 @@ font-size: 10px;
 
     <div class="hidden_clipboard"></div>
 
-    <div style="position: absolute;" id="floating_layer">
+    <div style="position: absolute;">
             
         <floating-pane id="action_info" grabber_mode="[[grabber_mode]]" hidden="">
             <div class="pane_title">Action List [z]</div>
@@ -27090,22 +27612,16 @@ font-size: 10px;
             <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
             So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
         </floating-pane>
-        
-        <floating-pane id="help_info" grabber_mode="[[grabber_mode]]" hidden="">
-            <div class="pane_title">Help [?]</div>
-            Help is available on the <img src="img/github.png" alt="gigthub logo" height="15px"> readme - click to open in a new tab. <br><br>
-            You can submit bug reports and feature requests on <img src="img/github.png" alt="gigthub logo" height="15px"> (see the button on the right hand side). You can also contribute to the code!
-        </floating-pane>
-            
+                    
         <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;" hidden="">
             <div class="pane_title">Shortcuts [k]</div>
             <p>
                 For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
-                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <alt>r</alt> 
+                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <b>r</b> 
                 by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
                 the only action linked to the shortcut.)
             </p><p>
-                 Shorcuts for the plots shown for each group, use <b>shift</b> to select multiple:
+                 Shorcuts for the plots shown for each group; use <b>shift</b> to select multiple:
                 </p><ul>
                 <li><b>w</b> waveforms</li>
                 <li><b>r</b> spatial ratemap</li>
@@ -27251,7 +27767,7 @@ font-size: 10px;
         </div>
 
         <div>
-            <paper-icon-button icon="list"></paper-icon-button>
+            <paper-icon-button icon="list" on-tap="toggle_shorcut_pane"></paper-icon-button>
             <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
         </div>
 
@@ -27277,7 +27793,7 @@ font-size: 10px;
 
         <div>
             <paper-icon-button icon="settings-applications" id="pos_settings" on-tap="toggle_pos_pane"></paper-icon-button>
-            <paper-tooltip>position post processing settings [s]</paper-tooltip>
+            <paper-tooltip>position post processing settings [x]</paper-tooltip>
         </div>
 
         <div>
@@ -27316,8 +27832,8 @@ font-size: 10px;
             
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
-            <div style="flex:1 1 0%; position:relative;">
-                <managed-canvas style="position:absolute;" ckey="[[pos_path]]"></managed-canvas>
+            <div style="flex:1 1 0%; position:relative;display: flex; flex-direction: row;">
+                <managed-canvas style="margin:0 auto;" stretch_height="" ckey="[[pos_path]]"></managed-canvas>
                 <div class="info_summary">
                     <div class="info_summary_text">
                     </div>
@@ -27330,7 +27846,7 @@ font-size: 10px;
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}">
+            <cluster-plots style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" on-paint="_paint">
                </cluster-plots>
 
         </iron-resize-notifier>
@@ -27359,15 +27875,15 @@ font-size: 10px;
             other file types will be ignored
         </div>
         <div class="initial_extra_under_secondary">
-            <div class="github_button github_button_filedrop">
-                Go to <b>quickstart guide</b> on GitHub
+            <div class="github_button github_button_filedrop" on-tap="open_github">
+                goto <b>readme, code, and issues</b> on github
             </div><br><br>
             <a href="https://www.youtube.com/watch?v=36o69CPu-1E" target="_blank">
                 <img class="youtube_demo_img" src="img/demo_youtube.png" width="560" height="315">
             </a>
         </div>
         <div class="initial_extra_bottom_right">
-            v1.0.0 | Tested with Chrome <img src="img/chromelogo.png" width="15px">
+            Waveform v1.0, by DM<br> Tested with Chrome 49 <img src="img/chromelogo.png" width="15px" style="float:right;margin-left:2px;">
         </div>
     </drop-zone>
 
@@ -27432,6 +27948,7 @@ the_app._sanitize_options = function(stored_options) {
         header_filter: '',
         spa_rm_height: 120,
         cluster_plot_size: 128,
+        cluster_painter_r: 15,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
         splitter_c_size: "350px",
@@ -27490,6 +28007,16 @@ the_app._splitter = function(e){
     }
 }
 
+the_app._paint = function(e){
+    if(e.detail.state === "start"){
+        the_app.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+    }
+
+    if(e.detail.state === "end"){
+        the_app.set('disable_shortcuts', false);
+        the_app.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
+    }
+}
 
 the_app._merge_groups = function(e){
     if(the_app.tile_wall_is_empty){
@@ -27586,6 +28113,9 @@ the_app.toggle_header_pane = function(){
 }
 the_app.toggle_help_pane = function(){
     the_app.$.help_info.toggle();
+}
+the_app.toggle_shorcut_pane = function(){
+    the_app.$.shortcut_info.toggle()
 }
 the_app.open_github = function(){
     window.open('https://github.com/d1manson/waveform', '_blank');

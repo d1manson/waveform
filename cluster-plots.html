@@ -2,7 +2,6 @@
 
 Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off, which makes life a little simpler.
 
-
 -->
 
 
@@ -101,6 +100,8 @@ Polymer({
 
         this._old_x = x;
         this._old_y = y;
+    }, get_data: function(){
+        return this._ctx && this._ctx.getImageData(0, 0, this.width, this.height); // object with width, height and data 
     }
 });
 
@@ -117,7 +118,7 @@ Polymer({
 var palette_flag;
 
 var set_palettes = function(arrays){
-    palette_flag = new Uint32Array(arrays.flag.buffer);
+    palette_flag = arrays.flag;
 }
 
 var n_spikes;
@@ -264,21 +265,70 @@ var get_group_at = function(msg){
     if(!plot){
         return;
     }
-    var r = 8; // square ball radius, i.e. width is 2w+1
-    var counts = new Uint32Array(256);
+
+    // we do something a bit dodgy, which is to look at the color and lookup the
+    // original value in the inverse of the palette, so first build the inverse map...
+    let palette_flag_inverse = {};
+    for(let ii=0; ii< palette_flag.length; ii++){
+        palette_flag_inverse[palette_flag[ii]] = ii;
+    }
+
+    // now we can count the occurance of each group
+    let r = 4; // square ball radius, i.e. width is 2w+1
+    let group_counts = new Uint32Array(256);
     for(let ii=Math.max(0, point[0]-r); ii< Math.min(s, point[0]+r+1); ii++){
         for(let jj=Math.max(0, point[1]-r); jj< Math.min(s, point[1]+r+1); jj++){
-            // TODO: accumulate counts at that point
+            let color = plot[ii*s + jj];
+            let group_num = palette_flag_inverse[color];
+            group_num >=0 && group_counts[group_num]++;
         }
     }
+
+    // find the argmax of group_counts
+    let max_group=null;
+    let max_val=0;
+    for(let ii=0; ii<group_counts.length; ii++) if(group_counts[ii] > max_val){
+        max_group = ii;
+        max_val = group_counts[ii];
+    }
+
     exec_main('got_group_at', {
         generation: pkey_generation,
         point: point, // provide the details back to main so it can decide whether or not to use the result
         plot: msg.plot,
-        group_num: 3
+        group_num: max_group
     })
 }
 
+var compute_paint_masks = function(msg, arrays){
+    // This is called on the mouseup of a paint event
+    let im = arrays.mask;
+    let [c1, c2] = msg.plot.split('x');
+    c1 = parseInt(c1) - 1;
+    c2 = parseInt(c2) - 1;
+    let pkeys = msg.pkeys;
+
+    let f = msg.mask_width/s; 
+    let h = msg.mask_height; //should be eq to mask_width
+    let arrays_out = {};
+    for(let pkey of msg.pkeys){
+        let inds = pkey_to_array.get(pkey);
+        if(!inds || !inds.length){
+            continue;
+        }
+        let m = new Uint8Array(inds.length);
+        for(let ii=0; ii<m.length; ii++){
+            let a1 = amps[inds[ii]*n_c + c1];
+            let a2 = amps[inds[ii]*n_c + c2];
+            m[ii] = !!im[0 | ((s-1-a1)*f*h + a2*f)];
+        }
+        arrays_out[pkey] = m;
+    }
+    exec_main_b('computed_paint_masks', {
+        generation: pkey_generation,
+        pkeys: msg.pkeys
+    }, arrays_out);
+}
 </script>
 
 
@@ -406,7 +456,7 @@ font-size: 10px;
         </div>
     </div>
 
-    <div class="bottom" id="bottom" on-mousedown="_start_paint" on-mousemove="_mousemove">
+    <div class="bottom" id="bottom" on-mousedown="_start_paint" on-mousemove="_mousemove" on-mouseleave="_mouseleave">
         <div style="position: absolute; top:0; left:0; right:0; bottom: 0;overflow-y: scroll;" on-scroll="_update_scrolled_down">
             <template is="dom-repeat" items="[[cluster_plots]]">
                 <div class="plot" style$="{{_show(item.is_used)}}">
@@ -417,7 +467,7 @@ font-size: 10px;
                 </div>
             </template>
         </div>
-        <cross-hair r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
+        <cross-hair style$="{{_show(mouse_x)}}" r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
         </div>
     </div>
 
@@ -474,10 +524,12 @@ font-size: 10px;
                 observer: '_painter_r_changed'
             }, mouse_x: {
                 type: Number,
+                value: -1,
                 notify: true,
                 readOnly: true
             }, mouse_y: {
                 type: Number,
+                value: -1,
                 notify: true,
                 readOnly: true
             }, scrolled_down: {
@@ -495,7 +547,7 @@ font-size: 10px;
         }, created: function(){
             var worker_builder = Polymer.DomModule.import('cluster-plots','#worker');
             this._worker = worker_builder.create_for(this);
-            this._worker.exec_b('set_palettes', {flag: Palettes.flag.slice(0)});
+            this._worker.exec_b('set_palettes', {flag: Palettes.flag32.slice(0)});
             this._pkey_generation = 0;
         }, ready: function(){
             let n_c = 4; // TODO: get this from parsed-data
@@ -676,7 +728,7 @@ font-size: 10px;
             // work out which plot is closest (or underneath) the click location...
             let plots = Polymer.dom(this.root).querySelectorAll('.plot');
             let min_dist = Infinity;
-            let best_ii;
+            this._paint_ii = null;
             for(let [ii, plot] of plots.entries()){
                 let rect = plot.getBoundingClientRect();
                 let x_dist = e.clientX < rect.left ? 
@@ -691,15 +743,15 @@ font-size: 10px;
                              : 0;
                 let dist = Math.hypot(x_dist, y_dist);
                 if(dist === 0){
-                    best_ii = ii;
+                    this._paint_ii = ii;
                     break;
                 } else if(dist< min_dist){
-                    best_ii = ii;
+                    this._paint_ii = ii;
                     min_dist = dist;
                 }
             }
 
-            plots[best_ii].appendChild(this._painter_el);
+            plots[this._paint_ii].appendChild(this._painter_el);
             this.listen(document, 'mouseup', '_end_paint');
             Polymer.dom.flush();
             this.fire('paint',{
@@ -708,11 +760,39 @@ font-size: 10px;
             this._painter_el._mousemove(e);
         }, _end_paint: function(){
             this.unlisten(document, 'mouseup', '_end_paint');
+            let result = this._painter_el.get_data();
+
+            this._worker.exec_b('compute_paint_masks', {
+                plot: this.cluster_plots[this._paint_ii].y_axis + 'x' +
+                      this.cluster_plots[this._paint_ii].x_axis,
+                mask: 'mask',
+                mask_width: result.width,
+                mask_height: result.height,
+                pkeys: this.painter_state.srcs.map(function(num){
+                    return num != this.painter_state.dest && this.groups[num] && this.groups[num]._pkey
+                }, this)
+            }, {
+                mask: new Uint32Array(result.data.buffer)
+            });
+
             this._painter_el.set('active', false);
             this._painter_el.parentNode.removeChild(this._painter_el);
             this._painter_el = null;
-            this.fire('paint',{
-                state: 'end'
+
+        }, computed_paint_masks: function(msg, arrays){
+            // convert from pkeys to group_nums, which is the reverse of what we did
+            // when sending to the worker.  Note that we basically assume that nothing 
+            // has changed in the interim.
+            let coll =  Polymer.Collection.get(this.groups);
+            let masks = {};
+            for(let pkey of msg.pkeys){
+                let g = coll.getItem(pkey);
+                g && (masks[g.group_num] = arrays[pkey]);
+            }
+            this.fire('paint', {
+                state: 'end',
+                src_masks: masks,
+                dest: this.painter_state.dest
             });
         }, _scroll: function(e){
             let inc = e.wheelDelta > 0 ? 5 : -5;
@@ -722,6 +802,9 @@ font-size: 10px;
             let rect = this.$.bottom.getBoundingClientRect();
             this._setMouse_x(e.clientX - rect.left);
             this._setMouse_y(e.clientY - rect.top);
+        }, _mouseleave: function(e){
+            this._setMouse_x(-1);
+            this._setMouse_y(-1);
         }, _painter_r_changed: function(){
             if(this._painter_el){
                 this._painter_el.set('r', this.painter_r);
@@ -730,6 +813,8 @@ font-size: 10px;
             this._setScrolled_down(e.target.scrollTop > 0);
         }, _scroll_shadow: function(v){
             return v ? 'box-shadow: 0px 3px 4px 0px #bbb;z-index: 1;' : '';
+        }, _show: function(v){
+            return v>=0 ? '' : 'display: none;';
         }
     });
 </script>
