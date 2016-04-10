@@ -285,9 +285,13 @@ var timer_tick = function(){
         process_plot_path();
     } 
 
-    // find one valid thing to render...
+    let batch_limit = 5; // a bit arbitrary
+    let arrays={};
+    let msgs = [];
+
+    // find batch_limit things to render...
     // this is somewhat ugly, but whatever.
-    while(pkeys_pending_render.length > 0){
+    while(pkeys_pending_render.length > 0 && msgs.length < batch_limit){
         let pkey = pkeys_pending_render.shift();
         let pkey_rendered_options = pkey_to_rendered_options.get(pkey)
         let inds =  pkey_to_array.get(pkey);
@@ -301,37 +305,38 @@ var timer_tick = function(){
                 generation: pkey_generation,
                 render_options: render_options // note we send all options regardless of show 'n'
             }
-            let arrays={};
-
+            msgs.push(msg);
             if(show[0] === 'y' && !options_match(pkey_rendered_options, render_options, "spa")){
                     let res = get_group_xy_rm(inds);
-                    msg.spa_rm = 'spa_rm';
+                    msg.spa_rm = pkey + ' spa_rm';
                     msg.spa_max = res.max;
                     msg.spa_rm_dims = [n_bins_xy_1, n_bins_xy_0];
-                    arrays.spa_rm = res.im;
+                    arrays[msg.spa_rm] = res.im;
                     copy_options(pkey_rendered_options, render_options, "spa");
             }
 
             if(show[1] === 'y' && !options_match(pkey_rendered_options, render_options, "dir")){
                     let res = get_group_dir_rm(inds);
-                    msg.dir_rm = 'dir_rm';
+                    msg.dir_rm = pkey + ' dir_rm';
                     msg.dir_max = res.max;
                     msg.dir_rm_dims = [dir_plot_size, dir_plot_size];
-                    arrays.dir_rm = res.im;
+                    arrays[msg.dir_rm] = res.im;
                     copy_options(pkey_rendered_options, render_options, "dir");
             }
 
             if(show[2] === 'y' && !options_match(pkey_rendered_options, render_options, "speed")){
                 let im = get_group_speed_rm(inds);
-                msg.speed_rm = 'speed_rm';
+                msg.speed_rm = pkey + ' speed_rm';
                 msg.speed_rm_dims = speed_plot_size;
-                arrays.speed_rm = im;
+                arrays[msg.speed_rm] = im;
                 copy_options(pkey_rendered_options, render_options, "speed");
             }
 
-            exec_main_b('plot_things', msg, arrays);
-            break;
         }
+    }
+
+    if(msgs.length){
+        exec_main_b('plot_things', msgs, arrays);        
     }
 
     touch_timer();
@@ -1203,30 +1208,32 @@ var use_mask = function(vector, mask, val){
                 dest.max_speed = src.max_speed;
                 dest.cps_per_speed_bin = src.cps_per_speed_bin;
             }
-        }, plot_things: function(msg, arrays) {
-            if(msg.generation !== this._pkey_generation){
-                return; // pft! get with the times, dude.
+        }, plot_things: function(msgs, arrays) {
+            for (let msg of msgs){
+                if(msg.generation !== this._pkey_generation){
+                    return; // pft! get with the times, dude.
+                }
+                let okey = this._groups_collection.getItem(msg.pkey);
+                if(!okey){
+                    return;
+                }
+                let cm = Utils.canvas_manager;
+                if(msg.spa_rm){
+                    okey._rm_spa_other = cm.buffer_to_ckey(arrays[msg.spa_rm].buffer, msg.spa_rm_dims);
+                    okey._rm_spa_max_other = msg.spa_max.toFixed(1);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "spa");
+                }
+                if(msg.dir_rm){
+                    okey._rm_dir_other = cm.buffer_to_ckey(arrays[msg.dir_rm].buffer, msg.dir_rm_dims);
+                    okey._rm_dir_max_other = msg.dir_max.toFixed(1);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "dir");
+                }
+                if(msg.speed_rm){
+                    okey._rm_speed_other = cm.buffer_to_ckey(arrays[msg.speed_rm].buffer, msg.speed_rm_dims);
+                    this._copy_options(okey._rm_other_options, msg.render_options, "speed");
+                }
+                this._use_other_if_possible([okey]);
             }
-            let okey = this._groups_collection.getItem(msg.pkey);
-            if(!okey){
-                return;
-            }
-            let cm = Utils.canvas_manager;
-            if(msg.spa_rm){
-                okey._rm_spa_other = cm.buffer_to_ckey(arrays.spa_rm.buffer, msg.spa_rm_dims);
-                okey._rm_spa_max_other = msg.spa_max.toFixed(1);
-                this._copy_options(okey._rm_other_options, msg.render_options, "spa");
-            }
-            if(msg.dir_rm){
-                okey._rm_dir_other = cm.buffer_to_ckey(arrays.dir_rm.buffer, msg.dir_rm_dims);
-                okey._rm_dir_max_other = msg.dir_max.toFixed(1);
-                this._copy_options(okey._rm_other_options, msg.render_options, "dir");
-            }
-            if(msg.speed_rm){
-                okey._rm_speed_other = cm.buffer_to_ckey(arrays.speed_rm.buffer, msg.speed_rm_dims);
-                this._copy_options(okey._rm_other_options, msg.render_options, "speed");
-            }
-            this._use_other_if_possible([okey]);
 
         }, plot_path: function(msg, arrays){
             let cm = Utils.canvas_manager;
