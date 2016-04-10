@@ -189,7 +189,9 @@ font-size: 10px;
         <div class$="tet_button [[_selected_equality(item, selected_tet_num)]]" on-click="_tet_button_click">[[item]]</div>
     </template>
   </div>
-  <iron-list items="[[trials]]" as="trial" id="trial_list" selection-enabled>
+  <iron-list items="[[trials]]" as="trial" id="trial_list" 
+        on-scroll="_update_scrolled_down"
+        on-selected-item-changed="_update_trial_selection_debounce" selection-enabled>
     <template><div><div class$='trial [[_selected(selected)]]'>
         <div class='trial_top' on-mouseenter="_make_trial_captions">
             <div class='trial_title'>trial '[[trial.name]]'</div>
@@ -288,19 +290,16 @@ Polymer({
         this._byte_formatter = new Intl.NumberFormat({}, {maximumFractionDigits: 0});
         this._trial_from_base = new Map();
         this._use_url_search = window.location.search;
-        document.addEventListener("dragover", this._dragover.bind(this));
-        document.addEventListener("drop", this._drop.bind(this));
+        this.listen(document, "dragover", '_dragover');
+        this.listen(document, "drop", '_drop');
+    }, _update_scrolled_down: function(e){
+        this._setScrolled_down(e.target.scrollTop > 0);
+    }, _update_trial_selection_debounce: function(e){
+        this.debounce('update_trial_selection', this._update_trial_selection);
     }, attached: function(){
-        var self = this;
-        this.$.trial_list.addEventListener('scroll', function(){
-            self._setScrolled_down(this.scrollTop > 0);
-        });
-        this.$.trial_list.addEventListener('selected-item-changed', function(e){
-            self.debounce('update_trial_selection', self._update_trial_selection.bind(self));
-        });
-        var els = document.getElementsByTagName('cut-object');
+        let els = document.getElementsByTagName('cut-object');
         for(let ii=0; ii<els.length; ii++){
-            els[ii].addEventListener('fork', this._cut_forked.bind(this));
+            this.listen(els[ii], 'fork', '_cut_forked');
         }
     }, _cut_forked: function(e){
         let new_cut = e.detail
@@ -332,7 +331,7 @@ Polymer({
         } else if(new_sel === old_sel){
             // nothing changed after all
         } else {
-            this.set('selected_trial', new_sel.name);
+            this.set('selected_trial', new_sel && new_sel.name);
         }
     }, _update_tet_num: function(new_val){
         this._select_default_cut(); // note cut may be updated again before the debouncer fires

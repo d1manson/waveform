@@ -1414,7 +1414,7 @@ var parse_clu_file = function(full_str, fkey){
         }, attached: function(){
             var els = document.getElementsByTagName('cut-object');
             for(let ii=0; ii<els.length; ii++){
-                els[ii].addEventListener('fork', this._cut_forked.bind(this));
+                this.listen(els[ii], 'fork', '_cut_forked');
             }
         }, _cut_forked: function(e){
             // We catch this signal from the cut-obj directly, in addition to the file-organiser catching it.

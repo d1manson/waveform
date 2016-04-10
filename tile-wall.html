@@ -97,9 +97,6 @@ background-color: rgba(0,0,0,0.2);
             'groups_modified(groups.*)'
         ], listeners: {
             'mousedown': '_mousedown_splitter'
-        }, created: function(){
-            this._scroll_bound = this._scroll.bind(this);
-            this._failed_track_bound = this._failed_track.bind(this);
         }, groups_modified: function(change){
 
         }, _show: function(v){
@@ -136,8 +133,8 @@ background-color: rgba(0,0,0,0.2);
                 if(!this._track_state){
                     return; 
                 }
-                this.removeEventListener('scroll', this._scroll_bound);
-                this.removeEventListener('mouseup', this._failed_track_bound);
+                this.unlisten(this, 'scroll', '_scroll');
+                this.unlisten(this, 'mouseup', '_failed_track');
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
@@ -169,8 +166,8 @@ background-color: rgba(0,0,0,0.2);
                     tile_el: e.target,
                     other_tile_el: null
                 }
-                this.addEventListener('scroll', this._scroll_bound);
-                this.addEventListener('mouseup', this._failed_track_bound);
+                this.listen(this, 'scroll', '_scroll');
+                this.listen(this, 'mouseup', '_failed_track');
                 e.target.set('moving', true);
             } else {
                 this._track_state.last_client_x = e.detail.x;

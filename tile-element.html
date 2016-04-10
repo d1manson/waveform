@@ -355,18 +355,15 @@ pointer-events: none;
             detail.state = this.splitter_metrics ? 'move' : 'start';
             this.fire('splitter', detail);
             this._splitter_el = e.target;
-            if(!this._mousemove_splitter_bound){
-                this._mousemove_splitter_bound = this._mousemove_splitter.bind(this);
-                this._mouseup_splitter_bound = this._mouseup_splitter.bind(this)
-            }
-            this._splitter_el.addEventListener('canvas-mousemove', this._mousemove_splitter_bound);
-            this._splitter_el.addEventListener('canvas-mouseup', this._mousemove_splitter_bound);  // this just goes to mousemove, and then ...
-            document.addEventListener('mouseup', this._mouseup_splitter_bound); // we actually process the up on the document
+
+            this.listen(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
+            this.listen(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter'); // this just goes to mousemove, and then ...
+            this.listen(document, 'mouseup', '_mouseup_splitter'); // we actually process the up on the document
 
         }, _mouseup_splitter: function(e){
-            document.removeEventListener('mouseup', this._mouseup_splitter_bound);
-            this._splitter_el.removeEventListener('canvas-mousemove', this._mousemove_splitter_bound);
-            this._splitter_el.removeEventListener('canvas-mouseup', this._mousemove_splitter_bound);
+            this.unlisten(document, 'mouseup', '_mouseup_splitter');
+            this.unlisten(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
+            this.unlisten(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter');
             this.fire('splitter', {
                 state: 'update',
                 group: this.group_model,
