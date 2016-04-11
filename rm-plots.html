@@ -1209,11 +1209,11 @@ var use_mask = function(vector, mask, val){
         }, plot_things: function(msgs, arrays) {
             for (let msg of msgs){
                 if(msg.generation !== this._pkey_generation){
-                    return; // pft! get with the times, dude.
+                    continue; // pft! get with the times, dude.
                 }
                 let okey = this._groups_collection.getItem(msg.pkey);
                 if(!okey){
-                    return;
+                    continue;
                 }
                 let cm = Utils.canvas_manager;
                 if(msg.spa_rm){

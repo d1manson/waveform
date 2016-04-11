@@ -128,22 +128,30 @@ var touch_timer = function(){
     }
 }
 
+
 var timer_tick = function(){
     timer = 0;
 
-    // find one valid thing to render...
-    while(pkeys_pending_render.length > 0){
+    let batch_limit = 5; // a bit arbitrary
+    let arrays={};
+    let msgs = [];
+
+    // find batch_limit things to render...
+    while(pkeys_pending_render.length > 0 && msgs.length < batch_limit){
         let pkey = pkeys_pending_render.shift();
         if(pkey && pkey_to_array.get(pkey) && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
-            get_group_hist(pkey);
-            break;
+            msgs.push(get_group_hist(pkey, arrays));
         }
+    }
+    
+    if(msgs.length){        
+        exec_main_b('plot_hist', msgs, arrays);
     }
 
     touch_timer();
 }
 
-var get_group_hist = function(pkey){
+var get_group_hist = function(pkey, arrays){
     // note desired_max_delta_t and spike_times should both be in the same units
     let group_times = pick(spike_times, pkey_to_array.get(pkey));
 
@@ -155,13 +163,15 @@ var get_group_hist = function(pkey){
     hist = plot_histogram(hist, render_options.height);
     let opts = Object.assign({}, render_options);
     pkey_to_rendered_options.set(pkey, opts);
-    exec_main_b('plot_hist', {
+
+    arrays[pkey + ' hist'] = hist;
+    return {
         pkey: pkey,
         generation: pkey_generation,
-        hist_name: 'hist',
+        hist: pkey + ' hist',
         dims: [opts.n_bins, opts.height],
         render_options: opts
-    }, {hist: hist});
+    }
 }
 
 var get_group_hist_sub = function(ret, group_times, D, b){
@@ -396,17 +406,19 @@ var is_equal_simple = function(a, b){
             }
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
-        }, plot_hist: function(data, arrays) {
-            if(data.generation !== this._pkey_generation)
-                return; // pft! get with the times, dude.
-            let okey = this._groups_collection.getItem(data.pkey);
-            if(!okey){
-                return;
+        }, plot_hist: function(msgs, arrays) {
+            for(let msg of msgs){
+                if(msg.generation !== this._pkey_generation)
+                    continue; // pft! get with the times, dude.
+                let okey = this._groups_collection.getItem(msg.pkey);
+                if(!okey){
+                    continue;
+                }
+                let cm = Utils.canvas_manager;
+                okey._tac_other = cm.buffer_to_ckey(arrays[msg.hist].buffer, msg.dims);
+                okey._tac_other_options = msg.render_options;
+                this._use_other_if_possible([okey]);
             }
-            let cm = Utils.canvas_manager;
-            okey._tac_other = cm.buffer_to_ckey(arrays.hist.buffer, data.dims);
-            okey._tac_other_options = data.render_options;
-            this._use_other_if_possible([okey]);
         }
 
     });
