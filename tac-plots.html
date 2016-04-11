@@ -415,7 +415,7 @@ var is_equal_simple = function(a, b){
                     continue;
                 }
                 let cm = Utils.canvas_manager;
-                okey._tac_other = cm.buffer_to_ckey(arrays[msg.hist].buffer, msg.dims);
+                okey._tac_other = {buffer: arrays[msg.hist].buffer, dims: msg.dims};
                 okey._tac_other_options = msg.render_options;
                 this._use_other_if_possible([okey]);
             }

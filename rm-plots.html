@@ -1217,17 +1217,17 @@ var use_mask = function(vector, mask, val){
                 }
                 let cm = Utils.canvas_manager;
                 if(msg.spa_rm){
-                    okey._rm_spa_other = cm.buffer_to_ckey(arrays[msg.spa_rm].buffer, msg.spa_rm_dims);
+                    okey._rm_spa_other = {buffer: arrays[msg.spa_rm].buffer, dims: msg.spa_rm_dims};
                     okey._rm_spa_max_other = msg.spa_max.toFixed(1);
                     this._copy_options(okey._rm_other_options, msg.render_options, "spa");
                 }
                 if(msg.dir_rm){
-                    okey._rm_dir_other = cm.buffer_to_ckey(arrays[msg.dir_rm].buffer, msg.dir_rm_dims);
+                    okey._rm_dir_other = {buffer: arrays[msg.dir_rm].buffer, dims: msg.dir_rm_dims};
                     okey._rm_dir_max_other = msg.dir_max.toFixed(1);
                     this._copy_options(okey._rm_other_options, msg.render_options, "dir");
                 }
                 if(msg.speed_rm){
-                    okey._rm_speed_other = cm.buffer_to_ckey(arrays[msg.speed_rm].buffer, msg.speed_rm_dims);
+                    okey._rm_speed_other = {buffer: arrays[msg.speed_rm].buffer, dims: msg.speed_rm_dims};
                     this._copy_options(okey._rm_other_options, msg.render_options, "speed");
                 }
                 this._use_other_if_possible([okey]);

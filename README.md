@@ -108,7 +108,7 @@ There are a bunch of things called "keys", used for refering to specific objects
 
 * akey - a box around an `array`, which is a `TypedArray`.  `Utils.typed_array_manager` offers some methods for working with these.
 
-* ckey - a box around an actual dom `canvas` element. `Utils.canvas_manager` offers some methods for working with these, and the `managed-canvas` element provides an easy way of inserting the canvas into the dom. Note that a dom element can only be in one place in the dom at any given time.
+* ckey - this is either a box around an actual dom `canvas` element, or a box around an `ArrayBuffer` accompanied by a two-element `dims` array. The `managed-canvas` element provides an easy way of visualising `ckey`s. Note that in the case of actual `canvas` elements, it can only be in one place in the dom at any given time.
 
 * fkey - a box around a `File` instance. Also includes an `id`, which counts up from 1 at the start of the program. On worker threads, it is the `id` which is refered to as an `fkey` rather than the object itself, although the distinction isn't always correctly made in variable names (specfically in the `parsed-data` main thread code).  `Utils.file_manager` offers some methods for working with these.
 
