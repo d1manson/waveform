@@ -16203,8 +16203,12 @@ Polymer({
         if(this.fix_height && this.stretch_height){
             console.warn('managed-canvas cannot stretch and fix height')
         }
-        if(el_canv){
-            el_canv.style.cssText = "";
+        if(el_canv){            
+            el_canv.style.margin = "";
+            el_canv.style.left = "";
+            el_canv.style.right = "";
+            el_canv.style.position = "";
+            
             if(this.stretch_height){
                 // this does what is needed for now, but it's not pretty...
                 el_canv.style.height = "100%";
@@ -16510,7 +16514,7 @@ pointer-events: none;
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
-        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter"></managed-canvas>
+        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter" fix_height="128"></managed-canvas>
         <template is="dom-if" if="[[splitter_metrics]]">
             <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
         </template>
@@ -16752,6 +16756,7 @@ Polymer.Collection.prototype.initMap = function() {
 /* Optimize bad perf func, this was getting deopt'ed by Chrome.
    For some reason this doesn't monkey-patch all uses.
 */
+/*
 Polymer.Bind._modelApi._clearPath = function (path) {
   let keys = Object.keys(this.__data__);
   path = path + ".";
@@ -16759,7 +16764,7 @@ Polymer.Bind._modelApi._clearPath = function (path) {
     (key.substring(0, path.length) === path) && (this.__data__[key] = undefined);
   }
 }
-
+*/
 </script><script>
 
 var Utils = {}
@@ -24447,11 +24452,11 @@ var use_mask = function(vector, mask, val){
         }, plot_things: function(msgs, arrays) {
             for (let msg of msgs){
                 if(msg.generation !== this._pkey_generation){
-                    return; // pft! get with the times, dude.
+                    continue; // pft! get with the times, dude.
                 }
                 let okey = this._groups_collection.getItem(msg.pkey);
                 if(!okey){
-                    return;
+                    continue;
                 }
                 let cm = Utils.canvas_manager;
                 if(msg.spa_rm){
@@ -24606,22 +24611,30 @@ var touch_timer = function(){
     }
 }
 
+
 var timer_tick = function(){
     timer = 0;
 
-    // find one valid thing to render...
-    while(pkeys_pending_render.length > 0){
+    let batch_limit = 5; // a bit arbitrary
+    let arrays={};
+    let msgs = [];
+
+    // find batch_limit things to render...
+    while(pkeys_pending_render.length > 0 && msgs.length < batch_limit){
         let pkey = pkeys_pending_render.shift();
         if(pkey && pkey_to_array.get(pkey) && !is_equal_simple(pkey_to_rendered_options.get(pkey), render_options)){
-            get_group_hist(pkey);
-            break;
+            msgs.push(get_group_hist(pkey, arrays));
         }
+    }
+    
+    if(msgs.length){        
+        exec_main_b('plot_hist', msgs, arrays);
     }
 
     touch_timer();
 }
 
-var get_group_hist = function(pkey){
+var get_group_hist = function(pkey, arrays){
     // note desired_max_delta_t and spike_times should both be in the same units
     let group_times = pick(spike_times, pkey_to_array.get(pkey));
 
@@ -24633,13 +24646,15 @@ var get_group_hist = function(pkey){
     hist = plot_histogram(hist, render_options.height);
     let opts = Object.assign({}, render_options);
     pkey_to_rendered_options.set(pkey, opts);
-    exec_main_b('plot_hist', {
+
+    arrays[pkey + ' hist'] = hist;
+    return {
         pkey: pkey,
         generation: pkey_generation,
-        hist_name: 'hist',
+        hist: pkey + ' hist',
         dims: [opts.n_bins, opts.height],
         render_options: opts
-    }, {hist: hist});
+    }
 }
 
 var get_group_hist_sub = function(ret, group_times, D, b){
@@ -24874,17 +24889,19 @@ var is_equal_simple = function(a, b){
             }
 
             this._worker.exec('set_show', this.show); // worker needs to know even if it's all 'n', because then it won't bother doing anything.
-        }, plot_hist: function(data, arrays) {
-            if(data.generation !== this._pkey_generation)
-                return; // pft! get with the times, dude.
-            let okey = this._groups_collection.getItem(data.pkey);
-            if(!okey){
-                return;
+        }, plot_hist: function(msgs, arrays) {
+            for(let msg of msgs){
+                if(msg.generation !== this._pkey_generation)
+                    continue; // pft! get with the times, dude.
+                let okey = this._groups_collection.getItem(msg.pkey);
+                if(!okey){
+                    continue;
+                }
+                let cm = Utils.canvas_manager;
+                okey._tac_other = cm.buffer_to_ckey(arrays[msg.hist].buffer, msg.dims);
+                okey._tac_other_options = msg.render_options;
+                this._use_other_if_possible([okey]);
             }
-            let cm = Utils.canvas_manager;
-            okey._tac_other = cm.buffer_to_ckey(arrays.hist.buffer, data.dims);
-            okey._tac_other_options = data.render_options;
-            this._use_other_if_possible([okey]);
         }
 
     });
@@ -25821,8 +25838,8 @@ var off_canv_dt = 2; //distance from t to t+1 on the wave
 var off_canv_wave_gap = 4; //horizontal and vertical gap between waves
 
 // These two are applied in css..the actual width used matches the pixels on the off_canv
-var on_canv_width = n_c*n_w*2;
-var on_canv_height = 128;
+var on_canv_w = n_c*n_w*2;
+var on_canv_h = 256; // this is absolutely critical, if it's smaller then drawimage is about 50x slower.
 
 var off_canv_count_increment = 0.00001;
 
@@ -25851,7 +25868,7 @@ return {
             v_color = texture2D(palette, vec2(wave_color_tex, 0.));
 
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + t_x_offset + delta_t_x_offset*is_t_plus_one;
 
             //calculate the y coordiante in canvas coordinates
             gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
@@ -25880,7 +25897,7 @@ return {
 
         void main(void) {
             //calculate the x coordiante in canvas coordinates
-            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + (t_x_offset + delta_t_x_offset*is_t_plus_one);
+            gl_Position.x = wave_xy_offset.x*(1./128.) -1. + t_x_offset + delta_t_x_offset * is_t_plus_one;
 
             //calculate the y coordiante in canvas coordinates
             gl_Position.y = wave_xy_offset.y*(1./128.) -1. + voltage*y_factor;
@@ -25921,7 +25938,6 @@ return {
         void main() {
             highp vec4 src = texture2D(u_src, v_tex_coord);
             highp float counts = sqrt(src.r*normalising_factor*10.);
-            gl_FragColor = src;
             gl_FragColor = vec4(counts > 0.5 ?
                                      counts > 0.75 ?
                                          4. - 4.*counts 
@@ -26006,7 +26022,7 @@ var WavesRenderer = function(callback, debug){
     }
 
     if(debug){
-        gl = this.gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined);
+        //gl = this.gl = WebGLDebugUtils.makeDebugContext(gl, throwOnGLError, validateNoneOfTheArgsAreUndefined);
         this.debug_show_off_canv();
     }
 
@@ -26247,7 +26263,7 @@ WavesRenderer.prototype.set_voltage_data = function(prepared_voltage_data){
 WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     // okeys is an array of objs, each with .akey property that gives a akey.
 
-    var okeys = [null].concat(Array.from(okeys)); // if it was a set, then make it an array with well-defined order
+    okeys = [null].concat(Array.from(okeys)); // if it was a set, then make it an array with well-defined order
                                                   // also, make the 0th okey null, because we render the rubbish in that
                                                   // bit of the canvas.
 
@@ -26256,12 +26272,12 @@ WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     // instead we render small slices from t to t+something. 
     // the question is, how big is that something?
 
-    var n_okeys = okeys.length;
-    var n_rows = Math.floor(off_canv_h/(off_canv_wave_h+off_canv_wave_gap)); // TODO: we should really have a vertical gap between waves
+    let n_okeys = okeys.length;
+    let n_rows = Math.floor(off_canv_h/(off_canv_wave_h+off_canv_wave_gap)); // TODO: we should really have a vertical gap between waves
 
-    var success = false;
-    var n_cols;
-    for(var batch_t=to_t-from_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
+    let success = false;
+    let n_cols, batch_t;
+    for(batch_t=to_t-from_t; batch_t>3; batch_t = Math.ceil(batch_t/2)){
         n_cols = Math.floor(off_canv_w/(batch_t*off_canv_dt + off_canv_wave_gap));
         if(n_okeys <= n_cols * n_rows){
             success = true;
@@ -26274,8 +26290,8 @@ WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
     }
 
     // Now we compute that offsets for each okey, in both pixel coordinates
-    var x_offset = new Uint16Array(n_rows*n_cols);
-    var y_offset = new Uint16Array(n_rows*n_cols);
+    let x_offset = new Uint16Array(n_rows*n_cols);
+    let y_offset = new Uint16Array(n_rows*n_cols);
     
     for(let row=0, p=0; row<n_rows; row++){
         for(let col=0; col<n_cols; col++, p++){
@@ -26284,12 +26300,28 @@ WavesRenderer.prototype._prepare_render_metrics = function(okeys, from_t, to_t){
         }
     }
 
+    // We could have done the following in the above loop, but hey, we use a second loop...
+
+    // convert x and y offsets to 8-bit, which are the values to be passed to the vertex-shader.
+    // Then convert the rounded values back to pixels, thus correcting the pixel values to match the
+    // rounding errors involved.
+    let xy_offset_gl_i8 = new Uint8Array(x_offset.length*2);
+    for(let p=0; p<x_offset.length; p++){
+        let x_gl = 0 | (x_offset[p]/off_canv_w * 256);
+        let y_gl = 0 | ((y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256); 
+        xy_offset_gl_i8[p*2] = x_gl;
+        xy_offset_gl_i8[p*2+1] = y_gl;
+        let y_gl_11 = (y_gl*(1/128) -1); // value on interval [-1 to 1]
+        y_offset[p] =  Math.max(0, (y_gl_11+1)*off_canv_h/2 - off_canv_wave_h/2);
+    }
+
     return {
         from_t: from_t,
         to_t: to_t,
         batch_t: batch_t,
         x_offset: x_offset,
         y_offset: y_offset,
+        xy_offset_gl_i8: xy_offset_gl_i8,
         okeys: okeys
     }
 }
@@ -26304,13 +26336,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
     var render_metrics = this._render_metrics;
     var okeys = render_metrics.okeys; // 0th entry is null,  because offsets are reserved for rubbish
 
-    var xy_offset_gl_i8 = new Uint8Array(render_metrics.x_offset.length*2);
-    var xy_offset_gl_i16 = new Uint16Array(xy_offset_gl_i8.buffer);  
-
-    for(var p=0; p<render_metrics.x_offset.length; p++){
-        xy_offset_gl_i8[p*2] = render_metrics.x_offset[p]/off_canv_w * 256;
-        xy_offset_gl_i8[p*2+1] = (render_metrics.y_offset[p] + off_canv_wave_h/2)/off_canv_h * 256;
-    }
+    var xy_offset_gl_i16 = new Uint16Array(render_metrics.xy_offset_gl_i8.buffer);  
 
     if(this._mode === 'density'){
         // just need to provide x and y
@@ -26339,7 +26365,7 @@ WavesRenderer.prototype._upload_okey_data = function(){
             let xy = xy_offset_gl_i16[ii];
             let gx = okeys[ii].group_num |  (xy << 8); 
             let yg = ((0xff00 & xy) >>> 8) | (okeys[ii].group_num << 8);
-            for(var jj=0; jj<inds.length; jj++){
+            for(let jj=0; jj<inds.length; jj++){
                 data_i16[inds[jj]*3 +0] = xy;
                 data_i16[inds[jj]*3 +1] = gx;
                 data_i16[inds[jj]*3 +2] = yg;
@@ -26395,7 +26421,8 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
                 main_has_canv: false
             };
             part.el_canv.width = off_canv_dt*n_c*(n_w-1);
-            part.el_canv.height = off_canv_wave_h;
+            part.el_canv.height = on_canv_h;
+            part.el_canv.style.width = part.el_canv.width  + "px"; // if managed-canvas sets the height then this will hold the width fixed
             part.ctx = part.el_canv.getContext('2d');
             this._okey_to_part_rendered.set(okey, part);
             this._n_t_to_okeys[0].add(okey);
@@ -26446,7 +26473,8 @@ WavesRenderer.prototype.update_okeys = function(okeys_to_remove, okeys_to_add, o
         }
         this._okey_to_part_rendered.set(okey, part);
         part.el_canv.width = off_canv_dt*n_c*(n_w-1);
-        part.el_canv.height = off_canv_wave_h;
+        part.el_canv.height = on_canv_h;
+        part.el_canv.style.width = part.el_canv.width  + "px";  // if managed-canvas sets the height then this will hold the width fixed
         part.ctx = part.el_canv.getContext('2d');
         this._n_t_to_okeys[0].add(okey);
         results.set(okey, part.el_canv);
@@ -26548,7 +26576,7 @@ WavesRenderer.prototype._timer_tick = function(){
         let okey = okeys[ii];
         let part = this._okey_to_part_rendered.get(okey);
         part.ctx.drawImage(this.el_off_canv, x_offsets[ii], off_canv_h - 1 - y_offsets[ii] - off_canv_wave_h,
-                            width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, off_canv_wave_h);
+                            width, off_canv_wave_h, part.n_t*off_canv_dt, 0, width, on_canv_h);
     }
 
     // record that the okeys have now increaed their n_t
@@ -26617,13 +26645,13 @@ WavesRenderer.prototype._timer_tick = function(){
 WavesRenderer.prototype._render_batch_flag = function(from_t, end_t){
     var gl = this.gl;
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
 
     for(let t=from_t; t<end_t; t++){
         gl.uniform1f(this._locs_flag.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
-        gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
+        gl.vertexAttribPointer(this._locs_flag.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
 }
@@ -26632,12 +26660,12 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
     this._switch_to_density_1_prog();
     var gl = this.gl;
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
 
     for(let t=from_t; t<end_t; t++){
         gl.uniform1f(this._locs_density_1.t_x_offset, off_canv_dt*(t-from_t)/off_canv_w*2); 
 
         // bind the voltage buffer with data for (t,t+1) and render it
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._buf_voltage);
         gl.vertexAttribPointer(this._locs_density_1.voltage, 1, gl.BYTE, false, 1, t*this._n*2); 
         gl.drawArrays(gl.LINES, 0, 2*this._n); 
     }
@@ -26648,7 +26676,7 @@ WavesRenderer.prototype._render_batch_density = function(from_t, end_t){
 
 WavesRenderer.prototype.mask_at_vt = function(inds, point){
     let t = 0 | (point[1] / off_canv_dt);
-    let v = 0 | (127 - (point[0] /off_canv_wave_h)*255);
+    let v = 0 | (127 - (point[0] /on_canv_h)*255);
     let m = new Uint8Array(inds.length);
     let vdata = new Int8Array(this._voltage_data.buffer);
     let n = this._n;

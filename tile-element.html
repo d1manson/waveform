@@ -194,7 +194,7 @@ pointer-events: none;
         <div class="placeholder_text">[group [[group_num]]]</div> 
     </div>
     <div class="canvas_part_1">
-        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter"></managed-canvas>
+        <managed-canvas ckey="[[group_model.waves]]" on-canvas-mousedown="_mousedown_splitter" fix_height="128"></managed-canvas>
         <template is="dom-if" if="[[splitter_metrics]]">
             <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
         </template>

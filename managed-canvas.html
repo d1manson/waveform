@@ -49,8 +49,12 @@ Polymer({
         if(this.fix_height && this.stretch_height){
             console.warn('managed-canvas cannot stretch and fix height')
         }
-        if(el_canv){
-            el_canv.style.cssText = "";
+        if(el_canv){            
+            el_canv.style.margin = "";
+            el_canv.style.left = "";
+            el_canv.style.right = "";
+            el_canv.style.position = "";
+            
             if(this.stretch_height){
                 // this does what is needed for now, but it's not pretty...
                 el_canv.style.height = "100%";

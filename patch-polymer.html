@@ -49,6 +49,7 @@ Polymer.Collection.prototype.initMap = function() {
 /* Optimize bad perf func, this was getting deopt'ed by Chrome.
    For some reason this doesn't monkey-patch all uses.
 */
+/*
 Polymer.Bind._modelApi._clearPath = function (path) {
   let keys = Object.keys(this.__data__);
   path = path + ".";
@@ -56,5 +57,5 @@ Polymer.Bind._modelApi._clearPath = function (path) {
     (key.substring(0, path.length) === path) && (this.__data__[key] = undefined);
   }
 }
-
+*/
 </script>
