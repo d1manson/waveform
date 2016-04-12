@@ -17038,6 +17038,7 @@ Utils.canvas_manager = (function(){
             new_canv.width = old_canv.width;
             new_canv.height = old_canv.height;
             new_canv.getContext('2d').drawImage(old_canv, 0, 0);
+            new_canv.style.cssText = old_canv.style.cssText;
             return {canvas: new_canv};
         },
         get_2d_ctx: function(ckey){
@@ -28156,7 +28157,6 @@ wav._grab_group = function(e){
         this.set('grabbed_tiles', []);
     }
 
-    // for simplicity we make new canvases for this tile
     let cm = Utils.canvas_manager;
     let group = e.detail.group;
     this.push('grabbed_tiles', {
@@ -28165,11 +28165,13 @@ wav._grab_group = function(e){
                 "c" + group.group_num + " [Grabbed]",
         group_num: group.group_num,
         group: {
-            waves: cm.clone_ckey(group.waves),
-            tac: cm.clone_ckey(group.tac),
-            rm_spa: cm.clone_ckey(group.rm_spa),
-            rm_dir: cm.clone_ckey(group.rm_dir),
-            rm_speed: cm.clone_ckey(group.rm_speed)
+            waves: cm.clone_ckey(group.waves), 
+            tac: group.tac,
+            rm: {
+              spa: group.rm.spa,
+              dir: group.rm.dir,
+              speed: group.rm.speed  
+            }
         },
         x: e.detail.src_client_x + 20,
         y: e.detail.src_client_y + 20
@@ -28276,6 +28278,8 @@ wav.show_tap = function(e){
     wav.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
     e.preventDefault(); 
 }
+
+// :::: initialize application ::::::::::::::::::::::
 
 wav.addEventListener('dom-change', function(){
     // remove keyboard handlers from buttons. Note that ripple still shows.

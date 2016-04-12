@@ -242,6 +242,7 @@ Utils.canvas_manager = (function(){
             new_canv.width = old_canv.width;
             new_canv.height = old_canv.height;
             new_canv.getContext('2d').drawImage(old_canv, 0, 0);
+            new_canv.style.cssText = old_canv.style.cssText;
             return {canvas: new_canv};
         },
         get_2d_ctx: function(ckey){
