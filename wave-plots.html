@@ -1073,7 +1073,7 @@ Polymer({
             }
             if(!okey.waves || okey.waves.canvas !== el_canvas){
                 okey.waves = cm.to_ckey(el_canvas);
-                this.notifyPath('groups.' + key + '.waves', okey.waves);            
+                this.notifyPathForPrimaryView('waves', okey.waves, okey); // actual path: 'groups.' + key + '.waves'
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
     }, mask_at_vt: function(inds, point){

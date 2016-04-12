@@ -1060,7 +1060,7 @@ var use_mask = function(vector, mask, val){
                     rm.speed = op === 1 ? okey._rm_speed_other : null;
                 }
 
-                this.notifyPath('groups.' + okey._pkey + '.rm', rm);
+                this.notifyPathForPrimaryView('rm', rm, okey); // actual path: 'groups.' + okey._pkey + '.rm'
             }
 
         }, _options_modified: function(){

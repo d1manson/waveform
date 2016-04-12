@@ -373,7 +373,7 @@ var is_equal_simple = function(a, b){
 
                 if(op){
                     okey.tac = op === 1 ? okey._tac_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
+                    this.notifyPathForPrimaryView('tac', okey.tac, okey); // actual path: 'groups.' + okey._pkey + '.tac'
                 }
             }
 

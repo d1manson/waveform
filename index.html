@@ -16600,7 +16600,8 @@ pointer-events: none;
                 type: Object,
                 notify: true,
                 value: function(){return {};},
-                notify: true
+                notify: true,
+                observer: '_register_primary_view'
             },
             moving: {
                 type: Boolean,
@@ -16731,6 +16732,8 @@ pointer-events: none;
                 y: e.detail.offset_y,
                 w: e.detail.canvas_width
             });
+        }, _register_primary_view: function(okey){
+            okey && this.setAsPrimaryViewForModel('group_model');
         }
     });
 </script>
@@ -16783,19 +16786,57 @@ Polymer.Collection.prototype.initMap = function() {
 }
 
 
+Polymer.Base._addFeature({
+  /*
+    This is an important hack which allows you to avoid doing expensive
+    notifications if you really have to.
 
-/* Optimize bad perf func, this was getting deopt'ed by Chrome.
-   For some reason this doesn't monkey-patch all uses.
-*/
-/*
-Polymer.Bind._modelApi._clearPath = function (path) {
-  let keys = Object.keys(this.__data__);
-  path = path + ".";
-  for(let key of keys){
-    (key.substring(0, path.length) === path) && (this.__data__[key] = undefined);
+    It is to be used when an object has various properties that will be
+    rendered by only a single element.  The element registers itself as
+    the primary view for the given object using
+
+      this.setAsPrimaryViewForModel('special_object');
+
+    where 'special_object' is the name of a property on the element.
+    (I think this may support paths as well as raw property names, but
+    I haven't tested it.)
+
+    Then, in some other script we replace the following:
+
+      this.notifyPath('some_array.#42.some_property', mutated_object.some_property)      
+
+    with this:
+
+       this.notifyPathForPrimaryView('some_property', mutated_object.some_property, mutated_object);
+
+    Note how here we only use the final suffix for the path, and we provide the actual
+    object as the final argument.
+    (Again, I think you can use multi-part paths as the first argument, not just single property 
+    names but I haven't tested it.)
+
+    Using this approach very much goes against the Polymeric way of doing things, 
+    but it's far easier to implement than something less hacky (I did try something
+    much fancier, but ran in to all kinds of complciations and decided to abandon the effort.)
+  */
+
+  _primaryViews: new WeakMap(),
+  _pendingNotifies: new WeakMap(),
+
+  setAsPrimaryViewForModel: function(model_name){
+    let model = this.get(model_name);
+    this._primaryViews.set(model, {
+      el: this,
+      prefix: model_name
+    });
+  },
+
+  notifyPathForPrimaryView: function(path, value, model){
+    let view = this._primaryViews.get(model);
+    view && view.el.notifyPath(view.prefix + "." + path, value, true);
   }
-}
-*/
+
+});
+
 </script><script>
 
 var Utils = {}
@@ -24345,7 +24386,7 @@ var use_mask = function(vector, mask, val){
                     rm.speed = op === 1 ? okey._rm_speed_other : null;
                 }
 
-                this.notifyPath('groups.' + okey._pkey + '.rm', rm);
+                this.notifyPathForPrimaryView('rm', rm, okey); // actual path: 'groups.' + okey._pkey + '.rm'
             }
 
         }, _options_modified: function(){
@@ -24908,7 +24949,7 @@ var is_equal_simple = function(a, b){
 
                 if(op){
                     okey.tac = op === 1 ? okey._tac_other : null;
-                    this.notifyPath('groups.' + okey._pkey + '.tac', okey.tac);
+                    this.notifyPathForPrimaryView('tac', okey.tac, okey); // actual path: 'groups.' + okey._pkey + '.tac'
                 }
             }
 
@@ -26869,7 +26910,7 @@ Polymer({
             }
             if(!okey.waves || okey.waves.canvas !== el_canvas){
                 okey.waves = cm.to_ckey(el_canvas);
-                this.notifyPath('groups.' + key + '.waves', okey.waves);            
+                this.notifyPathForPrimaryView('waves', okey.waves, okey); // actual path: 'groups.' + key + '.waves'
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
     }, mask_at_vt: function(inds, point){

@@ -249,7 +249,8 @@ pointer-events: none;
                 type: Object,
                 notify: true,
                 value: function(){return {};},
-                notify: true
+                notify: true,
+                observer: '_register_primary_view'
             },
             moving: {
                 type: Boolean,
@@ -380,6 +381,8 @@ pointer-events: none;
                 y: e.detail.offset_y,
                 w: e.detail.canvas_width
             });
+        }, _register_primary_view: function(okey){
+            okey && this.setAsPrimaryViewForModel('group_model');
         }
     });
 </script>
