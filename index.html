@@ -38,7 +38,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script> 
 document.addEventListener('keydown', function(e){
-    if(the_app.disable_shortcuts){
+    if(wav.disable_shortcuts){
         e.stopImmediatePropagation(); // for this to be effective it needs to be the first registered listener
         return;
     }
@@ -27676,7 +27676,7 @@ font-size: 10px;
 </dom-module></div>
 <paper-iconset id="meta"></paper-iconset>
 
-<template is="dom-bind" id="the_app">
+<template is="dom-bind" id="wav">
 
     <iron-localstorage name="waveform" value="{{stored_options}}"></iron-localstorage>
     <value-transform value_b="{{options}}" value_a="{{stored_options}}" a_to_b="_sanitize_options"></value-transform>
@@ -28012,7 +28012,6 @@ font-size: 10px;
 
       
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github" target="[[keyboard_target]]"></iron-a11y-keys>
-    <iron-a11y-keys keys="¿+alt" on-keys-pressed="toggle_help_pane" target="[[keyboard_target]]"></iron-a11y-keys>   
     
     
 </template>
@@ -28023,9 +28022,14 @@ font-size: 10px;
 
 <script>
 "use strict";
-var the_app = document.getElementById('the_app')
+var wav = document.getElementById('wav')
 
-the_app._sanitize_options = function(stored_options) {
+wav.keyboard_target = document.querySelector('body'); // passed through to iron-a11y-keys
+
+// :::: define default options and validate values read from localStorage :::::::::::::::
+
+wav._sanitize_options = function(stored_options) {
+
     let opts = {
         max_delta_t: 500,
         show_rms: 'yyy',
@@ -28062,190 +28066,125 @@ the_app._sanitize_options = function(stored_options) {
     return opts;
 }
 
-the_app._splitter = function(e){
+// :::: the cutting tools: split, paint, merge, swap ::::::::::::::::::::::::::
+
+wav._splitter = function(e){
     if(e.detail.state === "finalize" || e.detail.state === "cancel"){
         if(e.detail.state === "cancel"){
-            if(the_app.splitter_state.group_b){
-                the_app.$.cut.undo();
+            if(wav.splitter_state.group_b){
+                wav.$.cut.undo();
             }
         }
-        the_app.splitter_state._akey_full = null;
-        the_app.set('splitter_state.group_a', null);
-        the_app.set('splitter_state.group_b', null);
-        the_app.set('splitter_state.metrics', null);
+        wav.splitter_state._akey_full = null;
+        wav.set('splitter_state.group_a', null);
+        wav.set('splitter_state.group_b', null);
+        wav.set('splitter_state.metrics', null);
         this.set('disable_shortcuts', false);
         return;
     }
 
     if(e.detail.state === "start"){
-        the_app.splitter_state._akey_full = e.detail.group.akey;
-        the_app.set('splitter_state.group_a', e.detail.group);
+        wav.splitter_state._akey_full = e.detail.group.akey;
+        wav.set('splitter_state.group_a', e.detail.group);
         this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts or else have a mechanism for reseting the split.
     } 
     if(e.detail.point !== null){
-        the_app.splitter_state._point = e.detail.point;
-        the_app.set('splitter_state.metrics', {
+        wav.splitter_state._point = e.detail.point;
+        wav.set('splitter_state.metrics', {
             x: e.detail.x,
             y: e.detail.y,
             w: e.detail.w
         });       
     }
     if(e.detail.state === "update"){
-        if(the_app.splitter_state.group_b){
-            the_app.$.cut.undo();
+        if(wav.splitter_state.group_b){
+            wav.$.cut.undo();
         }
-        let m = this.$.wave_plots.mask_at_vt(the_app.splitter_state._akey_full.array, the_app.splitter_state._point);
-        let group_num_a = the_app.splitter_state.group_a.group_num;
-        the_app.$.cut.split_group(group_num_a, m);
-        the_app.set('splitter_state.group_a', the_app.cut_groups[group_num_a]);
-        the_app.set('splitter_state.group_b', the_app.cut_groups[group_num_a + 1]);
+        let m = this.$.wave_plots.mask_at_vt(wav.splitter_state._akey_full.array, wav.splitter_state._point);
+        let group_num_a = wav.splitter_state.group_a.group_num;
+        wav.$.cut.split_group(group_num_a, m);
+        wav.set('splitter_state.group_a', wav.cut_groups[group_num_a]);
+        wav.set('splitter_state.group_b', wav.cut_groups[group_num_a + 1]);
     }
 }
 
-the_app._paint = function(e){
+wav._paint = function(e){
     if(e.detail.state === "start"){
-        the_app.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+        wav.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
     }
 
     if(e.detail.state === "end"){
-        the_app.set('disable_shortcuts', false);
-        the_app.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
+        wav.set('disable_shortcuts', false);
+        wav.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
     }
 }
 
-the_app._merge_groups = function(e){
-    if(the_app.tile_wall_is_empty){
+wav._merge_groups = function(e){
+    if(wav.tile_wall_is_empty){
         return;
     }
-    the_app.$.cut.merge_groups(e.detail.a, e.detail.b);
+    wav.$.cut.merge_groups(e.detail.a, e.detail.b);
 }
 
-the_app.swap_groups = function(){
-    if(the_app.tile_wall_is_empty){
+wav.swap_groups = function(){
+    if(wav.tile_wall_is_empty){
         return;
     }
 
     let a, b;
-    if(!the_app.active_group_a){
+    if(!wav.active_group_a){
         a = parseInt(prompt("Swap two groups. Enter first group:", ""));
         if(!(a>=0)){
             return;
         }
         b = parseInt(prompt("Swap two groups. Enter second group:", ""));
     } else {
-        a = the_app.active_group_a.group_num;
+        a = wav.active_group_a.group_num;
         b = parseInt(prompt("Enter group to swap with group " + a + ":", ""));
     }
     if(!(b>=0)){
         return;
     }
 
-    the_app.$.cut.swap_groups(a, b);
+    wav.$.cut.swap_groups(a, b);
 }
 
-the_app._highlight_group = function(e){
-    the_app.$.cluster_plots.highlight_group(e.detail.group_num);
+// :::: the grab tools: tile, (TODO: clusters & path) ::::::::::::::::::::::::::
+
+wav._grab_group = function(e){
+    if(!wav.grabbed_tiles){
+        this.set('grabbed_tiles', []);
+    }
+
+    // for simplicity we make new canvases for this tile
+    let cm = Utils.canvas_manager;
+    let group = e.detail.group;
+    this.push('grabbed_tiles', {
+        title: wav.selected_trial +
+               " t" + wav.selected_tet_num + 
+                "c" + group.group_num + " [Grabbed]",
+        group_num: group.group_num,
+        group: {
+            waves: cm.clone_ckey(group.waves),
+            tac: cm.clone_ckey(group.tac),
+            rm_spa: cm.clone_ckey(group.rm_spa),
+            rm_dir: cm.clone_ckey(group.rm_dir),
+            rm_speed: cm.clone_ckey(group.rm_speed)
+        },
+        x: e.detail.src_client_x + 20,
+        y: e.detail.src_client_y + 20
+    });
 }
 
-// see https://github.com/Polymer/polymer/issues/1877
-the_app._get_safe = function(a,b){
-    return a && a[b];
+wav._close_grabbed_tile = function(e){
+    // remove the grabbed tile from the list
+    wav.splice('grabbed_tiles', wav.grabbed_tiles.indexOf(e.model.item), 1);
 }
 
-the_app._to_render_mode_str = function(is_checked){
-    return is_checked ? "density" : "flag";
-}
 
-the_app._from_render_mode_str = function(str){
-    return (str==="density");
-}
+// :::: plot toggling :::::::::::::::::::::::::::::::
 
-the_app._make_max_rate_caption = function(v){
-    return v > 0 ? "scaled to max of " + v + "Hz" : "individually scaled";
-}
-
-the_app._make_max_speed_caption = function(v){
-    return v > 0 ? "capped at " + v + " m/s" : "not limited";
-}
-
-the_app._make_pos_smoothing_caption = function(v){
-    return v > 0 ? v + " s" : "turned off";
-}
-
-the_app._make_spa_rm_height_caption = function(v){
-    return v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
-}
-
-the_app.toggle_palette = function(){
-    the_app.set('options.waves_render_mode', the_app.options.waves_render_mode === "density" ? 
-                        "flag" : "density");
-}
-the_app._show = function(v){
-    return v ? '' : 'display: none;';
-}
-the_app.toggle_action_pane = function(){
-    the_app.$.action_info.toggle();
-}
-the_app.toggle_keyboard_pane = function(){
-    the_app.$.shortcut_info.toggle();
-}
-the_app.toggle_tac_pane = function(){
-    the_app.$.tc_info.toggle();
-}
-the_app.toggle_spa_rm_pane = function(){
-    the_app.$.rm_info.toggle();
-}
-the_app.toggle_dir_rm_pane = function(){
-    the_app.$.dir_info.toggle();
-}
-the_app.toggle_speed_rm_pane = function(){
-    the_app.$.speed_info.toggle();
-}
-the_app.toggle_pos_pane = function(){
-    the_app.$.pos_info.toggle();
-}
-the_app.toggle_palette_pane = function(){
-    the_app.$.waves_info.toggle();
-}
-the_app.toggle_header_pane = function(){
-    the_app.$.header_info.toggle();
-}
-the_app.toggle_help_pane = function(){
-    the_app.$.help_info.toggle();
-}
-the_app.toggle_shorcut_pane = function(){
-    the_app.$.shortcut_info.toggle()
-}
-the_app.open_github = function(){
-    window.open('https://github.com/d1manson/waveform', '_blank');
-}
-the_app._style_toolbar = function(toggle_toolbar){
-    return toggle_toolbar ? '' : 'height:0px;overflow:hidden';
-}
-the_app._toggle_toolbar = function(){
-    the_app.set('options.toggle_toolbar', !the_app.options.toggle_toolbar);
-}
-the_app._yn_to_bool = function(v, index){
-    return (v && v[index] === 'y');
-}
-
-the_app.show_key_wav = function(e){
-    the_app.toggle_show('show_wav', e.detail.keyboardEvent.shiftKey);
-}
-the_app.show_key_rm = function(e){
-    the_app.toggle_show('show_rm', e.detail.keyboardEvent.shiftKey);
-}
-the_app.show_key_dir = function(e){
-    the_app.toggle_show('show_dir', e.detail.keyboardEvent.shiftKey);
-}
-the_app.show_key_spd = function(e){
-    the_app.toggle_show('show_spd', e.detail.keyboardEvent.shiftKey);
-}
-the_app.show_key_tc = function(e){
-    the_app.toggle_show('show_tc', e.detail.keyboardEvent.shiftKey);
-}
-
-the_app.toggle_show = function(id, shiftKey){
+wav.toggle_show = function(id, shiftKey){
     // This is a bit ugly sadly. We want to allow basic toggling
     // without shift, and multi-toggling with shift.
     let result;
@@ -28278,9 +28217,9 @@ the_app.toggle_show = function(id, shiftKey){
         } 
     } else {
         result = {
-            waves: the_app.options.show_waves,
-            tac: the_app.options.show_tac,
-            rms: the_app.options.show_rms
+            waves: wav.options.show_waves,
+            tac: wav.options.show_tac,
+            rms: wav.options.show_rms
         };
         let n_selected = (result.waves.indexOf('y') > -1) + 
                        (result.tac === 'y') + 
@@ -28328,65 +28267,17 @@ the_app.toggle_show = function(id, shiftKey){
             break;
         } 
     }
-    the_app.set('options.show_waves', result.waves);
-    the_app.set('options.show_tac', result.tac);
-    the_app.set('options.show_rms', result.rms);
+    wav.set('options.show_waves', result.waves);
+    wav.set('options.show_tac', result.tac);
+    wav.set('options.show_rms', result.rms);
 }
 
-the_app.show_tap = function(e){
-    the_app.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
+wav.show_tap = function(e){
+    wav.toggle_show(e.target.id, e.detail.sourceEvent.shiftKey);
     e.preventDefault(); 
 }
 
-the_app._grab_group = function(e){
-    if(!the_app.grabbed_tiles){
-        this.set('grabbed_tiles', []);
-    }
-
-    // for simplicity we make new canvases for this tile
-    let cm = Utils.canvas_manager;
-    let group = e.detail.group;
-    this.push('grabbed_tiles', {
-        title: the_app.selected_trial +
-               " t" + the_app.selected_tet_num + 
-                "c" + group.group_num + " [Grabbed]",
-        group_num: group.group_num,
-        group: {
-            waves: cm.clone_ckey(group.waves),
-            tac: cm.clone_ckey(group.tac),
-            rm_spa: cm.clone_ckey(group.rm_spa),
-            rm_dir: cm.clone_ckey(group.rm_dir),
-            rm_speed: cm.clone_ckey(group.rm_speed)
-        },
-        x: e.detail.src_client_x + 20,
-        y: e.detail.src_client_y + 20
-    });
-}
-
-the_app._close_grabbed_tile = function(e){
-    // remove the grabbed tile from the list
-    the_app.splice('grabbed_tiles', the_app.grabbed_tiles.indexOf(e.model.item), 1);
-}
-
-the_app.keyboard_target = document.querySelector('body');
-
-// and then some stuff that doesn't sit so well with polymer...
-document.addEventListener('contextmenu', function(e){e.preventDefault();});
-document.addEventListener('keydown', function(e){
-    if(e.which === 32){//  space
-        the_app.set('grabber_mode', true);
-    }
-    if(e.which == 32){ //space
-        e.preventDefault(); // normally does things like toggle buttons and scroll divs
-    } 
-}, true);
-document.addEventListener('keyup', function(e){
-    if(e.which === 32){
-        the_app.set('grabber_mode', false);
-    }
-})
-
-the_app.addEventListener('dom-change', function(){
+wav.addEventListener('dom-change', function(){
     // remove keyboard handlers from buttons. Note that ripple still shows.
     let els =   Array.from(document.getElementsByTagName('paper-button'))
         .concat(Array.from(document.getElementsByTagName('paper-icon-button')));
@@ -28394,20 +28285,71 @@ the_app.addEventListener('dom-change', function(){
         el._unlistenKeyEventListeners();
     }
 
-    the_app.set('splitter_state', {
+    // initialize some things which aren't part of options, and aren't initialzied elsewhere
+    wav.set('splitter_state', {
         group_a: null,
         group_b: null,
         metrics: null,
         _akey_full: null,
         _point: null
     });
-    the_app.set('grabber_mode', false);
+    wav.set('grabber_mode', false);
 })
 
 
+// :::: some very simple functions (this is the new ES6 "arrow function" syntax) :::::::::::::::
+
+wav._to_render_mode_str = (is_checked) =>  is_checked ? "density" : "flag";
+wav._from_render_mode_str = (str) => (str==="density");
+wav._make_max_rate_caption = (v) => v > 0 ? "scaled to max of " + v + "Hz" : "individually scaled";
+wav._make_max_speed_caption = (v) => v > 0 ? "capped at " + v + " m/s" : "not limited";
+wav._make_pos_smoothing_caption = (v) =>  v > 0 ? v + " s" : "turned off";
+wav._make_spa_rm_height_caption = (v) =>  v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
+wav._show = (v) => v ? '' : 'display: none;';
+wav._yn_to_bool = (v, index) => (v && v[index] === 'y');
+wav._style_toolbar = (toggle_toolbar) => toggle_toolbar ? '' : 'height:0px;overflow:hidden';
+wav._get_safe = (a,b) => a && a[b]; // see https://github.com/Polymer/polymer/issues/1877
+wav.toggle_action_pane = () => wav.$.action_info.toggle();
+wav.toggle_keyboard_pane = () => wav.$.shortcut_info.toggle();
+wav.toggle_tac_pane = () => wav.$.tc_info.toggle();
+wav.toggle_spa_rm_pane = () => wav.$.rm_info.toggle();
+wav.toggle_dir_rm_pane = () => wav.$.dir_info.toggle();
+wav.toggle_speed_rm_pane = () => wav.$.speed_info.toggle();
+wav.toggle_pos_pane = () => wav.$.pos_info.toggle();
+wav.toggle_palette_pane = () => wav.$.waves_info.toggle();
+wav.toggle_header_pane = () => wav.$.header_info.toggle();
+wav.toggle_shorcut_pane = () => wav.$.shortcut_info.toggle();
+wav.show_key_wav = (e) => wav.toggle_show('show_wav', e.detail.keyboardEvent.shiftKey);
+wav.show_key_rm = (e) => wav.toggle_show('show_rm', e.detail.keyboardEvent.shiftKey);
+wav.show_key_dir = (e) => wav.toggle_show('show_dir', e.detail.keyboardEvent.shiftKey);
+wav.show_key_spd = (e) => wav.toggle_show('show_spd', e.detail.keyboardEvent.shiftKey);
+wav.show_key_tc = (e) => wav.toggle_show('show_tc', e.detail.keyboardEvent.shiftKey);
+wav._highlight_group = (e) => wav.$.cluster_plots.highlight_group(e.detail.group_num);
+wav.toggle_palette = () =>  wav.set('options.waves_render_mode', wav.options.waves_render_mode === "density" ? "flag" : "density");
+wav.open_github = () => window.open('https://github.com/d1manson/waveform', '_blank');
+wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggle_toolbar);
+
+// :::: and then some stuff that doesn't sit so well with polymer ::::::::
+
+document.addEventListener('contextmenu', function(e){
+    e.preventDefault();
+});
+document.addEventListener('keydown', function(e){
+    if(e.which === 32){//  space
+        wav.set('grabber_mode', true);
+    }
+    if(e.which == 32){ //space
+        e.preventDefault(); // normally does things like toggle buttons and scroll divs
+    } 
+}, true);
+document.addEventListener('keyup', function(e){
+    if(e.which === 32){
+        wav.set('grabber_mode', false);
+    }
+})
+
 
 </script>
-
 
 
 </body></html>
