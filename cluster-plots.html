@@ -189,13 +189,20 @@ var update_pkeys = function(changes, options, arrays){
     touch_timer();
 }
 
+var fill_0 = function(x){
+    // TypedArray.fill is apparently unoptimized
+
+    for(let ii=0; ii<x.length; ii++){
+        x[ii] = 0;
+    }
+}
 
 var set_amps = function(n_spikes_, chan_is_ok_, arrays){
     n_spikes = n_spikes_;
     chan_is_ok = chan_is_ok_;
     amps = arrays && arrays.data; 
     for(let ii=0; ii<plots.length; ii++){
-        plots[ii].fill(0);
+        fill_0(plots[ii])
     }
     plot_names = [];
     if(chan_is_ok){
@@ -222,30 +229,38 @@ var touch_timer = function(){
     }
 }
 
-var timer_tick = function(){
-    timer = 0;
+var perform_render_sub = function(group_inds, color){
+    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+        for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
+            let im = plots[p++];
+            for(let ii=0; ii<group_inds.length; ii++){
+                let a1 = amps[group_inds[ii]*n_c +c1];
+                let a2 = amps[group_inds[ii]*n_c +c2];
+                im[(s-1-a1)*s + a2] = color;
+            }
+        }
+    }
+}
 
+var perform_render = function(){
     // unlike tac and rm we render all pending groups in a single tick and then *copy*
     // the results back.
     while(pkeys_pending_render.length){
         let pkey = pkeys_pending_render.shift();
         let group_inds = pkey_to_array.get(pkey);
-        if(!group_inds){
-            continue;
-        }
-        let pkey_opts = pkey_to_desired_options.get(pkey);
-        let color = palette_flag[pkey_opts.group_num];
-        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-            for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
-                let im = plots[p++];
-                for(let ii=0; ii<group_inds.length; ii++){
-                    let a1 = amps[group_inds[ii]*n_c +c1];
-                    let a2 = amps[group_inds[ii]*n_c +c2];
-                    im[(s-1-a1)*s + a2] = color;
-                }
-            }
-        }
+        if(group_inds){
+            let pkey_opts = pkey_to_desired_options.get(pkey);
+            let color = palette_flag[pkey_opts.group_num];
+            perform_render_sub(group_inds, color)
+        }        
     }
+}
+
+
+var timer_tick = function(){
+    timer = 0;
+
+    perform_render();
 
     // copy plots into the object to send back to main, labeling each plot
     // with its channel numbers.

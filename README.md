@@ -132,3 +132,29 @@ Using events as a means of mutating state is un-Polymeric, and we avoid using th
 * `tile-wall.splitter` (from self and from child `tile-element`s) - the splittler tool is a bit complicated because its implementation is spread over many files.  There is a `splitter_state` property on `the_app` which is modified in `index.html` in response to the `splitter` events from the `tile-wall`, and this state value is not modified anywhere else, i.e. the `tile-wall` and `tile-element` only read it.  There are several stages to the splitting process: `start`, several `moves` and `update`s, and then `finalize` or `cancel`.  The first three classes are produced by the `tile-element` whereas the latter two are produced by the `tile-wall`, but this distinction is not visible to `index.html`. 
 
 
+### Notes on optimizations
+
+At the time of writing Chrome fails to optimize the following:
+
+```javasript
+let a = 1;
+a += 2
+```
+
+Though it does optimize these:
+```javascript
+var b = 1;
+b += 2;
+let c = 1;
+c++;
+let d = 1;
+d = d + 2; 
+```
+
+Here we opt to use the last form (the one with `d`).
+
+### Notes on naming conventions
+
+The project uses the pythoning naming convention known as PEP8. This is not common in JavaScript, but it's nice to use because you don't have to think much: just go with `lower_snake_case` for everything except `ClassNames`.  It also has the side effect of making it fairly obvious when you are using an API because the API typically uses `lowerFirstCamelCase`.   
+
+Favour long variable names over abbreviations or ommisions of helpful information, e.g. `pkey_to_rendered_options` is a good variable name because it makes it clear that the object is a form of map (an actual ES6 `Map` in this case rather than an `Object`); it tells you the meaning of the key - `pkey` (which has a special menaing in this project as described elsewhere) - and the full meaning of the value - `rendered_options`.

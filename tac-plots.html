@@ -190,13 +190,16 @@ var get_group_hist_sub = function(ret, group_times, D, b){
 
 // TODO: come with a better method than copy-pasting utility functions ....
 
-var plot_histogram = function(vals, h){
-    let w = vals.length-1;
+var max = function(vals, w){
     let max = 0;
     for(let ii=0; ii<w; ii++){
         (vals[ii] > max) && (max = vals[ii]);
     }
-    let factor = h/max;
+    return max;
+}
+var plot_histogram = function(vals, h){
+    let w = vals.length-1;
+    let factor = h/max(vals, w);
     let color_a = 0xff0000ff;
     let im = new Uint32Array(w*h);
     for(let x=0, y=vals[0]; x<w; x++){

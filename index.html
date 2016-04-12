@@ -18840,7 +18840,7 @@ var take_2_2_swapped = function(src, offset_bytes, stride_bytes){
 
     var dest = new Uint32Array( (0 | (src.length/stride_bytes)) - (0 | (offset_bytes/stride_bytes)));
 
-    for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src+=stride_bytes,p_dest++){
+    for(let p_src=offset_bytes, p_dest=0; p_src<src.length;p_src=p_src+stride_bytes,p_dest++){
         dest[p_dest] =   src[p_src+1]
                        |(src[p_src+0] << 8)
                        |(src[p_src+3] << 16)
@@ -18892,11 +18892,12 @@ var minus = function(a, b, c){
     }
 }
 
-var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
-var regex_header_b = /(\S*) ([\S ]*)/g
+const regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+const regex_header_b = /(\S*) ([\S ]*)/g
 
-var bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
-var nan16 = -32768; //custom nan value, equal to minimum int16 value    
+const bytes_per_pos_sample = 4 + 2 + 2 + 2 + 2 + 2 + 2 + (2 + 2) ;//the last two uint16s are numpix1 and numpix2 repeated
+const nan16 = -32768; //custom nan value, equal to minimum int16 value    
+const pos_nan = 1023;
 
 var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cache){
     var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
@@ -19214,45 +19215,93 @@ var get_dir = function(pos){
 var get_speed = function(pos){
     var xy = pos.xy;
     var ret = new Float32Array(xy.length/2);
-    for(let ii=0; ii<xy.length; ii+=2){
+    for(let ii=0; ii<xy.length; ii=ii+2){
          ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1]);
     }
     return ret;
 }
 
 
+var any_nonzero = function(x, offset, stride){
+    for(let ii=offset; ii<x.length; ii+= stride){
+        if(x[ii] && x[ii] != pos_nan){
+            return true;
+        }
+    } 
+    return false;
+}
+
+var compute_zscores = function(xy_pix, n_pos, mean_1, mean_2, std_1, std_2){
+    var dest = new Uint8Array(n_pos);  
+
+    for(let i=0; i< n_pos; i++){
+        let i1 = i*2+0;
+        let i2 = i*2+1;
+        if(xy_pix[i1] && xy_pix[i2] && xy_pix[i1] != nan16 && xy_pix[i2] != nan16){
+            let z11 = (mean_1 - xy_pix[i1])/std_1;
+            let z12 = (xy_pix[i1] - mean_2)/std_2;
+            dest[i] = z11 > z12;
+        }
+    }
+    return dest;
+}
+
+var use_zscore = function(xy_1, xy_2, n_pos, shrunk_and_switched, swapping_thresh){
+    // Find first (x,y) that is non-nan on both xy and xy_2
+    let start;
+    for(start=0; start<n_pos; start++){
+        let ix = start*2+0;
+        let iy = start*2+1;
+        if(xy_1[ix] != nan16 && xy_1[iy] !=nan16 && xy_2[ix] != nan16 && xy_2[iy] !=nan16)
+            break;
+    }
+
+    for(let i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
+        // we are going to do diffs with XY_i - XY_(i-1)
+        let ix = i*2+0;
+        let iy = i*2+1;
+        let i_1x = i*2-2;
+        let i_1y = i*2-1;
+        if(xy_1[ix] == nan16 || xy_1[iy] == nan16 || xy_2[ix] == nan16 || xy_2[iy] == nan16){
+            shrunk_and_switched[i] = 0;
+            i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
+            shrunk_and_switched[i] = 0;
+            continue; 
+        }
+
+        let dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
+        let dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
+        let dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
+        let dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
+
+        shrunk_and_switched[i] = (dist12 < dist11-swapping_thresh) && (dist21 < dist22 - swapping_thresh);
+    }
+}
+
 var post_process = function(buffer, offset_bytes, length_bytes, header, options){
-    var data8 = new Uint8Array(buffer, offset_bytes, length_bytes);
+    let data8 = new Uint8Array(buffer, offset_bytes, length_bytes);
 
-    var elements_per_pos_sample = bytes_per_pos_sample/2;
-    var n_pos = parseInt(header.num_pos_samples); 
-    var end = n_pos * elements_per_pos_sample; 
+    let elements_per_pos_sample = bytes_per_pos_sample/2;
+    let n_pos = parseInt(header.num_pos_samples); 
+    let end = n_pos * elements_per_pos_sample; 
     
-    var pos_nan = 1023;
-
      // for each pos sample take bytes 4-7, and then view them as a pair of int16s 
-    var xy_1 = new Int16Array(take_2_2_swapped(data8, 4, bytes_per_pos_sample).buffer);
+    let xy_1 = new Int16Array(take_2_2_swapped(data8, 4, bytes_per_pos_sample).buffer);
     replace_val_in_place(xy_1, pos_nan,nan16); //switch from axona custom nan value to our custom nan value
     
-    var n_led = 1;
-    var xy_2;
+    let n_led = 1;
+    let xy_2, xy_pix;
     if (options.use_both_leds){
         // Rather than using colactive header value in set file (which is a massive pain to get asynchrously here)
         // We see if any of the pixel counts are non-zero/non-nan for the second led, to establish how many leds were used.
-        var xy_pix = new Int16Array(take_2_2_swapped(data8, 12, bytes_per_pos_sample).buffer);
+        xy_pix = new Int16Array(take_2_2_swapped(data8, 12, bytes_per_pos_sample).buffer);
         replace_val_in_place(xy_pix, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-        for(let i=0; i<n_pos; i++){
-            if(xy_pix[i*2 +1] && xy_pix[i*2 +1] != pos_nan){
-                n_led = 2;
-                break;
-            }
-        } // if we make it to the end of the loop then n_led reamined as =1.
+        n_led = any_nonzero(xy_pix, 1, 2) ? 2 : 1;
 
         if(n_led == 2){
              // for each pos sample take bytes 8-11, and then view them as a pair of int16s 
             xy_2 = new Int16Array(take_2_2_swapped(data8, 8, bytes_per_pos_sample).buffer);
             replace_val_in_place(xy_2, pos_nan, nan16); //switch from axona custom nan value to our custom nan value
-        
         }
     }
     
@@ -19264,80 +19313,41 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
             minus(xy_2, min_x, min_y);
     }
 
-    var ppm = parseInt(header.pixels_per_metre);
-    var units_per_m = 10000;
+    let ppm = parseInt(header.pixels_per_metre);
+    const units_per_m = 10000;
     times_in_place(xy_1, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
     if(n_led == 2){
         times_in_place(xy_2, units_per_m/ppm, nan16); //convert from pixels to milimeters (we use mm because then we can happily use Int16s)
     }
 
+    let weight_1, weight_2, mean_1, mean_2, std_1, std_2;
     if(n_led == 2){
         // check for and apply LED swaping...
-        var shrunk_and_switched = new Uint8Array(n_pos);  
-
-        var swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
+        let swapping_thresh = options.swapping_thresh_cm * (units_per_m/100);
 
         // firstly we check to see if number of pixels for first LED is actually closer to pixel count mean for second led,
         // where "closer" is defined as z-score, i.e. distance/std for the relevant distribution.
-        var pix_props = nanmean_and_std_2(xy_pix);
-        var weight_1 = pix_props.n_1/n_pos; var weight_2 = pix_props.n_2/n_pos;
+        let pix_props = nanmean_and_std_2(xy_pix);
+        weight_1 = pix_props.n_1/n_pos; weight_2 = pix_props.n_2/n_pos;
 
-        var mean_1 = pix_props.mean_1; var mean_2 = pix_props.mean_2; var std_1 = pix_props.std_1; var std_2 = pix_props.std_2;
+        mean_1 = pix_props.mean_1; mean_2 = pix_props.mean_2; std_1 = pix_props.std_1; std_2 = pix_props.std_2;
         header.post_n_pix_led1 = "mean=" + pix_props.mean_1.toFixed(2) + " std=" + pix_props.std_1.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_1) + ")";
         header.post_n_pix_led2 = "mean=" + pix_props.mean_2.toFixed(2) + " std=" + pix_props.std_2.toFixed(2) + " (nan count=" + (n_pos - pix_props.n_2) + ")";
 
         // use std and mean to get z score of pix1 to pix1 and pix2
-        for(let i=0; i< n_pos; i++){
-            let i1 = i*2+0;
-            let i2 = i*2+1;
-            if(xy_pix[i1] && xy_pix[i2] && xy_pix[i1] != nan16 && xy_pix[i2] != nan16){
-                let z11 = (mean_1 - xy_pix[i1])/std_1;
-                let z12 = (xy_pix[i1] - mean_2)/std_2;
-                shrunk_and_switched[i] = z11 > z12;
-            }
-        }
-
+        let shrunk_and_switched = compute_zscores(xy_pix, n_pos, mean_1, mean_2, std_1, std_2);
 
         // Now we calculate jump distance (from time i-1 to time i)
         // four distnaces: led1 to led1, led1 to led2, led2 to led1, led2 to led2.
         // if the recorded version of distance is more than swapping_thresh further
         // than the potential "swapped" version, then consider it a swap.
-
-        // Find first (x,y) that is non-nan on both xy and xy_2
-        for(var start=0; start<n_pos; start++){
-            let ix = start*2+0;
-            let iy = start*2+1;
-            if(xy_1[ix] != nan16 && xy_1[iy] !=nan16 && xy_2[ix] != nan16 && xy_2[iy] !=nan16)
-                break;
-        }
-
-        for(let i = start+1; i<n_pos; i++)if(shrunk_and_switched[i]){
-            // we are going to do diffs with XY_i - XY_(i-1)
-            let ix = i*2+0;
-            let iy = i*2+1;
-            let i_1x = i*2-2;
-            let i_1y = i*2-1;
-            if(xy_1[ix] == nan16 || xy_1[iy] == nan16 || xy_2[ix] == nan16 || xy_2[iy] == nan16){
-                shrunk_and_switched[i] = 0;
-                i++; // skip next iteration as well becuase the current index cannot be used as i, or as (i-1)
-                shrunk_and_switched[i] = 0;
-                continue; 
-            }
-
-            let dist12 = Math.hypot(xy_1[ix] - xy_2[i_1x],  xy_1[iy] - xy_2[i_1y]);
-            let dist11 = Math.hypot(xy_1[ix] - xy_1[i_1x],  xy_1[iy] - xy_1[i_1y]);
-            let dist21 = Math.hypot(xy_2[ix] - xy_1[i_1x],  xy_2[iy] - xy_1[i_1y]);
-            let dist22 = Math.hypot(xy_2[ix] - xy_2[i_1x],  xy_2[iy] - xy_2[i_1y]);
-
-            shrunk_and_switched[i] = (dist12 < dist11-swapping_thresh) && (dist21 < dist22 - swapping_thresh);
-
-        }
+        use_zscore(xy_1, xy_2, n_pos, shrunk_and_switched, swapping_thresh)
 
         // Swap xy_1 with xy_2 where we decided we need to swap. (Note we use 32bit to swap 2x16bit xy in one go)
         header.post_n_swapped = swap(new Uint32Array(xy_1.buffer), new Uint32Array(xy_2.buffer), shrunk_and_switched);
     }
     
-    var pos_timebase = parseInt(header.sample_rate);
+    let pos_timebase = parseInt(header.sample_rate);
     header.post_n_jumpy_led1 = jump_filter(xy_1, n_pos, options.max_speed, units_per_m, pos_timebase)
     if(n_led == 2){
          header.post_n_jumpy_led2 = jump_filter(xy_2, n_pos, options.max_speed, units_per_m, pos_timebase);
@@ -19348,9 +19358,9 @@ var post_process = function(buffer, offset_bytes, length_bytes, header, options)
         interp_xy(xy_2,n_pos);
     }
 
-    var k = Math.floor(pos_timebase*options.smoothing_secs/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired         
+    let k = Math.floor(pos_timebase*options.smoothing_secs/2); //the actual filter will be of length k*2+1, which means it may be one sample longer than desired         
     smooth_1d_in_place(xy_1, 2, k);
-    var xy;
+    let xy;
     if(n_led == 2){
         smooth_1d_in_place(xy_2, 2, k);
         xy = combine_xy(xy_1, xy_2, weight_1, weight_2);
@@ -19456,12 +19466,12 @@ var got_ports = function(ports){
     }
 }
 
-var regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
-var regex_header_b = /(\S*) ([\S ]*)/g
-var data_end = "\r\ndata_end";
-var n_c = 4;
-var n_w = 50;
-var bytes_per_spike = n_c*(4 + n_w);
+const regex_header_a = /((?:[\S\s](?!\r\ndata_start))*[\S\s])(\r\ndata_start)/
+const regex_header_b = /(\S*) ([\S ]*)/g
+const data_end = "\r\ndata_end";
+const n_c = 4;
+const n_w = 50;
+const bytes_per_spike = n_c*(4 + n_w);
 
 var parse_tet_file = function(buffer, fkey, options, file_name){
     var top_str = new TextDecoder('utf-8').decode(buffer.slice(0, 1204+1));
@@ -19544,11 +19554,11 @@ var build_gl_data_sub = function(data_in, data_out_16, n_spikes){
     var q = -1;
     for(let i=0, p=0;i<n_spikes;i++,p=i){ //for each spike
         for(let c=0;c<n_c;c++){ //for each channel
-            q += 5;
+            q = q + 5;
             for(let t=0;t<n_w-1;t++){ //for each time point (except the last one)
                 data_out_16[p] = data_in[q] | (data_in[++q] << 8); // TODO: deal properly with endianness of system 
                 // (Note that even though we are drawing a stand alone line segment from a to b, we still need to know how they match up to times t and t+1)
-                p += n_spikes;
+                p = p + n_spikes;
             }
         }
     }
@@ -19585,7 +19595,7 @@ var get_amplitudes_sub = function(old_data, amps, n_sc, n_w){
     n_sc = n_sc | 0; // int
     n_w = n_w | 0; // int
     for(let i=0, p=0; i<n_sc; i++){
-        p += 4; // skip timestamp 
+        p = p+ 4; // skip timestamp 
         let min = 127;
         let max = -128;
         for(let t=0; t<n_w; t++,p++){
@@ -19672,7 +19682,7 @@ var got_ports = function(ports){
     }
 }
 
-var regex_header_b = /(\S*) ([\S ]*)/g
+const regex_header_b = /(\S*) ([\S ]*)/g
 
 var parse_set_file = function(full_str, fkey){
     var header = {};
@@ -19688,10 +19698,10 @@ var parse_set_file = function(full_str, fkey){
 <script is="worker-builder" id="cut_parser" title="cut-parser" type="javascript/worker">
 "use strict";
 
-var max_cache_size = 4; // arbitrary
-var main_cached_fkeys = new Set();
-var regex_ext = /\.([0-9a-z]+)$/i;
-var fkey_to_buffer = new Map();
+const max_cache_size = 4; // arbitrary
+const main_cached_fkeys = new Set();
+const regex_ext = /\.([0-9a-z]+)$/i;
+const fkey_to_buffer = new Map();
 
 var got_ports = function(ports){
     self.io_port = ports.cut;
@@ -19745,10 +19755,10 @@ var got_ports = function(ports){
     }
 }
 
-var regex_cut_a = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
-var regex_cut_b = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
-var regex_cut_c = /([0-9]+)/g;
-var max_length_match_cut_b = 300;//this is needed so that when we read in chunks of the cut fkey we dont have to apply the regex_b to the whole thing each time
+const regex_cut_a = /n_clusters:\s*(\S*)\s*n_channels:\s*(\S*)\s*n_params:\s*(\S*)\s*times_used_in_Vt:\s*(\S*)\s*(\S*)\s*(\S*)\s*(\S*)/;
+const regex_cut_b = /Exact_cut_for: ((?:[\s\S](?! spikes:))*[\s\S])\s*spikes: ([0-9]*)/;
+const regex_cut_c = /([0-9]+)/g;
+const max_length_match_cut_b = 300;//this is needed so that when we read in chunks of the cut fkey we dont have to apply the regex_b to the whole thing each time
 
 var parse_cut_file = function(full_str, fkey){
     var match = regex_cut_a.exec(full_str);      
@@ -24086,28 +24096,38 @@ var draw_points = function(xy, w, h, scale, im, color, k){
 }
 
 var draw_lines = function(xy, w, h, scale, im, color){
+    // Chrome currently de-optizes for "compound let assignment"
+    // which means using += or -= on a variable declared with "let"
+    // so we have to manually write x = x + something
+    
     color = color || 0xff000000; //black
     im = im || new Uint32Array(w*h);
 
     let x0 = (xy[0] * scale) | 0;
     let y0 = (xy[1] * scale) | 0;
-    for(let ii=2; ii<xy.length; ii+=2){
+    for(let ii=2; ii<xy.length; ii=ii+2){
         let x1 = (xy[ii+0] * scale) | 0;
         let y1 = (xy[ii+1] * scale) | 0;
 
         // Bresenham algorithm adapted from http://stackoverflow.com/a/4672319/2399799
-        let dx = Math.abs(x1-x0);
-        let dy = Math.abs(y1-y0);
-        let sx = (x0 < x1) ? 1 : -1;
-        let sy = (y0 < y1) ? 1 : -1;
+        let sx = ((x0 < x1) <<1) -1; // (x0 < x1) ? 1 : -1
+        let sy = ((y0 < y1) <<1) -1; // (y0 < y1) ? 1 : -1
+        let dx = sx*(x1-x0); // abs(x0-x1)
+        let dy = sy*(y1-y0); // abs(y0-y1)
         let err = dx-dy;
         while(true){
             im[y0*w + x0] = color;
 
-            if ((x0==x1) && (y0==y1)) break;
+            if ((x0===x1) && (y0===y1)) break;
             let e2 = err << 1;
-            if (e2 >-dy){ err -= dy; x0  += sx; }
-            if (e2 < dx){ err += dx; y0  += sy; }
+            if (e2 >-dy){ 
+                err = err - dy;
+                x0  = x0 + sx; 
+            }
+            if (e2 < dx){
+                err = err + dx;
+                y0  = y0 + sy;
+            }
         }
 
         x0 = x1;
@@ -24705,13 +24725,16 @@ var get_group_hist_sub = function(ret, group_times, D, b){
 
 // TODO: come with a better method than copy-pasting utility functions ....
 
-var plot_histogram = function(vals, h){
-    let w = vals.length-1;
+var max = function(vals, w){
     let max = 0;
     for(let ii=0; ii<w; ii++){
         (vals[ii] > max) && (max = vals[ii]);
     }
-    let factor = h/max;
+    return max;
+}
+var plot_histogram = function(vals, h){
+    let w = vals.length-1;
+    let factor = h/max(vals, w);
     let color_a = 0xff0000ff;
     let im = new Uint32Array(w*h);
     for(let x=0, y=vals[0]; x<w; x++){
@@ -27034,13 +27057,20 @@ var update_pkeys = function(changes, options, arrays){
     touch_timer();
 }
 
+var fill_0 = function(x){
+    // TypedArray.fill is apparently unoptimized
+
+    for(let ii=0; ii<x.length; ii++){
+        x[ii] = 0;
+    }
+}
 
 var set_amps = function(n_spikes_, chan_is_ok_, arrays){
     n_spikes = n_spikes_;
     chan_is_ok = chan_is_ok_;
     amps = arrays && arrays.data; 
     for(let ii=0; ii<plots.length; ii++){
-        plots[ii].fill(0);
+        fill_0(plots[ii])
     }
     plot_names = [];
     if(chan_is_ok){
@@ -27067,30 +27097,38 @@ var touch_timer = function(){
     }
 }
 
-var timer_tick = function(){
-    timer = 0;
+var perform_render_sub = function(group_inds, color){
+    for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+        for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
+            let im = plots[p++];
+            for(let ii=0; ii<group_inds.length; ii++){
+                let a1 = amps[group_inds[ii]*n_c +c1];
+                let a2 = amps[group_inds[ii]*n_c +c2];
+                im[(s-1-a1)*s + a2] = color;
+            }
+        }
+    }
+}
 
+var perform_render = function(){
     // unlike tac and rm we render all pending groups in a single tick and then *copy*
     // the results back.
     while(pkeys_pending_render.length){
         let pkey = pkeys_pending_render.shift();
         let group_inds = pkey_to_array.get(pkey);
-        if(!group_inds){
-            continue;
-        }
-        let pkey_opts = pkey_to_desired_options.get(pkey);
-        let color = palette_flag[pkey_opts.group_num];
-        for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
-            for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
-                let im = plots[p++];
-                for(let ii=0; ii<group_inds.length; ii++){
-                    let a1 = amps[group_inds[ii]*n_c +c1];
-                    let a2 = amps[group_inds[ii]*n_c +c2];
-                    im[(s-1-a1)*s + a2] = color;
-                }
-            }
-        }
+        if(group_inds){
+            let pkey_opts = pkey_to_desired_options.get(pkey);
+            let color = palette_flag[pkey_opts.group_num];
+            perform_render_sub(group_inds, color)
+        }        
     }
+}
+
+
+var timer_tick = function(){
+    timer = 0;
+
+    perform_render();
 
     // copy plots into the object to send back to main, labeling each plot
     // with its channel numbers.
@@ -27983,7 +28021,7 @@ font-size: 10px;
         </div>
     </drop-zone>
 
-    <parsed-data selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
+    <parsed-data id="parser" selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
 
     <cut-object id="cut" groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
