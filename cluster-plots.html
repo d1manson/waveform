@@ -12,64 +12,6 @@ Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off
 <link rel="import" href="palettes.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 
-
-<dom-module id="canvas-with-axes">
-<style>
-:host{
-display: inline-block;
-position: relative;
-border: 1px solid #000;
-padding: 1px;
-margin-right: 2px;
-margin-bottom: 2px;
-}
-.x_axis_label{
-position: absolute;
-display: inline-block;
-bottom: 2px;
-right: 2px;
-font-size: 10px;
-}
-.y_axis_label{
-position: absolute;
-display: inline-block;
-left: 2px;
-top: 2px;
-font-size: 10px;
-}
-</style>
-<template>
-    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]"></managed-canvas>
-    <div class="x_axis_label">[[x_label]]</div>
-    <div class="y_axis_label">[[y_label]]</div>
-</template>
-
-<script>
-Polymer({
-    is: 'canvas-with-axes',
-    properties: {
-        fix_height: {
-            type: Number,
-            notify: true
-        },
-        ckey: {
-            type: Object,
-            notify: true
-        },
-        x_label: {
-            type: String,
-            notify: true
-        },
-        y_label: {
-            type: String,
-            notify: true
-        }
-    }
-})
-</script>
-
-</dom-module>
-
 <dom-module id="paint-tool">
 <style>
 :host{
@@ -485,6 +427,7 @@ background: #ffffe0;
 .plot{
 display: inline-block;
 position: relative;
+@apply(--cluster-plot-style);
 }
 .grabber{
 position: absolute;

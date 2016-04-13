@@ -16,12 +16,17 @@ Polymer({
         fix_height: {
             type: Number,
             value: 0,
-            observer: '_height_changed'
+            observer: '_update_canv_style'
         },
         stretch_height: {
             type: Boolean,
             value: false,
-            observer: '_height_changed'
+            observer: '_update_canv_style'
+        },flip_horizontal: {
+            type: Boolean,
+            notify: true,
+            value: false,
+            observer: '_update_canv_style'
         }
     }, listeners: {
         'mousemove': '_onmousemove',
@@ -68,12 +73,6 @@ Polymer({
             this.style.display = 'none';
         }
        
-    }, _height_changed: function(){
-        if(!this.ckey){
-            return;
-        }
-        let el_canv = this.ckey.canvas;
-        this._update_canv_style(el_canv);
     }, _update_canv_style: function(){
         if(this.fix_height && this.stretch_height){
             console.warn('managed-canvas cannot stretch and fix height')
@@ -99,7 +98,9 @@ Polymer({
         } else {
             el_canv.style.height = "";
         }
-        el_canv.style.imageRendering = "pixelated";          
+        el_canv.style.imageRendering = "pixelated";  
+        this.transform(this.flip_horizontal ? 'scaleX(-1)' : '', el_canv);
+
     }, _onmousemove: function(e){
         this._fire_pointer_event(e, 'canvas-mousemove');
     }, _onmouseup: function(e){
@@ -126,4 +127,66 @@ Polymer({
 });
 
 </script>
+</dom-module>
+
+
+
+<dom-module id="canvas-with-axes">
+<style>
+:host{
+display: inline-block;
+position: relative;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
+</style>
+<template>
+    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]" id="the_canvas" flip_horizontal="[[flip_horizontal]]"></managed-canvas>
+    <div class="x_axis_label" style$="[[_show(ckey)]]">[[x_label]]</div>
+    <div class="y_axis_label" style$="[[_show(ckey)]]">[[y_label]]</div>
+</template>
+
+<script>
+Polymer({
+    is: 'canvas-with-axes',
+    properties: {
+        fix_height: {
+            type: Number,
+            notify: true
+        },
+        ckey: {
+            type: Object,
+            notify: true
+        },
+        x_label: {
+            type: String,
+            notify: true
+        },
+        y_label: {
+            type: String,
+            notify: true
+        }, 
+        flip_horizontal: {
+            type: Boolean,
+            notify: true,
+            value: false
+        }
+    }, _show: function(v){
+        return v ? '' : 'display: none;';
+    }
+})
+</script>
+
 </dom-module>

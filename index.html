@@ -70,6 +70,13 @@ border: 3px solid red;
 background: rgba(255,0,0,0.2);
 cursor: pointer;    
 };
+--cluster-plot-style:{
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+};
+
 }
 
 p, ul, ol{
@@ -185,6 +192,9 @@ display: none;
 ::-webkit-scrollbar-thumb {
 background-color: rgba(0,0,0,0.2);
 -webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
+.cluster_plot{
+@apply(--cluster-plot-style);
 }
 </style>
 
@@ -18196,12 +18206,17 @@ Polymer({
         fix_height: {
             type: Number,
             value: 0,
-            observer: '_height_changed'
+            observer: '_update_canv_style'
         },
         stretch_height: {
             type: Boolean,
             value: false,
-            observer: '_height_changed'
+            observer: '_update_canv_style'
+        },flip_horizontal: {
+            type: Boolean,
+            notify: true,
+            value: false,
+            observer: '_update_canv_style'
         }
     }, listeners: {
         'mousemove': '_onmousemove',
@@ -18248,12 +18263,6 @@ Polymer({
             this.style.display = 'none';
         }
        
-    }, _height_changed: function(){
-        if(!this.ckey){
-            return;
-        }
-        let el_canv = this.ckey.canvas;
-        this._update_canv_style(el_canv);
     }, _update_canv_style: function(){
         if(this.fix_height && this.stretch_height){
             console.warn('managed-canvas cannot stretch and fix height')
@@ -18279,7 +18288,9 @@ Polymer({
         } else {
             el_canv.style.height = "";
         }
-        el_canv.style.imageRendering = "pixelated";          
+        el_canv.style.imageRendering = "pixelated";  
+        this.transform(this.flip_horizontal ? 'scaleX(-1)' : '', el_canv);
+
     }, _onmousemove: function(e){
         this._fire_pointer_event(e, 'canvas-mousemove');
     }, _onmouseup: function(e){
@@ -18307,7 +18318,68 @@ Polymer({
 
 </script>
 </dom-module>
+
+
+
+<dom-module id="canvas-with-axes" assetpath="/">
+<style>
+:host{
+display: inline-block;
+position: relative;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
+</style>
+<template>
+    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]" id="the_canvas" flip_horizontal="[[flip_horizontal]]"></managed-canvas>
+    <div class="x_axis_label" style$="[[_show(ckey)]]">[[x_label]]</div>
+    <div class="y_axis_label" style$="[[_show(ckey)]]">[[y_label]]</div>
+</template>
+
 <script>
+Polymer({
+    is: 'canvas-with-axes',
+    properties: {
+        fix_height: {
+            type: Number,
+            notify: true
+        },
+        ckey: {
+            type: Object,
+            notify: true
+        },
+        x_label: {
+            type: String,
+            notify: true
+        },
+        y_label: {
+            type: String,
+            notify: true
+        }, 
+        flip_horizontal: {
+            type: Boolean,
+            notify: true,
+            value: false
+        }
+    }, _show: function(v){
+        return v ? '' : 'display: none;';
+    }
+})
+</script>
+
+</dom-module><script>
 var Palettes = Palettes || {};
 
 // all pallets are given as Uint8 arrays, except *_css and *_css_text, which are strings
@@ -21668,6 +21740,12 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true,
                 readOnly: true
             },
+            start_end_times: {
+                type: Object, // start and end miliseconds (numbers)
+                value: null,
+                notify: true,
+                readOnly: true
+            },
             spike_times: {
                 type: Object,
                 value: function(){ return {};}, // data (akey), timebase
@@ -22110,6 +22188,11 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, _use_set: function(header){
             this._setDuration(parseInt(header.duration));
+            let start = parseInt(header.lasttrialdatetime)*1000;
+            this._setStart_end_times({
+                start: start,
+                end: start + this.duration *1000
+            });
             this._setSet_header(header);
         }
     });
@@ -25546,20 +25629,45 @@ var make_cached_path = function(){
     });
 }
 
+var send_speed_dwell_hist = function(){
+    let im = plot_histogram(speed_plot_size[0], speed_plot_size[1], cached_speed_dwell);
+     exec_main_b('plot_speed_hist', {
+        path: 'hist',
+        dims: speed_plot_size
+    }, {
+        hist: im
+    });
+}
+
 var build_cache = function(){
     // this is called when we change xy/dir/speed/times/options/show
     // clear_cached will have been called immediately before hand.
 
+    // using just pos timebas and spike times, we can get the pos indices for each spike
     if(!cached_spike_pos_ind && pos_timebase && spikes_timebase && spike_times){
         make_cached_spike_pos_ind();
     }    
+
+    // it doesn't require spikes to just draw the path
+    if(show && show[0] === 'y' && !cached_path && pos_xy){
+        make_cached_path(); 
+    }
+
+    // it also doesn't require spikes to compute and draw the speed dwell hist
+    if(show && show[2] === 'y' && !cached_speed_dwell && pos_speed
+        && render_options.cps_per_speed_bin 
+        && render_options.max_speed){
+        make_cached_speed_bins_and_dwell();
+        send_speed_dwell_hist(); 
+    }
+
+    // the rest requires spikes+xy/dir/speed
 
     if(show && show[0] === 'y'
          && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell && cached_spike_xy_bins)
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
-        make_cached_xy_bins_and_dwell();
-        make_cached_path();
+        make_cached_xy_bins_and_dwell();    
     }
 
     if(show && show[1] === 'y'
@@ -25571,11 +25679,11 @@ var build_cache = function(){
     }
 
     if(show && show[2] === 'y'
-        && !(cached_spike_speed_bins && cached_speed_dwell && cached_spike_speed_bins)
+        && !cached_spike_speed_bins
         && pos_speed && cached_spike_pos_ind
         && render_options.cps_per_speed_bin 
         && render_options.max_speed){
-        make_cached_speed_bins_and_dwell();
+        make_cached_speed_spike_bins();
     }
 }
 
@@ -25644,19 +25752,24 @@ var make_cached_dir_bins_and_dwell = function(){
 }
 
 
+
+
 var make_cached_speed_bins_and_dwell = function(){
-    var factor = 1/render_options.cps_per_speed_bin;
+    let factor = 1/render_options.cps_per_speed_bin;
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
-    var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
+    let n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(let i=0;i<pos_speed.length;i++)
+    for(let i=0;i<pos_speed.length;i++){
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
-    
-    cached_spike_speed_bins = pick(cached_speed_bins, cached_spike_pos_ind); 
+    }
     cached_speed_dwell = hist_1(cached_speed_bins, n_valid_speed_bins+1);
     cached_speed_dwell = cached_speed_dwell.subarray(0, n_valid_speed_bins);
+}
 
+
+var make_cached_speed_spike_bins = function(){
+    cached_spike_speed_bins = pick(cached_speed_bins, cached_spike_pos_ind); 
     return true;
 }
 
@@ -25727,10 +25840,11 @@ var get_group_speed_rm = function(group_inds){
     spike = spike.subarray(0, spike.length-1);
 
     var ratemap = divide_float(spike, cached_speed_dwell);
-    // TODO: need to normalize to max
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
 
+
+cached_speed_dwell
 
 var plot_dir = function(vals, s, max){
     // produces a square plot
@@ -26009,8 +26123,14 @@ var use_mask = function(vector, mask, val){
             Polymer.ShortcutNotifyerBehavior
         ], properties: {
             pos_path: {
-                type: String, //canvas-manager id
-                value: "",
+                type: Object, 
+                value: null,
+                notify: true,
+                readOnly: true
+            },
+            pos_speed_hist: {
+                type: Object, 
+                value: null,
                 notify: true,
                 readOnly: true
             },
@@ -26059,6 +26179,11 @@ var use_mask = function(vector, mask, val){
                 value: 2,
                 notify: true
             },
+            speed_rm_max: {
+                type: Number,
+                value: 45,
+                notify: true
+            },
             show: {
                 type: String,
                 value: 'yyy',
@@ -26085,7 +26210,7 @@ var use_mask = function(vector, mask, val){
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
-            '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
+            '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins, speed_rm_max)',
             '_show_changed(show)',
             '_pos_xy_modified(pos_xy)',
             '_pos_dir_modified(pos_dir)',
@@ -26101,7 +26226,7 @@ var use_mask = function(vector, mask, val){
                 max_rate_spa: undefined,
                 deg_per_dir_bin: undefined,
                 smoothing_dir_bins: undefined,
-                max_speed: 60, // currently not exposed as user-configurable
+                max_speed: undefined, // partially supported as user-configurable
                 cps_per_speed_bin: 4 // currently not exposed as user-configurable
             };
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
@@ -26199,6 +26324,7 @@ var use_mask = function(vector, mask, val){
             this._options.max_rate_spa = this.max_rate_spa;
             this._options.deg_per_dir_bin = this.deg_per_dir_bin;
             this._options.smoothing_dir_bins = this.smoothing_dir_bins;
+            this._options.max_speed = this.speed_rm_max;
             this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
         }, _groups_set: function(new_val, old_val){
@@ -26288,6 +26414,7 @@ var use_mask = function(vector, mask, val){
                 this._pos_dir_is_on_worker = false;
             }
         }, _pos_speed_modified: function(){
+            this._setPos_speed_hist(null); 
             if(this.show && this.show[2] === 'y'){
                 if(this.pos_speed){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_speed.speed);
@@ -26385,6 +26512,9 @@ var use_mask = function(vector, mask, val){
                 this._setPos_path(this._blank_pos_path);
             }
             
+        }, plot_speed_hist: function(msg, arrays){
+                this._setPos_speed_hist({buffer: arrays.hist.buffer, dims: msg.dims});
+
         }, _update_pos_path: function(){
             if(this.active_group_a && this.show && this.show[0]==='y'){
                 // note we are slightly lazy in so far as we don't watch for changes of group_num
@@ -28726,64 +28856,7 @@ Polymer({
 </script>
 
   
-</dom-module><dom-module id="canvas-with-axes" assetpath="/">
-<style>
-:host{
-display: inline-block;
-position: relative;
-border: 1px solid #000;
-padding: 1px;
-margin-right: 2px;
-margin-bottom: 2px;
-}
-.x_axis_label{
-position: absolute;
-display: inline-block;
-bottom: 2px;
-right: 2px;
-font-size: 10px;
-}
-.y_axis_label{
-position: absolute;
-display: inline-block;
-left: 2px;
-top: 2px;
-font-size: 10px;
-}
-</style>
-<template>
-    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]"></managed-canvas>
-    <div class="x_axis_label">[[x_label]]</div>
-    <div class="y_axis_label">[[y_label]]</div>
-</template>
-
-<script>
-Polymer({
-    is: 'canvas-with-axes',
-    properties: {
-        fix_height: {
-            type: Number,
-            notify: true
-        },
-        ckey: {
-            type: Object,
-            notify: true
-        },
-        x_label: {
-            type: String,
-            notify: true
-        },
-        y_label: {
-            type: String,
-            notify: true
-        }
-    }
-})
-</script>
-
-</dom-module>
-
-<dom-module id="paint-tool" assetpath="/">
+</dom-module><dom-module id="paint-tool" assetpath="/">
 <style>
 :host{
 display: inline-block;
@@ -29198,6 +29271,7 @@ background: #ffffe0;
 .plot{
 display: inline-block;
 position: relative;
+@apply(--cluster-plot-style);
 }
 .grabber{
 position: absolute;
@@ -29824,7 +29898,7 @@ bottom: 0px;
                 <div class="pane_title">[[item.title]]</div>
                 <div style="text-align: center;">
                     <template is="dom-repeat" items="[[item.plots]]">
-                        <canvas-with-axes ckey="[[item.ckey]]" x_label="[[item.x_axis]]" y_label="[[item.y_axis]]" fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
+                        <canvas-with-axes class="cluster_plot" ckey="[[item.ckey]]" x_label="[[item.x_axis]]" y_label="[[item.y_axis]]" fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
                     </template>
                 </div>
             </floating-pane>
@@ -29906,13 +29980,9 @@ bottom: 0px;
 
             <div style="flex:1 1 0%; position:relative;display: flex; flex-direction: row;">
                 <managed-canvas style="margin:0 auto;" stretch_height="" ckey="[[pos_path]]"></managed-canvas>
-                <div class="info_summary">
-                    <div class="info_summary_text">
-                    </div>
-                    <canvas id="speedhist" width="50" height="84"></canvas>
-                    <div id="speedhist_labels" style="display:inline;position:relative;">
-                        <div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div>
-                    </div>
+                <div class="info_summary" style$="[[_info_summary_style(active_group_a)]]">
+                    <div class="info_summary_text">[[_format_timespan(start_end_times)]]</div>
+                    <canvas-with-axes style="width:55px;" ckey="[[pos_speed_hist]]" x_label="[[_caption_speed_max(options.speed_rm_max)]]" fix_height="92" flip_horizontal=""></canvas-with-axes>
                 </div>
             </div>
 
@@ -29961,11 +30031,11 @@ bottom: 0px;
         </div>
     </drop-zone>
 
-    <parsed-data id="parser" selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
+    <parsed-data id="parser" selected_files="[[selected_files]]" use_n_leds="[[options.use_n_leds]]" speed_filter_mps="[[options.speed_filter_mps]]" pos_smoothing_s="[[options.pos_smoothing_s]]" duration="{{duration}}" start_end_times="{{start_end_times}}" spike_times="{{spike_times}}" pos_xy="{{pos_xy}}" pos_dir="{{pos_dir}}" pos_speed="{{pos_speed}}" amplitudes="{{amplitudes}}" data_for_gl="{{data_for_gl}}" cut_box="{{cut_box}}" tet_header="{{tet_header}}" pos_header="{{pos_header}}" set_header="{{set_header}}" want_data_for_gl="{{want_data_for_gl}}" want_amplitudes="{{want_amplitudes}}" want_spike_times="{{want_spike_times}}" no_groups="{{tile_wall_is_empty}}"></parsed-data>
 
     <cut-object id="cut" groups="{{cut_groups}}" painter_state="{{cut_painter_state}}" cut_box="[[cut_box]]" undo_stack_descriptions="{{cut_undo_stack}}" redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
+    <rm-plots groups="{{cut_groups}}" pos_path="{{pos_path}}" pos_speed_hist="{{pos_speed_hist}}" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" spike_times="[[spike_times]]" pos_xy="[[pos_xy]]" pos_dir="[[pos_dir]]" pos_speed="[[pos_speed]]" show="[[options.show_rms]]" cm_per_spa_bin="[[options.cm_per_spa_bin]]" smoothing_spa_bins="[[options.smoothing_spa_bins]]" max_rate_spa="[[options.max_rate_spa]]" deg_per_dir_bin="[[options.deg_per_dir_bin]]" smoothing_dir_bins="[[options.smoothing_dir_bins]]" speed_rm_max="[[options.speed_rm_max]]" want_spike_times="{{want_spike_times}}"></rm-plots> 
 
     <tac-plots groups="{{cut_groups}}" max_delta_t="[[options.max_delta_t]]" spike_times="[[spike_times]]" show="[[options.show_tac]]" want_spike_times="{{want_spike_times}}"></tac-plots> 
                 
@@ -30027,6 +30097,7 @@ wav._sanitize_options = function(stored_options) {
         spa_rm_height: 120,
         cluster_plot_size: 128,
         cluster_painter_r: 15,
+        speed_rm_max: 45,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
         splitter_c_size: "350px",
@@ -30294,6 +30365,7 @@ wav._make_max_rate_caption = (v) => v > 0 ? "scaled to max of " + v + "Hz" : "in
 wav._make_max_speed_caption = (v) => v > 0 ? "capped at " + v + " m/s" : "not limited";
 wav._make_pos_smoothing_caption = (v) =>  v > 0 ? v + " s" : "turned off";
 wav._make_spa_rm_height_caption = (v) =>  v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
+wav._caption_speed_max = (v) => v + " cm/s";
 wav._show = (v) => v ? '' : 'display: none;';
 wav._yn_to_bool = (v, index) => (v && v[index] === 'y');
 wav._style_toolbar = (toggle_toolbar) => toggle_toolbar ? '' : 'height:0px;overflow:hidden';
@@ -30317,6 +30389,9 @@ wav._highlight_group = (e) => wav.$.cluster_plots.highlight_group(e.detail.group
 wav.toggle_palette = () =>  wav.set('options.waves_render_mode', wav.options.waves_render_mode === "density" ? "flag" : "density");
 wav.open_github = () => window.open('https://github.com/d1manson/waveform', '_blank');
 wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggle_toolbar);
+wav._info_summary_style = (v) => v ? 'opacity: 0;' : '';
+wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-digit', minute: '2-digit'}));
+wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 
@@ -30369,4 +30444,4 @@ document.addEventListener('copy', function(e){
 </script>
 
 
-</body></html>
+                       </body></html>

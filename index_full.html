@@ -70,6 +70,13 @@ border: 3px solid red;
 background: rgba(255,0,0,0.2);
 cursor: pointer;    
 };
+--cluster-plot-style:{
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+};
+
 }
 
 p, ul, ol{
@@ -185,6 +192,9 @@ display: none;
 ::-webkit-scrollbar-thumb {
 background-color: rgba(0,0,0,0.2);
 -webkit-box-shadow: inset 1px 1px 0 rgba(0,0,0,0.10),inset 0 -1px 0 rgba(0,0,0,0.07);
+}
+.cluster_plot{
+@apply(--cluster-plot-style);
 }
 </style>
 
@@ -399,7 +409,7 @@ background-color: rgba(0,0,0,0.2);
                 <div class='pane_title'>[[item.title]]</div>
                 <div style="text-align: center;">
                     <template is="dom-repeat" items="[[item.plots]]">
-                        <canvas-with-axes 
+                        <canvas-with-axes class="cluster_plot"
                             ckey="[[item.ckey]]"
                             x_label="[[item.x_axis]]"
                             y_label="[[item.y_axis]]" 
@@ -491,13 +501,12 @@ background-color: rgba(0,0,0,0.2);
 
             <div style="flex:1 1 0%; position:relative;display: flex; flex-direction: row;">
                 <managed-canvas style="margin:0 auto;" stretch_height ckey="[[pos_path]]" ></managed-canvas>
-                <div class="info_summary">
-                    <div class="info_summary_text">
-                    </div>
-                    <canvas id="speedhist" width="50" height= "84"></canvas>
-                    <div id="speedhist_labels" style="display:inline;position:relative;">
-                        <div style="position:absolute;right:0px;color:#888;font-size:8px;bottom:-2px;">45&nbsp;cm/s</div>
-                    </div>
+                <div class="info_summary" style$="[[_info_summary_style(active_group_a)]]">
+                    <div class="info_summary_text">[[_format_timespan(start_end_times)]]</div>
+                    <canvas-with-axes style="width:55px;"
+                        ckey="[[pos_speed_hist]]"
+                        x_label="[[_caption_speed_max(options.speed_rm_max)]]"
+                        fix_height="92" flip_horizontal></canvas-with-axes>
                 </div>
             </div>
 
@@ -576,6 +585,7 @@ background-color: rgba(0,0,0,0.2);
         speed_filter_mps="[[options.speed_filter_mps]]"
         pos_smoothing_s="[[options.pos_smoothing_s]]"
         duration="{{duration}}"
+        start_end_times="{{start_end_times}}"
         spike_times="{{spike_times}}"
         pos_xy="{{pos_xy}}"
         pos_dir="{{pos_dir}}"
@@ -602,6 +612,7 @@ background-color: rgba(0,0,0,0.2);
     <rm-plots  
         groups="{{cut_groups}}" 
         pos_path="{{pos_path}}"
+        pos_speed_hist="{{pos_speed_hist}}"
         active_group_a="{{active_group_a}}"
         active_group_b="{{active_group_b}}"
         spike_times="[[spike_times]]"
@@ -614,6 +625,7 @@ background-color: rgba(0,0,0,0.2);
         max_rate_spa="[[options.max_rate_spa]]"
         deg_per_dir_bin="[[options.deg_per_dir_bin]]"
         smoothing_dir_bins="[[options.smoothing_dir_bins]]"
+        speed_rm_max="[[options.speed_rm_max]]"
         want_spike_times="{{want_spike_times}}"></rm-plots> 
 
     <tac-plots 
@@ -686,6 +698,7 @@ wav._sanitize_options = function(stored_options) {
         spa_rm_height: 120,
         cluster_plot_size: 128,
         cluster_painter_r: 15,
+        speed_rm_max: 45,
         splitter_a_size: "200px",
         splitter_b_size: "300px",
         splitter_c_size: "350px",
@@ -953,6 +966,7 @@ wav._make_max_rate_caption = (v) => v > 0 ? "scaled to max of " + v + "Hz" : "in
 wav._make_max_speed_caption = (v) => v > 0 ? "capped at " + v + " m/s" : "not limited";
 wav._make_pos_smoothing_caption = (v) =>  v > 0 ? v + " s" : "turned off";
 wav._make_spa_rm_height_caption = (v) =>  v > 0 ? "stretch to " + v + "px" : "one pixel per bin";
+wav._caption_speed_max = (v) => v + " cm/s";
 wav._show = (v) => v ? '' : 'display: none;';
 wav._yn_to_bool = (v, index) => (v && v[index] === 'y');
 wav._style_toolbar = (toggle_toolbar) => toggle_toolbar ? '' : 'height:0px;overflow:hidden';
@@ -976,6 +990,9 @@ wav._highlight_group = (e) => wav.$.cluster_plots.highlight_group(e.detail.group
 wav.toggle_palette = () =>  wav.set('options.waves_render_mode', wav.options.waves_render_mode === "density" ? "flag" : "density");
 wav.open_github = () => window.open('https://github.com/d1manson/waveform', '_blank');
 wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggle_toolbar);
+wav._info_summary_style = (v) => v ? 'opacity: 0;' : '';
+wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-digit', minute: '2-digit'}));
+wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 
@@ -1028,4 +1045,4 @@ document.addEventListener('copy', function(e){
 </script>
 
 </body>
-</html>
+</html>                       

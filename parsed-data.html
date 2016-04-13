@@ -1299,6 +1299,12 @@ var parse_clu_file = function(full_str, fkey){
                 notify: true,
                 readOnly: true
             },
+            start_end_times: {
+                type: Object, // start and end miliseconds (numbers)
+                value: null,
+                notify: true,
+                readOnly: true
+            },
             spike_times: {
                 type: Object,
                 value: function(){ return {};}, // data (akey), timebase
@@ -1741,6 +1747,11 @@ var parse_clu_file = function(full_str, fkey){
             }
         }, _use_set: function(header){
             this._setDuration(parseInt(header.duration));
+            let start = parseInt(header.lasttrialdatetime)*1000;
+            this._setStart_end_times({
+                start: start,
+                end: start + this.duration *1000
+            });
             this._setSet_header(header);
         }
     });

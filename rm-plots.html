@@ -418,20 +418,45 @@ var make_cached_path = function(){
     });
 }
 
+var send_speed_dwell_hist = function(){
+    let im = plot_histogram(speed_plot_size[0], speed_plot_size[1], cached_speed_dwell);
+     exec_main_b('plot_speed_hist', {
+        path: 'hist',
+        dims: speed_plot_size
+    }, {
+        hist: im
+    });
+}
+
 var build_cache = function(){
     // this is called when we change xy/dir/speed/times/options/show
     // clear_cached will have been called immediately before hand.
 
+    // using just pos timebas and spike times, we can get the pos indices for each spike
     if(!cached_spike_pos_ind && pos_timebase && spikes_timebase && spike_times){
         make_cached_spike_pos_ind();
     }    
+
+    // it doesn't require spikes to just draw the path
+    if(show && show[0] === 'y' && !cached_path && pos_xy){
+        make_cached_path(); 
+    }
+
+    // it also doesn't require spikes to compute and draw the speed dwell hist
+    if(show && show[2] === 'y' && !cached_speed_dwell && pos_speed
+        && render_options.cps_per_speed_bin 
+        && render_options.max_speed){
+        make_cached_speed_bins_and_dwell();
+        send_speed_dwell_hist(); 
+    }
+
+    // the rest requires spikes+xy/dir/speed
 
     if(show && show[0] === 'y'
          && !(cached_xy_bins && cached_xy_no_dwell && cached_xy_dwell && cached_spike_xy_bins)
          && pos_xy && cached_spike_pos_ind && render_options.cm_per_spa_bin 
          && render_options.smoothing_spa_bins !== undefined ){
-        make_cached_xy_bins_and_dwell();
-        make_cached_path();
+        make_cached_xy_bins_and_dwell();    
     }
 
     if(show && show[1] === 'y'
@@ -443,11 +468,11 @@ var build_cache = function(){
     }
 
     if(show && show[2] === 'y'
-        && !(cached_spike_speed_bins && cached_speed_dwell && cached_spike_speed_bins)
+        && !cached_spike_speed_bins
         && pos_speed && cached_spike_pos_ind
         && render_options.cps_per_speed_bin 
         && render_options.max_speed){
-        make_cached_speed_bins_and_dwell();
+        make_cached_speed_spike_bins();
     }
 }
 
@@ -516,19 +541,24 @@ var make_cached_dir_bins_and_dwell = function(){
 }
 
 
+
+
 var make_cached_speed_bins_and_dwell = function(){
-    var factor = 1/render_options.cps_per_speed_bin;
+    let factor = 1/render_options.cps_per_speed_bin;
     cached_speed_bins = new Uint8ClampedArray(pos_speed.length);
-    var n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
+    let n_valid_speed_bins = render_options.max_speed/render_options.cps_per_speed_bin;
     // we use an extra bin for everything invalid
-    for(let i=0;i<pos_speed.length;i++)
+    for(let i=0;i<pos_speed.length;i++){
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
                                 n_valid_speed_bins : pos_speed[i] * factor;
-    
-    cached_spike_speed_bins = pick(cached_speed_bins, cached_spike_pos_ind); 
+    }
     cached_speed_dwell = hist_1(cached_speed_bins, n_valid_speed_bins+1);
     cached_speed_dwell = cached_speed_dwell.subarray(0, n_valid_speed_bins);
+}
 
+
+var make_cached_speed_spike_bins = function(){
+    cached_spike_speed_bins = pick(cached_speed_bins, cached_spike_pos_ind); 
     return true;
 }
 
@@ -599,10 +629,11 @@ var get_group_speed_rm = function(group_inds){
     spike = spike.subarray(0, spike.length-1);
 
     var ratemap = divide_float(spike, cached_speed_dwell);
-    // TODO: need to normalize to max
     return plot_histogram(speed_plot_size[0], speed_plot_size[1], ratemap);
 }       
 
+
+cached_speed_dwell
 
 var plot_dir = function(vals, s, max){
     // produces a square plot
@@ -881,8 +912,14 @@ var use_mask = function(vector, mask, val){
             Polymer.ShortcutNotifyerBehavior
         ], properties: {
             pos_path: {
-                type: String, //canvas-manager id
-                value: "",
+                type: Object, 
+                value: null,
+                notify: true,
+                readOnly: true
+            },
+            pos_speed_hist: {
+                type: Object, 
+                value: null,
                 notify: true,
                 readOnly: true
             },
@@ -931,6 +968,11 @@ var use_mask = function(vector, mask, val){
                 value: 2,
                 notify: true
             },
+            speed_rm_max: {
+                type: Number,
+                value: 45,
+                notify: true
+            },
             show: {
                 type: String,
                 value: 'yyy',
@@ -957,7 +999,7 @@ var use_mask = function(vector, mask, val){
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
-            '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins)',
+            '_options_modified(cm_per_spa_bin, smoothing_spa_bins, max_rate_spa, deg_per_dir_bin, smoothing_dir_bins, speed_rm_max)',
             '_show_changed(show)',
             '_pos_xy_modified(pos_xy)',
             '_pos_dir_modified(pos_dir)',
@@ -973,7 +1015,7 @@ var use_mask = function(vector, mask, val){
                 max_rate_spa: undefined,
                 deg_per_dir_bin: undefined,
                 smoothing_dir_bins: undefined,
-                max_speed: 60, // currently not exposed as user-configurable
+                max_speed: undefined, // partially supported as user-configurable
                 cps_per_speed_bin: 4 // currently not exposed as user-configurable
             };
             var worker_builder = Polymer.DomModule.import('rm-plots','#worker');
@@ -1071,6 +1113,7 @@ var use_mask = function(vector, mask, val){
             this._options.max_rate_spa = this.max_rate_spa;
             this._options.deg_per_dir_bin = this.deg_per_dir_bin;
             this._options.smoothing_dir_bins = this.smoothing_dir_bins;
+            this._options.max_speed = this.speed_rm_max;
             this._use_other_if_possible(this.groups || []);
             this._worker.exec('set_options', this._options);
         }, _groups_set: function(new_val, old_val){
@@ -1160,6 +1203,7 @@ var use_mask = function(vector, mask, val){
                 this._pos_dir_is_on_worker = false;
             }
         }, _pos_speed_modified: function(){
+            this._setPos_speed_hist(null); 
             if(this.show && this.show[2] === 'y'){
                 if(this.pos_speed){
                     let arr = Utils.typed_array_manager.get_array_clone(this.pos_speed.speed);
@@ -1257,6 +1301,9 @@ var use_mask = function(vector, mask, val){
                 this._setPos_path(this._blank_pos_path);
             }
             
+        }, plot_speed_hist: function(msg, arrays){
+                this._setPos_speed_hist({buffer: arrays.hist.buffer, dims: msg.dims});
+
         }, _update_pos_path: function(){
             if(this.active_group_a && this.show && this.show[0]==='y'){
                 // note we are slightly lazy in so far as we don't watch for changes of group_num
