@@ -371,14 +371,37 @@ background-color: rgba(0,0,0,0.2);
             </p>
         </floating-pane>
 
+        <!-- grabbed tiles -->
         <template is="dom-repeat" items="[[grabbed_tiles]]">
             <floating-pane 
                   grabber_mode="[[grabber_mode]]"
                   initial_x='[[item.x]]'
                   initial_y='[[item.y]]'
-                  on-close="_close_grabbed_tile" style="max-width:initial;" >
+                  width="auto"
+                  on-close="_close_grabbed_tile">
                 <div class='pane_title'>[[item.title]]</div>
                 <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]' class="noborder"></tile-element>
+            </floating-pane>
+        </template>
+
+        <!-- grabbed cluster plots -->
+        <template is="dom-repeat" items="[[grabbed_cluster_plots]]">
+            <floating-pane 
+                  grabber_mode="[[grabber_mode]]"
+                  initial_x='[[item.x]]'
+                  initial_y='[[item.y]]'
+                  on-close="_close_grabbed_cluster_plots" 
+                  width="[[options.splitter_c_size]]">
+                <div class='pane_title'>[[item.title]]</div>
+                <div style="text-align: center;">
+                    <template is="dom-repeat" items="[[item.plots]]">
+                        <canvas-with-axes 
+                            ckey="[[item.ckey]]"
+                            x_label="[[item.x_axis]]"
+                            y_label="[[item.y_axis]]" 
+                            fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
+                    </template>
+                </div>
             </floating-pane>
         </template>
 
@@ -484,7 +507,9 @@ background-color: rgba(0,0,0,0.2);
                want_amplitudes="{{want_amplitudes}}"
                active_group_a="{{active_group_a}}"
                painter_r="{{options.cluster_painter_r}}"
-               on-paint="_paint">
+               grabber_mode="[[grabber_mode]]"
+               on-paint="_paint"
+               on-grab="_grab_cluster_plots">
                </cluster-plots>
 
         </iron-resize-notifier>
@@ -763,22 +788,12 @@ wav._grab_group = function(e){
         this.set('grabbed_tiles', []);
     }
 
-    let cm = Utils.canvas_manager;
-    let group = e.detail.group;
-    this.push('grabbed_tiles', {
+    wav.push('grabbed_tiles', {
         title: wav.selected_trial +
                " t" + wav.selected_tet_num + 
-                "c" + group.group_num + " [Grabbed]",
-        group_num: group.group_num,
-        group: {
-            waves: cm.clone_ckey(group.waves), 
-            tac: group.tac,
-            rm: {
-              spa: group.rm.spa,
-              dir: group.rm.dir,
-              speed: group.rm.speed  
-            }
-        },
+                "c" + e.detail.group_num + " [Grabbed]",
+        group_num: e.detail.group_num,
+        group: e.detail.group, // this is already sufficently-deeply cloned
         x: e.detail.src_client_x + 20,
         y: e.detail.src_client_y + 20
     });
@@ -789,7 +804,24 @@ wav._close_grabbed_tile = function(e){
     wav.splice('grabbed_tiles', wav.grabbed_tiles.indexOf(e.model.item), 1);
 }
 
+wav._grab_cluster_plots = function(e){
+    if(!wav.grabbed_cluster_plots){
+        this.set('grabbed_cluster_plots', []);
+    }
+    
+    wav.push('grabbed_cluster_plots', {
+        title: wav.selected_trial +
+               " t" + wav.selected_tet_num,
+        plots: e.detail.plots, // this is already sufficently-deeply cloned
+        x: e.detail.src_client_x + 20,
+        y: e.detail.src_client_y + 20
+    });
+}
 
+wav._close_grabbed_cluster_plots = function(e){
+    // remove the grabbed plots from the list
+    wav.splice('grabbed_cluster_plots', wav.grabbed_cluster_plots.indexOf(e.model.item), 1);
+}
 // :::: plot toggling :::::::::::::::::::::::::::::::
 
 wav.toggle_show = function(id, shiftKey){

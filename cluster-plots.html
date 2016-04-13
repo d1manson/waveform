@@ -13,6 +13,63 @@ Note that unlike rm's, tac's, and waveforms, cluster plots cannot be toggled off
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 
 
+<dom-module id="canvas-with-axes">
+<style>
+:host{
+display: inline-block;
+position: relative;
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
+</style>
+<template>
+    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]"></managed-canvas>
+    <div class="x_axis_label">[[x_label]]</div>
+    <div class="y_axis_label">[[y_label]]</div>
+</template>
+
+<script>
+Polymer({
+    is: 'canvas-with-axes',
+    properties: {
+        fix_height: {
+            type: Number,
+            notify: true
+        },
+        ckey: {
+            type: Object,
+            notify: true
+        },
+        x_label: {
+            type: String,
+            notify: true
+        },
+        y_label: {
+            type: String,
+            notify: true
+        }
+    }
+})
+</script>
+
+</dom-module>
+
 <dom-module id="paint-tool">
 <style>
 :host{
@@ -279,7 +336,8 @@ var timer_tick = function(){
     }
     exec_main_b('plot_clusters', {
         generation: pkey_generation,
-        plots: plot_names
+        plots: plot_names,
+        dims: [s,s]
     }, arrays);
 }
 
@@ -427,25 +485,18 @@ background: #ffffe0;
 .plot{
 display: inline-block;
 position: relative;
-border: 1px solid #000;
-padding: 1px;
-margin-right: 2px;
-margin-bottom: 2px;
 }
-.x_axis_label{
+.grabber{
 position: absolute;
-display: inline-block;
-bottom: 2px;
-right: 2px;
-font-size: 10px;
+top: 0px;
+left: 0px;
+right: 0px;
+bottom: 0px;
 }
-.y_axis_label{
-position: absolute;
-display: inline-block;
-left: 2px;
-top: 2px;
-font-size: 10px;
+.grabber:hover{
+@apply(--grabber-hover);
 }
+
 </style>
 
 <template>
@@ -490,14 +541,18 @@ font-size: 10px;
         <div style="position: absolute; top:0; left:0; right:0; bottom: 0;overflow-y: scroll;" on-scroll="_update_scrolled_down">
             <template is="dom-repeat" items="[[cluster_plots]]">
                 <div class="plot" style$="{{_show(item.is_used)}}">
-                   <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" 
-                            on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
-                   <div class="x_axis_label">[[item.x_axis]]</div>
-                   <div class="y_axis_label">[[item.y_axis]]</div>
+                    <canvas-with-axes 
+                        ckey="[[item.ckey]]"
+                        x_label="[[item.x_axis]]"
+                        y_label="[[item.y_axis]]" 
+                        fix_height="[[canvas_size]]"
+                        on-canvas-mousemove="_mousemove_canvas" 
+                        on-mouseleave="_mouseleave_canvas"></canvas-with-axes>
                 </div>
             </template>
         </div>
         <cross-hair style$="{{_show(mouse_x)}}" r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
+        <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="_grab" on-mousedown="_stop_propagation"></div>
         </div>
     </div>
 
@@ -567,7 +622,11 @@ font-size: 10px;
                 value: false,
                 notify: true,
                 readOnly: true
-            },
+            }, grabber_mode: {
+                type: Boolean,
+                value: false,
+                notify: true
+            }
         }, observers: [
             '_groups_spliced(groups.splices)',
             '_compute_unused_groups(painter_state.*)',
@@ -701,9 +760,11 @@ font-size: 10px;
                 return; // pft, get with the times
             }
             let cm = Utils.canvas_manager;
-            for(let [ii,label] of msg.plots.entries()){
-                cm.update_from_buffer(this.cluster_plots[ii].ckey, 
-                                        arrays[label].buffer);
+            for(let [ii, label] of msg.plots.entries()){
+                this.set('cluster_plots.' + ii + '.ckey', {
+                    buffer: arrays[label].buffer,
+                    dims: msg.dims
+                });
                 let axes = label.split('x');
                 this.set('cluster_plots.' + ii + '.x_axis', axes[1]);
                 this.set('cluster_plots.' + ii + '.y_axis', axes[0]);
@@ -855,6 +916,21 @@ font-size: 10px;
                 pkey: okey._pkey,
                 group_num: group_num
                 }]);
+        }, _grab: function(e){
+            let plots = [];
+            for(let pp of this.cluster_plots){
+                if(pp.is_used){
+                    plots.push(Object.assign({}, pp));
+                }
+            }
+            let rect  = this.getBoundingClientRect();
+            this.fire('grab', {
+                plots: plots,
+                src_client_x: rect.left,
+                src_client_y: rect.top
+            });
+        }, _stop_propagation: function(e){
+            e.stopPropagation();
         }
     });
 </script>

@@ -612,7 +612,10 @@ doesn't have a worker, but it uses a similar system.
                 src_masks: src_masks 
             }
 
-            this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            let valid = this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            if(!valid){
+                return;
+            }
             this.undo_stack.push(delta);
 
 
@@ -649,6 +652,10 @@ doesn't have a worker, but it uses a similar system.
             }
             let res = merge_sorted_masked(x, x_mask); // this combines everything
             
+            if(!res[0].length){
+                return false; // nothing actually was transfered
+            }
+
             // and now we can update the dest group
             this.splice('groups', delta.dest, 1, this._make_okey(res[0], delta.dest));
 
@@ -656,7 +663,9 @@ doesn't have a worker, but it uses a similar system.
                                // and src[ii]=v means that element ii was oritinally in src_nums[v+1] group.
             delta.src_nums = src_nums;
             delete delta['src_masks']; // don't need this any more
-           
+
+            return true;
+
         }, _undo_transplant: function(delta){
             let src_inds = [null];
             for(let group_num of delta.src_nums){
@@ -664,12 +673,12 @@ doesn't have a worker, but it uses a similar system.
             }
             let res = labeled_split(this.groups[delta.dest].akey.array, delta.src, src_inds);
 
-            this.splice('groups', delta.dest, 1, this._make_okey(res[0][0], delta.dest));
+            this.splice('groups', delta.dest, 1, res[0][0].length ? this._make_okey(res[0][0], delta.dest) : null);
 
             let src_masks = {}; // this will be the same as originally povided to transplant
             for(let [ii, group_num] of delta.src_nums.entries()){
                 src_masks[group_num] = res[1][ii+1]; // +1 because the 0th entry is the dest
-                this.splice('groups', group_num, 1, this._make_okey(res[0][ii+1], group_num))
+                this.splice('groups', group_num, 1, res[0][ii+1].length ? this._make_okey(res[0][ii+1], group_num) : null)
             }
             delta.src_masks = src_masks;
             delete delta['src']; //we don't need these any more..

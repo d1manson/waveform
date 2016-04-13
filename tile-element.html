@@ -331,11 +331,25 @@ pointer-events: none;
                 this.transform('',this.$.placeholder);
             }
         }, _grab: function(){
+            // do a sufficiently-deep clone of the group model
+            // TODO: this could perhaps be turned into a fucntion in cut-object
+            // rather than doing it here
+            let cm = Utils.canvas_manager;
+            let group = {
+                waves: cm.clone_ckey(this.group_model.waves), 
+                tac: this.group_model.tac,
+                rm: {
+                  spa: this.group_model.rm.spa,
+                  dir: this.group_model.rm.dir,
+                  speed: this.group_model.rm.speed  
+                }
+            };
             let rect = this.getBoundingClientRect();
             this.fire('grab_group', {
                 src_client_x: rect.left,
                 src_client_y: rect.top,
-                group: this.group_model
+                group: group,
+                group_num: this.group_num
             });
         }, _mousedown_splitter: function(e){
             if(e.detail.button === 0){

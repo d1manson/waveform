@@ -24,8 +24,6 @@ min-height: 14px;
 position: fixed;
 top: 0px;
 left: 0px;
-transform: translate(400px,100px);
--webkit-transform: translate(400px, 100px);
 min-width: 200px;
 max-width: 400px;
 max-height: 600px;
@@ -131,10 +129,18 @@ Polymer({
         initial_x:{
             type: Number,
             notify: true,
+            value: 400
         },
         initial_y:{
             type: Number,
             notify: true,
+            value: 400
+        }, 
+        width: {
+            type: String,
+            notify: true,
+            value: '',
+            observer: '_set_width'
         }
     }, listeners: {
         'mousedown': '_on_drag_start'
@@ -144,6 +150,16 @@ Polymer({
         this.style.zIndex = ++top_z_index;
     }, _stop_propagation: function(e){
         e.stopPropagation(); 
+    }, _set_width: function(v){
+        if(v){
+            this.style.width = v;
+            this.style.maxWidth = 'initial';    
+            this.style.minWidth = 'initial';
+        } else {
+            this.style.width = '';
+            this.style.maxWidth = '';   
+            this.style.minWidth = '';
+        }
     }, _on_drag_start: function(e){
         // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
         // TODO: switch to using Polymer's tap event
@@ -151,7 +167,7 @@ Polymer({
         while(el !== e.currentTarget){
             for(let c of el.classList){
                 if(c === 'nodrag'){
-                    return;
+                    return;   
                 }
             }
             el = el.parentNode;

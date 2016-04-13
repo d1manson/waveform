@@ -16866,11 +16866,25 @@ pointer-events: none;
                 this.transform('',this.$.placeholder);
             }
         }, _grab: function(){
+            // do a sufficiently-deep clone of the group model
+            // TODO: this could perhaps be turned into a fucntion in cut-object
+            // rather than doing it here
+            let cm = Utils.canvas_manager;
+            let group = {
+                waves: cm.clone_ckey(this.group_model.waves), 
+                tac: this.group_model.tac,
+                rm: {
+                  spa: this.group_model.rm.spa,
+                  dir: this.group_model.rm.dir,
+                  speed: this.group_model.rm.speed  
+                }
+            };
             let rect = this.getBoundingClientRect();
             this.fire('grab_group', {
                 src_client_x: rect.left,
                 src_client_y: rect.top,
-                group: this.group_model
+                group: group,
+                group_num: this.group_num
             });
         }, _mousedown_splitter: function(e){
             if(e.detail.button === 0){
@@ -18354,7 +18368,10 @@ cursor: default;
                 src_masks: src_masks 
             }
 
-            this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            let valid = this._do_transplant(delta); // this applies the delta and inverts the data stored within it
+            if(!valid){
+                return;
+            }
             this.undo_stack.push(delta);
 
 
@@ -18391,6 +18408,10 @@ cursor: default;
             }
             let res = merge_sorted_masked(x, x_mask); // this combines everything
             
+            if(!res[0].length){
+                return false; // nothing actually was transfered
+            }
+
             // and now we can update the dest group
             this.splice('groups', delta.dest, 1, this._make_okey(res[0], delta.dest));
 
@@ -18398,7 +18419,9 @@ cursor: default;
                                // and src[ii]=v means that element ii was oritinally in src_nums[v+1] group.
             delta.src_nums = src_nums;
             delete delta['src_masks']; // don't need this any more
-           
+
+            return true;
+
         }, _undo_transplant: function(delta){
             let src_inds = [null];
             for(let group_num of delta.src_nums){
@@ -18406,12 +18429,12 @@ cursor: default;
             }
             let res = labeled_split(this.groups[delta.dest].akey.array, delta.src, src_inds);
 
-            this.splice('groups', delta.dest, 1, this._make_okey(res[0][0], delta.dest));
+            this.splice('groups', delta.dest, 1, res[0][0].length ? this._make_okey(res[0][0], delta.dest) : null);
 
             let src_masks = {}; // this will be the same as originally povided to transplant
             for(let [ii, group_num] of delta.src_nums.entries()){
                 src_masks[group_num] = res[1][ii+1]; // +1 because the 0th entry is the dest
-                this.splice('groups', group_num, 1, this._make_okey(res[0][ii+1], group_num))
+                this.splice('groups', group_num, 1, res[0][ii+1].length ? this._make_okey(res[0][ii+1], group_num) : null)
             }
             delta.src_masks = src_masks;
             delete delta['src']; //we don't need these any more..
@@ -22964,8 +22987,6 @@ min-height: 14px;
 position: fixed;
 top: 0px;
 left: 0px;
-transform: translate(400px,100px);
--webkit-transform: translate(400px, 100px);
 min-width: 200px;
 max-width: 400px;
 max-height: 600px;
@@ -23070,10 +23091,18 @@ Polymer({
         initial_x:{
             type: Number,
             notify: true,
+            value: 400
         },
         initial_y:{
             type: Number,
             notify: true,
+            value: 400
+        }, 
+        width: {
+            type: String,
+            notify: true,
+            value: '',
+            observer: '_set_width'
         }
     }, listeners: {
         'mousedown': '_on_drag_start'
@@ -23083,6 +23112,16 @@ Polymer({
         this.style.zIndex = ++top_z_index;
     }, _stop_propagation: function(e){
         e.stopPropagation(); 
+    }, _set_width: function(v){
+        if(v){
+            this.style.width = v;
+            this.style.maxWidth = 'initial';    
+            this.style.minWidth = 'initial';
+        } else {
+            this.style.width = '';
+            this.style.maxWidth = '';   
+            this.style.minWidth = '';
+        }
     }, _on_drag_start: function(e){
         // if the mouse-down element or any of its ancestors has the "nodrag" class then dont start the dragging.
         // TODO: switch to using Polymer's tap event
@@ -23090,7 +23129,7 @@ Polymer({
         while(el !== e.currentTarget){
             for(let c of el.classList){
                 if(c === 'nodrag'){
-                    return;
+                    return;   
                 }
             }
             el = el.parentNode;
@@ -27013,7 +27052,64 @@ Polymer({
 </script>
 
   
-</dom-module><dom-module id="paint-tool" assetpath="/">
+</dom-module><dom-module id="canvas-with-axes" assetpath="/">
+<style>
+:host{
+display: inline-block;
+position: relative;
+border: 1px solid #000;
+padding: 1px;
+margin-right: 2px;
+margin-bottom: 2px;
+}
+.x_axis_label{
+position: absolute;
+display: inline-block;
+bottom: 2px;
+right: 2px;
+font-size: 10px;
+}
+.y_axis_label{
+position: absolute;
+display: inline-block;
+left: 2px;
+top: 2px;
+font-size: 10px;
+}
+</style>
+<template>
+    <managed-canvas ckey="[[ckey]]" fix_height="[[fix_height]]"></managed-canvas>
+    <div class="x_axis_label">[[x_label]]</div>
+    <div class="y_axis_label">[[y_label]]</div>
+</template>
+
+<script>
+Polymer({
+    is: 'canvas-with-axes',
+    properties: {
+        fix_height: {
+            type: Number,
+            notify: true
+        },
+        ckey: {
+            type: Object,
+            notify: true
+        },
+        x_label: {
+            type: String,
+            notify: true
+        },
+        y_label: {
+            type: String,
+            notify: true
+        }
+    }
+})
+</script>
+
+</dom-module>
+
+<dom-module id="paint-tool" assetpath="/">
 <style>
 :host{
 display: inline-block;
@@ -27279,7 +27375,8 @@ var timer_tick = function(){
     }
     exec_main_b('plot_clusters', {
         generation: pkey_generation,
-        plots: plot_names
+        plots: plot_names,
+        dims: [s,s]
     }, arrays);
 }
 
@@ -27427,25 +27524,18 @@ background: #ffffe0;
 .plot{
 display: inline-block;
 position: relative;
-border: 1px solid #000;
-padding: 1px;
-margin-right: 2px;
-margin-bottom: 2px;
 }
-.x_axis_label{
+.grabber{
 position: absolute;
-display: inline-block;
-bottom: 2px;
-right: 2px;
-font-size: 10px;
+top: 0px;
+left: 0px;
+right: 0px;
+bottom: 0px;
 }
-.y_axis_label{
-position: absolute;
-display: inline-block;
-left: 2px;
-top: 2px;
-font-size: 10px;
+.grabber:hover{
+@apply(--grabber-hover);
 }
+
 </style>
 
 <template>
@@ -27487,13 +27577,12 @@ font-size: 10px;
         <div style="position: absolute; top:0; left:0; right:0; bottom: 0;overflow-y: scroll;" on-scroll="_update_scrolled_down">
             <template is="dom-repeat" items="[[cluster_plots]]">
                 <div class="plot" style$="{{_show(item.is_used)}}">
-                   <managed-canvas ckey="[[item.ckey]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></managed-canvas>
-                   <div class="x_axis_label">[[item.x_axis]]</div>
-                   <div class="y_axis_label">[[item.y_axis]]</div>
+                    <canvas-with-axes ckey="[[item.ckey]]" x_label="[[item.x_axis]]" y_label="[[item.y_axis]]" fix_height="[[canvas_size]]" on-canvas-mousemove="_mousemove_canvas" on-mouseleave="_mouseleave_canvas"></canvas-with-axes>
                 </div>
             </template>
         </div>
         <cross-hair style$="{{_show(mouse_x)}}" r="[[painter_r]]" show_bars="0" top="0" left="0" x="[[mouse_x]]" y="[[mouse_y]]"></cross-hair>
+        <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="_grab" on-mousedown="_stop_propagation"></div>
         </div>
     
 
@@ -27563,7 +27652,11 @@ font-size: 10px;
                 value: false,
                 notify: true,
                 readOnly: true
-            },
+            }, grabber_mode: {
+                type: Boolean,
+                value: false,
+                notify: true
+            }
         }, observers: [
             '_groups_spliced(groups.splices)',
             '_compute_unused_groups(painter_state.*)',
@@ -27697,9 +27790,11 @@ font-size: 10px;
                 return; // pft, get with the times
             }
             let cm = Utils.canvas_manager;
-            for(let [ii,label] of msg.plots.entries()){
-                cm.update_from_buffer(this.cluster_plots[ii].ckey, 
-                                        arrays[label].buffer);
+            for(let [ii, label] of msg.plots.entries()){
+                this.set('cluster_plots.' + ii + '.ckey', {
+                    buffer: arrays[label].buffer,
+                    dims: msg.dims
+                });
                 let axes = label.split('x');
                 this.set('cluster_plots.' + ii + '.x_axis', axes[1]);
                 this.set('cluster_plots.' + ii + '.y_axis', axes[0]);
@@ -27851,6 +27946,21 @@ font-size: 10px;
                 pkey: okey._pkey,
                 group_num: group_num
                 }]);
+        }, _grab: function(e){
+            let plots = [];
+            for(let pp of this.cluster_plots){
+                if(pp.is_used){
+                    plots.push(Object.assign({}, pp));
+                }
+            }
+            let rect  = this.getBoundingClientRect();
+            this.fire('grab', {
+                plots: plots,
+                src_client_x: rect.left,
+                src_client_y: rect.top
+            });
+        }, _stop_propagation: function(e){
+            e.stopPropagation();
         }
     });
 </script>
@@ -28029,10 +28139,23 @@ font-size: 10px;
             </p>
         </floating-pane>
 
+        
         <template is="dom-repeat" items="[[grabbed_tiles]]">
-            <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" on-close="_close_grabbed_tile" style="max-width:initial;">
+            <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" width="auto" on-close="_close_grabbed_tile">
                 <div class="pane_title">[[item.title]]</div>
                 <tile-element group_model="[[item.group]]" group_num="[[item.group_num]]" class="noborder"></tile-element>
+            </floating-pane>
+        </template>
+
+        
+        <template is="dom-repeat" items="[[grabbed_cluster_plots]]">
+            <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" on-close="_close_grabbed_cluster_plots" width="[[options.splitter_c_size]]">
+                <div class="pane_title">[[item.title]]</div>
+                <div style="text-align: center;">
+                    <template is="dom-repeat" items="[[item.plots]]">
+                        <canvas-with-axes ckey="[[item.ckey]]" x_label="[[item.x_axis]]" y_label="[[item.y_axis]]" fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
+                    </template>
+                </div>
             </floating-pane>
         </template>
 
@@ -28124,7 +28247,7 @@ font-size: 10px;
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots id="cluster_plots" style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" on-paint="_paint">
+            <cluster-plots id="cluster_plots" style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" grabber_mode="[[grabber_mode]]" on-paint="_paint" on-grab="_grab_cluster_plots">
                </cluster-plots>
 
         </iron-resize-notifier>
@@ -28339,22 +28462,12 @@ wav._grab_group = function(e){
         this.set('grabbed_tiles', []);
     }
 
-    let cm = Utils.canvas_manager;
-    let group = e.detail.group;
-    this.push('grabbed_tiles', {
+    wav.push('grabbed_tiles', {
         title: wav.selected_trial +
                " t" + wav.selected_tet_num + 
-                "c" + group.group_num + " [Grabbed]",
-        group_num: group.group_num,
-        group: {
-            waves: cm.clone_ckey(group.waves), 
-            tac: group.tac,
-            rm: {
-              spa: group.rm.spa,
-              dir: group.rm.dir,
-              speed: group.rm.speed  
-            }
-        },
+                "c" + e.detail.group_num + " [Grabbed]",
+        group_num: e.detail.group_num,
+        group: e.detail.group, // this is already sufficently-deeply cloned
         x: e.detail.src_client_x + 20,
         y: e.detail.src_client_y + 20
     });
@@ -28365,7 +28478,24 @@ wav._close_grabbed_tile = function(e){
     wav.splice('grabbed_tiles', wav.grabbed_tiles.indexOf(e.model.item), 1);
 }
 
+wav._grab_cluster_plots = function(e){
+    if(!wav.grabbed_cluster_plots){
+        this.set('grabbed_cluster_plots', []);
+    }
+    
+    wav.push('grabbed_cluster_plots', {
+        title: wav.selected_trial +
+               " t" + wav.selected_tet_num,
+        plots: e.detail.plots, // this is already sufficently-deeply cloned
+        x: e.detail.src_client_x + 20,
+        y: e.detail.src_client_y + 20
+    });
+}
 
+wav._close_grabbed_cluster_plots = function(e){
+    // remove the grabbed plots from the list
+    wav.splice('grabbed_cluster_plots', wav.grabbed_cluster_plots.indexOf(e.model.item), 1);
+}
 // :::: plot toggling :::::::::::::::::::::::::::::::
 
 wav.toggle_show = function(id, shiftKey){
