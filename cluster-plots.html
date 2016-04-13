@@ -21,7 +21,7 @@ opacity: 0.4;
 }
 </style>
 <template>
-    <canvas id="canv" width="[[width]]" height="[[height]]"></canvas>
+    <canvas id="canv" width="[[width]]" height="[[height]]" style$="height:{{_use_css_height(css_height)}};"></canvas>
 </template>
 
 <script>
@@ -53,10 +53,19 @@ Polymer({
         color: {
             type: String,
             value: '#003300'
+        },
+        css_height: {
+            type: Number,
+            notify: true,
+            observer: '_use_css_height'
         }
     }, observers: [
         '_set_state(active, negative, color, width, height)'
-    ], _set_state : function(active, negative, color, width, height){
+    ], _use_css_height: function(h){
+        let str = h ? h + 'px' : '';
+        this.style.height = str;
+        return str;
+    }, _set_state : function(active, negative, color, width, height){
         this._ctx = this.$.canv.getContext('2d');
         if(active){
             (!this._bound) && this.listen(document, 'mousemove', '_mousemove');
@@ -80,17 +89,17 @@ Polymer({
             this._ctx.clearRect(0, 0, width, height);
         }
     }, _mousemove: function(e){
-
         let rect = this.getBoundingClientRect();
-        let x = e.clientX - rect.left;
-        let y = e.clientY - rect.top;
+        let scale = this.width/rect.width;
+        let x = (e.clientX - rect.left) * scale;
+        let y = (e.clientY - rect.top) * scale;
         if(this._old_x === null){
             this._old_x = x-0.0001;
             this._old_y = y;
         }
 
         this._ctx.beginPath();
-        this._ctx.lineWidth = this.r*2;
+        this._ctx.lineWidth = this.r*2*scale;
         this._ctx.strokeStyle = this.color;
         this._ctx.lineCap = 'round';
         this._ctx.moveTo(this._old_x, this._old_y);
@@ -321,14 +330,16 @@ var get_group_at = function(msg){
 
 var compute_paint_masks = function(msg, arrays){
     // This is called on the mouseup of a paint event
+    if(msg.mask_height !== s || msg.mask_width !== s){
+        throw "paint mask must be " + s + " x " + s + ".";
+    }
+    
     let im = arrays.mask;
     let [c1, c2] = msg.plot.split('x');
     c1 = parseInt(c1) - 1;
     c2 = parseInt(c2) - 1;
     let pkeys = msg.pkeys;
 
-    let f = msg.mask_width/s; 
-    let h = msg.mask_height; //should be eq to mask_width
     let arrays_out = {};
     for(let pkey of msg.pkeys){
         let inds = pkey_to_array.get(pkey);
@@ -339,7 +350,7 @@ var compute_paint_masks = function(msg, arrays){
         for(let ii=0; ii<m.length; ii++){
             let a1 = amps[inds[ii]*n_c + c1];
             let a2 = amps[inds[ii]*n_c + c2];
-            m[ii] = !!im[0 | ((s-1-a1)*f*h + a2*f)];
+            m[ii] = !!im[(s-a1-1)*s + a2];
         }
         arrays_out[pkey] = m;
     }
@@ -735,8 +746,9 @@ font-size: 10px;
             return null;
         }, _start_paint: function(e){
             this._painter_el = document.createElement('paint-tool');
-            this._painter_el.set('width', this.canvas_size);
-            this._painter_el.set('height', this.canvas_size);
+            this._painter_el.set('css_height', this.canvas_size);
+            this._painter_el.set('width', 256); // this has to match the actual height used in cluster plots
+            this._painter_el.set('height', 256);
             this._painter_el.set('r', this.painter_r);
             this._painter_el.style.position = 'absolute';
             this._painter_el.style.top = '1px';
