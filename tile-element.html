@@ -237,7 +237,8 @@ pointer-events: none;
     Polymer({
         is:'tile-element',
         behaviors: [
-            Polymer.NeonAnimationRunnerBehavior
+            Polymer.NeonAnimationRunnerBehavior, 
+            Polymer.ShortcutNotifyTargetBehavior(['group_model'])
         ], properties: {
             group_num: {
                 type: Number,
@@ -249,8 +250,7 @@ pointer-events: none;
                 type: Object,
                 notify: true,
                 value: function(){return {};},
-                notify: true,
-                observer: '_register_primary_view'
+                notify: true
             },
             moving: {
                 type: Boolean,
@@ -381,8 +381,6 @@ pointer-events: none;
                 y: e.detail.offset_y,
                 w: e.detail.canvas_width
             });
-        }, _register_primary_view: function(okey){
-            okey && this.setAsPrimaryViewForModel('group_model');
         }
     });
 </script>

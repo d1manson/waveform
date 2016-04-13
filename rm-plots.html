@@ -877,7 +877,9 @@ var use_mask = function(vector, mask, val){
 
     Polymer({
         is:'rm-plots',
-        properties: {
+        behaviors: [
+            Polymer.ShortcutNotifyerBehavior
+        ], properties: {
             pos_path: {
                 type: String, //canvas-manager id
                 value: "",
@@ -894,7 +896,7 @@ var use_mask = function(vector, mask, val){
                 value: function(){ return {};},
                 notify: true
             },
-        pos_speed: {
+            pos_speed: {
                 type: Object, // array akey "data" and timebase Number in same units as max_delta_t
                 value: function(){ return {};},
                 notify: true
@@ -1060,7 +1062,7 @@ var use_mask = function(vector, mask, val){
                     rm.speed = op === 1 ? okey._rm_speed_other : null;
                 }
 
-                this.notifyPathForPrimaryView('rm', rm, okey); // actual path: 'groups.' + okey._pkey + '.rm'
+                this.shortcutNotify('rm', rm, okey); // actual path: 'groups.' + okey._pkey + '.rm'
             }
 
         }, _options_modified: function(){

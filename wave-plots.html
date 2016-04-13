@@ -964,6 +964,9 @@ return WavesRenderer;
 
 Polymer({
     is:'wave-plots',
+    behaviors: [
+        Polymer.ShortcutNotifyerBehavior
+    ],
     properties: {
         palette_mode: {
             type: String,
@@ -1038,7 +1041,7 @@ Polymer({
 
             this._renderer.set_show('n');
             for(let okey of this.groups) if(okey && okey.waves){
-                this.set('groups.' + okey._pkey + '.waves', null);
+                this.set('groups.' + okey._pkey + '.waves', null); 
             }
         } else {
             this.set('show_chans', 'yyyy');
@@ -1073,7 +1076,7 @@ Polymer({
             }
             if(!okey.waves || okey.waves.canvas !== el_canvas){
                 okey.waves = cm.to_ckey(el_canvas);
-                this.notifyPathForPrimaryView('waves', okey.waves, okey); // actual path: 'groups.' + key + '.waves'
+                this.shortcutNotify('waves', okey.waves, okey); // actual path: 'groups.' + key + '.waves'
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
     }, mask_at_vt: function(inds, point){

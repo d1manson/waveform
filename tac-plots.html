@@ -252,7 +252,9 @@ var is_equal_simple = function(a, b){
 
     Polymer({
         is:'tac-plots',
-        properties: {
+        behaviors: [
+            Polymer.ShortcutNotifyerBehavior
+        ], properties: {
                max_delta_t: {
                 type: Number, // in miliseconds
                 value: 2,
@@ -373,7 +375,7 @@ var is_equal_simple = function(a, b){
 
                 if(op){
                     okey.tac = op === 1 ? okey._tac_other : null;
-                    this.notifyPathForPrimaryView('tac', okey.tac, okey); // actual path: 'groups.' + okey._pkey + '.tac'
+                    this.shortcutNotify('tac', okey.tac, okey); // actual path: 'groups.' + okey._pkey + '.tac'
                 }
             }
 
