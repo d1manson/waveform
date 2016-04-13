@@ -22,6 +22,7 @@
     "iron-a11y-keys": "PolymerElements/iron-a11y-keys#^1.0.4",
     "iron-a11y-keys-behavior": "https://github.com/d1manson/iron-a11y-keys-behavior.git#1.1.3",
     "paper-button": "PolymerElements/paper-button#^1.0.11",
-    "iron-splitter": "https://github.com/d1manson/iron-splitter.git#1.0.1-rc"
+    "iron-splitter": "https://github.com/d1manson/iron-splitter.git#1.0.1-rc",
+    "paper-toast": "PolymerElements/paper-toast#^1.2.2"
   }
 }

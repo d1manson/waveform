@@ -1227,7 +1227,6 @@ var use_mask = function(vector, mask, val){
                 if(!okey){
                     continue;
                 }
-                let cm = Utils.canvas_manager;
                 if(msg.spa_rm){
                     okey._rm_spa_other = {buffer: arrays[msg.spa_rm].buffer, dims: msg.spa_rm_dims};
                     okey._rm_spa_max_other = msg.spa_max.toFixed(1);
@@ -1246,17 +1245,15 @@ var use_mask = function(vector, mask, val){
             }
 
         }, plot_path: function(msg, arrays){
-            let cm = Utils.canvas_manager;
-
             if(msg.a && this._pkey_generation == msg.generation &&
                 (this.active_group_a && this.active_group_a._pkey == msg.a) && 
                 ((!this.active_group_b && !msg.b) || (this.active_group_b && this.active_group_b._pkey == msg.b))
                 && this.show && this.show[0]==='y'){
                 // plot is of current a (and b), and generation is current and we want spa plots
-                this._setPos_path(cm.buffer_to_ckey(arrays.path.buffer, msg.dims))    
+                this._setPos_path({buffer: arrays.path.buffer, dims: msg.dims})    
             } else if(!msg.a){
                 // plot has null a and b, so store it as the blank path and set it now
-                this._blank_pos_path = cm.buffer_to_ckey(arrays.path.buffer, msg.dims);
+                this._blank_pos_path = {buffer: arrays.path.buffer, dims: msg.dims};
                 this._setPos_path(this._blank_pos_path);
             }
             

@@ -641,11 +641,10 @@ bottom: 0px;
         }, ready: function(){
             let n_c = 4; // TODO: get this from parsed-data
             let s = 256; // TODO: this too, and maybe alow scaling
-            let cm = Utils.canvas_manager;
             let plots = [];
             for(let ii=0; ii<n_c*(n_c-1)/2; ii++){
                 plots.push({
-                    ckey: cm.dims_to_ckey([s,s]),
+                    ckey: null,
                     is_used: false
                 });
             }
@@ -672,8 +671,7 @@ bottom: 0px;
             this._update_okeys(parsed.removed, parsed.added, this._pkey_generation, this._pkey_generation);
         }, _update_okeys: function(okeys_to_remove, okeys_to_add, generation_remove, generation_add){
             var am = Utils.typed_array_manager;
-            var cm = Utils.canvas_manager;
-
+            
             var added_arrays = {};
             var pkeys_to_add = []; 
             var options = [];
@@ -759,7 +757,6 @@ bottom: 0px;
             if(msg.generation !== this._pkey_generation){
                 return; // pft, get with the times
             }
-            let cm = Utils.canvas_manager;
             for(let [ii, label] of msg.plots.entries()){
                 this.set('cluster_plots.' + ii + '.ckey', {
                     buffer: arrays[label].buffer,

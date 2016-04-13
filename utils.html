@@ -189,7 +189,7 @@ Utils.typed_array_manager = (function(){
             // transfer an array in its intereity to another thread.
             return akey && akey.array && new akey.array.constructor(akey.array);
         }
-    };
+    }; 
 
 })();
 
@@ -204,58 +204,79 @@ Utils.file_manager = (function(){
             };
         },
     };
-
 })();
 
 
 
-Utils.canvas_manager = (function(){
-    
-   return {
-        buffer_to_ckey: function(buffer, dims){
-            var el = document.createElement("canvas");
-            el.width = dims[0];
-            el.height = dims[1];
-            var ctx = el.getContext('2d');
+Utils.clone_canvas = function(old_canv){
+    if(!old_canv){
+        return;
+    }
+    let new_canv = document.createElement("canvas");
+    new_canv.width = old_canv.width;
+    new_canv.height = old_canv.height;
+    new_canv.getContext('2d').drawImage(old_canv, 0, 0);
+    new_canv.style.cssText = old_canv.style.cssText;
+    return new_canv;
+}
 
-            var im_data = ctx.createImageData(dims[0], dims[1]);
-            im_data.data.set(new Uint8ClampedArray(buffer));
-            ctx.putImageData(im_data, 0, 0);
-            return {canvas: el};
-        },
-        dims_to_ckey: function(dims){
-            var el = document.createElement("canvas");
-            el.width = dims[0];
-            el.height = dims[1];
-            return {canvas: el};
-        },
-        to_ckey: function(c){
-            return {canvas: c};
-        },
-        clone_ckey: function(ckey){
-            // if we were really sensible this may never be needed...but we're not
-            let old_canv = ckey && ckey.canvas;
-            if(!old_canv){
-                return;
-            }
-            let new_canv = document.createElement("canvas");
-            new_canv.width = old_canv.width;
-            new_canv.height = old_canv.height;
-            new_canv.getContext('2d').drawImage(old_canv, 0, 0);
-            new_canv.style.cssText = old_canv.style.cssText;
-            return {canvas: new_canv};
-        },
-        get_2d_ctx: function(ckey){
-            return ckey && ckey.canvas && ckey.canvas.getContext('2d');
-        },
-        update_from_buffer: function(ckey, buffer){
-            let el = ckey && ckey.canvas;
-            let ctx = el.getContext('2d');
-            var im_data = ctx.createImageData(el.width, el.height);
-            im_data.data.set(new Uint8ClampedArray(buffer));
-            ctx.putImageData(im_data, 0, 0);
+Utils.ckey_to_data_url = function(ckey, height, width){
+    if(!ckey){
+        return "";
+    }
+
+    let canv_el;
+    if(ckey.canvas){
+        // ckey is an actual canvas
+        canv_el = ckey.canvas;
+        let computed_width, computed_height;
+
+        if(!height || !width){
+            try{
+                let s = getComputedStyle(canv_el);
+                width = width || parseInt(s.width);
+                height = height || parseInt(s.height);
+            }catch(e){
+                // TODO: might want the (width && !height) thing, as below
+                width = width || canv_el.width; 
+                height = height || canv_el.height;
+            };            
         }
-    };
+    } else {
 
-})();
+        // ckey is just buffer and dims, so put data into a new canvas
+        canv_el = document.createElement('canvas');
+        canv_el.width = ckey.dims[0];
+        canv_el.height = ckey.dims[1];
+        ctx = canv_el.getContext('2d');
+        let im_data = ctx.createImageData(ckey.dims[0], ckey.dims[1]);
+        im_data.data.set(new Uint8ClampedArray(ckey.buffer));
+        ctx.putImageData(im_data, 0, 0);
+        if(width && !height){
+            height = ckey.dims[1] * width/ckey.dims[0];
+        } else if(height && !width){
+            width = ckey.dims[0] * height/ckey.dims[1];
+        } else {
+            height = ckey.dims[1];
+            width = ckey.dims[0];
+        }
+    }
+
+    if(width !== canv_el.width || height !== canv_el.height){
+        // resize to new canvas, so there's no room for recieving
+        // application to screw it up
+        let original_canv = canv_el;
+        canv_el = document.createElement('canvas');
+        canv_el.width = width;
+        canv_el.height = height;
+        canv_el.getContext('2d').drawImage(original_canv, 0, 0, original_canv.width, 
+                                           original_canv.height, 0, 0, width, height);
+    }
+
+    let url = canv_el.toDataURL();
+
+    return `<img src='${url}' width='${width}' height='${height}' />`;
+
+}
+
 </script>

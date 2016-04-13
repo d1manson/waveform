@@ -7,6 +7,9 @@
 <title>Waveform</title>
 
 <script> 
+console.log("")
+console.log("%cWaveform v1.0 by DM", "color: blue; font-size: large; background: #ccc; border: 1px solid blue;padding: 4px 10px;");
+console.log("")
 document.addEventListener('keydown', function(e){
     if(wav.disable_shortcuts){
         e.stopImmediatePropagation(); // for this to be effective it needs to be the first registered listener
@@ -28,6 +31,7 @@ window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
 <link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
+<link rel="import" href="bower_components/paper-toast/paper-toast.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
 <link rel="import" href="tile-element.html">
@@ -534,6 +538,8 @@ background-color: rgba(0,0,0,0.2);
 
     <paper-icon-button icon="menu" class="menu_toggle" on-tap="_toggle_toolbar"></paper-icon-button>
     
+    <paper-toast id="toast"></paper-toast>
+
     <div class="grabber_signifier" style$="{{_show(grabber_mode)}}">
         grabber mode
     </div>
@@ -988,6 +994,34 @@ document.addEventListener('keyup', function(e){
     if(e.which === 32){
         wav.set('grabber_mode', false);
     }
+})
+
+document.addEventListener('copy', function(e){
+    if(!wav.active_group_a){
+        return;
+    }
+    let group = wav.active_group_a;
+    let title = wav.selected_trial +
+               " t" + wav.selected_tet_num + 
+                "c" + group.group_num;
+    let n_spikes = group.n_spikes;
+    let info_str = "";
+    (group.n_spikes) && (info_str += " | " + group.n_spikes + " spikes");
+    (group.rm.spa_max) && (info_str += " | spatial max: " + group.rm.spa_max + "Hz");
+    (group.rm.dir_max) && (info_str += " | directional max: " + group.rm.dir_max + "Hz");
+
+    let plot_str = "";
+    (group.waves) && (plot_str += Utils.ckey_to_data_url(group.waves));
+    (group.rm.spa) && (plot_str += Utils.ckey_to_data_url(group.rm.spa, wav.options.spa_rm_height));
+    (group.rm.dir) && (plot_str += Utils.ckey_to_data_url(group.rm.dir));
+    (group.rm.speed) && (plot_str += Utils.ckey_to_data_url(group.rm.speed));
+    (group.tac) && (plot_str += Utils.ckey_to_data_url(group.tac));
+
+    let html = `<span style="font-weight:bold;">${title}</span>${info_str}<br>${plot_str}`;
+    e.clipboardData.setData('text/html', html);
+    e.preventDefault();
+    wav.$.toast.text = "plots for '" + title + "' copied to clipboard"
+    wav.$.toast.open();
 })
 
 

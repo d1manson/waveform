@@ -18,7 +18,7 @@ If you find bugs please, please, please, report them - either using the github i
 
 TODO: list shortcuts and think of stuff not mentioned in the video or whatever.
 
-You can interact with the application from the F12 developer console, using the variable named `wav`. 
+You can interact with the application from the F12 developer console, using the variable named `wav`.  The developer tools in modern browsers are incredibly powerful, even the console itself has a [variety of features](https://developer.chrome.com/devtools/docs/console) in chrome.
 
 ---
 

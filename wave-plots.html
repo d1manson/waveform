@@ -1068,14 +1068,13 @@ Polymer({
         this._update_okeys(parsed.removed, parsed.added, parsed.moved);
     }, _okey_rendered: function(results){
         // results is a map from okey to canvas.
-        var cm = Utils.canvas_manager;
         for(let [okey, el_canvas] of results){
             let key = this.groups_collection.getKey(okey);
             if(!key){
                 throw "group rendered unneccesairly"; // this should never happen because it's all happening on the same thread
             }
             if(!okey.waves || okey.waves.canvas !== el_canvas){
-                okey.waves = cm.to_ckey(el_canvas);
+                okey.waves = {canvas: el_canvas};
                 this.shortcutNotify('waves', okey.waves, okey); // actual path: 'groups.' + key + '.waves'
             } // else the current rendered canvas aparently has the desired options already, and the renderer just re-sent it to us
         }
