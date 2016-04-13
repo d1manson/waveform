@@ -76,23 +76,26 @@ padding: 1px;
 margin-right: 2px;
 margin-bottom: 2px;
 };
-
 }
 
 a {
 color: inherit;
 }
+
 p, ul, ol{
 margin-top: 6px;
 margin-bottom: 6px;
 }
+
 ul, ol{
 padding-left:10px;
 margin-left:10px;
 }
+
 canvas, img{
 vertical-align: bottom;
 }
+
 body{
 overflow:hidden;
 font-family: sans-serif;
@@ -106,6 +109,7 @@ display: flex;
 flex-direction: column;
 margin: 0;
 }
+
 .info_summary{
 position: absolute;
 padding: 3px;
@@ -115,20 +119,11 @@ background: rgba(255,255,255,0.5);
 -webkit-transition: opacity 0.5s ease-in-out;
 transition: opacity 0.5s ease-in-out;
 }
-.hidden_clipboard{
-opacity: 0;
-position: absolute;
-top: -10000px;
-right: 0;
--webkit-user-select: initial;
--khtml-user-select: inital;
--moz-user-select: -moz-initial;
--o-user-select: initial;
-user-select: initial;
-}
+
 .slider_val{
 font-weight: bold;
 }
+
 .github_button_filedrop{
 cursor: pointer;
 margin: 20px 0px 0px 0px;
@@ -138,6 +133,7 @@ padding: 4px 10px 4px 10px;
 border-radius: 4px;
 background: #eee;
 }
+
 .github_button_filedrop:hover{
 background: #ddd;
 border-color: #777;
@@ -170,6 +166,7 @@ border: 2px solid #f00;
 padding: 4px 6px 4px 6px;
 border-radius: 4px;
 }
+
 .menu_toggle {
 position: fixed;
 top: 0px;
@@ -211,218 +208,212 @@ background-color: rgba(0,0,0,0.2);
     <iron-localstorage name="waveform" value="{{stored_options}}"></iron-localstorage>
     <value-transform value_b="{{options}}" value_a="{{stored_options}}"
         a_to_b="_sanitize_options"></value-transform>
-
-    <div class="hidden_clipboard"></div>
-
-    <div style="position: absolute;">
             
-        <floating-pane id="action_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Action List [z]</div>
-            <undo-stack-view 
-                    undo_stack="[[cut_undo_stack]]"
-                    redo_stack="[[cut_redo_stack]]"></undo-stack-view>
-        </floating-pane>
-        
+    <floating-pane id="action_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Action List [z]</div>
+        <undo-stack-view 
+                undo_stack="[[cut_undo_stack]]"
+                redo_stack="[[cut_redo_stack]]"></undo-stack-view>
+    </floating-pane>
 
-        <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Temporal auto correlation [t]</div>
-            <p class="nodrag">
-                Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
-                <paper-slider pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
-            </p><p>
-                The number of bins is fixed at 100.
-            </p>
-        </floating-pane>
+    <floating-pane id="tc_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Temporal auto correlation [t]</div>
+        <p class="nodrag">
+            Time window <span class="slider_val">[[options.max_delta_t]] ms</span><br>
+            <paper-slider pin snaps min="20" max="5000" step="20" value="{{options.max_delta_t}}" style='width:300px;'></paper-slider><br>
+        </p><p>
+            The number of bins is fixed at 100.
+        </p>
+    </floating-pane>
 
-        <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Drift [d]</div>
-            Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
-            <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
-            So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
-        </floating-pane>
-                    
-        <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;" hidden>
-            <div class='pane_title'>Shortcuts [k]</div>
-            <p>
-                For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
-                pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <b>r</b> 
-                by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
-                the only action linked to the shortcut.)
-            </p><p>
-                 Shorcuts for the plots shown for each group; use <b>shift</b> to select multiple:
-                <ul>
-                <li><b>w</b> waveforms</li>
-                <li><b>r</b> spatial ratemap</li>
-                <li><b>c</b> directional ratemap ("c" is for circle)</li>
-                <li><b>v</b> speed ratemap ("v" is for velocity)</li>
-                <li><b>t</b> temporal autocorrelogram</li>
-                </ul>
-            </p><p>
-                Shorcuts applied to the "active" group, which is the one under the cursor:
-                <ul>
-                <li><b>e</b> set the cluster painting destination group to the active group.</li>
-                <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
-                <li><b>s</b> launch the swap dialog for the "active" group.</li>
-                <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
-                </ul>           
-            </p><p>
-                Other shortcuts:
-                <ul>
-                <li><b>0-9</b> jump to tetrode number with 1s digit 0-9</li>
-                <li><b>o</b> (the letter "o") toggle 10s digit of tetrode number</li>
-                <li><b>d</b> toggle drift rendering on/off</li>
-                <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
-                <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
-                <li><b>enter</b> increment cluster painting destination group</li>
-                <li><b>esc</b> open/close the toolbar</li>
-                <li><b>p</b> toggle waveform palette</li>
-                <li><b>h</b> show header info</li>
-                <li><b>x</b> show pos settings</li>
-                <li><b>k</b> show this info ("k" is for keyboard)</li>
-                <li><b>?</b> open GitHub info in a new tab</li>
-                </ul>   
-            </p>                    
-        </floating-pane>
-        
-        <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Speed ratemap [v]</div>
-            <p>
-                Bin size <span class="slider_val">4 cm/s</span><br>
-                Upper limit <span class="slider_val">45 cm/s</span>
-            </p><p>
-                Histogram shows slowest speed at the top, and upper limit speed at the bottom.
-            </p><p>
-                WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
-            </p>
-        </floating-pane>
+    <floating-pane id="drift_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Drift [d]</div>
+        Render the cluster plots and spatial spike plot using a palette that shows the average time for spikes in each pixel (smoothing is applied in the case of the cluster plots but not for the spatial plot). <br><br>
+        <div style="/* background:#f00; */color: #fff; text-align: center;background: -moz-linear-gradient(left, #ff0000 0%, #00ff00 100%); /* FF3.6+ */  background: -webkit-gradient(linear, left top, right top, color-stop(0%,#ff0000), color-stop(100%,#00ff00)); /* Chrome,Safari4+ */  background: -webkit-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Chrome10+,Safari5.1+ */  background: -o-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* Opera 11.10+ */  background: -ms-linear-gradient(left, #ff0000 0%,#00ff00 100%); /* IE10+ */  background: linear-gradient(to right, #ff0000 0%,#00ff00 100%); /* W3C */;">early mean time ------ late mean time</div><br><br>
+        So red means that the spikes have "dissapeared" from that area of the plot as the trial progressed, while green means "new" spikes have "appeared" (scare quotes needed because it could be more complciated than this).<br>
+    </floating-pane>
+                
+    <floating-pane id="shortcut_info" grabber_mode="[[grabber_mode]]" style="max-height: 350px;" hidden>
+        <div class='pane_title'>Shortcuts [k]</div>
+        <p>
+            For most of the following shortcuts, if you use <b>alt-x</b> instead of just <b>x</b> you will toggle the settings 
+            pane for the given feature, e.g. <b>alt-r</b> toggles the settings pane for spatial ratemap, whereas <b>r</b> 
+            by itself toggles the actual ratemap plots.  (In some cases <b>alt</b> is not needed because toggling the pane is
+            the only action linked to the shortcut.)
+        </p><p>
+             Shorcuts for the plots shown for each group; use <b>shift</b> to select multiple:
+            <ul>
+            <li><b>w</b> waveforms</li>
+            <li><b>r</b> spatial ratemap</li>
+            <li><b>c</b> directional ratemap ("c" is for circle)</li>
+            <li><b>v</b> speed ratemap ("v" is for velocity)</li>
+            <li><b>t</b> temporal autocorrelogram</li>
+            </ul>
+        </p><p>
+            Shorcuts applied to the "active" group, which is the one under the cursor:
+            <ul>
+            <li><b>e</b> set the cluster painting destination group to the active group.</li>
+            <li><b>f</b> set the cluster painting srouce group to the active group. Note you can hold down shift to toggle multiple source groups on/off.</li>
+            <li><b>s</b> launch the swap dialog for the "active" group.</li>
+            <li><b>ctrl-c</b> copy the active group's plots and some info text to the system clipboard.</li>
+            </ul>           
+        </p><p>
+            Other shortcuts:
+            <ul>
+            <li><b>0-9</b> jump to tetrode number with 1s digit 0-9</li>
+            <li><b>o</b> (the letter "o") toggle 10s digit of tetrode number</li>
+            <li><b>d</b> toggle drift rendering on/off</li>
+            <li><b>space</b> hold down space and click with mouse for plot grabbing or removal</li>
+            <li><b>+/-</b> grow/shrink size of cluster plots (note that "+" is actually the "=" key)</li>
+            <li><b>enter</b> increment cluster painting destination group</li>
+            <li><b>esc</b> open/close the toolbar</li>
+            <li><b>p</b> toggle waveform palette</li>
+            <li><b>h</b> show header info</li>
+            <li><b>x</b> show pos settings</li>
+            <li><b>k</b> show this info ("k" is for keyboard)</li>
+            <li><b>?</b> open GitHub info in a new tab</li>
+            </ul>   
+        </p>                    
+    </floating-pane>
+    
+    <floating-pane id="speed_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Speed ratemap [v]</div>
+        <p>
+            Bin size <span class="slider_val">4 cm/s</span><br>
+            Upper limit <span class="slider_val">45 cm/s</span>
+        </p><p>
+            Histogram shows slowest speed at the top, and upper limit speed at the bottom.
+        </p><p>
+            WARNING: speed plots are still in alpha testing (unlike everything else which is just about in beta!).
+        </p>
+    </floating-pane>
 
-        <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Waves [w]</div>
-            <p>
-                There are two palette modes. 
-            </p><p class="nodrag">
-                Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
-                <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
-                <value-transform value_a="{{options.waves_render_mode}}" value_b="{{waves_toggle_raw}}"
-                        b_to_a="_to_render_mode_str" a_to_b="_from_render_mode_str"
-                        ></value-transform>
-            </p><p>
-                In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
-            </p><p>
-                In "density" mode, the color of each pixel reflects the proportion of the waves which cross it.
-            </p>
-        </floating-pane>
+    <floating-pane id="waves_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Waves [w]</div>
+        <p>
+            There are two palette modes. 
+        </p><p class="nodrag">
+            Render in <span class="slider_val">[[options.waves_render_mode]]</span> mode.<br>
+            <paper-toggle-button checked="{{waves_toggle_raw}}"></paper-toggle-button>
+            <value-transform value_a="{{options.waves_render_mode}}" value_b="{{waves_toggle_raw}}"
+                    b_to_a="_to_render_mode_str" a_to_b="_from_render_mode_str"
+                    ></value-transform>
+        </p><p>
+            In "flag" mode, each group from 0 to 30 gets its own color, and is rendered solidly in that color.
+        </p><p>
+            In "density" mode, the color of each pixel reflects the proportion of the waves which cross it.
+        </p>
+    </floating-pane>
 
-        <floating-pane id='header_info' grabber_mode="[[grabber_mode]]" has_search search_text="{{options.header_filter}}" 
-                    search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}" hidden>
-            <div class='pane_title'>File headers [h]</div>
-            <header-view 
+    <floating-pane id='header_info' grabber_mode="[[grabber_mode]]" has_search search_text="{{options.header_filter}}" 
+                search_placeholder="filter headers" disable_shortcuts="{{disable_shortcuts}}" hidden>
+        <div class='pane_title'>File headers [h]</div>
+        <header-view 
             set_header="[[set_header]]"
             pos_header="[[pos_header]]"
             tet_header="[[tet_header]]"
             cut_header="[[_get_safe(cut_box,'header')]]"
             header_filter="[[options.header_filter]]"
             ></header-view>
+    </floating-pane>
+
+    <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Spatial ratemap [r]</div>
+        <p class="nodrag">
+            Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
+            <paper-slider pin snaps min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style='width:300px'></paper-slider>
+        </p><p class="nodrag">
+            Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
+            <paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
+        </p><p class="nodrag">
+            Ratemap frequency values are <span class="slider_val">{{_make_max_rate_caption(options.max_rate_spa)}}</span><br>
+            <paper-slider pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
+        </p><p>
+            The true peak rate is shown as "spa max" when you move your cursor over a group.
+        </p>
+        <p class="nodrag">
+            Ratemap height:<span class="slider_val">{{_make_spa_rm_height_caption(options.spa_rm_height)}}</span><br>
+            <paper-slider pin snaps min="0" max="400" step="20" value="{{options.spa_rm_height}}"></paper-slider>
+        </p>
+    </floating-pane>
+    
+    <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>Directional ratemap [c]</div>
+        <p class="nodrag">
+            Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
+            <paper-slider  pin snaps min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style='width:300px'></paper-slider>
+        </p><p class="nodrag">
+            Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
+            <paper-slider pin snaps min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style='width:300px'></paper-slider>
+        </p><p>
+            Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
+             the direction of movement is used (this is sometimes refered to as "displacement direction").
+        </p><p>
+            The true peak rate is shown as "dir max" when you move your cursor over a group.
+        </p>
+    </floating-pane>
+
+    <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]" hidden>
+        <div class='pane_title'>position post processing</div>
+        <p>
+            If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
+            the two spots have swapped.
+        </p><p class="nodrag">
+            Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
+            <paper-slider class="nodrag" pin snaps min="1" max="2" step="1" value="{{options.use_n_leds}}" style='width:80px'></paper-slider>
+        </p><p>
+            The following filtering and smoothing is applied to the one/two data streams separately.
+            If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
+        </p><p class="nodrag">
+            Speed <span class="slider_val">{{_make_max_speed_caption(options.speed_filter_mps)}}</span><br>
+            <paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
+        </p><p>
+            Where the speed appears to rise above this threshold the data is considered invalid.
+        </p><p>
+            Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
+            new values are created by linearly interpolated across the gaps.
+        </p><p class="nodrag">
+            Smoothing <span class="slider_val">{{_make_pos_smoothing_caption(options.pos_smoothing_s)}}</span><br>
+            <paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
+        </p><p>
+            Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
+        </p>
+    </floating-pane>
+
+    <!-- grabbed tiles -->
+    <template is="dom-repeat" items="[[grabbed_tiles]]">
+        <floating-pane 
+              grabber_mode="[[grabber_mode]]"
+              initial_x='[[item.x]]'
+              initial_y='[[item.y]]'
+              width="auto"
+              on-close="_close_grabbed_tile">
+            <div class='pane_title'>[[item.title]]</div>
+            <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]' class="noborder"></tile-element>
         </floating-pane>
+    </template>
 
-        <floating-pane id="rm_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Spatial ratemap [r]</div>
-            <p class="nodrag">
-                Bin size <span class="slider_val">[[options.cm_per_spa_bin]] cm</span><br>
-                <paper-slider pin snaps min="0.5" max="10" step="0.5" value="{{options.cm_per_spa_bin}}" style='width:300px'></paper-slider>
-            </p><p class="nodrag">
-                Smoothing kernel boxcar <span class="slider_val">(2x[[options.smoothing_spa_bins]]+1) by (2x[[options.smoothing_spa_bins]]+1) bins</span><br>
-                <paper-slider pin snaps min="0" max="5" step="1" value="{{options.smoothing_spa_bins}}" style='width:300px;'></paper-slider>
-            </p><p class="nodrag">
-                Ratemap frequency values are <span class="slider_val">{{_make_max_rate_caption(options.max_rate_spa)}}</span><br>
-                <paper-slider pin snaps min="0" max="20" step="1" value="{{options.max_rate_spa}}" style='width:300px'></paper-slider>
-            </p><p>
-                The true peak rate is shown as "spa max" when you move your cursor over a group.
-            </p>
-            <p class="nodrag">
-                Ratemap height:<span class="slider_val">{{_make_spa_rm_height_caption(options.spa_rm_height)}}</span><br>
-                <paper-slider pin snaps min="0" max="400" step="20" value="{{options.spa_rm_height}}"></paper-slider>
-            </p>
+    <!-- grabbed cluster plots -->
+    <template is="dom-repeat" items="[[grabbed_cluster_plots]]">
+        <floating-pane 
+              grabber_mode="[[grabber_mode]]"
+              initial_x='[[item.x]]'
+              initial_y='[[item.y]]'
+              on-close="_close_grabbed_cluster_plots" 
+              width="[[options.splitter_c_size]]">
+            <div class='pane_title'>[[item.title]]</div>
+            <div style="text-align: center;">
+                <template is="dom-repeat" items="[[item.plots]]">
+                    <canvas-with-axes class="cluster_plot"
+                        ckey="[[item.ckey]]"
+                        x_label="[[item.x_axis]]"
+                        y_label="[[item.y_axis]]" 
+                        fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
+                </template>
+            </div>
         </floating-pane>
-        
-        <floating-pane id="dir_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>Directional ratemap [c]</div>
-            <p class="nodrag">
-                Bin size <span class="slider_val">[[options.deg_per_dir_bin]] degrees</span><br>
-                <paper-slider  pin snaps min="2" max="15" step="1" value="{{options.deg_per_dir_bin}}" style='width:300px'></paper-slider>
-            </p><p class="nodrag">
-                Smoothing kernel boxcar <span class="slider_val">([[options.smoothing_dir_bins]]x2+1) bins</span><br>
-                <paper-slider pin snaps min="0" max="10" step="1" value="{{options.smoothing_dir_bins}}" style='width:300px'></paper-slider>
-            </p><p>
-                Note that in 2-spot LED mode, the relative position of the two LEDs is used, in 1-spot LED mode,
-                 the direction of movement is used (this is sometimes refered to as "displacement direction").
-            </p><p>
-                The true peak rate is shown as "dir max" when you move your cursor over a group.
-            </p>
-        </floating-pane>
+    </template>
 
-        <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]" hidden>
-            <div class='pane_title'>position post processing</div>
-            <p>
-                If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
-                the two spots have swapped.
-            </p><p class="nodrag">
-                Use <span class="slider_val">[[options.use_n_leds]] LEDs</span>:<br>
-                <paper-slider class="nodrag" pin snaps min="1" max="2" step="1" value="{{options.use_n_leds}}" style='width:80px'></paper-slider>
-            </p><p>
-                The following filtering and smoothing is applied to the one/two data streams separately.
-                If two LEDs are used, a single estimate of position is produced at the end, using a weighted sum.
-            </p><p class="nodrag">
-                Speed <span class="slider_val">{{_make_max_speed_caption(options.speed_filter_mps)}}</span><br>
-                <paper-slider class="nodrag" pin snaps min="0" max="10" step="0.25" value="{{options.speed_filter_mps}}" style='width:300px'></paper-slider><br>
-            </p><p>
-                Where the speed appears to rise above this threshold the data is considered invalid.
-            </p><p>
-                Where data is missing (either because no pixels were tracked for the given sample or the above filter invalidated the data),
-                new values are created by linearly interpolated across the gaps.
-            </p><p class="nodrag">
-                Smoothing <span class="slider_val">{{_make_pos_smoothing_caption(options.pos_smoothing_s)}}</span><br>
-                <paper-slider class="nodrag" pin snaps min="0" max="4" step="0.1" value="{{options.pos_smoothing_s}}" style='width:300px'></paper-slider>
-            </p><p>
-                Following filtering for speed and interpolation, the X and Y data is smoothed using a boxcar (i.e. moving average) of the above width.
-            </p>
-        </floating-pane>
-
-        <!-- grabbed tiles -->
-        <template is="dom-repeat" items="[[grabbed_tiles]]">
-            <floating-pane 
-                  grabber_mode="[[grabber_mode]]"
-                  initial_x='[[item.x]]'
-                  initial_y='[[item.y]]'
-                  width="auto"
-                  on-close="_close_grabbed_tile">
-                <div class='pane_title'>[[item.title]]</div>
-                <tile-element group_model='[[item.group]]' group_num='[[item.group_num]]' class="noborder"></tile-element>
-            </floating-pane>
-        </template>
-
-        <!-- grabbed cluster plots -->
-        <template is="dom-repeat" items="[[grabbed_cluster_plots]]">
-            <floating-pane 
-                  grabber_mode="[[grabber_mode]]"
-                  initial_x='[[item.x]]'
-                  initial_y='[[item.y]]'
-                  on-close="_close_grabbed_cluster_plots" 
-                  width="[[options.splitter_c_size]]">
-                <div class='pane_title'>[[item.title]]</div>
-                <div style="text-align: center;">
-                    <template is="dom-repeat" items="[[item.plots]]">
-                        <canvas-with-axes class="cluster_plot"
-                            ckey="[[item.ckey]]"
-                            x_label="[[item.x_axis]]"
-                            y_label="[[item.y_axis]]" 
-                            fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
-                    </template>
-                </div>
-            </floating-pane>
-        </template>
-
-    </div>
         
     <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
@@ -556,7 +547,6 @@ background-color: rgba(0,0,0,0.2);
         grabber mode
     </div>
 
-
     <drop-zone
         show_initial="[[no_files]]"
         drop_in_progress="[[drop_in_progress]]">
@@ -651,7 +641,7 @@ background-color: rgba(0,0,0,0.2);
         show_chans="[[options.show_waves]]"
         want_data_for_gl="{{want_data_for_gl}}"></wave-plots> 
     
-    <iron-a11y-keys keys="esc" on-keys-pressed="_toggle_toolbar"              target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="esc" on-keys-pressed="_toggle_toolbar"             target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="h+only alt+h" on-keys-pressed="toggle_header_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="alt+p alt+w" on-keys-pressed="toggle_palette_pane" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="p+only" on-keys-pressed="toggle_palette"           target="[[keyboard_target]]"></iron-a11y-keys>
@@ -674,9 +664,6 @@ background-color: rgba(0,0,0,0.2);
     
     
 </template>
-
-
-
 
 
 <script>
@@ -809,7 +796,7 @@ wav.swap_groups = function(){
     wav.$.cut.swap_groups(a, b);
 }
 
-// :::: the grab tools: tile, (TODO: clusters & path) ::::::::::::::::::::::::::
+// :::: the grab tools: tile, cluster (TODO: path) ::::::::::::::::::::::::::
 
 wav._grab_group = function(e){
     if(!wav.grabbed_tiles){
@@ -850,6 +837,7 @@ wav._close_grabbed_cluster_plots = function(e){
     // remove the grabbed plots from the list
     wav.splice('grabbed_cluster_plots', wav.grabbed_cluster_plots.indexOf(e.model.item), 1);
 }
+
 // :::: plot toggling :::::::::::::::::::::::::::::::
 
 wav.toggle_show = function(id, shiftKey){

@@ -723,7 +723,7 @@ Polymer({
         let model = e.model;
         let trial_base = model.dataHost.dataHost.dataHost.dataHost.trial.name; // https://github.com/Polymer/polymer/issues/1919
         let tet_num = model.dataHost.dataHost.tet_block.tet_num;
-        let cut = model.cut.cut.file;
+        let cut = model.cut.cut;
         let filename = trial_base + "_" + tet_num + ".cut";
         let blob_url = cut.get_blob_url(trial_base);
 
