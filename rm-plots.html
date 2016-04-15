@@ -622,7 +622,7 @@ var plot_dir = function(vals, s, max){
     var xy = new Int8Array(n*2+2)
     for(let ii=0; ii<n; ii++){
         let theta = 2*pi/n*ii;
-        xy[ii*2+0] = s/2 + Math.cos(theta) * vals[ii]/max*s/2;
+        xy[ii*2+0] = s/2 - Math.cos(theta) * vals[ii]/max*s/2;
         xy[ii*2+1] = s/2 - Math.sin(theta) * vals[ii]/max*s/2;
     }
     // join up the start and end
