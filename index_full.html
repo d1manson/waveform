@@ -447,7 +447,7 @@ background: #B1B1B1;
         <div class="toolbar_divider"></div>
         
         <div>
-            <paper-icon-button icon="waveform:format-line-spacing" id='reorder_n_button'></paper-icon-button>
+            <paper-icon-button icon="waveform:format-line-spacing" id='reorder_n_button' on-tap="_sort"></paper-icon-button>
             <paper-tooltip>sort on group size [n]</paper-tooltip>
         </div>
 
@@ -682,6 +682,7 @@ background: #B1B1B1;
     <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd"     target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc"      target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="s+only" on-keys-pressed="swap_groups"              target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="n+only" on-keys-pressed="_sort"                    target="[[keyboard_target]]"></iron-a11y-keys>
 
      <!-- TODO: use question mark key when bug is fixed: https://github.com/PolymerElements/iron-a11y-keys-behavior/issues/27#issuecomment-184833697 --> 
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github"              target="[[keyboard_target]]"></iron-a11y-keys>
@@ -1016,6 +1017,7 @@ wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-dig
 wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
 wav._undo = () => wav.$.cut.undo();
 wav._redo = () => wav.$.cut.redo();
+wav._sort = () => wav.$.cut.sort();
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 

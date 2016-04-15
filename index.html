@@ -19908,6 +19908,54 @@ cursor: default;
             delete delta['src']; //we don't need these any more..
             delete delta['src_nums'];
 
+        }, sort: function(){
+            this._fork_if_needed();
+            // TODO: might want to accept a custom ordering rather than assuming n-order
+
+            let sorted_groups = this.groups.slice(0).sort(function(a,b){
+                return (a && b) ?  (a.n_spikes > b.n_spikes ? -1 : 1)
+                                :  (a ? -1 : 1);
+            });
+
+            // invert the mapping for use with _do_reorder
+            let move_to = [];
+            for(let [ii, g] of sorted_groups.entries())if(g){
+                move_to[g.group_num] = ii;
+            }
+
+            let delta = {
+                action: "reorder",
+                move_to: move_to
+            }
+
+            // this will re-invert the mapping for storage
+            this._do_reorder(delta);
+
+            this.undo_stack.push(delta);
+            this.push('undo_stack_descriptions', 'sort groups by n_spikes');
+            this.splice('redo_stack_descriptions', 0, this.redo_stack_descriptions.length); // clear
+            this.redo_stack.splice(0, this.redo_stack.length); // clear
+
+        }, _do_reorder: function(delta){
+            let new_groups = [];
+            let inverse_move_to = [];
+            for(let [ii, group_num] of delta.move_to.entries())if(group_num > 0 || group_num === 0){
+                new_groups[group_num] = this.groups[ii];
+                inverse_move_to[group_num] = ii;
+            }
+            delta.move_to = inverse_move_to;
+
+            for(let [ii, group] of new_groups.entries()){
+                if(group){
+                    group.group_num = ii; // update group_num for new ordering
+                }else{
+                    new_groups[ii] = null; //enforce null rather than undefined
+                }
+            }
+
+            // splice out everything, then splice it back in the right order
+            this.splice.apply(this, ['groups', 0, this.groups.length].concat(new_groups));
+
         }, undo: function(){
             var delta = this.undo_stack[this.undo_stack.length-1];
             var success = false;
@@ -19943,6 +19991,11 @@ cursor: default;
 
                 case "transplant":
                 this._undo_transplant(delta); // it's complicated so it gets its own function
+                success = true;
+                break;
+
+                case "reorder":
+                this._do_reorder(delta); // will invert the delta
                 success = true;
                 break;
 
@@ -19992,6 +20045,11 @@ cursor: default;
 
                 case "transplant":
                 this._do_transplant(delta); // it's complicated so it gets its own function
+                success = true;
+                break;
+
+                case "reorder":
+                this._do_reorder(delta); // will invert the delta
                 success = true;
                 break;
 
@@ -29642,7 +29700,7 @@ bottom: 0px;
         <div class="toolbar_divider"></div>
         
         <div>
-            <paper-icon-button icon="waveform:format-line-spacing" id="reorder_n_button"></paper-icon-button>
+            <paper-icon-button icon="waveform:format-line-spacing" id="reorder_n_button" on-tap="_sort"></paper-icon-button>
             <paper-tooltip>sort on group size [n]</paper-tooltip>
         </div>
 
@@ -29791,6 +29849,7 @@ bottom: 0px;
     <iron-a11y-keys keys="v+only v+shift" on-keys-pressed="show_key_spd" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="t+only t+shift" on-keys-pressed="show_key_tc" target="[[keyboard_target]]"></iron-a11y-keys>
     <iron-a11y-keys keys="s+only" on-keys-pressed="swap_groups" target="[[keyboard_target]]"></iron-a11y-keys>
+    <iron-a11y-keys keys="n+only" on-keys-pressed="_sort" target="[[keyboard_target]]"></iron-a11y-keys>
 
       
     <iron-a11y-keys keys="¿+only" on-keys-pressed="open_github" target="[[keyboard_target]]"></iron-a11y-keys>
@@ -30125,6 +30184,7 @@ wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-dig
 wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
 wav._undo = () => wav.$.cut.undo();
 wav._redo = () => wav.$.cut.redo();
+wav._sort = () => wav.$.cut.sort();
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 
