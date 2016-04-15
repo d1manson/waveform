@@ -1,26 +1,3 @@
-<!--
-CUSTOM ELEMENT: tac-plots
-BY: DM
-
-This is designed to be used inside a tile-wall element.  The "groups" array of the tilewall should be bound
-to this element's "groups" property.  Then whenever the tilewall's groups array is spliced this element will
-be notified and can update ratemaps acordingly, with the tilewall be notified of the updates.
-
-See cut-obj for a fairly detailed introduction to how the groups array works, and how keys are used here for
-main-worker thread communication and more.  Both threads maintain a pair of maps, on the worker thread 
-these maps are called:
-    pkey_to_rendered_options and pkey_to_array
-and on the main thread they are called:
-    pkey_to_rendered_options and key_to_canvas
-
-The worker thread independently decides which arrays need to be rendered, as new arrays arrive and settings
-are changed etc.  The main thread must keep the most recently rendered version for each array (and a record
-of the settings used for the render), otherwise in future it may end up wanting something which the worker
-thought it had already delivered.
-
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="worker-builder.html">
 <link rel="import" href="utils.html">

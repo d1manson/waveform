@@ -1,49 +1,6 @@
-<!--
-CUSTOM ELEMENT: cut-object
-BY: DM
-
-This doesn't have to be a singleton (I hope).
-
-The main property is the "groups" array.  You don't splice and dice it directly, instead you use one of the following:
-    init_cut, swap_groups, merge_groups, split_groups, undo, redo
-
-Each element is an object, which contains an .akey property, which is a typed-array manager id for the array of
-indices that the object represents.  This id and the indices data never changes during the lifetime of the object.
-
-The rendering modules listen for changes to the groups array and provide/update properties with names
-like .spa_rm_canvas, and .dir_rm_canvas.
-
-The groups array is backed by a Polymer.Collection.  This means that each object has a unique key associated
-to it, and these keys are valid for the lifetime of the object (well so long as the objected enver leaves
-and re-enters the array, which it shoudln't if you only use the special methods listed above).  Note that both
-the key and the inds property are unique to the object, but they are distinct - one is used by typed-array-manager
-and one is used by Polymer.Collection.
-
-See tac-plots for a reltaively simple example of how the comings and going of keys can be tracked.  Note how
-the tac-plots has a private worker and that it uses the keys when "discussing" indices with the worker.  This
-makes life very easy, because when the worker returns a rendered result with a key, you can simply lookup the
-associated object in the collection, and then provide the lovely new canvas.  tac-plots also maintains a
-couple of private maps which use the key as their key (isn't that wonderful?!).  These maps record the last
-rendered canvas produced by the woker for the given group, and the settings used to produce that canvas.  
-A slight complication is that when the groups array is switched entirely e.g. because a new cut is hooked up to
-the tilewall (or maybe beause internally the cut obj decides to assign a new array) the old key's suddenly cease
-to be unique.  But at that point we want the plotting code to discard the old ararys completely anyway.  So, we
-use the concept of "generation", which is a counter that increments by one each time a new cut array is encountered
-to the plotting machinery.  This generation value is passed to the worker with each list of key changes, and then
-passed back to the main thread with each delivery of rendered plots.  In other words you  could think of the keys
-as being qualified by this generation value, ie. they are really unique_val: "generation.key", but remembering that
-we only ever care about one generation at any one time.
-
-A very similar arrangement is used for rm-plots, though things are slightly more complex there.  waves-plots
-doesn't have a worker, but it uses a similar system.
-
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="utils.html">
-
 
 <dom-module id="cut-object">
 
@@ -470,7 +427,7 @@ doesn't have a worker, but it uses a similar system.
                 }];
                 this.set('undo_stack_descriptions', ['create blank cut']);
                 this.set('redo_stack_descriptions', []);
-                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes))], 0);
+                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes), 0)], 0);
                 this.undo_stack = [];
                 this.redo_stack = [];
                 this.set('painter_state', {

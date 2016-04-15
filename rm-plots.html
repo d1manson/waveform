@@ -1,29 +1,3 @@
-<!--
-CUSTOM ELEMENT: rm-plots
-BY: DM
-
-See tac-plots.html for introductorary notes.
-
-This is a bit more complicated for a few reasons:
-
-Firstly, we have multiple plots being made for each set of indices: spa (aka 'xy'), dir, and speed.
-Whenever an order is required, they always come in that order, i.e. 0: spa, 1: dir, 2: speed.
-
-Secondly, we cache parts of the computation on the worker: the dwell map and pos bin indices etc.
-Changing certain things requires clearing different parts of the cache.  This logic is handled
-by the function clear_cache, which takes an array of strings that name the things which should
-be considered invalidated, this might be 'pos_xy', or 'cm_per_spa_bin', etc.
-
-Thirdly, there's just more inputs to the calculation, so there's more to keep track of.
-
-TODO:  deal with limits of xy ratemap...and possibly some other stuff too.
-
-And..
-
-TODO: produce spike pos plots on demand
--->
-
-
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="worker-builder.html">
 <link rel="import" href="managed-canvas.html">

@@ -19977,7 +19977,7 @@ cursor: default;
                 }];
                 this.set('undo_stack_descriptions', ['create blank cut']);
                 this.set('redo_stack_descriptions', []);
-                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes))], 0);
+                this.set('groups', [this._make_okey(arange(this.cut_box.n_spikes), 0)], 0);
                 this.undo_stack = [];
                 this.redo_stack = [];
                 this.set('painter_state', {

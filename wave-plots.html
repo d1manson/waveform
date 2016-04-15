@@ -1,13 +1,5 @@
 <!--
-CUSTOM ELEMENT: wave-plots
-BY: DM
-
-See tac-plots.html for introductorary notes, although note that we don't have to deal with
-workers here (but life is complicated in other ways!).
-
-In fact, because we don't have to deal with workers here, we don't need to use the Collection's
-"key" for referring to unique objects in the groups array, we can use the objects directly as the
-keys in a Map/WeakMap. By analogy, we use the term "okey" for the objects used in this context.
+See main readme for extensive introductorary notes.
 
 Note that although we don't have a worker, we still split the logic into two sections: a polymer
 component, which communicates with the outer world, and a WavesRenderer that is very
@@ -24,13 +16,6 @@ There are two rendering modes:
         then we "copy" the counts image, recolouring it using a computed color-scale, i.e.
         we compute the colour arithmetically from the raw count value rather than looking
         it up in a palette.
-
-    TODO: check the resolution of the float used for counting in density mode. If it really
-    is a limit on the number of spikes we could potentially split the rendering into multiple
-    phases, using the other colour channels to get 3x more spikes...or more if you could
-    really work out a way to do fully-fledged counting.  Note that this will likely be
-    reasoanbly complicated though.
-
 
 As far as I can tell, OES_texture_float gives 32bit float for each of r, g, and b. This gives
 precise integer representation from 0 to 16million, which is plenty if we are trying to count
