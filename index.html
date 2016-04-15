@@ -208,6 +208,17 @@ height: 70%;
 width: 1px;
 background: #B1B1B1;
 }
+
+.grabber{
+position: absolute;
+top: 0px;
+left: 0px;
+right: 0px;
+bottom: 0px;
+}
+.grabber:hover{
+@apply(--grabber-hover);
+}
 </style>
 
 </head>
@@ -29703,7 +29714,15 @@ bottom: 0px;
         </floating-pane>
     </template>
 
-        
+    
+    <template is="dom-repeat" items="[[grabbed_paths]]">
+        <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" width="auto" on-close="_close_grabbed_path">
+            <div class="pane_title">[[item.title]]</div>
+            <managed-canvas ckey="[[item.plot]]">
+        </managed-canvas></floating-pane>
+    </template>
+
+
     <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
             <paper-icon-button icon="waveform:help-outline" on-tap="open_github"></paper-icon-button>
@@ -29800,6 +29819,7 @@ bottom: 0px;
                     <div class="info_summary_text">[[_format_timespan(start_end_times)]]</div>
                     <canvas-with-axes style="width:55px;" ckey="[[pos_speed_hist]]" x_label="[[_caption_speed_max(options.speed_rm_max)]]" fix_height="92" flip_horizontal=""></canvas-with-axes>
                 </div>
+                <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="_grab_path"></div>
             </div>
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
@@ -30058,6 +30078,25 @@ wav._grab_cluster_plots = function(e){
 wav._close_grabbed_cluster_plots = function(e){
     // remove the grabbed plots from the list
     wav.splice('grabbed_cluster_plots', wav.grabbed_cluster_plots.indexOf(e.model.item), 1);
+}
+
+wav._grab_path = function(e){
+    if(!wav.grabbed_paths){
+        this.set('grabbed_paths', []);
+    }
+    let rect = e.target.getBoundingClientRect();
+    wav.push('grabbed_paths', {
+        title: wav.selected_trial,
+        plot: wav.pos_path,
+        x: rect.left + 20,
+        y: rect.top + 20
+    });
+}
+
+
+wav._close_grabbed_path = function(e){
+    // remove the grabbed plots from the list
+    wav.splice('grabbed_paths', wav.grabbed_paths.indexOf(e.model.item), 1);
 }
 
 // :::: plot toggling :::::::::::::::::::::::::::::::
