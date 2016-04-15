@@ -17921,7 +17921,7 @@ Polymer({
     is:'managed-canvas',
     properties: {
         ckey: {
-            type: String,
+            type: Object,
             value: "",
             observer: '_update'
         },
@@ -18272,6 +18272,7 @@ bottom: 0px;
 .canvas_part_1{
 display: table-cell;
 vertical-align: bottom;
+text-align: left;
 }
 .canvas_part_2{
 display: table-cell;
@@ -18506,7 +18507,7 @@ pointer-events: none;
             // TODO: this could perhaps be turned into a fucntion in cut-object
             // rather than doing it here
             let group = {
-                waves: {canvas: Utils.clone_canvas(this.group_model.waves.canvas)}, 
+                waves: {canvas: Utils.clone_canvas(this.group_model.waves && this.group_model.waves.canvas)}, 
                 tac: this.group_model.tac,
                 rm: {
                   spa: this.group_model.rm.spa,
@@ -19638,8 +19639,8 @@ cursor: default;
                 // for efficiency of notification, the rm is always changed in
                 // its entirerity, i.e. a new object is assigned.
                 n_spikes: inds.length,
-                tac: "",
-                waves: "",
+                tac: null,
+                waves: null,
                 rm: { 
                     spa_max: "",
                     dir_max: "",
@@ -28613,7 +28614,8 @@ Polymer({
 
             this._renderer.set_show('n');
             for(let okey of this.groups) if(okey && okey.waves){
-                this.set('groups.' + okey._pkey + '.waves', null); 
+                okey.waves = null;
+                this.shortcutNotify('waves', null, okey); 
             }
         } else {
             this.set('show_chans', 'yyyy');
@@ -29685,7 +29687,7 @@ bottom: 0px;
     <template is="dom-repeat" items="[[grabbed_tiles]]">
         <floating-pane grabber_mode="[[grabber_mode]]" initial_x="[[item.x]]" initial_y="[[item.y]]" width="auto" on-close="_close_grabbed_tile">
             <div class="pane_title">[[item.title]]</div>
-            <tile-element group_model="[[item.group]]" group_num="[[item.group_num]]" class="noborder"></tile-element>
+            <tile-element group_model="[[item.group]]" group_num="[[item.group_num]]" class="noborder" style="min-width:100%;"></tile-element>
         </floating-pane>
     </template>
 

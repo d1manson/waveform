@@ -101,6 +101,7 @@ bottom: 0px;
 .canvas_part_1{
 display: table-cell;
 vertical-align: bottom;
+text-align: left;
 }
 .canvas_part_2{
 display: table-cell;
@@ -335,7 +336,7 @@ pointer-events: none;
             // TODO: this could perhaps be turned into a fucntion in cut-object
             // rather than doing it here
             let group = {
-                waves: {canvas: Utils.clone_canvas(this.group_model.waves.canvas)}, 
+                waves: {canvas: Utils.clone_canvas(this.group_model.waves && this.group_model.waves.canvas)}, 
                 tac: this.group_model.tac,
                 rm: {
                   spa: this.group_model.rm.spa,

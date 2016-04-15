@@ -1026,7 +1026,8 @@ Polymer({
 
             this._renderer.set_show('n');
             for(let okey of this.groups) if(okey && okey.waves){
-                this.set('groups.' + okey._pkey + '.waves', null); 
+                okey.waves = null;
+                this.shortcutNotify('waves', null, okey); 
             }
         } else {
             this.set('show_chans', 'yyyy');
