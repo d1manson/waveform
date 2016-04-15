@@ -28,10 +28,10 @@ window.Polymer = {dom: 'shadow'}; // this tells Polymer to use fast native dom
 <link rel="import" href="bower_components/paper-slider/paper-slider.html">
 <link rel="import" href="bower_components/paper-button/paper-button.html">  
 <link rel="import" href="bower_components/paper-toggle-button/paper-toggle-button.html">
-<link rel="import" href="bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="bower_components/paper-toolbar/paper-toolbar.html">
 <link rel="import" href="bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="bower_components/paper-toast/paper-toast.html">
+<link rel="import" href="waveform-icons.html">
 <link rel="import" href="tile-wall.html">
 <link rel="import" href="bower_components/iron-splitter/iron-splitter.html">
 <link rel="import" href="tile-element.html">
@@ -196,12 +196,18 @@ background-color: rgba(0,0,0,0.2);
 .cluster_plot{
 @apply(--cluster-plot-style);
 }
+
+.toolbar_divider{
+margin: 0px 3px;
+height: 70%;
+width: 1px;
+background: #B1B1B1;
+}
 </style>
 
 </head>
 
 <body>
-<paper-iconset id="meta"></paper-iconset>
 
 <template is="dom-bind" id="wav">
 
@@ -354,7 +360,7 @@ background-color: rgba(0,0,0,0.2);
     </floating-pane>
 
     <floating-pane id="pos_info" grabber_mode="[[grabber_mode]]" hidden>
-        <div class='pane_title'>position post processing</div>
+        <div class='pane_title'>position post processing [x]                          </div>
         <p>
             If you tracked with two LEDs you can read in both data streams.  "Standard" post-processing will be applied to decide when
             the two spots have swapped.
@@ -417,40 +423,58 @@ background-color: rgba(0,0,0,0.2);
         
     <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
-            <paper-icon-button icon="flip-to-front" on-tap="open_github"></paper-icon-button>
+            <paper-icon-button icon="waveform:help-outline" on-tap="open_github"></paper-icon-button>
             <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="list" on-tap="toggle_shorcut_pane"></paper-icon-button>
+            <paper-icon-button icon="waveform:keyboard" on-tap="toggle_shorcut_pane"></paper-icon-button>
             <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
         </div>
 
+        <div class="toolbar_divider"></div>
+
         <div>
-            <paper-icon-button icon="reply" id="undo_button"></paper-icon-button>
+            <paper-icon-button icon="waveform:undo" id="undo_button" on-tap="_undo"></paper-icon-button>
             <paper-tooltip>undo [z]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="info" id='file_headers_button' on-tap="toggle_header_pane"></paper-icon-button>
-            <paper-tooltip>file headers [h]</paper-tooltip>
+            <paper-icon-button icon="waveform:redo" id="redo_button" on-tap="_redo"></paper-icon-button>
+            <paper-tooltip>redo [y]</paper-tooltip>
         </div>
 
+        <div class="toolbar_divider"></div>
+        
         <div>
-            <paper-icon-button icon="swap-horiz" id='drift_button'></paper-icon-button>
-            <paper-tooltip>toggle drift [d]</paper-tooltip>
-        </div>
-
-        <div>
-            <paper-icon-button icon="sort" id='reorder_n_button'></paper-icon-button>
+            <paper-icon-button icon="waveform:format-line-spacing" id='reorder_n_button'></paper-icon-button>
             <paper-tooltip>sort on group size [n]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="settings-applications" id='pos_settings' on-tap="toggle_pos_pane"></paper-icon-button>
+            <paper-icon-button icon="waveform:cached" id='reorder_n_button' on-tap="swap_groups"></paper-icon-button>
+            <paper-tooltip>swap/move groups [s]</paper-tooltip>
+        </div>
+
+        <div class="toolbar_divider"></div>
+
+        <div>
+            <paper-icon-button icon="waveform:view-list" id='file_headers_button' on-tap="toggle_header_pane"></paper-icon-button>
+            <paper-tooltip>file headers [h]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="waveform:access-time" id='drift_button'></paper-icon-button>
+            <paper-tooltip>toggle drift [d]</paper-tooltip>
+        </div>
+
+        <div>
+            <paper-icon-button icon="waveform:gesture" id='pos_settings' on-tap="toggle_pos_pane"></paper-icon-button>
             <paper-tooltip>position post processing settings [x]</paper-tooltip>
         </div>
 
+        <div class="toolbar_divider"></div>
+        
         <div>
             <paper-button selected$="{{_yn_to_bool(options.show_waves, 0)}}" on-tap="show_tap" id="show_wav">wav</paper-button>
             <paper-tooltip>waves [w]</paper-tooltip>
@@ -539,7 +563,7 @@ background-color: rgba(0,0,0,0.2);
 
     </div>
 
-    <paper-icon-button icon="menu" class="menu_toggle" on-tap="_toggle_toolbar"></paper-icon-button>
+    <paper-icon-button icon="waveform:menu" class="menu_toggle" on-tap="_toggle_toolbar"></paper-icon-button>
     
     <paper-toast id="toast"></paper-toast>
 
@@ -990,6 +1014,8 @@ wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggl
 wav._info_summary_style = (v) => v ? 'opacity: 0;' : '';
 wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-digit', minute: '2-digit'}));
 wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
+wav._undo = () => wav.$.cut.undo();
+wav._redo = () => wav.$.cut.redo();
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 
