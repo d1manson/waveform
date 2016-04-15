@@ -569,6 +569,8 @@ bottom: 0px;
                 type: Boolean,
                 value: false,
                 notify: true
+            }, tool_is_active:{
+                type: Boolean
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -746,6 +748,10 @@ bottom: 0px;
             }
             return null;
         }, _start_paint: function(e){
+            if(this.tool_is_active){
+                return;
+            }
+            
             this._painter_el = document.createElement('paint-tool');
             this._painter_el.set('css_height', this.canvas_size);
             this._painter_el.set('width', 256); // this has to match the actual height used in cluster plots

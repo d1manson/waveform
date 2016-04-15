@@ -292,6 +292,9 @@ pointer-events: none;
                 type: Object,
                 value: null,
                 notify: true
+            },
+            tool_is_active:{
+                type: Boolean
             }
         },
         observers: [
@@ -306,8 +309,9 @@ pointer-events: none;
                 throw "cannot disable tile while moving";
             }
                 
-            if(disabled){
-                this.set('active', false); // may have been true. TODO: really?
+            if(disabled && this.active){
+                this.set('active', false); // this can happen if you move the cursor over cluster plots during split
+                return;
             } 
 
             if(proximate && !moving){
@@ -354,6 +358,10 @@ pointer-events: none;
         }, _mousedown_splitter: function(e){
             if(e.detail.button === 0){
                 return; // left click either irrelevant or handled by tile-wall itself
+            }
+
+            if(this.tool_is_active && !this.splitter_metrics){
+                return; // something else is already going on
             }
 
             let detail = {

@@ -18474,6 +18474,9 @@ pointer-events: none;
                 type: Object,
                 value: null,
                 notify: true
+            },
+            tool_is_active:{
+                type: Boolean
             }
         },
         observers: [
@@ -18488,8 +18491,9 @@ pointer-events: none;
                 throw "cannot disable tile while moving";
             }
                 
-            if(disabled){
-                this.set('active', false); // may have been true. TODO: really?
+            if(disabled && this.active){
+                this.set('active', false); // this can happen if you move the cursor over cluster plots during split
+                return;
             } 
 
             if(proximate && !moving){
@@ -18536,6 +18540,10 @@ pointer-events: none;
         }, _mousedown_splitter: function(e){
             if(e.detail.button === 0){
                 return; // left click either irrelevant or handled by tile-wall itself
+            }
+
+            if(this.tool_is_active && !this.splitter_metrics){
+                return; // something else is already going on
             }
 
             let detail = {
@@ -18918,7 +18926,7 @@ background-color: rgba(0,0,0,0.2);
     </div>
 
     <template is="dom-repeat" items="[[groups]]">
-        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}" disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile" on-tap="_tap_tile"></tile-element>        
+        <tile-element style$="[[_show(item)]]" group_num="[[index]]" group_model="[[item]]" spa_rm_height="[[options.spa_rm_height]]" active="{{_is_equal(item, active_group_a)}}" grabber_mode="[[grabber_mode]]" splitter_metrics="{{_metrics_if_splitting(item, splitter_state.*)}}" disabled="{{_disabled_if_not_splitting(item, splitter_state.*)}}" on-mouseenter="_mouseenter_tile" on-mouseleave="_mouseleave_tile" on-track="_track_tile" on-tap="_tap_tile" tool_is_active="[[tool_is_active]]"></tile-element>        
     </template>
 </template>
 
@@ -18960,6 +18968,9 @@ background-color: rgba(0,0,0,0.2);
             splitter_state: {
                 type: Object,
                 notify: true
+            },
+            tool_is_active: {
+                type: Boolean
             }
         },
         observers: [
@@ -19007,6 +19018,7 @@ background-color: rgba(0,0,0,0.2);
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
+                        state: 'end',
                         a: this.active_group_a.group_num,
                         b: this.active_group_b.group_num
                     });
@@ -19021,6 +19033,9 @@ background-color: rgba(0,0,0,0.2);
             } 
 
             if (e.detail.state === "start"){
+                if(this.tool_is_active){
+                    return;
+                }
                 // Polymer's track doesn't do everything we need it to,
                 // so we basically reinvent it and do a bit more...
                 let rect = e.target.getBoundingClientRect();
@@ -19038,6 +19053,9 @@ background-color: rgba(0,0,0,0.2);
                 this.listen(this, 'scroll', '_scroll');
                 this.listen(this, 'mouseup', '_failed_track');
                 e.target.set('moving', true);
+                this.fire('merge_groups', {
+                    state: 'start'
+                });
             } else {
                 this._track_state.last_client_x = e.detail.x;
                 this._track_state.last_client_y = e.detail.y;
@@ -29220,6 +29238,8 @@ bottom: 0px;
                 type: Boolean,
                 value: false,
                 notify: true
+            }, tool_is_active:{
+                type: Boolean
             }
         }, observers: [
             '_groups_spliced(groups.splices)',
@@ -29397,6 +29417,10 @@ bottom: 0px;
             }
             return null;
         }, _start_paint: function(e){
+            if(this.tool_is_active){
+                return;
+            }
+            
             this._painter_el = document.createElement('paint-tool');
             this._painter_el.set('css_height', this.canvas_size);
             this._painter_el.set('width', 256); // this has to match the actual height used in cluster plots
@@ -29824,14 +29848,14 @@ bottom: 0px;
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots id="cluster_plots" style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" grabber_mode="[[grabber_mode]]" on-paint="_paint" on-grab="_grab_cluster_plots">
+            <cluster-plots id="cluster_plots" style="flex:0 0 0%;" groups="[[cut_groups]]" painter_state="{{cut_painter_state}}" amplitudes="[[amplitudes]]" canvas_size="{{options.cluster_plot_size}}" want_amplitudes="{{want_amplitudes}}" active_group_a="{{active_group_a}}" painter_r="{{options.cluster_painter_r}}" grabber_mode="[[grabber_mode]]" tool_is_active="[[tool_is_active]]" on-paint="_paint" on-grab="_grab_cluster_plots">
                </cluster-plots>
 
         </iron-resize-notifier>
 
         <iron-splitter direction="left" size="{{options.splitter_c_size}}"></iron-splitter>
         
-        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" splitter_state="[[splitter_state]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group" on-splitter="_splitter" on-tap_group="_highlight_group"></tile-wall>
+        <tile-wall style="flex:1 1 0%; position:relative;" groups="{{cut_groups}}" options="[[options]]" active_group_a="{{active_group_a}}" active_group_b="{{active_group_b}}" grabber_mode="[[grabber_mode]]" is_empty="[[tile_wall_is_empty]]" splitter_state="[[splitter_state]]" on-merge_groups="_merge_groups" on-grab_group="_grab_group" on-splitter="_splitter" on-tap_group="_highlight_group" tool_is_active="[[tool_is_active]]"></tile-wall>
 
     </div>
 
@@ -29969,13 +29993,15 @@ wav._splitter = function(e){
         wav.set('splitter_state.group_b', null);
         wav.set('splitter_state.metrics', null);
         this.set('disable_shortcuts', false);
+        wav.set('tool_is_active', false);
         return;
     }
 
     if(e.detail.state === "start"){
         wav.splitter_state._akey_full = e.detail.group.akey;
         wav.set('splitter_state.group_a', e.detail.group);
-        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts or else have a mechanism for reseting the split.
+        this.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
     } 
     if(e.detail.point !== null){
         wav.splitter_state._point = e.detail.point;
@@ -29999,24 +30025,34 @@ wav._splitter = function(e){
 
 wav._paint = function(e){
     if(e.detail.state === "start"){
-        wav.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+        wav.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
     }
 
     if(e.detail.state === "end"){
         wav.set('disable_shortcuts', false);
+        wav.set('tool_is_active', false);
         wav.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
     }
 }
 
 wav._merge_groups = function(e){
-    if(wav.tile_wall_is_empty){
+    if(wav.tile_wall_is_empty){ // not sure how this could happend
         return;
     }
-    wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+
+    if(e.detail.state === "start"){
+        wav.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
+    } else {
+        wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        wav.set('tool_is_active', false);
+        wav.set('disable_shortcuts', false); 
+    }
 }
 
 wav.swap_groups = function(){
-    if(wav.tile_wall_is_empty){
+    if(wav.tile_wall_is_empty || wav.tool_is_active){
         return;
     }
 
@@ -30038,7 +30074,7 @@ wav.swap_groups = function(){
     wav.$.cut.swap_groups(a, b);
 }
 
-// :::: the grab tools: tile, cluster (TODO: path) ::::::::::::::::::::::::::
+// :::: the grab tools: tile, cluster, path ::::::::::::::::::::::::::
 
 wav._grab_group = function(e){
     if(!wav.grabbed_tiles){
@@ -30213,6 +30249,7 @@ wav.addEventListener('dom-change', function(){
         _point: null
     });
     wav.set('grabber_mode', false);
+    wav.set('tool_is_active', false);
 })
 
 
@@ -30251,9 +30288,9 @@ wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggl
 wav._info_summary_style = (v) => v ? 'opacity: 0;' : '';
 wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-digit', minute: '2-digit'}));
 wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
-wav._undo = () => wav.$.cut.undo();
-wav._redo = () => wav.$.cut.redo();
-wav._sort = () => wav.$.cut.sort();
+wav._undo = () => (!wav.tool_is_active) && wav.$.cut.undo();
+wav._redo = () => (!wav.tool_is_active) && wav.$.cut.redo();
+wav._sort = () => (!wav.tool_is_active) && wav.$.cut.sort();
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 

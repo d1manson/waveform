@@ -569,6 +569,7 @@ bottom: 0px;
                active_group_a="{{active_group_a}}"
                painter_r="{{options.cluster_painter_r}}"
                grabber_mode="[[grabber_mode]]"
+               tool_is_active="[[tool_is_active]]"
                on-paint="_paint"
                on-grab="_grab_cluster_plots">
                </cluster-plots>
@@ -589,6 +590,7 @@ bottom: 0px;
             on-grab_group="_grab_group"
             on-splitter="_splitter"
             on-tap_group="_highlight_group"
+            tool_is_active="[[tool_is_active]]"
             ></tile-wall>
 
     </div>
@@ -782,13 +784,15 @@ wav._splitter = function(e){
         wav.set('splitter_state.group_b', null);
         wav.set('splitter_state.metrics', null);
         this.set('disable_shortcuts', false);
+        wav.set('tool_is_active', false);
         return;
     }
 
     if(e.detail.state === "start"){
         wav.splitter_state._akey_full = e.detail.group.akey;
         wav.set('splitter_state.group_a', e.detail.group);
-        this.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts or else have a mechanism for reseting the split.
+        this.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
     } 
     if(e.detail.point !== null){
         wav.splitter_state._point = e.detail.point;
@@ -812,24 +816,34 @@ wav._splitter = function(e){
 
 wav._paint = function(e){
     if(e.detail.state === "start"){
-        wav.set('disable_shortcuts', true); // TODO: probably should disable more than just shortcuts
+        wav.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
     }
 
     if(e.detail.state === "end"){
         wav.set('disable_shortcuts', false);
+        wav.set('tool_is_active', false);
         wav.$.cut.transplant_groups(e.detail.dest, e.detail.src_masks);
     }
 }
 
 wav._merge_groups = function(e){
-    if(wav.tile_wall_is_empty){
+    if(wav.tile_wall_is_empty){ // not sure how this could happend
         return;
     }
-    wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+
+    if(e.detail.state === "start"){
+        wav.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
+    } else {
+        wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        wav.set('tool_is_active', false);
+        wav.set('disable_shortcuts', false); 
+    }
 }
 
 wav.swap_groups = function(){
-    if(wav.tile_wall_is_empty){
+    if(wav.tile_wall_is_empty || wav.tool_is_active){
         return;
     }
 
@@ -851,7 +865,7 @@ wav.swap_groups = function(){
     wav.$.cut.swap_groups(a, b);
 }
 
-// :::: the grab tools: tile, cluster (TODO: path) ::::::::::::::::::::::::::
+// :::: the grab tools: tile, cluster, path ::::::::::::::::::::::::::
 
 wav._grab_group = function(e){
     if(!wav.grabbed_tiles){
@@ -1026,6 +1040,7 @@ wav.addEventListener('dom-change', function(){
         _point: null
     });
     wav.set('grabber_mode', false);
+    wav.set('tool_is_active', false);
 })
 
 
@@ -1064,9 +1079,9 @@ wav._toggle_toolbar = () => wav.set('options.toggle_toolbar', !wav.options.toggl
 wav._info_summary_style = (v) => v ? 'opacity: 0;' : '';
 wav._as_hour_and_mins = (v) => (new Date(v).toLocaleTimeString({}, {hour: '2-digit', minute: '2-digit'}));
 wav._format_timespan = (v) => v && (wav._as_hour_and_mins(v.start) + " to " + wav._as_hour_and_mins(v.end));
-wav._undo = () => wav.$.cut.undo();
-wav._redo = () => wav.$.cut.redo();
-wav._sort = () => wav.$.cut.sort();
+wav._undo = () => (!wav.tool_is_active) && wav.$.cut.undo();
+wav._redo = () => (!wav.tool_is_active) && wav.$.cut.redo();
+wav._sort = () => (!wav.tool_is_active) && wav.$.cut.sort();
 
 // :::: and then some stuff that doesn't sit so well with polymer ::::::::
 

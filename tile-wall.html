@@ -50,6 +50,7 @@ background-color: rgba(0,0,0,0.2);
             on-mouseleave="_mouseleave_tile"
             on-track="_track_tile"
             on-tap="_tap_tile"
+            tool_is_active="[[tool_is_active]]"
             ></tile-element>        
     </template>
 </template>
@@ -92,6 +93,9 @@ background-color: rgba(0,0,0,0.2);
             splitter_state: {
                 type: Object,
                 notify: true
+            },
+            tool_is_active: {
+                type: Boolean
             }
         },
         observers: [
@@ -139,6 +143,7 @@ background-color: rgba(0,0,0,0.2);
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
+                        state: 'end',
                         a: this.active_group_a.group_num,
                         b: this.active_group_b.group_num
                     });
@@ -153,6 +158,9 @@ background-color: rgba(0,0,0,0.2);
             } 
 
             if (e.detail.state === "start"){
+                if(this.tool_is_active){
+                    return;
+                }
                 // Polymer's track doesn't do everything we need it to,
                 // so we basically reinvent it and do a bit more...
                 let rect = e.target.getBoundingClientRect();
@@ -170,6 +178,9 @@ background-color: rgba(0,0,0,0.2);
                 this.listen(this, 'scroll', '_scroll');
                 this.listen(this, 'mouseup', '_failed_track');
                 e.target.set('moving', true);
+                this.fire('merge_groups', {
+                    state: 'start'
+                });
             } else {
                 this._track_state.last_client_x = e.detail.x;
                 this._track_state.last_client_y = e.detail.y;
