@@ -18,7 +18,11 @@ If you find bugs please, please, please, report them - either using the github i
 
 If you haven't done already, I recommend looking at the shortcuts info pane - you can open it using the button in the toolbar (second from the left) or using the shortcut `k`.
 
-Should you wish to (and right now it's not obvious that you would) you can interact with the application from the F12 developer console, using the variable named `wav`.  The developer tools in modern browsers are incredibly powerful, even the console itself has a [variety of features](https://developer.chrome.com/devtools/docs/console) in chrome.
+Should you wish to, you can interact with the application from the F12 developer console, using the variable named `wav`.  The developer tools in modern browsers are incredibly powerful, even the console itself has a [variety of features](https://developer.chrome.com/devtools/docs/console) in chrome.  Additionally, this project provides a function called `Utils.array_to_csv` which takes a `TypedArray` as its first argument, followed optionally by the number of columns and then the title of the document.  For example, to save the xy data you can do: 
+
+```javascript
+Utils.array_to_csv(wav.pos_xy.xy.array, 2, "xy_data")
+```
 
 ---
 

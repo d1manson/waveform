@@ -18844,6 +18844,28 @@ Utils.ckey_to_data_url = function(ckey, height, width){
 
 }
 
+Utils.array_to_csv = function(array, cols, title){
+    "use strict";
+    let text;
+    if(cols){
+        text = [];
+        for(let ii=0; ii<array.length; ii+=cols){
+            text.push(Array.prototype.join.call(array.slice(ii, ii+cols), ", "));
+        }
+        text = text.join("\n");
+    } else {
+        text = Array.prototype.join.call(array, "\n");
+    }
+    let a = document.createElement('a');
+    document.body.appendChild(a);
+    a.download = (title || "data") + ".csv";
+    a.href = "data:text/plain;base64," + btoa(text);
+    a.click();
+    document.body.removeChild(a);
+    console.log("(you may need to give permission for the document to be saved)");
+};
+
+
 </script><dom-module id="tile-wall" assetpath="/">
 <style>
 .blank_info {
@@ -20616,7 +20638,7 @@ var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cach
         delete_from_cache: delete_from_cache,
     }, {
         xy: pos.xy,
-        dir: get_dir(pos),
+        dir: get_dir(pos, header),
         speed: get_speed(pos)
     });
 
@@ -20860,19 +20882,20 @@ var combine_xy = function(xy_1, xy_2, weight_1, weight_2){
     return ret;
 }
 
-var get_dir = function(pos){
-    var xy_1 = pos.xy_1;
-    var xy_2 = pos.xy_2;
-    var ret = new Float32Array(xy_1.length/2);
-    var pi = 3.14159265;
+var get_dir = function(pos, header){
+    let xy_1 = pos.xy_1;
+    let xy_2 = pos.xy_2;
+    let ret = new Float32Array(xy_1.length/2);
+    let pi = 3.14159265;
 
     if(xy_2){
+        let correction = (parseInt(header.bearing_colour_1)/180*pi) || 0; 
         for(let i=0;i<xy_1.length/2;i++){
             let ix = 2*i+0;
             let iy = 2*i+1;
             let dy = xy_2[iy] - xy_1[iy];
             let dx = xy_2[ix] - xy_1[ix];
-            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi) % (2*pi);
+            ret[i] = Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001 ? NaN : (Math.atan2(dy, dx) + 2*pi + correction) % (2*pi);
         }        
     } else {
         // only one led used...
@@ -25634,7 +25657,7 @@ var plot_dir = function(vals, s, max){
     var xy = new Int8Array(n*2+2)
     for(let ii=0; ii<n; ii++){
         let theta = 2*pi/n*ii;
-        xy[ii*2+0] = s/2 + Math.cos(theta) * vals[ii]/max*s/2;
+        xy[ii*2+0] = s/2 - Math.cos(theta) * vals[ii]/max*s/2;
         xy[ii*2+1] = s/2 - Math.sin(theta) * vals[ii]/max*s/2;
     }
     // join up the start and end

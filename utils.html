@@ -279,4 +279,26 @@ Utils.ckey_to_data_url = function(ckey, height, width){
 
 }
 
+Utils.array_to_csv = function(array, cols, title){
+    "use strict";
+    let text;
+    if(cols){
+        text = [];
+        for(let ii=0; ii<array.length; ii+=cols){
+            text.push(Array.prototype.join.call(array.slice(ii, ii+cols), ", "));
+        }
+        text = text.join("\n");
+    } else {
+        text = Array.prototype.join.call(array, "\n");
+    }
+    let a = document.createElement('a');
+    document.body.appendChild(a);
+    a.download = (title || "data") + ".csv";
+    a.href = "data:text/plain;base64," + btoa(text);
+    a.click();
+    document.body.removeChild(a);
+    console.log("(you may need to give permission for the document to be saved)");
+};
+
+
 </script>
