@@ -61,6 +61,11 @@ user-select: none;
 --paper-toolbar-background: #efefef;
 --paper-toolbar-color: #000;
 --paper-tooltip-opacity: 0.96;
+--paper-tooltip:{
+    text-align: center;
+    line-height: 12px;
+    padding: 4px 6px;
+};
 --paper-icon-button: {
       width: 38px;
       height: 38px;
@@ -29700,80 +29705,80 @@ bottom: 0px;
     <paper-toolbar style$="{{_style_toolbar(options.toggle_toolbar)}}">
         <div>
             <paper-icon-button icon="waveform:help-outline" on-tap="open_github"></paper-icon-button>
-            <paper-tooltip position="right">help on GitHub [?]</paper-tooltip>
+            <paper-tooltip position="right" animation-delay="0">help on GitHub [?]</paper-tooltip>
         </div>
 
         <div>
             <paper-icon-button icon="waveform:keyboard" on-tap="toggle_shorcut_pane"></paper-icon-button>
-            <paper-tooltip>keyboard shortcuts [k]</paper-tooltip>
+            <paper-tooltip animation-delay="0">keyboard shortcuts [k]</paper-tooltip>
         </div>
 
         <div class="toolbar_divider"></div>
 
         <div>
-            <paper-icon-button icon="waveform:undo" id="undo_button" on-tap="_undo"></paper-icon-button>
-            <paper-tooltip>undo [z]</paper-tooltip>
+            <paper-icon-button icon="waveform:undo" on-tap="_undo" on-mousedown="toggle_action_pane"></paper-icon-button>
+            <paper-tooltip animation-delay="0">undo [z]<br>right-click for full history [alt-z]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="waveform:redo" id="redo_button" on-tap="_redo"></paper-icon-button>
-            <paper-tooltip>redo [y]</paper-tooltip>
+            <paper-icon-button icon="waveform:redo" on-tap="_redo" on-mousedown="toggle_action_pane"></paper-icon-button>
+            <paper-tooltip animation-delay="0">redo [y]<br>right-click for full history [alt-z]</paper-tooltip>
         </div>
 
         <div class="toolbar_divider"></div>
         
         <div>
-            <paper-icon-button icon="waveform:format-line-spacing" id="reorder_n_button" on-tap="_sort"></paper-icon-button>
-            <paper-tooltip>sort on group size [n]</paper-tooltip>
+            <paper-icon-button icon="waveform:format-line-spacing" on-tap="_sort"></paper-icon-button>
+            <paper-tooltip animation-delay="0">sort on group size [n]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="waveform:cached" id="reorder_n_button" on-tap="swap_groups"></paper-icon-button>
-            <paper-tooltip>swap/move groups [s]</paper-tooltip>
+            <paper-icon-button icon="waveform:cached" on-tap="swap_groups"></paper-icon-button>
+            <paper-tooltip animation-delay="0">swap/move groups [s]</paper-tooltip>
         </div>
 
         <div class="toolbar_divider"></div>
 
         <div>
-            <paper-icon-button icon="waveform:view-list" id="file_headers_button" on-tap="toggle_header_pane"></paper-icon-button>
-            <paper-tooltip>file headers [h]</paper-tooltip>
+            <paper-icon-button icon="waveform:view-list" on-tap="toggle_header_pane"></paper-icon-button>
+            <paper-tooltip animation-delay="0">file headers [h]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="waveform:access-time" id="drift_button"></paper-icon-button>
+            <paper-icon-button icon="waveform:access-time"></paper-icon-button>
             <paper-tooltip>toggle drift [d]</paper-tooltip>
         </div>
 
         <div>
-            <paper-icon-button icon="waveform:gesture" id="pos_settings" on-tap="toggle_pos_pane"></paper-icon-button>
-            <paper-tooltip>position post processing settings [x]</paper-tooltip>
+            <paper-icon-button icon="waveform:gesture" on-tap="toggle_pos_pane"></paper-icon-button>
+            <paper-tooltip animation-delay="0">position post processing settings [x]</paper-tooltip>
         </div>
 
         <div class="toolbar_divider"></div>
         
         <div>
-            <paper-button selected$="{{_yn_to_bool(options.show_waves, 0)}}" on-tap="show_tap" id="show_wav">wav</paper-button>
-            <paper-tooltip>waves [w]</paper-tooltip>
+            <paper-button selected$="{{_yn_to_bool(options.show_waves, 0)}}" on-tap="show_tap" on-mousedown="toggle_palette_pane" id="show_wav">wav</paper-button>
+            <paper-tooltip animation-delay="0">waves [w]<br>right-click for settings [alt-w]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button selected$="{{_yn_to_bool(options.show_rms, 0)}}" on-tap="show_tap" id="show_rm">rm</paper-button>
-            <paper-tooltip>spatial ratemap [r]</paper-tooltip>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 0)}}" on-tap="show_tap" id="show_rm" on-mousedown="toggle_spa_rm_pane">rm</paper-button>
+            <paper-tooltip animation-delay="0">spatial ratemap [r]<br>right-click for settings [alt-r]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button selected$="{{_yn_to_bool(options.show_rms, 1)}}" on-tap="show_tap" id="show_dir">dir</paper-button>
-            <paper-tooltip>directional ratemap [c]</paper-tooltip>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 1)}}" on-tap="show_tap" id="show_dir" on-mousedown="toggle_dir_rm_pane">dir</paper-button>
+            <paper-tooltip>directional ratemap [c]<br>right-click for settings [alt-c]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button selected$="{{_yn_to_bool(options.show_rms, 2)}}" on-tap="show_tap" id="show_spd">spd</paper-button>
-            <paper-tooltip>speed ratemap [v]</paper-tooltip>
+            <paper-button selected$="{{_yn_to_bool(options.show_rms, 2)}}" on-tap="show_tap" id="show_spd" on-mousedown="toggle_speed_rm_pane">spd</paper-button>
+            <paper-tooltip animation-delay="0">speed ratemap [v]<br>right-click for settings [alt-v]</paper-tooltip>
         </div>
 
         <div>
-            <paper-button selected$="{{_yn_to_bool(options.show_tac, 0)}}" on-tap="show_tap" id="show_tc">tc</paper-button>
-            <paper-tooltip>temporal autocorrelation [t]</paper-tooltip>
+            <paper-button selected$="{{_yn_to_bool(options.show_tac, 0)}}" on-tap="show_tap" id="show_tc" on-mousedown="toggle_tac_pane">tc</paper-button>
+            <paper-tooltip animation-delay="0">temporal autocorrelation [t]<br>right-click for settings [alt-t]</paper-tooltip>
         </div>
 
     </paper-toolbar>
@@ -30183,14 +30188,14 @@ wav._show = (v) => v ? '' : 'display: none;';
 wav._yn_to_bool = (v, index) => (v && v[index] === 'y');
 wav._style_toolbar = (toggle_toolbar) => toggle_toolbar ? '' : 'height:0px;overflow:hidden';
 wav._get_safe = (a,b) => a && a[b]; // see https://github.com/Polymer/polymer/issues/1877
-wav.toggle_action_pane = () => wav.$.action_info.toggle();
+wav.toggle_action_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.action_info.toggle();
 wav.toggle_keyboard_pane = () => wav.$.shortcut_info.toggle();
-wav.toggle_tac_pane = () => wav.$.tc_info.toggle();
-wav.toggle_spa_rm_pane = () => wav.$.rm_info.toggle();
-wav.toggle_dir_rm_pane = () => wav.$.dir_info.toggle();
-wav.toggle_speed_rm_pane = () => wav.$.speed_info.toggle();
+wav.toggle_tac_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.tc_info.toggle();
+wav.toggle_spa_rm_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.rm_info.toggle();
+wav.toggle_dir_rm_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.dir_info.toggle();
+wav.toggle_speed_rm_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.speed_info.toggle();
 wav.toggle_pos_pane = () => wav.$.pos_info.toggle();
-wav.toggle_palette_pane = () => wav.$.waves_info.toggle();
+wav.toggle_palette_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.waves_info.toggle();
 wav.toggle_header_pane = () => wav.$.header_info.toggle();
 wav.toggle_shorcut_pane = () => wav.$.shortcut_info.toggle();
 wav.show_key_wav = (e) => wav.toggle_show('show_wav', e.detail.keyboardEvent.shiftKey);
