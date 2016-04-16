@@ -18663,9 +18663,47 @@ Utils.parse_splices = function(splices, give_moved){
         }
     }
 
-    if(give_moved){
-        console.warn("parse_splices give_moved=true not implemented yet.");
+    if(give_moved && splices && splices.indexSplices.length){
+        // Not sure what the right way to do this is...
+        // I think the API needs to improve, at least the docs do.
+        let new_array = splices.indexSplices[0].object; // all indexSplices refer to the actual object, i.e. as it currently exists
+
+        // firstly, work out how long the array originally was
+        let original_len = new_array.length;
+        for(let s of splices.indexSplices){
+            original_len -= s.addedCount;
+            original_len += s.removed.length;
+        }
+
+        // now we construct a map from new_idx to old idx
+        // note that added things are inserted as undefined, because we don't care about them here..yet..
+        let old_from_new = [];
+        for(let ii=0; ii<original_len; ii++){
+            old_from_new.push(ii);
+        }
+        for(let s of splices.indexSplices){
+            old_from_new.splice.apply(old_from_new, [s.index, s.removed.length].concat(Array(s.addedCount)));
+        }
+
+        // and then we can iterate over it to see which things have moved
         moved = [];
+        for(let [ii, item] of new_array.entries()) if(old_from_new[ii] !== undefined && old_from_new[ii] !== ii) {
+            moved.push(item);
+        }
+
+        // ahh, but it turns out we do care about things that were removed and then reinserted
+        // to find them, we collect a list of all the items that have been removed and check
+        // if any of them are still in the array (given that they were inserted they will be "undefined"
+        // in the old_from_new mapping).
+        let all_removed_items = new Set();
+        for(let s of splices.indexSplices){
+            for(let item of s.removed){
+                all_removed_items.add(item);
+            }
+        }
+        for(let [ii, item] of new_array.entries()) if(old_from_new[ii] === undefined && all_removed_items.has(item)){
+            moved.push(item);
+        }        
     }
 
     return {
@@ -28273,7 +28311,7 @@ WavesRenderer.prototype._deal_with_modified_okeys = function(okeys_modified){
                 this._okey_to_part_rendered.delete(okey);
             }
             results.set(okey, this._okey_to_rendered.get(okey).el_canv);
-        } if (!this._okey_to_part_rendered.has(okey)){
+        } else if (!this._okey_to_part_rendered.has(okey)){
             // this is different to the last thing we renderd, and we weren't
             // previously planning on rendering it. So need to render from scratch
             let part = {
@@ -28652,16 +28690,15 @@ Polymer({
         }
     }, _palette_mode_changed: function(){
         this._renderer.set_mode(this.palette_mode);
-    }, _update_okeys: function(okeys_to_remove, okeys_to_add){
+    }, _update_okeys: function(okeys_to_remove, okeys_to_add, okeys_to_update){
         // free canvases, it's our responsiblity to do this, whereas 
         // freeing the inds arrays was the responsibility of cut-obj.
         for(let okey of okeys_to_remove) if(okey && okey.waves){
             okey.waves = null; // Note we don't both to use the Polymer .set machienery, because the okey is being (at least temporarily) discarded
         }
-        okeys_to_add = okeys_to_add.filter(function(okey){
-            return okey ? 1 : 0;
-        });
-        this._renderer.update_okeys(okeys_to_remove, okeys_to_add, []); 
+        okeys_to_add = okeys_to_add.filter((okey) => !!okey);
+        okeys_to_update = okeys_to_update.filter((okey) => !!okey);
+        this._renderer.update_okeys(okeys_to_remove, okeys_to_add, okeys_to_update); 
 
     }, _groups_set: function(new_val, old_val){
         this.groups_collection = Array.isArray(new_val) && Polymer.Collection.get(new_val);

@@ -73,9 +73,47 @@ Utils.parse_splices = function(splices, give_moved){
         }
     }
 
-    if(give_moved){
-        console.warn("parse_splices give_moved=true not implemented yet.");
+    if(give_moved && splices && splices.indexSplices.length){
+        // Not sure what the right way to do this is...
+        // I think the API needs to improve, at least the docs do.
+        let new_array = splices.indexSplices[0].object; // all indexSplices refer to the actual object, i.e. as it currently exists
+
+        // firstly, work out how long the array originally was
+        let original_len = new_array.length;
+        for(let s of splices.indexSplices){
+            original_len -= s.addedCount;
+            original_len += s.removed.length;
+        }
+
+        // now we construct a map from new_idx to old idx
+        // note that added things are inserted as undefined, because we don't care about them here..yet..
+        let old_from_new = [];
+        for(let ii=0; ii<original_len; ii++){
+            old_from_new.push(ii);
+        }
+        for(let s of splices.indexSplices){
+            old_from_new.splice.apply(old_from_new, [s.index, s.removed.length].concat(Array(s.addedCount)));
+        }
+
+        // and then we can iterate over it to see which things have moved
         moved = [];
+        for(let [ii, item] of new_array.entries()) if(old_from_new[ii] !== undefined && old_from_new[ii] !== ii) {
+            moved.push(item);
+        }
+
+        // ahh, but it turns out we do care about things that were removed and then reinserted
+        // to find them, we collect a list of all the items that have been removed and check
+        // if any of them are still in the array (given that they were inserted they will be "undefined"
+        // in the old_from_new mapping).
+        let all_removed_items = new Set();
+        for(let s of splices.indexSplices){
+            for(let item of s.removed){
+                all_removed_items.add(item);
+            }
+        }
+        for(let [ii, item] of new_array.entries()) if(old_from_new[ii] === undefined && all_removed_items.has(item)){
+            moved.push(item);
+        }        
     }
 
     return {
