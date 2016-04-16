@@ -1480,6 +1480,14 @@ var parse_clu_file = function(full_str, fkey){
 
         }, _pos_options_changed: function(){
             var options = this._make_pos_options();
+            options.fkey = this._fkey_ids.pos;
+            for(let [cached_opts, data] of this._pos_from_options){
+                if(Utils.is_equal_simple(cached_opts, options)){
+                    this._use_pos(data);
+                    return;
+                }
+            }
+            delete options.fkey;
             this._worker_io.exec('read_files', {
                 pos: this._files.pos,
                 pos_fkey: this._fkey_ids.pos
