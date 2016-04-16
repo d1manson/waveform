@@ -1056,7 +1056,7 @@ wav._caption_speed_max = (v) => v + " cm/s";
 wav._show = (v) => v ? '' : 'display: none;';
 wav._yn_to_bool = (v, index) => (v && v[index] === 'y');
 wav._style_toolbar = (toggle_toolbar) => toggle_toolbar ? '' : 'height:0px;overflow:hidden';
-wav._get_safe = (a,b) => a && a[b]; // see https://github.com/Polymer/polymer/issues/1877
+wav._get_safe = (a,b) => (a && a[b]) || null; // see https://github.com/Polymer/polymer/issues/1877
 wav.toggle_action_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.action_info.toggle();
 wav.toggle_keyboard_pane = () => wav.$.shortcut_info.toggle();
 wav.toggle_tac_pane = (e) => (e.button===undefined || e.button!==0) && wav.$.tc_info.toggle();
