@@ -20,7 +20,7 @@ var render_options = {
 };
 var speed_plot_size = [20, 46]; // might want to upgraded this to render_options
 var dir_plot_size = 78;
-
+var path_s = 512;
 var pi = 3.14159265;
 
 var show;
@@ -383,10 +383,10 @@ var clear_cache = function(names){
 }
 
 var make_cached_path = function(){
-    cached_path = draw_lines(pos_xy, 256, 256, 256/Math.max(xy_max[0], xy_max[1]));
+    cached_path = draw_lines(pos_xy, path_s, path_s, path_s/Math.max(xy_max[0], xy_max[1]));
      exec_main_b('plot_path', {
         path: 'path',
-        dims: [256, 256],
+        dims: [path_s, path_s],
     }, {
         path: new Uint32Array(cached_path)
     });
@@ -671,7 +671,7 @@ var process_plot_path = function(){
       //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
       let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.a)); 
             
-      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+      draw_points(new Uint16Array(group_xy.buffer), path_s, path_s, path_s/Math.max(xy_max[0], xy_max[1]),
                    im, pending_path_plot.color_a, 1);
     }
 
@@ -679,13 +679,13 @@ var process_plot_path = function(){
       //cached_spike_xy_raw is 16bit values stored as 4byte blocks, which is what we want to pick here
       let group_xy = pick(cached_spike_xy_raw, pkey_to_array.get(pending_path_plot.b)); 
             
-      draw_points(new Uint16Array(group_xy.buffer), 256, 256, 256/Math.max(xy_max[0], xy_max[1]),
+      draw_points(new Uint16Array(group_xy.buffer), path_s, path_s, path_s/Math.max(xy_max[0], xy_max[1]),
                   im, pending_path_plot.color_b, 1);
     }
    
     exec_main_b('plot_path', {
         path: 'path',
-        dims: [256, 256],
+        dims: [path_s, path_s],
         generation: pkey_generation,
         a: pending_path_plot.a,
         b: pending_path_plot.b,
@@ -815,43 +815,110 @@ var draw_points = function(xy, w, h, scale, im, color, k){
     }
 }
 
+var fpart = function(x){
+    // fractional part of floating point x
+    return x - (0 | x);
+}
+
+var rfpart = function(x){
+    // 1-fractional part of floating point x
+    return (0 | x) + 1 - x;
+}
+
+var draw_pixel = function(im, x, y, w, color, alpha){
+    if(x>=w || x<0){ // y is dealt with by bounds checking, when indexing into im
+        return;
+    } 
+    let old_val = im[y*w + x];
+    let old_alpha = old_val >>> 24;
+    let new_alpha = alpha * 0xff;
+
+    // we do a simple blend that assumes the color hasn't changed, we just increase alpha.
+    // setting it to:  1-(1-old)*(1-new) 
+    //new_alpha = old_alpha + new_alpha - ((old_alpha * new_alpha) /0xff);
+    new_alpha = Math.min(new_alpha + old_alpha, 0xff);
+    im[y*w+x] = (new_alpha<<24)| color; 
+}
+
 var draw_lines = function(xy, w, h, scale, im, color){
     // Chrome currently de-optizes for "compound let assignment"
     // which means using += or -= on a variable declared with "let"
-    // so we have to manually write x = x + something
+    // so we have to manually write x = x + so         mething
     
-    color = color || 0xff000000; //black
+    color = color || 0; //black
+    color = color & 0xffffff; // remove the alpha, that is added in by the alogrithm
+
     im = im || new Uint32Array(w*h);
 
-    let x0 = (xy[0] * scale) | 0;
-    let y0 = (xy[1] * scale) | 0;
     for(let ii=2; ii<xy.length; ii=ii+2){
-        let x1 = (xy[ii+0] * scale) | 0;
-        let y1 = (xy[ii+1] * scale) | 0;
+        let x0 = (xy[ii-2] * scale) |0; // the |0, is a hack to fix a bug at the line ends
+        let y0 = (xy[ii-1] * scale) |0; 
+        let x1 = (xy[ii+0] * scale) |0;
+        let y1 = (xy[ii+1] * scale) |0;
 
-        // Bresenham algorithm adapted from http://stackoverflow.com/a/4672319/2399799
-        let sx = ((x0 < x1) <<1) -1; // (x0 < x1) ? 1 : -1
-        let sy = ((y0 < y1) <<1) -1; // (y0 < y1) ? 1 : -1
-        let dx = sx*(x1-x0); // abs(x0-x1)
-        let dy = sy*(y1-y0); // abs(y0-y1)
-        let err = dx-dy;
-        while(true){
-            im[y0*w + x0] = color;
-
-            if ((x0===x1) && (y0===y1)) break;
-            let e2 = err << 1;
-            if (e2 >-dy){ 
-                err = err - dy;
-                x0  = x0 + sx; 
-            }
-            if (e2 < dx){
-                err = err + dx;
-                y0  = y0 + sy;
-            }
+        // Xiaolin Wu algorithm adapted from psudo-code on wikipedia
+        let dx = Math.abs(x1-x0);
+        let dy = Math.abs(y1-y0);
+        let steep = dy > dx;
+        if(steep){
+            let temp;
+            temp = x0; x0 = y0; y0 = temp; // swap x0, y0
+            temp = x1; x1 = y1; y1 = temp; // swap x1, y1
         }
+        if(x0 > x1){
+            let temp;
+            temp = x0; x0 = x1; x1 = temp; // swap x0, x1
+            temp = y0; y0 = y1; y1 = temp; // swap y0, y1
+        }
+        
+        dx = x1 - x0; // I guess these will have changed due to the swapping
+        dy = y1 - y0;
+        let gradient = dy / dx;
+        (gradient !== gradient) && (gradient = 0); // NaN => 0
+    
+        // handle first endpoint    
+        let xend = 0 | (x0 + 0.5);
+        let yend = y0 + gradient * (xend - x0);
+        let xgap = rfpart(x0 + 0.5);
+        let xpxl1 = xend; // this will be used in the main loop
+        let ypxl1 = 0 | yend;
+        if (steep){
+            draw_pixel(im, ypxl1, xpxl1, w, color, rfpart(yend) * xgap);
+            draw_pixel(im, ypxl1+1, xpxl1, w, color, fpart(yend) * xgap);            
+        } else {
+            draw_pixel(im, xpxl1, ypxl1, w, color, rfpart(yend) * xgap);
+            draw_pixel(im, xpxl1, ypxl1+1, w, color, fpart(yend) * xgap);            
+        }
+        let intery = yend + gradient; // first y-intersection for the main loop
+        
 
-        x0 = x1;
-        y0 = y1;
+        // handle second endpoint
+        xend = 0 | (x1 + 0.5);
+        yend = y1 + gradient * (xend - x1);
+        xgap = rfpart(x1 + 0.5);
+        let xpxl2 = xend; //this will be used in the main loop
+        let ypxl2 = 0 | yend;
+        
+        if (steep){
+            draw_pixel(im, ypxl2, xpxl2, w, color, rfpart(yend) * xgap);
+            draw_pixel(im, ypxl2+1, xpxl2, w, color, fpart(yend) * xgap);            
+        } else {
+            draw_pixel(im, xpxl2, ypxl2, w, color, rfpart(yend) * xgap);
+            draw_pixel(im, xpxl2, ypxl2+1, w,  color, fpart(yend) * xgap);            
+        }
+        
+        // main loop
+        for(let x=xpxl1 + 1; x<xpxl2; x++){
+            let intery_int = 0 | intery;
+            if(steep){
+                draw_pixel(im, intery_int, x, w, color, rfpart(intery));
+                draw_pixel(im, intery_int+1, x, w, color, fpart(intery));                
+            }else{
+                draw_pixel(im, x, intery_int, w, color, rfpart(intery));
+                draw_pixel(im, x, intery_int+1, w, color, fpart(intery));
+            }
+            intery = intery + gradient;
+        } 
     }
     return im;
 }
