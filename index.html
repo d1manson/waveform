@@ -24179,7 +24179,8 @@ Polymer({
                             base = undefined;
                         }
                     } else if(base.slice(-4) === ".fet" ||
-                              base.slice(-4) === ".klg" ){
+                              base.slice(-4) === ".klg" ||
+                              parseInt(ext) === 0){ // .0 files are DACQ rubbish
                         continue;
                     } // else a tet file
                 } else {
