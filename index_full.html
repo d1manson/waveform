@@ -836,7 +836,9 @@ wav._merge_groups = function(e){
         wav.set('disable_shortcuts', true); 
         wav.set('tool_is_active', true);
     } else {
-        wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        if(e.detail.state === "end"){
+            wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        } // else it's cancel
         wav.set('tool_is_active', false);
         wav.set('disable_shortcuts', false); 
     }

@@ -139,7 +139,7 @@ background-color: rgba(0,0,0,0.2);
                     return; 
                 }
                 this.unlisten(this, 'scroll', '_scroll');
-                this.unlisten(this, 'mouseup', '_failed_track');
+                document.removeEventListener('mouseup', this._failed_track_bound, true);
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
@@ -149,6 +149,10 @@ background-color: rgba(0,0,0,0.2);
                     });
                     this.set('active_group_b', null);
                     this._track_state.other_tile_el.shake(); // either this or...
+                }else{
+                    this.fire('merge_groups', {
+                        state: 'cancel'
+                    });
                 }
                 this._track_state.tile_el.shake(); // ... this will remain in the tilewall after the merge
                 this._track_state.tile_el.set('proximate', false);
@@ -176,7 +180,8 @@ background-color: rgba(0,0,0,0.2);
                     other_tile_el: null
                 }
                 this.listen(this, 'scroll', '_scroll');
-                this.listen(this, 'mouseup', '_failed_track');
+                (!this._failed_track_bound) && (this._failed_track_bound = this._failed_track.bind(this));
+                document.addEventListener('mouseup', this._failed_track_bound, true);
                 e.target.set('moving', true);
                 this.fire('merge_groups', {
                     state: 'start'
@@ -211,6 +216,7 @@ background-color: rgba(0,0,0,0.2);
             this._track_tile(e);
         }, _failed_track: function(e){
             // attached during tracking as mouseup on tilewall itself
+            document.removeEventListener('mouseup', this._failed_track_bound, true);
             if(!this._track_state){
                 return; 
             }

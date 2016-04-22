@@ -73,7 +73,7 @@ Utils.parse_splices = function(splices, give_moved){
         }
     }
 
-    if(give_moved && splices && splices.indexSplices.length){
+    if(give_moved && splices && splices.indexSplices && splices.indexSplices.length){
         // Not sure what the right way to do this is...
         // I think the API needs to improve, at least the docs do.
         let new_array = splices.indexSplices[0].object; // all indexSplices refer to the actual object, i.e. as it currently exists

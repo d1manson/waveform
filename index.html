@@ -18663,7 +18663,7 @@ Utils.parse_splices = function(splices, give_moved){
         }
     }
 
-    if(give_moved && splices && splices.indexSplices.length){
+    if(give_moved && splices && splices.indexSplices && splices.indexSplices.length){
         // Not sure what the right way to do this is...
         // I think the API needs to improve, at least the docs do.
         let new_array = splices.indexSplices[0].object; // all indexSplices refer to the actual object, i.e. as it currently exists
@@ -19052,7 +19052,7 @@ background-color: rgba(0,0,0,0.2);
                     return; 
                 }
                 this.unlisten(this, 'scroll', '_scroll');
-                this.unlisten(this, 'mouseup', '_failed_track');
+                document.removeEventListener('mouseup', this._failed_track_bound, true);
                 this._track_state.tile_el.translate_xy(null);
                 if(this.active_group_b){
                     this.fire('merge_groups', {
@@ -19062,6 +19062,10 @@ background-color: rgba(0,0,0,0.2);
                     });
                     this.set('active_group_b', null);
                     this._track_state.other_tile_el.shake(); // either this or...
+                }else{
+                    this.fire('merge_groups', {
+                        state: 'cancel'
+                    });
                 }
                 this._track_state.tile_el.shake(); // ... this will remain in the tilewall after the merge
                 this._track_state.tile_el.set('proximate', false);
@@ -19089,7 +19093,8 @@ background-color: rgba(0,0,0,0.2);
                     other_tile_el: null
                 }
                 this.listen(this, 'scroll', '_scroll');
-                this.listen(this, 'mouseup', '_failed_track');
+                (!this._failed_track_bound) && (this._failed_track_bound = this._failed_track.bind(this));
+                document.addEventListener('mouseup', this._failed_track_bound, true);
                 e.target.set('moving', true);
                 this.fire('merge_groups', {
                     state: 'start'
@@ -19124,6 +19129,7 @@ background-color: rgba(0,0,0,0.2);
             this._track_tile(e);
         }, _failed_track: function(e){
             // attached during tracking as mouseup on tilewall itself
+            document.removeEventListener('mouseup', this._failed_track_bound, true);
             if(!this._track_state){
                 return; 
             }
@@ -30090,7 +30096,9 @@ wav._merge_groups = function(e){
         wav.set('disable_shortcuts', true); 
         wav.set('tool_is_active', true);
     } else {
-        wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        if(e.detail.state === "end"){
+            wav.$.cut.merge_groups(e.detail.a, e.detail.b);
+        } // else it's cancel
         wav.set('tool_is_active', false);
         wav.set('disable_shortcuts', false); 
     }
