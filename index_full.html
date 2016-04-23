@@ -612,6 +612,7 @@ bottom: 0px;
             on-grab_group="_grab_group"
             on-splitter="_splitter"
             on-tap_group="_highlight_group"
+            on-marker="_rm_spa_marker"
             tool_is_active="[[tool_is_active]]"
             ></tile-wall>
 
@@ -686,7 +687,7 @@ bottom: 0px;
         undo_stack_descriptions="{{cut_undo_stack}}"
         redo_stack_descriptions="{{cut_redo_stack}}"></cut-object>
 
-    <rm-plots  
+    <rm-plots id="rm_plots"
         groups="{{cut_groups}}" 
         pos_path="{{pos_path}}"
         pos_speed_hist="{{pos_speed_hist}}"
@@ -703,7 +704,8 @@ bottom: 0px;
         deg_per_dir_bin="[[options.deg_per_dir_bin]]"
         smoothing_dir_bins="[[options.smoothing_dir_bins]]"
         speed_rm_max="[[options.speed_rm_max]]"
-        want_spike_times="{{want_spike_times}}"></rm-plots> 
+        want_spike_times="{{want_spike_times}}"
+        ></rm-plots> 
 
     <tac-plots 
         groups="{{cut_groups}}" 
@@ -949,6 +951,39 @@ wav._close_grabbed_path = function(e){
     // remove the grabbed plots from the list
     wav.splice('grabbed_paths', wav.grabbed_paths.indexOf(e.model.item), 1);
 }
+
+
+// :::: marker tool :::::::::::::::::::::::::::::::
+
+wav._rm_spa_marker = function(e){
+    let g = e.detail.group;
+
+    if(e.detail.state === "start"){
+        wav.set('disable_shortcuts', true); 
+        wav.set('tool_is_active', true);
+        let p = wav.$.rm_plots.spa_canv_point_to_xy(g, e.detail.point[0], e.detail.point[1]);
+        wav.push('cut_groups.' + g._pkey + '.markers', {
+            kind: 'line',
+            transform_func: wav.$.rm_plots.xy_to_spa_css_xy.bind(wav.$.rm_plots, g),
+            x1: p[1],
+            y1: p[0],
+            x2: p[1],
+            y2: p[0],
+            label: '0 cm'
+        });
+    } else if(e.detail.state === "move"){
+        let p = wav.$.rm_plots.spa_canv_point_to_xy(g, e.detail.point[0], e.detail.point[1]);
+        let idx = g.markers.length-1;
+        wav.set('cut_groups.' + g._pkey + '.markers.' + idx + '.x2', p[1]);
+        wav.set('cut_groups.' + g._pkey + '.markers.' + idx + '.y2', p[0]);
+        let dist = Math.hypot(p[1] - g.markers[idx].x1, p[0] - g.markers[idx].y1);
+        wav.set('cut_groups.' + g._pkey + '.markers.' + idx + '.label', dist.toFixed(1) + " cm");
+    } else if(e.detail.state === "end") {
+        wav.set('tool_is_active', false);
+        wav.set('disable_shortcuts', false); 
+    }
+}
+
 
 // :::: plot toggling :::::::::::::::::::::::::::::::
 

@@ -1291,6 +1291,11 @@ var use_mask = function(vector, mask, val){
             } else {
                 this._setPos_path(this._blank_pos_path);
             }
+        }, spa_canv_point_to_xy: function(okey, d0, d1){
+            // TODO: check that rm is actually using the current desired options
+            return [d0/this.cm_per_spa_bin, d1/this.cm_per_spa_bin];
+        }, xy_to_spa_css_xy: function(okey, d0, d1){
+            return [d0, d1];
         }
     });
 </script>

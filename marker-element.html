@@ -19,7 +19,7 @@ Polymer({
 	is: 'marker-element',
 	properties:{
 		state: {
-			type: Object,
+			type: Object, // has kind, x1, y1, x2, y2, label, and transform_func
 			value: null,
 			notify: true
 		}
@@ -35,10 +35,12 @@ Polymer({
 			} else if (this.state.kind === "line"){
 
 			let r = 3;
+			let p1 = this.state.transform_func(this.state.y1, this.state.x1);
+			let p2 = this.state.transform_func(this.state.y2, this.state.x2);
 
 			// text background from: http://stackoverflow.com/a/31013492/2399799
 
-			svg = `<svg style='pointer-events:none;position:absolute;left:0px;top:0px;' xmlns='http://www.w3.org/2000/svg' version='1.1'>
+			svg = `<svg style='pointer-events:none;position:absolute;left:0px;top:0px;width:100%;height:100%;' xmlns='http://www.w3.org/2000/svg' version='1.1'>
 						<defs>
 							<filter x="-10%" y="0" width="120%" height="1" id="solid">
 								<feFlood flood-color="black"/>
@@ -46,11 +48,11 @@ Polymer({
 							</filter>
 						</defs>
 
-						<line x1='${this.state.x1}' y1='${this.state.y1}' x2='${this.state.x2}' y2='${this.state.y2}' stroke='black' stroke-width='3'/>
-						<line x1='${this.state.x1}' y1='${this.state.y1}' x2='${this.state.x2}' y2='${this.state.y2}' stroke='white' stroke-width='1'/>
-						<circle cx='${this.state.x1}' cy='${this.state.y1}' r='${r}' stroke='black' stroke-width='2' fill='white'/>
-					    <circle cx='${this.state.x2}' cy='${this.state.y2}' r='${r}' stroke='black' stroke-width='2' fill='white'/>
-					    <text filter="url(#solid)" x='${this.state.x1/2 + this.state.x2/2}' y='${this.state.y1/2 + this.state.y2/2}' fill="white" style='font-size:10px'> ${this.state.label} </text>
+						<line x1='${p1[1]}' y1='${p1[0]}' x2='${p2[1]}' y2='${p2[0]}' stroke='black' stroke-width='3'/>
+						<line x1='${p1[1]}' y1='${p1[0]}' x2='${p2[1]}' y2='${p2[0]}' stroke='white' stroke-width='1'/>
+						<circle cx='${p1[1]}' cy='${p1[0]}' r='${r}' stroke='black' stroke-width='2' fill='white'/>
+					    <circle cx='${p2[1]}' cy='${p2[0]}' r='${r}' stroke='black' stroke-width='2' fill='white'/>
+					    <text filter="url(#solid)" x='${p1[1]/2 + p2[1]/2}' y='${p1[0]/2 + p2[0]/2}' fill="white" style='font-size:11px'> ${this.state.label} </text>
 					</svg>`;
 			} else {
 				throw "unrecognised marker kind: " + this.state.kind;

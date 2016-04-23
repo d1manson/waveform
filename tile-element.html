@@ -201,7 +201,7 @@ pointer-events: none;
                 <cross-hair r="6" show_bars="1" x="[[splitter_metrics.x]]" y="[[splitter_metrics.y]]" w="[[splitter_metrics.w]]"></cross-hair>
             </template>
         </managed-canvas>
-        <managed-canvas ckey="[[group_model.rm.spa]]" fix_height="[[spa_rm_height]]">
+        <managed-canvas ckey="[[group_model.rm.spa]]" fix_height="[[spa_rm_height]]" on-canvas-mousedown="_mousedown_marker">
             <template is="dom-repeat" items="[[group_model.markers]]">
                     <marker-element state="[[item]]"></marker-element>
             </template>
@@ -361,6 +361,36 @@ pointer-events: none;
                 group: group,
                 group_num: this.group_num
             });
+        }, _mousedown_marker: function(e){
+            if(e.detail.button === 0){
+                return;  // left click is irrelevant
+            }
+            let detail = {
+                state: 'start',
+                group: this.group_model,
+                point: e.detail.canvas_point
+            }
+            this.fire('marker', detail);
+            this._marker_el = e.target;
+            e.detail.stopPropagation();
+            this.listen(this._marker_el, 'canvas-mousemove', '_mousemove_marker');
+            (!this._mouseup_marker_bound) && (this._mouseup_marker_bound = this._mouseup_marker.bind(this));
+            document.addEventListener('mouseup', this._mouseup_marker_bound, true);
+        }, _mouseup_marker: function(e){
+            this.unlisten(this._marker_el, 'canvas-mousemove', '_mousemove_marker');
+            document.removeEventListener('mouseup', this._mouseup_marker_bound, true);
+            let detail = {
+                state: 'end',
+                group: this.group_model
+            }
+            this.fire('marker', detail);
+        }, _mousemove_marker: function(e){
+            let detail = {
+                state: 'move',
+                group: this.group_model,
+                point: e.detail.canvas_point
+            }
+            this.fire('marker', detail);
         }, _mousedown_splitter: function(e){
             if(e.detail.button === 0){
                 return; // left click either irrelevant or handled by tile-wall itself
@@ -386,10 +416,10 @@ pointer-events: none;
 
             this.listen(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
             this.listen(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter'); // this just goes to mousemove, and then ...
-            this.listen(document, 'mouseup', '_mouseup_splitter'); // we actually process the up on the document
-
+            (!this._mouseup_splitter_bound) && (this._mouseup_splitter_bound = this._mouseup_splitter.bind(this));
+            document.addEventListener('mouseup', this._mouseup_splitter_bound, true);
         }, _mouseup_splitter: function(e){
-            this.unlisten(document, 'mouseup', '_mouseup_splitter');
+            document.removeEventListener('mouseup', this._mouseup_splitter_bound, true);
             this.unlisten(this._splitter_el, 'canvas-mousemove', '_mousemove_splitter');
             this.unlisten(this._splitter_el, 'canvas-mouseup', '_mousemove_splitter');
             this.fire('splitter', {
