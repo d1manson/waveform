@@ -76,11 +76,26 @@ background: rgba(255,0,0,0.2);
 cursor: pointer;    
 };
 --cluster-plot-style:{
-border: 1px solid #000;
-padding: 1px;
-margin-right: 2px;
-margin-bottom: 2px;
+    border: 1px solid #000;
+    padding: 1px;
+    margin-right: 2px;
+    margin-bottom: 2px;
 };
+--cluster-x-axis-label:{
+    position: absolute;
+    display: inline-block;
+    bottom: 2px;
+    right: 2px;
+    font-size: 10px;
+};
+--cluster-y-axis-label:{
+    position: absolute;
+    display: inline-block;
+    left: 2px;
+    top: 2px;
+    font-size: 10px;
+};
+
 }
 
 a {
@@ -201,7 +216,12 @@ background-color: rgba(0,0,0,0.2);
 .cluster_plot{
 @apply(--cluster-plot-style);
 }
-
+.x_axis_label{
+@apply(--cluster-x-axis-label);
+}
+.y_axis_label{
+@apply(--cluster-y-axis-label);
+}
 .toolbar_divider{
 margin: 0px 3px;
 height: 70%;
@@ -426,11 +446,12 @@ bottom: 0px;
             <div class='pane_title'>[[item.title]]</div>
             <div style="text-align: center;">
                 <template is="dom-repeat" items="[[item.plots]]">
-                    <canvas-with-axes class="cluster_plot"
+                    <managed-canvas class="cluster_plot"
                         ckey="[[item.ckey]]"
-                        x_label="[[item.x_axis]]"
-                        y_label="[[item.y_axis]]" 
-                        fix_height="[[options.cluster_plot_size]]"></canvas-with-axes>
+                        fix_height="[[options.cluster_plot_size]]">
+                            <div class="x_axis_label">[[item.x_axis]]</div>
+                            <div class="y_axis_label">[[item.y_axis]]</div>
+                    </managed-canvas>
                 </template>
             </div>
         </floating-pane>
@@ -547,13 +568,14 @@ bottom: 0px;
             <iron-splitter direction="up" size="{{options.splitter_a_size}}"></iron-splitter>
 
             <div style="flex:1 1 0%; position:relative;display: flex; flex-direction: row;">
-                <managed-canvas style="margin:0 auto;" stretch_height ckey="[[pos_path]]" ></managed-canvas>
+                <managed-canvas style="margin:0 auto;position:initial;" stretch_height ckey="[[pos_path]]" ></managed-canvas>
                 <div class="info_summary" style$="[[_info_summary_style(active_group_a)]]">
                     <div class="info_summary_text">[[_format_timespan(start_end_times)]]</div>
-                    <canvas-with-axes style="width:55px;"
+                    <managed-canvas style="width:55px;"
                         ckey="[[pos_speed_hist]]"
-                        x_label="[[_caption_speed_max(options.speed_rm_max)]]"
-                        fix_height="92" flip_horizontal></canvas-with-axes>
+                        fix_height="92" flip_horizontal>
+                        <div class="x_axis_label">[[_caption_speed_max(options.speed_rm_max)]]</div>
+                    </managed-canvas>
                 </div>
                 <div class="grabber" hidden$="{{!grabber_mode}}" on-mouseup="_grab_path"></div>
             </div>
