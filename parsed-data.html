@@ -329,7 +329,7 @@ var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cach
     }, {
         xy: pos.xy,
         dir: get_dir(pos, header),
-        speed: get_speed(pos)
+        speed: get_speed(pos, header)
     });
 
 }
@@ -599,11 +599,12 @@ var get_dir = function(pos, header){
     return ret;
 }
 
-var get_speed = function(pos){
+var get_speed = function(pos, header){
     var xy = pos.xy;
     var ret = new Float32Array(xy.length/2);
+    let f =  parseInt(header.sample_rate)/header.units_per_meter*100;
     for(let ii=0; ii<xy.length; ii=ii+2){
-         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1]);
+         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1])*f;
     }
     return ret;
 }

@@ -524,7 +524,7 @@ var make_cached_speed_bins_and_dwell = function(){
     // we use an extra bin for everything invalid
     for(let i=0;i<pos_speed.length;i++){
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
-                                n_valid_speed_bins : pos_speed[i] * factor;
+                                n_valid_speed_bins : (pos_speed[i] * factor) | 0; // use floor rather than default of round for assigning to clamped array
     }
     cached_speed_dwell = hist_1(cached_speed_bins, n_valid_speed_bins+1);
     cached_speed_dwell = cached_speed_dwell.subarray(0, n_valid_speed_bins);

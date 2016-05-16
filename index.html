@@ -20718,7 +20718,7 @@ var parse_pos_file = function(buffer, fkey, options, file_name, delete_from_cach
     }, {
         xy: pos.xy,
         dir: get_dir(pos, header),
-        speed: get_speed(pos)
+        speed: get_speed(pos, header)
     });
 
 }
@@ -20988,11 +20988,12 @@ var get_dir = function(pos, header){
     return ret;
 }
 
-var get_speed = function(pos){
+var get_speed = function(pos, header){
     var xy = pos.xy;
     var ret = new Float32Array(xy.length/2);
+    let f =  parseInt(header.sample_rate)/header.units_per_meter*100;
     for(let ii=0; ii<xy.length; ii=ii+2){
-         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1]);
+         ret[ii>>1] = Math.hypot(xy[ii+2]-xy[ii+0], xy[ii+3]-xy[ii+1])*f;
     }
     return ret;
 }
@@ -25647,7 +25648,7 @@ var make_cached_speed_bins_and_dwell = function(){
     // we use an extra bin for everything invalid
     for(let i=0;i<pos_speed.length;i++){
         cached_speed_bins[i] = pos_speed[i] > render_options.max_speed ? 
-                                n_valid_speed_bins : pos_speed[i] * factor;
+                                n_valid_speed_bins : (pos_speed[i] * factor) | 0; // use floor rather than default of round for assigning to clamped array
     }
     cached_speed_dwell = hist_1(cached_speed_bins, n_valid_speed_bins+1);
     cached_speed_dwell = cached_speed_dwell.subarray(0, n_valid_speed_bins);
