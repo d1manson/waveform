@@ -666,6 +666,7 @@ bottom: 0px;
             for(let [ii, gg] of this.groups.entries()){
                 if(!gg && ii>0){
                     this.set('painter_state.dest', ii);
+                    return;
                 }
             }
             this.set('painter_state.dest', this.groups.length);
