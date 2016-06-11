@@ -536,7 +536,7 @@ bottom: 0px;
         
         <iron-resize-notifier style="display:flex; flex-direction:column;">
 
-            <file-organiser style="flex:0 0 0%;"
+            <file-organiser
                 is_dragging_in="{{drop_in_progress}}"
                 no_files="{{no_files}}"
                 selected_files="{{selected_files}}"
@@ -560,7 +560,7 @@ bottom: 0px;
 
             <iron-splitter direction="down" size="{{options.splitter_b_size}}"></iron-splitter>
                     
-            <cluster-plots id="cluster_plots"  style="flex:0 0 0%;"
+            <cluster-plots id="cluster_plots"
                groups="[[cut_groups]]"
                painter_state="{{cut_painter_state}}"
                amplitudes="[[amplitudes]]"
