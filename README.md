@@ -260,4 +260,4 @@ Favour long variable names over abbreviations or omissions of helpful informatio
 
 ### Notes on future development
 
-Asside from Polymer 2.0, WebAssembly and WebgGL 2.0 are upcomping technologies that are of interest here.
+Asside from Polymer 2.0, WebAssembly and WebgGL 2.0 are upcomping technologies that are of interest here.  It may also be worth using [electron](http://electron.atom.io/) to compile the application into a standalone executable so that future changes in chrome don't break it.
