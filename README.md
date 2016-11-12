@@ -6,13 +6,13 @@ For a quick, but fairly complete introduction to the application, please see the
 
 [![link to youtube](img/demo_youtube_hover.png)](http://www.youtube.com/watch?v=36o69CPu-1E)   
 
-Note that although the demo was recorded before the latest major re-write, there should be only minor differences from the point of view of the end-user.
+Note that although the demo was recorded before the latest major re-write, there should be only minor differences from the point of view of the end-user (but see [this issue](https://github.com/d1manson/waveform/issues/24)).
 
 ## Additional notes for end-users
 
 As with any other web application, you will always get the latest version of the application when you navigate to it in your browser, although you may need to clear you cache using `Cltr-Shift-F5` (I think?).  Every now and again, updates will be tagged as a "release", which doesn't mean anything particularly special, but you can get notifications of these releases by subscribing to the [RSS feed](https://github.com/d1manson/waveform/releases.atom) (I recommend [blogtrottr](https://blogtrottr.com/) for getting RSS updates by email).   
 
-If you are looking for the script that lets you run [KlustaKwik](https://github.com/klusta-team/klustakwik) in batches from the right-click menu in Windows Explorer (yes, Windows only), it's [here](https://googledrive.com/host/0B2QfZjKOj5KxT2wwSFZwRUVXNVE/fancykk.zip).   
+If you are looking for the script that lets you run [KlustaKwik](https://github.com/klusta-team/klustakwik) in batches from the right-click menu in Windows Explorer (yes, Windows only), you're out of luck (there was originally a link to the zip file here but that has been removed).
 
 If you find bugs please, please, please, report them - either using the github issue interface or via email.  And if you have a feature request, don't hold back from suggesting it.  General feedback and thank-yous are also welcome (email is probably most appropriate in this case).
 
@@ -23,6 +23,14 @@ Should you wish to, you can interact with the application from the F12 developer
 ```javascript
 Utils.array_to_csv(wav.pos_xy.xy.array, 2, "xy_data")
 ```
+
+You can also interact with the cut by doing things like:
+
+```javascript
+wav._merge_groups({detail:{a: 8, b:7, state: 'end'}})
+```
+
+although such functions are not documented.
 
 ---
 
@@ -44,21 +52,22 @@ And then, once you've downloaded/forked this repository, `cd` into the directory
 bower install
 ```
 
-At this point you are going to need a way to run a localhost server.  If you have python installed you can use:   
+At this point you are going to need a way to run a localhost server.  The easiest way is probably to install the special polymer server tool, polyserve:
 
 ```
-python -m SimpleHTTPServer
+npm install -g polyserve
 ```
 
-and then go to `localhost:8000\index_full.html` in Chrome.  If you don't have python (and don't feel like installing it specially) then you can (I believe) do something similar using node - [see here](http://stackoverflow.com/a/8427954/2399799).
+You can then simply use the command `polyserve` from the root of the repository and go to `localhost:8000\index_full.html` in Chrome to view the app.  
 
 During development I suggest using the `index_full.html` url, but when you're ready you can use the following command to build everything, which in this case basically just means concatenating files together in a specialised way:
 
 ```
+npm install -g vulcanize
 vulcanize index_full.html -o index.html --inline-scripts --strip-comments
 ```
 
-You can then just go to `localhost:8000` (i.e. without the `index_full.html`.
+You can then just go to `localhost:8000` (i.e. without the `index_full.html`).
 
 #### Application Structure
 
@@ -248,3 +257,7 @@ Here we opt to use the last form (the one with `d`).
 The project uses the pythoning naming convention known as [PEP8](https://www.python.org/dev/peps/pep-0008/). This is not common in JavaScript, but it's nice to use because you don't have to think much: just go with `lower_snake_case` for everything except `ClassNames`.  It also has the side effect of making it fairly obvious when you are using an API because the API typically uses `lowerFirstCamelCase`.   
 
 Favour long variable names over abbreviations or omissions of helpful information, e.g. `pkey_to_rendered_options` is a good variable name because it makes it clear that the object is a form of map (an actual ES6 `Map` in this case rather than an `Object`); it tells you the meaning of the key - `pkey` (which has a special meaning in this project as described elsewhere) - and the full meaning of the value - `rendered_options`.
+
+### Notes on future development
+
+Asside from Polymer 2.0, WebAssembly and WebgGL 2.0 are upcomping technologies that are of interest here.
