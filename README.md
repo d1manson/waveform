@@ -34,6 +34,17 @@ although such functions are not documented.
 
 ---
 
+#### Build/installation process
+
+1. Node.js - You need to download and install [node.js](https://nodejs.org/en/download/), ideally node 8 but later versions may also work fine.  Node is a runtime for JavaScript, which means you can run JavaScript for all kinds of different purposes beyond its traditional home in the browser (a lot of web apps currently run their servers on Node).  Part of the node install is `npm`, which stand for Node Package Manager, and is a command line utility for installing code libraries from npm.com.
+
+2. Vue command line - (you may not need to do this actually). As it says [here]() run `npm install -g @vue/cli` on the command line. Vue is the JavaScript framework we are using here and this command line interface (CLI) helps with some things.
+
+3. Run `vue serve main.js`.
+
+---
+# Old version
+
 ## Notes for developers
 
 If you are coming from a Matlab-only background you might find developing the application a bit tough, but it's worth giving it a shot!  There should hopefully be enough information below to get you started.
