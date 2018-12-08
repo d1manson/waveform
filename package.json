@@ -2,12 +2,15 @@
   "name": "waveform",
   "version": "1.0.0",
   "description": "The application is available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform).",
-  "main": "index.js",
+  "main": "electron-entrypoint.js",
   "dependencies": {},
   "devDependencies": {
     "electron": "^3.0.10"
   },
-  "scripts": {},
+  "scripts": {
+    "build-1": "echo 'need to build polymer stuff'",
+    "start": "electron ."
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/d1manson/waveform.git"

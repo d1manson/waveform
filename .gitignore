@@ -219,3 +219,5 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+waveform-win32-x64/
+waveform-electron-win32-x64.zip
