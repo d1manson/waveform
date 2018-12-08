@@ -29654,6 +29654,7 @@ var pkey_generation = 0;
 var pkey_to_array = new Map();
 var pkey_to_desired_options = new Map();
 var pkeys_pending_render = [];
+var highlighted_pkey = null;
 
 var n_c = 4; // TODO: probably shouldn't hard code this here..see parsed-data
 var s = 256; // currently there is a 1-to-1 from amp values to pixels
@@ -29671,6 +29672,7 @@ var plots = (function(){
 var update_pkeys = function(changes, options, arrays){
 
     if(changes){
+        highlighted_pkey = null;
         if(changes.generation_remove !== pkey_generation){
             changes.remove = [];
             pkey_to_array.clear();
@@ -29708,6 +29710,16 @@ var update_pkeys = function(changes, options, arrays){
     for(let item of options){
         pkey_to_desired_options.set(item.pkey, item);
         pkeys_pending_render.push(item.pkey);
+    }
+    touch_timer();
+}
+
+var highlight_pkey = function(pkey){
+    pkeys_pending_render = Array.from(pkey_to_desired_options.keys()).filter(x => x!=pkey);
+    pkeys_pending_render.push(pkey);
+    highlighted_pkey = pkey;
+    for(let ii=0; ii<plots.length; ii++){
+      fill_0(plots[ii])
     }
     touch_timer();
 }
@@ -29765,6 +29777,30 @@ var perform_render_sub = function(group_inds, color){
     }
 }
 
+var perform_render_sub_large = function(group_inds, color){
+  let a = new Uint8ClampedArray(2);
+  for(let c1=0, p=0; c1<n_c; c1++)if(chan_is_ok[c1]){
+      for(let c2=c1+1; c2<n_c; c2++)if(chan_is_ok[c2]){
+          let im = plots[p++];
+          for(let ii=0; ii<group_inds.length; ii++){
+              a = [amps[group_inds[ii]*n_c +c1], amps[group_inds[ii]*n_c +c2]];
+              im[(s-1-a[0])*s + a[1]] = color;
+              a[0] += 1;
+              im[(s-1-a[0])*s + a[1]] = color;
+              a[0] -= 1;                
+              a[1] += 1;
+              im[(s-1-a[0])*s + a[1]] = color;
+              a[1] -=1;
+              a[0] -=1;
+              im[(s-1-a[0])*s + a[1]] = color;
+              a[0] += 1;
+              a[1] -= 1;
+              im[(s-1-a[0])*s + a[1]] = color;
+          }
+      }
+  }
+}
+
 var perform_render = function(){
     // unlike tac and rm we render all pending groups in a single tick and then *copy*
     // the results back.
@@ -29774,7 +29810,7 @@ var perform_render = function(){
         if(group_inds){
             let pkey_opts = pkey_to_desired_options.get(pkey);
             let color = palette_flag[pkey_opts.group_num];
-            perform_render_sub(group_inds, color)
+            pkey === highlighted_pkey ? perform_render_sub_large(group_inds, color) : perform_render_sub(group_inds, color);
         }        
     }
 }
@@ -30364,11 +30400,8 @@ bottom: 0px;
              let okey = this.groups[group_num];
              if(!okey){
                 return;
-             }
-             this._worker.exec('update_pkeys',null,[{
-                pkey: okey._pkey,
-                group_num: group_num
-                }]);
+             }            
+             this._worker.exec('highlight_pkey',okey._pkey);
         }, _grab: function(e){
             let plots = [];
             for(let pp of this.cluster_plots){
