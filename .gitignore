@@ -32,6 +32,8 @@ local.properties
 # PDT-specific
 .buildpath
 
+node_modules/
+package-lock.json
 
 #################
 ## Visual Studio

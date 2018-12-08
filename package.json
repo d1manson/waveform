@@ -1,0 +1,21 @@
+{
+  "name": "waveform",
+  "version": "1.0.0",
+  "description": "The application is available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform).",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^3.0.10"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d1manson/waveform.git"
+  },
+  "author": "Daniel Manson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/d1manson/waveform/issues"
+  },
+  "homepage": "https://github.com/d1manson/waveform#readme"
+}
