@@ -5,7 +5,7 @@
   "main": "electron-entrypoint.js",
   "dependencies": {},
   "devDependencies": {
-    "electron": "^3.0.10"
+    "electron": "^1.7.0"
   },
   "scripts": {
     "build-1": "echo 'need to build polymer stuff'",
