@@ -1,6 +1,6 @@
 # <a name="wiki"/> Waveform
 
-The application is available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform). Note however that several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome. **You can download the frozen-in-time version [here](https://drive.google.com/file/d/1Zz38yIEK7kHf9_Rig49ONtZkHHHomdq4/view?usp=sharing). Simply download, unzip, and open waveform.exe.**
+**You can download the frozen-in-time version [here](https://drive.google.com/file/d/1Zz38yIEK7kHf9_Rig49ONtZkHHHomdq4/view?usp=sharing). Simply download, unzip, and open waveform.exe.**. Up until early 2020, the application was available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform), however  several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome.
 
 For a quick, but fairly complete introduction to the application, please see the following demo:
 
