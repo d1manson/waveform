@@ -726,6 +726,7 @@ bottom: 0px;
 <script>
 "use strict";
 var wav = document.getElementById('wav')
+var prompt = require("electron-prompt");
 
 wav.keyboard_target = document.querySelector('body'); // passed through to iron-a11y-keys
 
@@ -844,27 +845,36 @@ wav._merge_groups = function(e){
     }
 }
 
-wav.swap_groups = function(){
-    if(wav.tile_wall_is_empty || wav.tool_is_active){
-        return;
+wav.swap_groups = function () {
+    if (wav.tile_wall_is_empty || wav.tool_is_active) {
+    return;
     }
 
-    let a, b;
-    if(!wav.active_group_a){
-        a = parseInt(prompt("Swap two groups. Enter first group:", ""));
-        if(!(a>=0)){
-            return;
+    setTimeout(function() { // this is needed because the prompt box misses key-up somehow
+
+        if (wav.active_group_a) {
+        var a = wav.active_group_a.group_num;
+        prompt({label: "Swap group " + a + " with group..."})
+        .then(function(b){
+            b = parseInt(b);
+            if(b>=0){
+            wav.$.cut.swap_groups(a, b);
+            }
+        })
+        } else {
+        prompt({label: "Swap groups 'a b' (separated by space)..."})
+            .then(function(abStr){
+            var parts = abStr.split(" ")
+                .map(function(x){return  parseInt(x.trim());})
+                .filter(function(x){return x>=0});
+
+            if(parts.length == 2){
+                wav.$.cut.swap_groups(parts[0], parts[1]);
+            }
+            });
         }
-        b = parseInt(prompt("Swap two groups. Enter second group:", ""));
-    } else {
-        a = wav.active_group_a.group_num;
-        b = parseInt(prompt("Enter group to swap with group " + a + ":", ""));
-    }
-    if(!(b>=0)){
-        return;
-    }
 
-    wav.$.cut.swap_groups(a, b);
+    }, 20);
 }
 
 // :::: the grab tools: tile, cluster, path ::::::::::::::::::::::::::
