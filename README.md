@@ -1,6 +1,6 @@
 # <a name="wiki"/> Waveform
 
-**You can download the frozen-in-time version [here](https://drive.google.com/file/d/1Zz38yIEK7kHf9_Rig49ONtZkHHHomdq4/view?usp=sharing). Simply download, unzip, and open waveform.exe.**. Up until early 2020, the application was available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform), however  several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome.
+**You can download the frozen-in-time version for Mac/Windows [here](https://drive.google.com/drive/folders/1Pyls6WTbCFoQ3kPZ00WC0-LTs1gEUICv?usp=sharing). Simply download, unzip, and open waveform.**. Up until early 2020, the application was available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform), however several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome.
 
 For a quick, but fairly complete introduction to the application, please see the following demo:
 
@@ -40,43 +40,39 @@ If you are coming from a Matlab-only background you might find developing the ap
 
 #### Build/installation process
 
-You need to download and install [node.js](https://nodejs.org/en/). You can then install `bower` from the command line:
+You need to download and install [node.js](https://nodejs.org/en/). You can then install dependencies:
+
+It was last tested successfully on node 10.19.0 (insalled via fnm).
 
 ```
-npm install -g bower
-```
-
-And then, once you've downloaded/forked this repository, `cd` into the directory and run the following command to download all the dependencies (various things from [Polymer](https://www.polymer-project.org)):
-
-```
+npm install
 bower install
 ```
 
-At this point you are going to need a way to run a localhost server. The easiest way is probably to install the special polymer server tool, polyserve:
+Note that `bower` is a pacakge maanager in its own right, which is installed via npm (this is for historical reasons).
+
+To start run:
 
 ```
-npm install -g polyserve
+npm start
 ```
 
-You can then simply use the command `polyserve` from the root of the repository and go to `localhost:8000\index_full.html` in Chrome to view the app.
+Note that this only works in electron now, not in chrome, and that `npm start` command will launch electron - see the scripts section in `package.json` and `electron-entrypoint.js`.
 
-During development I suggest using the `index_full.html` url, but when you're ready you can use the following command to build everything, which in this case basically just means concatenating files together in a specialised way:
+During development use the `index_full.html` file rather than `index.html`.
 
-```
-npm install -g vulcanize
-vulcanize index_full.html -o index.html --inline-scripts --strip-comments
-```
-
-You can then just go to `localhost:8000` (i.e. without the `index_full.html`).
-
-To build the electron version of the app you need to run:
+To build, concatenating files together in a specialised way, and then compile with electron...
 
 ```
-npm install -g electron-packager
-electron-packager . waveform --platform=win32
+npm run vulcanize
+npm run build-window
+npm run build-mac
 ```
 
-This generates a directory with a bunch of dlls and a waveform.exe file. To distribute, simply zip up the directory.
+**Note that it's a pain to build for any platform other than the one you are currently on, but you can try.**
+
+The built directories contain a `waveform` exe/app, but you need to have the whole directory when sharing it around
+(so zip it up).
 
 #### Application Structure
 

@@ -3,12 +3,19 @@
   "version": "1.0.0",
   "description": "The application is available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform).",
   "main": "electron-entrypoint.js",
-  "dependencies": {},
+  "dependencies": {
+    "bower": "^1.8.8",
+    "electron-prompt": "^1.6.0"
+  },
   "devDependencies": {
-    "electron": "^1.7.0"
+    "electron": "=1.7.0",
+    "electron-packager": "^15.1.0",
+    "vulcanize": "^1.14.8"
   },
   "scripts": {
-    "build-1": "echo 'need to build polymer stuff'",
+    "vulcanize": "vulcanize index_full.html --inline-scripts --strip-comments > index.html",
+    "build-windows": "electron-packager . waveform --platform=win32",
+    "build-mac": "electron-packager . waveform --platform=darwin",
     "start": "electron ."
   },
   "repository": {
