@@ -1,14 +1,12 @@
 {
   "name": "waveform",
   "homepage": "https://github.com/d1manson/waveform",
-  "authors": [
-    "Daniel Manson <danielmanson.uk@gmail.com>"
-  ],
+  "authors": ["Daniel Manson <danielmanson.uk@gmail.com>"],
   "description": "",
   "main": "",
   "private": true,
   "dependencies": {
-    "polymer": "Polymer/polymer#^1.7",
+    "polymer": "Polymer/polymer#=1.7.0",
     "paper-tooltip": "PolymerElements/paper-tooltip#^1.1.2",
     "paper-toolbar": "PolymerElements/paper-toolbar#^1.1.4",
     "paper-slider": "PolymerElements/paper-slider#^1.0.9",
