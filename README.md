@@ -1,6 +1,10 @@
 # <a name="wiki"/> Waveform
 
-**You can download the frozen-in-time version for Mac/Windows [here](https://drive.google.com/drive/folders/1Pyls6WTbCFoQ3kPZ00WC0-LTs1gEUICv?usp=sharing). Simply download, unzip, and open waveform.**. Up until early 2020, the application was available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform), however several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome.
+**You can download the frozen-in-time version for Mac/Windows [here](https://drive.google.com/drive/folders/1Pyls6WTbCFoQ3kPZ00WC0-LTs1gEUICv?usp=sharing). Simply download, unzip, and open waveform.**. 
+
+As of Jan 2021, a new version is [being built](https://github.com/d1manson/waveform2020). You can view the current state of that live at [d1manson.github.io/waveform2020](http://d1manson.github.io/waveform2020).
+
+Up until early 2020, the application was available live at [d1manson.github.io/waveform](http://d1manson.github.io/waveform), however several bleeding edge features in Chrome were used that have since been deprecated. Fortunately, using the Electron project, it has been possible to package up Waveform in an old verison of Chrome so that the application is now protected against future changes to Chrome.
 
 For a quick, but fairly complete introduction to the application, please see the following demo:
 
