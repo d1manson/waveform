@@ -8,7 +8,7 @@
     "electron-prompt": "^1.6.0"
   },
   "devDependencies": {
-    "electron": "=1.7.0",
+    "electron": "=22.3.21",
     "electron-packager": "^15.1.0",
     "vulcanize": "^1.14.8"
   },
